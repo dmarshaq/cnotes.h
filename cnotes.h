@@ -27,6 +27,10 @@
 #endif // _WIN32
 
 #include <stdio.h>
+#include <stdbool.h>
+#include <stdarg.h>
+#include <ctype.h>
+#include <string.h>
 #include <stdint.h>
 
 #ifdef _MSC_VER
@@ -331,9 +335,9 @@ typedef struct {
 } Cn_Literal_Token;
 
 typedef struct {
-    uint64_t cursor;
-    uint64_t bol;            // BOL -> Beginning Of Line
-    uint64_t line_num;
+    int64_t cursor;
+    int64_t bol;            // BOL -> Beginning Of Line
+    int64_t line_num;
     Cn_String content;
     Cn_Token token; // Current token, changes whenever cn_lexer_next_token is called.
 } Cn_Lexer;
@@ -995,7 +999,7 @@ CNDEF void cn_lexer_next_token(Cn_Lexer *l) {
     }
 number_lexer_fail:
 
-    for (int64_t i = 0; i < CN_ARRAY_LENGTH(CN_LITERAL_TOKENS); i++) {
+    for (uint64_t i = 0; i < CN_ARRAY_LENGTH(CN_LITERAL_TOKENS); i++) {
         if (l->content.length - l->cursor > CN_LITERAL_TOKENS[i].literal.length && cn_str_equals(CN_LITERAL_TOKENS[i].literal, CN_STR(CN_LITERAL_TOKENS[i].literal.length, l->content.data + l->cursor))) {
             l->token.type = CN_LITERAL_TOKENS[i].type;
             l->token.str = CN_STR(CN_LITERAL_TOKENS[i].literal.length, l->content.data + l->cursor);
