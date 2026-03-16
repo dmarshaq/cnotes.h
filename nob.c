@@ -59,7 +59,26 @@ void arena_free(Arena *arena) {
 }
 
 
+bool confirm(const char *prompt) {
+    char input[10];
 
+    while (true) {
+        fprintf(stderr, "%s (y/n): ", prompt);
+
+        if (fgets(input, sizeof(input), stdin) == NULL) {
+            return false; // Treat input failure as "no".
+        }
+
+        char c = tolower(input[0]);
+
+        if (c == 'y')
+            return true;
+        if (c == 'n')
+            return false;
+
+        fprintf(stderr, "Please enter 'y' or 'n'.\n");
+    }
+}
 
 
 
@@ -68,6 +87,7 @@ void arena_free(Arena *arena) {
 #define BUILD_DIR   "build"
 #define SRC_DIR     "src"
 #define TESTS_DIR   "tests"
+
 
 
 static Arena arena_strings;
@@ -407,6 +427,9 @@ int record_command(int *argc, char ***argv) {
     Nob_Cmd cmd = {0};
 
     if (*argc == 0) {
+
+        if (!confirm("Are you sure you want to re-record ALL tests again?")) return 1;
+        
         // Rerecord all available tests.
         if (!nob_walk_dir(TESTS_DIR, test_record_entry, .data = &cmd)) 
             return 1;
