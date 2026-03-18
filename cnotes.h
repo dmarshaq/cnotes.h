@@ -116,7 +116,7 @@ typedef struct {
 /**
  * RETURNS: Cn_String that points to the memory of original "str" at index "start" with length up until index "end".
  * NOTE: Character at index "end" is not included in the returned Cn_String, domain for resulting substring is always [ start, end ).
- * IMPORTANT: DOESN'T COPY MEMORY. If "str" memory is freed later, returned string will not point to valid adress anymore.
+ * IMPORTANT: DOESN'T COPY MEMORY. If "str" memory is freed later, returned string will not point to valid address anymore.
  */
 CNDEF Cn_String cn_str_substring(Cn_String str, int64_t start, int64_t end);
 
@@ -295,6 +295,83 @@ CNDEF void cn__array_list_clear(void *list);
 CNDEF void cn__array_list_unordered_remove(void *list, int64_t index);
 
 CNDEF void cn__array_list_free(void **list);
+
+// HASH TABLE SECTION
+typedef uint32_t (Cn_Hashfunc)(int64_t, uint8_t *);
+
+typedef struct {
+    int64_t capacity;
+    int64_t count;
+    int64_t item_size;
+    Cn_Hashfunc *hash_func; 
+    uint8_t *keys;
+} Cn_Hash_Table_Header;
+
+typedef enum : uint8_t {
+    CN_SLOT_EMPTY      = 0x00,
+    CN_SLOT_OCCUPIED   = 0x01,
+    CN_SLOT_DEPRICATED = 0x02,
+} Cn_Hash_Table_Slot_State;
+
+typedef struct {
+    Cn_Hash_Table_Slot_State state;
+    int64_t key_size;
+    int64_t key_idx;
+} Cn_Hash_Table_Slot;
+
+#define cn_hash_table_make(type, capacity)\
+    (type *)cn__hash_table_make(sizeof(type), capacity) 
+
+#define cn_hash_table_count(ptr_table)\
+    cn__hash_table_count((void *)*ptr_table)
+
+#define cn_hash_table_capacity(ptr_table)\
+    cn__hash_table_capacity((void *)*ptr_table)
+
+#define cn_hash_table_item_size(ptr_table)\
+    cn__hash_table_item_size((void *)*ptr_table)
+
+#define cn_hash_table_put(ptr_table, item, ...)\
+    do {\
+        cn__hash_table_resize_to_fit((void **)(ptr_table), cn_hash_table_count(ptr_table) + 1);\
+        (*ptr_table)[cn__hash_table_push_key((void **)(ptr_table), __VA_ARGS__)] = item;\
+    } while(0)
+
+#define cn_hash_table_get(ptr_table, ...)\
+    cn__hash_table_get((void **)(ptr_table), __VA_ARGS__)
+
+#define cn_hash_table_remove(ptr_table, ...)\
+    cn__hash_table_remove((void **)(ptr_table), __VA_ARGS__) 
+
+#define cn_hash_table_free(ptr_table)\
+    cn__hash_table_free((void **)(ptr_table))
+
+#define cn_hash_table_header(table_ptr)\
+    ((Cn_Hash_Table_Header *)(*((void **)table_ptr) - sizeof(Cn_Hash_Table_Header)))
+
+CNDEF uint32_t cn_hashf(int64_t key_size, uint8_t *key);
+
+CNDEF void cn_hash_table_print(void **table);
+
+CNDEF void *cn__hash_table_make(int64_t item_size, int64_t initial_capacity);
+
+CNDEF int64_t cn__hash_table_count(void *table);
+
+CNDEF int64_t cn__hash_table_capacity(void *table);
+
+CNDEF int64_t cn__hash_table_item_size(void *table);
+
+CNDEF void cn__hash_table_resize_to_fit(void **table, int64_t requiered_length);
+
+CNDEF int64_t cn__hash_table_push_key(void **table, int64_t key_size, uint8_t *key);
+
+CNDEF void *cn__hash_table_get(void **table, int64_t key_size, uint8_t *key);
+
+CNDEF void cn__hash_table_remove(void **table, int64_t key_size, uint8_t *key);
+
+CNDEF void cn__hash_table_free(void **table);
+
+CNDEF Cn_Hash_Table_Slot *cn__hash_table_get_slot(void **table, int64_t index);
 
 // LEXER SECTION
 typedef enum {
@@ -715,21 +792,23 @@ CNDEF bool cn_str_empty(Cn_String str) {
 
 // ARRAY LIST SECTION
 CNDEF void *cn__array_list_make(int64_t item_size, int64_t capacity) {
+    CN_ASSERT(item_size > 0);
     CN_ASSERT(capacity > 0);
 
-    Cn_Array_List_Header *ptr = CN_REALLOC(NULL, sizeof(Cn_Array_List_Header) + item_size * capacity);
+    Cn_Array_List_Header *header = CN_REALLOC(NULL, sizeof(Cn_Array_List_Header) + item_size * capacity);
 
-    if (ptr == NULL) {
+    if (header == NULL) {
         cn_log(CN_ERROR, "Couldn't allocate more memory of size: %lld bytes, for the array list.", sizeof(Cn_Array_List_Header) + item_size * capacity);
         return NULL;
     }
 
-    ptr->capacity = capacity;
-    ptr->item_size = item_size;
-    ptr->length = 0;
+    // Setting all array list header members.
+    header->capacity   = capacity;
+    header->item_size  = item_size;
+    header->length     = 0;
 
-    // IMPORTANT: Because ptr is of type "Cn_Array_List_Header *", compiler will automatically translate "ptr + 1" to "(void*)(ptr) + sizeof(Cn_Array_List_Header)".
-    return ptr + 1;
+    // IMPORTANT: Because header is of type "Cn_Array_List_Header *", compiler will automatically translate "header + 1" to "(void*)(header) + sizeof(Cn_Array_List_Header)".
+    return header + 1;
 }
 
 CNDEF int64_t cn__array_list_length(void *list) {
@@ -801,6 +880,357 @@ CNDEF void cn__array_list_unordered_remove(void *list, int64_t index) {
     memcpy(list + index * header->item_size, list + (header->length - 1) * header->item_size, header->item_size);
     cn__array_list_pop(list, 1);
 }
+
+// HASH TABLE SECTION
+
+/**
+ * Internal function.
+ * RETURNS: Index of the corresponding key by calculating hash.
+ * IMPORTANT: Doesn't perfom any slot checks.
+ */
+CNDEF uint32_t cn__hash_table_hash_index_of(void **table, int64_t key_size, uint8_t *key) {
+    Cn_Hash_Table_Header *header = cn_hash_table_header(table);
+    return header->hash_func(key_size, key) % header->capacity;
+}
+
+/**
+ * Internal function.
+ * Sets all occupied slots to depricated.
+ */
+CNDEF void cn__hash_table_depricate_slots(void **table) {
+    int64_t cap = cn_hash_table_capacity(table);
+    Cn_Hash_Table_Slot *slot = NULL;
+    for (int64_t i = 0; i < cap; i++) {
+        slot = cn__hash_table_get_slot(table, i);
+        if (slot->state == CN_SLOT_OCCUPIED) {
+            slot->state = CN_SLOT_DEPRICATED;
+        }
+    }
+}
+
+/**
+ * Internal function.
+ */
+CNDEF void cn__hash_table_print_slot(void *item, int64_t item_size, uint8_t *keys, Cn_Hash_Table_Slot *slot) {
+    
+
+    // Print the state and key_size as hex.
+
+    if (slot->state == CN_SLOT_OCCUPIED) {
+        // Print the item in hex based on item_size.
+        printf("Item: 0x");
+        for (int64_t i = 0; i < item_size; i++) {
+            printf("%02x", *((uint8_t *)item + i));  // Print each byte of the item.
+        }
+
+        printf(" | State: 0x%02x | Key Size: %ld | Key -> %.*s\n", slot->state, slot->key_size, (int)slot->key_size, (char *)keys + slot->key_idx);
+    } else {
+        printf("EMPTY   %*s | State: 0x%02x\n", (int)item_size * 2, "",  slot->state);
+    }
+}
+
+/**
+ * Internal function.
+ * RECURSION: Recursivly readdresses slots if they are depricated.
+ * RETURNS: True, if it succesfully readdressed a slot.
+ */
+CNDEF bool cn__hash_table_readdress(void **table, int64_t index) {
+    Cn_Hash_Table_Header *header = cn_hash_table_header(table);
+    Cn_Hash_Table_Slot *target_slot = cn__hash_table_get_slot(table, index);
+
+    int64_t new_index = cn__hash_table_hash_index_of(table, target_slot->key_size, header->keys + target_slot->key_idx);
+    target_slot->state = CN_SLOT_EMPTY;
+
+    Cn_Hash_Table_Slot *slot = NULL;
+    for (int64_t i = 0; i < header->capacity; i++) {
+        slot = cn__hash_table_get_slot(table, (new_index + i) % header->capacity);
+        if (slot->state == CN_SLOT_EMPTY) {
+            // Copy data to a new slot.
+            slot->state = CN_SLOT_OCCUPIED;
+
+            slot->key_size = target_slot->key_size;
+            slot->key_idx = target_slot->key_idx;
+
+            memmove(*table + ((new_index + i) % header->capacity) * header->item_size, *table + index * header->item_size, header->item_size);
+
+            return true;
+        }
+        else if (slot->state == CN_SLOT_DEPRICATED && cn__hash_table_readdress(table, (new_index + i) % header->capacity)) {
+
+            // IMPORTANT: There is an additional is CN_SLOT_OCCUPIED check, because cn__hash_table_readdress can possbily readdress slot to the same index as it was before, therefore additional check is needed.
+            if (slot->state != CN_SLOT_OCCUPIED) {
+                // Copy data to a new slot.
+                slot->state = CN_SLOT_OCCUPIED;
+
+                slot->key_size = target_slot->key_size;
+                slot->key_idx = target_slot->key_idx;
+
+                memmove(*table + ((new_index + i) % header->capacity) * header->item_size, *table + index * header->item_size, header->item_size);
+
+                return true;
+            }
+        }
+    }
+
+    cn_log(CN_ERROR, "Couldn't find new free hash slot when readdressing.\n");
+    return false;
+
+}
+
+CNDEF uint32_t cn_hashf(int64_t key_size, uint8_t *key) {
+    CN_ASSERT(key != NULL);         // Do we need to assert this?
+    CN_ASSERT(key_size > 0);
+
+    if (key_size < 2) {
+        return *(uint8_t *)(key);
+    }
+    
+    uint32_t hash = 0;
+    uint8_t *hash_ptr = (uint8_t *)&(hash);
+    hash_ptr[0] = *((uint8_t *)(key) + 0);
+    hash_ptr[1] = *((uint8_t *)(key) + 1);
+    hash_ptr[2] = *((uint8_t *)(key) + key_size - 1);
+    hash_ptr[3] = *((uint8_t *)(key) + key_size - 2);
+
+    return hash;
+}
+
+CNDEF void cn_hash_table_print(void **table) {
+    Cn_Hash_Table_Header *header = cn_hash_table_header(table);
+
+    printf("\n--------\tHash Table\t--------\n");
+    for (int64_t i = 0; i < header->capacity; i++) {
+        cn__hash_table_print_slot(*table + i * header->item_size, header->item_size, header->keys, cn__hash_table_get_slot(table, i));
+    }
+}
+
+CNDEF Cn_Hash_Table_Slot *cn__hash_table_get_slot(void **table, int64_t index) {
+    Cn_Hash_Table_Header *header = cn_hash_table_header(table);
+    return *table + header->capacity * header->item_size + index * sizeof(Cn_Hash_Table_Slot);
+}
+
+CNDEF void *cn__hash_table_make(int64_t item_size, int64_t capacity) {
+    CN_ASSERT(item_size > 0);
+    CN_ASSERT(capacity > 0);
+
+    Cn_Hash_Table_Header *header = CN_REALLOC(NULL, sizeof(Cn_Hash_Table_Header) + (sizeof(Cn_Hash_Table_Slot) + item_size) * capacity);
+
+    if (header == NULL) {
+        cn_log(CN_ERROR, "Couldn't allocate more memory of size: %ld bytes, for the hash table.", sizeof(Cn_Hash_Table_Header) + (sizeof(Cn_Hash_Table_Slot) + item_size) * capacity);
+        return NULL;
+    }
+    
+    // IMPORTANT: Using separately allocated array list for keys, because keys are variable size, 
+    // and we want to reallocate whole hash table every time a long key is added. 
+    // But it is also usefull to allow hash table to store keys, 
+    // so user doesn't have to worry about saving keys manually. 
+    // And it also allows table to check whether certain key value pair is legal or not.
+    uint8_t *keys = cn_array_list_make(uint8_t, capacity * 8);    
+
+    if (keys == NULL) {
+        cn_log(CN_ERROR, "Couldn't allocate more memory of size: %ld bytes, for the keys needed for the hash table.\n", sizeof(uint8_t) * capacity * 8);
+        CN_FREE(header);
+        return NULL;
+    }
+
+    // Setting all hash table header members.
+    header->capacity   = capacity;
+    header->item_size  = item_size;
+    header->count      = 0;
+    header->hash_func  = cn_hashf;
+    header->keys       = keys;
+
+    // IMPORTANT: Because header is of type "Cn_Hash_Table_Header *", compiler will automatically translate "header + 1" to "(void*)(header) + sizeof(Cn_Hash_Table_Header)".
+    void *data = header + 1;
+    
+    // Set all slots to CN_SLOT_EMPTY.
+    for (int64_t i = 0; i < header->capacity; i++) {
+        cn__hash_table_get_slot(&data, i)->state = CN_SLOT_EMPTY;
+    }
+    
+    return data;
+}
+
+CNDEF int64_t cn__hash_table_count(void *table) {
+    return ((Cn_Hash_Table_Header *)(table - sizeof(Cn_Hash_Table_Header)))->count;
+}
+
+CNDEF int64_t cn__hash_table_capacity(void *table) {
+    return ((Cn_Hash_Table_Header *)(table - sizeof(Cn_Hash_Table_Header)))->capacity;
+}
+
+CNDEF int64_t cn__hash_table_item_size(void *table) {
+    return ((Cn_Hash_Table_Header *)(table - sizeof(Cn_Hash_Table_Header)))->item_size;
+}
+
+CNDEF void cn__hash_table_free(void **table) {
+    Cn_Hash_Table_Header *header = cn_hash_table_header(table);
+    cn_array_list_free(&(header->keys));
+    CN_FREE(header);
+    *table = NULL;
+}
+
+CNDEF void cn__hash_table_resize_to_fit(void **table, int64_t requiered_length) {
+    Cn_Hash_Table_Header *header = cn_hash_table_header(table);
+
+    if (requiered_length > header->capacity) {
+        // Before resizing, depricate slots.
+        cn__hash_table_depricate_slots(table);
+
+        // IMPORTANT: To understand where this calculation comes from check cn__array_list_resize_to_fit implementation.
+        // It uses same calculation that simplifies pow and log of base 2 caluclation to just using bit manipulation.
+        int64_t ratio = requiered_length / header->capacity;
+        int highest_bit_pos = 63 - CN_COUNT_LEADING_ZEROS(ratio);
+        CN_ASSERT(highest_bit_pos >= 0);
+        int64_t capacity_multiplier = (int64_t)(1 << (highest_bit_pos + 1));
+
+        header = CN_REALLOC(header, sizeof(Cn_Hash_Table_Header) + header->capacity * capacity_multiplier * (header->item_size + sizeof(Cn_Hash_Table_Slot)));
+
+        if (header == NULL) {
+            cn_log(CN_ERROR, "Couldn't reallocate more memory to fit new size of: %ld bytes, for the hash table.", sizeof(Cn_Hash_Table_Header) + header->capacity * capacity_multiplier * (header->item_size + sizeof(Cn_Hash_Table_Slot)));
+            return;
+        }
+
+        *table = header + 1; // IMPORTANT: Updating pointer to the table data after resizing.
+        header->capacity *= capacity_multiplier; // IMPORTANT: Updating capacity after, because if resize fails capacity should not change.
+
+        /**
+         * After resize, all data is copied and buffer is expanded to the right.
+         * But due to the nature of hash table structure the slot area of the buffer would not be properly shift in the resulting array.
+         * For example diagrams (NOT TO SCALE):
+         *
+         *      BEFORE:
+         *                  
+         *                  |-----------------------------Buffer-Capacity-4-------------------------------|
+         *                  |                                                                             |
+         *                  |------Array-of-Data-------|-----------------Array-of-Slots-------------------|
+         *      Indicies:   | 0     1     2     3      | 0           1           2           3            |
+         *      Data:       | [1111][1111][1111][____] | [10][0x2342][01][0x2344][11][0x2348][__][______] |
+         *                  ^
+         *                  |
+         *                  *table
+         *
+         *
+         *      AFTER RESIZE (BAD):
+         *                  
+         *                  |-------------------------------------------------------------------Buffer-Capacity-8-----------------------------------------------------------------------|
+         *                  |                                                                                                                                                           |
+         *                  |------Array-of-Data-------|-----------------Array-of-Slots-------------------|--------------------------|--------------------------------------------------|
+         *      Indicies:   | 0     1     2     3      | 0           1           2           3            |                          |                                                  |
+         *      Data:       | [1111][1111][1111][____] | [10][0x2342][01][0x2344][11][0x2348][__][______] | [____][____][____][____] | [__][______][__][______][__][______][__][______] |
+         *                  ^
+         *                  |
+         *                  *table
+         *
+         *
+         *      WHAT IS EXPECTED / NEEDED (GOOD):
+         *                  
+         *                  |----------------------------------------------------------------Buffer-Capacity-8--------------------------------------------------------------------|
+         *                  |                                                                                                                                                     |
+         *                  |------------------Array-of-Data-------------------|------------------------------------------Array-of-Slots------------------------------------------|
+         *      Indicies:   | 0     1     2     3     4     5     6     7      | 0           1           2           3           4           5           6           7            |
+         *      Data:       | [1111][1111][1111][____][____][____][____][____] | [10][0x2342][01][0x2344][11][0x2348][__][______][__][______][__][______][__][______][__][______] |
+         *                  ^
+         *                  |
+         *                  *table
+         *
+         * To achieve this good layout, it is needed to shift array of slots to the right.
+         * And it must be done with memmove cause, destination and source may overlap.
+         */
+
+        memmove(*table + header->capacity * header->item_size, *table + (header->capacity / capacity_multiplier) * header->item_size, (header->capacity / capacity_multiplier) * sizeof(Cn_Hash_Table_Slot));
+
+        // Set new slots to CN_SLOT_EMPTY.
+        for (int64_t i = header->capacity / capacity_multiplier; i < header->capacity; i++) {
+            cn__hash_table_get_slot(table, i)->state = CN_SLOT_EMPTY;
+        }
+
+        // Readdress slots after resizing.
+        for (int64_t i = 0; i < header->capacity; i++) {
+            if (cn__hash_table_get_slot(table, i)->state == CN_SLOT_DEPRICATED) {
+                cn__hash_table_readdress(table, i);
+            }
+        }
+    }
+}
+
+CNDEF int64_t cn__hash_table_push_key(void **table, int64_t key_size, uint8_t *key) {
+    int64_t index = cn__hash_table_hash_index_of(table, key_size, key);
+    Cn_Hash_Table_Header *header = cn_hash_table_header(table);
+
+    Cn_Hash_Table_Slot *slot = NULL;
+    for (int64_t i = 0; i < header->capacity; i++) {
+        slot = cn__hash_table_get_slot(table, (index + i) % header->capacity);
+        if (slot->state == CN_SLOT_EMPTY) {
+            // Write all data to hash table by corresponding index.
+            slot->state = CN_SLOT_OCCUPIED;
+
+            slot->key_size = key_size;
+            
+            /**
+             * Is this still an issue?
+             *
+             * IMPORTANT: "cn_array_list_append_multiple" is not inlined because it might change the "header->keys" value when resizing array list.
+             * So it is neccessary to call this macro like function in a separate line, otherwise undefined behaviour will occure.
+             */
+            int64_t key_index = cn_array_list_append_multiple(&(header->keys), key, key_size);
+            slot->key_idx = key_index;
+
+            header->count++;
+           
+            return (index + i) % header->capacity;
+
+        } else if (slot->key_size == key_size && !memcmp(header->keys + slot->key_idx, key, key_size)) {
+            // Key already exists, return index of that slot.
+            return (index + i) % header->capacity;
+        }
+    }
+
+    cn_log(CN_ERROR, "Couldn't find free hash table slot for the new key.\n");
+    return -1;
+}
+
+CNDEF void *cn__hash_table_get(void **table, int64_t key_size, uint8_t *key) {
+    int64_t index = cn__hash_table_hash_index_of(table, key_size, key);
+    Cn_Hash_Table_Header *header = cn_hash_table_header(table);
+
+    Cn_Hash_Table_Slot *slot = NULL;
+    for (int64_t i = 0; i < header->capacity; i++) {
+        slot = cn__hash_table_get_slot(table, (index + i) % header->capacity);
+
+        if (slot->state == CN_SLOT_EMPTY)
+            return NULL;
+        
+        if (slot->key_size == key_size && !memcmp(header->keys + slot->key_idx, key, key_size)) {
+            // Right key is found, return.
+            return *table + ((index + i) % header->capacity) * header->item_size;
+        }
+    }
+
+    return NULL;
+}
+
+CNDEF void cn__hash_table_remove(void **table, int64_t key_size, uint8_t *key) {
+    int64_t index = cn__hash_table_hash_index_of(table, key_size, key);
+    Cn_Hash_Table_Header *header = cn_hash_table_header(table);
+
+    Cn_Hash_Table_Slot *slot = NULL;
+    for (int64_t i = 0; i < header->capacity; i++) {
+        slot = cn__hash_table_get_slot(table, (index + i) % header->capacity);
+
+        if (slot->state == CN_SLOT_EMPTY)
+            return;
+
+        if (slot->key_size == key_size && !memcmp(header->keys + slot->key_idx, key, key_size)) {
+            // Right key is found.
+            // LEAK: INCOMPLETE: Doesn't delete key.
+            header->count--;
+            slot->state = CN_SLOT_EMPTY;
+            return;
+        }
+    }
+}
+
 
 // LEXER SECTION
 const Cn_Literal_Token CN_LITERAL_TOKENS[] = {
