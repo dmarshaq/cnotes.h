@@ -3,9 +3,6 @@
 #define NOB_IMPLEMENTATION
 #include "nob.h"
 
-#define CN_IMPLEMENTATION
-#include "cnotes.h"
-
 #include <string.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -85,9 +82,50 @@ bool confirm(const char *prompt) {
 #define STDOUT_TXT_FILE_EXTENSION   ".stdout.txt"
 
 #define BUILD_DIR   "build"
+#define OBJ_DIR     "obj"
+#define BIN_DIR     "bin"
 #define SRC_DIR     "src"
 #define TESTS_DIR   "tests"
 
+/**
+ * Executes compiler commands to produce .a file.
+ * Assumes needed directories exist.
+ */
+void compile_static_lib(Nob_Cmd *cmd) {
+#if defined(__GNUC__) || defined(__clang__)
+    // GCC, Clang
+
+    nob_write_entire_file(BUILD_DIR"/temp.c", "", 0);
+
+    nob_cc(cmd);
+    nob_cc_flags(cmd);
+    // Flags to tell to compile only, define CN_IMPLEMENTATION, and include cnotes.h.
+    nob_cmd_append(cmd, "-c", "-DCN_IMPLEMENTATION", "-include", "cnotes.h");
+    nob_cc_inputs(cmd, BUILD_DIR"/temp.c");
+    nob_cc_output(cmd, BUILD_DIR"/"OBJ_DIR"/cnotes.o");
+
+    if (!nob_cmd_run(cmd)) {
+        nob_log(NOB_ERROR, "couldn't compile cnotes object file.");
+    }
+
+    nob_cmd_append(cmd, "ar", "rcs", BIN_DIR"/libcnotes.a", BUILD_DIR"/"OBJ_DIR"/cnotes.o");
+    
+    if (!nob_cmd_run(cmd)) {
+        nob_log(NOB_ERROR, "couldn't produce static lib.");
+    }
+
+#else
+    // MSVC
+    NOB_TODO("Write implementation of static library compilation for MSVC.");
+#endif
+}
+
+void clean(Nob_Cmd *cmd) {
+    nob_cmd_append(cmd, "rm", "-r", BUILD_DIR, BIN_DIR);
+    if (!nob_cmd_run(cmd)) {
+        nob_log(NOB_ERROR, "couldn't clean build dir.");
+    }
+}
 
 
 static Arena arena_strings;
@@ -176,7 +214,6 @@ void test_record(const char *source, Nob_Cmd *cmd) {
     output_path_length = snprintf(output_path_buffer, sizeof(output_path_buffer), "%s", test_path);
     if (output_path_length < 0 && output_path_length >= sizeof(output_path_buffer)) {
         nob_log(NOB_ERROR, "record: test path is too long exceeds %lu buffer size.", sizeof(output_path_buffer));
-        nob_delete_file(test_path);
         NOB_FREE(sb.items);
         return;
     }
@@ -187,9 +224,9 @@ void test_record(const char *source, Nob_Cmd *cmd) {
 
     nob_cc_output(cmd, output_path_buffer);
     nob_cc_inputs(cmd, test_path);
+    nob_cmd_append(cmd, BIN_DIR"/libcnotes.a");
 
     if (!nob_cmd_run(cmd)) {
-        nob_delete_file(test_path);
         NOB_FREE(sb.items);
         return;
     }
@@ -202,7 +239,6 @@ void test_record(const char *source, Nob_Cmd *cmd) {
     strcat(stdout_path, STDOUT_TXT_FILE_EXTENSION);
 
     if (!nob_cmd_run(cmd, .stdout_path = stdout_path)) {
-        nob_delete_file(test_path);
         nob_delete_file(output_path_buffer);
         NOB_FREE(sb.items);
         return;
@@ -213,9 +249,6 @@ void test_record(const char *source, Nob_Cmd *cmd) {
     nob_log(NOB_INFO, "record: successfuly recorded '%s' file.", test_path);
 }
 
-/**
- * TODO: Compare .stdout.txt outputs to verify test. Write description.
- */
 void test_execute(Test_Record *r, Nob_Cmd *cmd) {
     char output_path_buffer[64];
     int output_path_length;
@@ -232,6 +265,7 @@ void test_execute(Test_Record *r, Nob_Cmd *cmd) {
 
     nob_cc_output(cmd, output_path_buffer);
     nob_cc_inputs(cmd, r->path);
+    nob_cmd_append(cmd, BIN_DIR"/libcnotes.a");
 
     if (!nob_cmd_run(cmd)) {
         r->status = BUILD_FAIL;
@@ -303,11 +337,15 @@ typedef struct {
 int help_command(int *argc, char ***argv);
 int test_command(int *argc, char ***argv);
 int record_command(int *argc, char ***argv);
+int clean_command(int *argc, char ***argv);
+int lib_command(int *argc, char ***argv);
 
 const static Command commands[] = {
-    { "help",   "",         "List all available commands.", help_command },
-    { "test",   "file...",  "Run the tests and check their output.", test_command },
-    { "record", "file...",  "Record file as a test and generate it's expected output.", record_command },
+    { "help",       "",             "List all available commands.", help_command },
+    { "test",       "[FILE...]",    "Run the tests and check their output.", test_command },
+    { "record",     "[FILE...]",    "Record file as a test and generate it's expected output.", record_command },
+    { "clean",      "",             "Recursivly deletes "BUILD_DIR"/ and "BIN_DIR"/ directories.", clean_command },
+    { "lib",        "",             "Will compile whole library into .o file and then produce static library.", lib_command },
 };
 
 void commands_list(void) {
@@ -345,8 +383,6 @@ int help_command(int *argc, char ***argv) {
 }
 
 int test_command(int *argc, char ***argv) {
-
-    if (!nob_mkdir_if_not_exists(SRC_DIR)) return 1;
     if (!nob_mkdir_if_not_exists(TESTS_DIR)) return 1;
     if (!nob_mkdir_if_not_exists(BUILD_DIR)) return 1;
     if (!nob_mkdir_if_not_exists(BUILD_DIR"/"TESTS_DIR)) return 1;
@@ -379,6 +415,7 @@ int test_command(int *argc, char ***argv) {
 
     // Executing tests
     Nob_Cmd cmd = {0};
+
     nob_da_foreach(Test_Record, r, &records) {
         test_execute(r, &cmd);
     }
@@ -421,8 +458,7 @@ int test_command(int *argc, char ***argv) {
 int record_command(int *argc, char ***argv) {
     if (!nob_mkdir_if_not_exists(SRC_DIR)) return 1;
     if (!nob_mkdir_if_not_exists(TESTS_DIR)) return 1;
-    if (!nob_mkdir_if_not_exists(BUILD_DIR)) return 1;
-    if (!nob_mkdir_if_not_exists(BUILD_DIR"/"TESTS_DIR)) return 1;
+    if (!nob_mkdir_if_not_exists(BIN_DIR)) return 1;
 
     Nob_Cmd cmd = {0};
 
@@ -447,6 +483,32 @@ int record_command(int *argc, char ***argv) {
     return 0;
 }
 
+int clean_command(int *argc, char ***argv) {
+    Nob_Cmd cmd = {0};
+
+    clean(&cmd);
+    
+    NOB_FREE(cmd.items);
+
+    return 0;
+}
+
+int lib_command(int *argc, char ***argv) {
+    Nob_Cmd cmd = {0};
+
+    clean(&cmd);
+
+    if (!nob_mkdir_if_not_exists(BUILD_DIR)) return 1;
+    if (!nob_mkdir_if_not_exists(BUILD_DIR"/"OBJ_DIR)) return 1;
+    if (!nob_mkdir_if_not_exists(BIN_DIR)) return 1;
+
+    compile_static_lib(&cmd);
+    
+    NOB_FREE(cmd.items);
+
+    return 0;
+}
+
 
 
 int main(int argc, char **argv) {
@@ -456,6 +518,8 @@ int main(int argc, char **argv) {
     const char *program_name = shift(argv, argc);
     
     if (argc == 0) {
+        clean_command(&argc, &argv);
+        if (lib_command(&argc, &argv) != 0) return 1;
         return test_command(&argc, &argv);
     }
 
@@ -478,7 +542,5 @@ continue_outer:
 
     return 0;
 }
-
-
 
 
