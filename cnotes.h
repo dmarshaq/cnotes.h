@@ -1021,8 +1021,8 @@ CNDEF void *cn__hash_table_make(int64_t item_size, int64_t capacity) {
     }
     
     // IMPORTANT: Using separately allocated array list for keys, because keys are variable size, 
-    // and we want to reallocate whole hash table every time a long key is added. 
-    // But it is also usefull to allow hash table to store keys, 
+    // and we do NOT want to reallocate whole hash table every time a long key is added. 
+    // But it is also useful to allow hash table to store keys, 
     // so user doesn't have to worry about saving keys manually. 
     // And it also allows table to check whether certain key value pair is legal or not.
     uint8_t *keys = cn_array_list_make(uint8_t, capacity * 8);    
