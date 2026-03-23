@@ -1,6 +1,7 @@
 #ifndef CN_H_
 #define CN_H_
 
+#include <cstdint>
 #ifndef CNDEF
 #   define CNDEF
 #endif // CNDEF
@@ -68,7 +69,7 @@ typedef enum {
 /**
  * Any messages with the level below cn_min_log_level are going to be suppressed. 
  * Idea stolen from nob, just like the most of the library structure. 
- * Thank you nob and stb <3.
+ * Thank you nob and stb.
  */
 extern Cn_Log_Level cn_min_log_level;
 
@@ -446,12 +447,99 @@ CNDEF void cn_lexer_print_snippet(Cn_Lexer *lexer, uint64_t index, int64_t lengt
 
 CNDEF void cn_lexer_print_snippet_token(Cn_Lexer *lexer);
 
+// PRE-PROCESSING SECTION
+
+typedef enum {
+    CN_INSERT,
+    CN_DELETE,
+} Cn_Modification_Kind;
+
+typedef struct {
+    Cn_String data;
+} Cn_Modification_Insert;
+
+typedef struct {
+    int64_t length;
+} Cn_Modification_Remove;
+
+typedef int64_t Cn_Modification_Idx;
+
+#define CN_MUTATION_IDX_NIL 0
+
+typedef struct {
+    int64_t          offset;
+    Cn_Modification_Idx  next_idx;
+    Cn_Modification_Kind kind;
+
+    union {
+        Cn_Modification_Insert insert;
+        Cn_Modification_Remove remove;
+    };
+} Cn_Modification;
+
+
+// INCOMPLETE: Notes are still work in progress.
+//
+//  typedef int64_t Cn_Note_Idx;
+//  
+//  #define CN_NOTE_IDX_NIL 0
+//  
+//  typedef struct {
+//      int64_t          priority;
+//      int64_t          offset;
+//      Cn_Note_Idx      next_idx;
+//  } Cn_Note;
 
 
 
+#ifndef CN_TU_MODIFICATION_LIST_INITIAL_CAP
+#   define CN_TU_MODIFICATION_LIST_INITIAL_CAP 32
+#endif
+
+typedef struct {
+    int64_t          version;
+    FILE *           file;
+    Cn_Modification *modification_list;
+} Cn_Translation_Unit;
+
+
+/**
+ * RETURNS: Cn_Translation_Unit struct that represent classic C translation unit in which all lexing, parsing, infering, modification occurs.
+ * IMPORTANT: Takes in path to the .i file, that is intermidiate pre-processed representation of a translation unit.
+ * Simply it is a .c file that has all macros expanded and ready to be sent to the compiler.
+ * Supplying .c files with macros that are not expanded will result in error, ensure to pass .c file through compiler's pre-processor first.
+ * In gcc it would be executing the following:
+ *      
+ *      $ gcc -E -o file.i file.c
+ *
+ * This will generate .i file, path to which can be safely specified here.
+ */
+CNDEF Cn_Translation_Unit cn_tu_make(const char *intermidiate_path);
+
+/**
+ * This function free's all memory used by the translation unit, including closing previously opened file.
+ */
+CNDEF void cn_tu_free(Cn_Translation_Unit *tu);
+
+
+typedef struct {
+    Cn_Translation_Unit *tu;
+
+    Cn_String file_path;
+    int64_t   line_number;
+
+    // TODO: Attach declaration info later.
+
+} Cn_Message;
+
+typedef void (Cn_Message_Handler)(Cn_Message *message);
+
+extern Cn_Message_Handler *cn_message_handler;
 
 
 #endif // CN_H_
+       
+
 
 
 
@@ -463,6 +551,7 @@ Cn_Log_Level cn_min_log_level = CN_INFO;
 Cn_Log_Handler *cn_log_handler = &cn_default_log_handler;
 
 CNDEF void cn_default_log_handler(Cn_Log_Level level, const char *format, va_list args) {
+    
     if (level < cn_min_log_level)
         return;
 

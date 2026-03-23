@@ -1,4 +1,3 @@
-#define CN_IMPLEMENTATION
 #include "../cnotes.h"
 
 // This wrapper is good, because any string copied in here will only exist inside this function on the stack and will be gone after.

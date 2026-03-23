@@ -1,4 +1,3 @@
-#define CN_IMPLEMENTATION
 #include "../cnotes.h"
 
 
