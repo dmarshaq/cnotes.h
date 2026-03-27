@@ -1,7 +1,6 @@
 #ifndef CN_H_
 #define CN_H_
 
-#include <cstdint>
 #ifndef CNDEF
 #   define CNDEF
 #endif // CNDEF
@@ -467,8 +466,7 @@ typedef int64_t Cn_Modification_Idx;
 #define CN_MUTATION_IDX_NIL 0
 
 typedef struct {
-    int64_t          offset;
-    Cn_Modification_Idx  next_idx;
+    int64_t              offset;
     Cn_Modification_Kind kind;
 
     union {
@@ -498,7 +496,8 @@ typedef struct {
 
 typedef struct {
     int64_t          version;
-    FILE *           file;
+    char *           path;
+    Cn_String        content;
     Cn_Modification *modification_list;
 } Cn_Translation_Unit;
 
@@ -521,6 +520,17 @@ CNDEF Cn_Translation_Unit cn_tu_make(const char *intermidiate_path);
  */
 CNDEF void cn_tu_free(Cn_Translation_Unit *tu);
 
+/**
+ * Processes the translation unit from top to bottom.
+ * Translation Unit passes through Infer -> Size stages.
+ * Meaning AST is built, type and symbol table is constructed, 
+ * and size's of the types are calculated too.
+ * Through the processing the messages are enqueued, 
+ * and by the end of the process they are triggered,
+ * if cn_message_handler is not NULL.
+ */
+CNDEF void cn_tu_process(Cn_Translation_Unit *tu); 
+
 
 typedef struct {
     Cn_Translation_Unit *tu;
@@ -529,7 +539,6 @@ typedef struct {
     int64_t   line_number;
 
     // TODO: Attach declaration info later.
-
 } Cn_Message;
 
 typedef void (Cn_Message_Handler)(Cn_Message *message);
@@ -1676,6 +1685,86 @@ CNDEF void cn_lexer_print_snippet(Cn_Lexer *lexer, uint64_t index, int64_t lengt
         fputc('~', stderr);
 
     fputs("\033[0m\n\n", stderr);
+}
+
+
+// PRE-PROCESSING SECTION
+
+
+Cn_Message_Handler *cn_message_handler = NULL;
+
+CNDEF Cn_Traslation_Unit cn_tu_make(const char *intermidiate_path) {
+    FILE *file = fopen(intermidiate_path, "rb");
+    if (file == NULL) {
+        cn_log(CN_ERROR, "Couldn't open the file '%s'.\n", intermidiate_path);
+        return {0};
+    }
+
+    fseek(file, 0, SEEK_END);
+    uint64_t size = ftell(file);
+    rewind(file);
+
+    uint8_t *buffer = CN_REALLOC(NULL, size);
+    if (buffer == NULL) {
+        cn_log(CN_ERROR, "Memory allocation for string buffer failed while reading the file '%s'.\n", intermidiate_path);
+        fclose(file);
+        return {0};
+    }
+
+    if (fread(buffer, 1, size, file) != size) {
+        cn_log(CN_ERROR, "Failure reading the file '%s'.\n", intermidiate_path);
+        fclose(file);
+        free(buffer);
+        return {0};
+    }
+
+    fclose(file);
+
+    Cn_Translation_Unit tu = {
+        .version = 0;
+        .path = intermidiate_path;
+        .content = {0};
+        .modification_list = array_list_make(Cn_Modification, CN_TU_MODIFICATION_LIST_INITIAL_CAP);
+    };
+
+    array_list_append(&tu.modification_list, (Cn_Modification)({ .offset = 0, .kind = CN_INSERT, .insert = (Cn_Modification_Insert)({CN_STR(size, buffer)}) }) );
+
+    return tu;
+}
+
+
+CNDEF void cn_tu_process(Cn_Translation_Unit *tu) {
+    // Check if there any modifications.
+    // Process them if there are.
+    int64_t size = 0;
+    for (int64_t i = 0; i < array_list_length(&tu->modification_list); i++) {
+        // TODO: Account for overlaps, and resolve them.
+        switch (tu->modification_list[i].kind) {
+            case CN_INSERT:
+                size += tu->modification_list[i].insert.data.length;
+                break;
+            case CN_REMOVE:
+                size -= tu->modification_list[i].remove.length;
+                break;
+        }
+    }
+
+    tu->content.length = size;
+    tu->content.data = CN_REALLOC(tu->content.data, tu->content.length);
+    
+    int64_t offset = 0;
+    for (int64_t i = 0; i < array_list_length(&tu->modification_list); i++) {
+        switch (tu->modification_list[i].kind) {
+            memcpy(tu->content.data + offset, );
+            case CN_INSERT:
+                size += tu->modification_list[i].insert.data.length;
+                break;
+            case CN_REMOVE:
+                size -= tu->modification_list[i].remove.length;
+                break;
+        }
+    }
+    
 }
 
 
