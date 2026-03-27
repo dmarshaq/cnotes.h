@@ -13,12 +13,12 @@
 #ifndef CN_REALLOC
 #   include <stdlib.h>
 #   define CN_REALLOC realloc
-#endif /* CN_REALLOC */
+#endif // CN_REALLOC
 
 #ifndef CN_FREE
 #   include <stdlib.h>
 #   define CN_FREE free
-#endif /* CN_FREE */
+#endif // CN_FREE
 
 #ifdef _WIN32
 #    define CN_LINE_END "\r\n"
@@ -447,14 +447,13 @@ CNDEF void cn_lexer_print_snippet(Cn_Lexer *lexer, uint64_t index, int64_t lengt
 CNDEF void cn_lexer_print_snippet_token(Cn_Lexer *lexer);
 
 // PRE-PROCESSING SECTION
-
 typedef enum {
     CN_INSERT,
-    CN_DELETE,
+    CN_REMOVE,
 } Cn_Modification_Kind;
 
 typedef struct {
-    Cn_String data;
+    Cn_String str;
 } Cn_Modification_Insert;
 
 typedef struct {
@@ -513,7 +512,7 @@ typedef struct {
  *
  * This will generate .i file, path to which can be safely specified here.
  */
-CNDEF Cn_Translation_Unit cn_tu_make(const char *intermidiate_path);
+CNDEF Cn_Translation_Unit cn_tu_make(char *intermidiate_path);
 
 /**
  * This function free's all memory used by the translation unit, including closing previously opened file.
@@ -1689,15 +1688,14 @@ CNDEF void cn_lexer_print_snippet(Cn_Lexer *lexer, uint64_t index, int64_t lengt
 
 
 // PRE-PROCESSING SECTION
-
-
 Cn_Message_Handler *cn_message_handler = NULL;
 
-CNDEF Cn_Traslation_Unit cn_tu_make(const char *intermidiate_path) {
+CNDEF Cn_Translation_Unit cn_tu_make(char *intermidiate_path) {
+    // Reading the whole .i file into memory.
     FILE *file = fopen(intermidiate_path, "rb");
     if (file == NULL) {
         cn_log(CN_ERROR, "Couldn't open the file '%s'.\n", intermidiate_path);
-        return {0};
+        return (Cn_Translation_Unit) {0};
     }
 
     fseek(file, 0, SEEK_END);
@@ -1708,26 +1706,27 @@ CNDEF Cn_Traslation_Unit cn_tu_make(const char *intermidiate_path) {
     if (buffer == NULL) {
         cn_log(CN_ERROR, "Memory allocation for string buffer failed while reading the file '%s'.\n", intermidiate_path);
         fclose(file);
-        return {0};
+        return (Cn_Translation_Unit) {0};
     }
 
     if (fread(buffer, 1, size, file) != size) {
         cn_log(CN_ERROR, "Failure reading the file '%s'.\n", intermidiate_path);
         fclose(file);
         free(buffer);
-        return {0};
+        return (Cn_Translation_Unit) {0};
     }
 
     fclose(file);
 
+    // Saving added file as single insert modification, so AST can of it can be constructed once cn_tu_process(...) is called.
     Cn_Translation_Unit tu = {
-        .version = 0;
-        .path = intermidiate_path;
-        .content = {0};
-        .modification_list = array_list_make(Cn_Modification, CN_TU_MODIFICATION_LIST_INITIAL_CAP);
+        .version = 0,
+        .path = intermidiate_path,
+        .content = {0},
+        .modification_list = cn_array_list_make(Cn_Modification, CN_TU_MODIFICATION_LIST_INITIAL_CAP),
     };
 
-    array_list_append(&tu.modification_list, (Cn_Modification)({ .offset = 0, .kind = CN_INSERT, .insert = (Cn_Modification_Insert)({CN_STR(size, buffer)}) }) );
+    cn_array_list_append(&tu.modification_list, ((Cn_Modification) { .offset = 0, .kind = CN_INSERT, .insert = ((Cn_Modification_Insert){ CN_STR(size, buffer) }) }) );
 
     return tu;
 }
@@ -1736,35 +1735,56 @@ CNDEF Cn_Traslation_Unit cn_tu_make(const char *intermidiate_path) {
 CNDEF void cn_tu_process(Cn_Translation_Unit *tu) {
     // Check if there any modifications.
     // Process them if there are.
-    int64_t size = 0;
-    for (int64_t i = 0; i < array_list_length(&tu->modification_list); i++) {
+    // Start size with previous content length.
+    // Expected to be zero by default.
+    int64_t size = tu->content.length;
+    for (int64_t i = 0; i < cn_array_list_length(&tu->modification_list); i++) {
         // TODO: Account for overlaps, and resolve them.
         switch (tu->modification_list[i].kind) {
             case CN_INSERT:
-                size += tu->modification_list[i].insert.data.length;
+                size += tu->modification_list[i].insert.str.length;
                 break;
             case CN_REMOVE:
-                size -= tu->modification_list[i].remove.length;
+                CN_TODO("Implement remove modification.");
+                // size -= tu->modification_list[i].remove.length;
                 break;
         }
     }
 
-    tu->content.length = size;
-    tu->content.data = CN_REALLOC(tu->content.data, tu->content.length);
+    char *buffer = CN_REALLOC(NULL, size);
     
-    int64_t offset = 0;
-    for (int64_t i = 0; i < array_list_length(&tu->modification_list); i++) {
+    int64_t buffer_offset = 0;
+    int64_t content_offset = 0;
+    for (int64_t i = 0; i < cn_array_list_length(&tu->modification_list); i++) {
+        memcpy(buffer + buffer_offset, tu->content.data + content_offset, tu->modification_list[i].offset - content_offset);
+        buffer_offset += tu->modification_list[i].offset - content_offset;
+        content_offset = tu->modification_list[i].offset;
+
         switch (tu->modification_list[i].kind) {
-            memcpy(tu->content.data + offset, );
             case CN_INSERT:
-                size += tu->modification_list[i].insert.data.length;
+                cn_str_copy_to(tu->modification_list[i].insert.str, buffer);
                 break;
             case CN_REMOVE:
-                size -= tu->modification_list[i].remove.length;
+                CN_TODO("Implement remove modification.");
+                break;
+            default:
+                CN_UNREACHABLE("Unexpected modification kind encountered.");
                 break;
         }
     }
-    
+
+    CN_FREE(tu->content.data);
+
+    tu->content.length = size;
+    tu->content.data = buffer;
+
+    printf("%.*s", CN_UNPACK(tu->content));
+
+    CN_TODO("AST building.");
+}
+
+CNDEF void cn_tu_free(Cn_Translation_Unit *tu) {
+    CN_TODO("Implement cn_tu_free.");
 }
 
 

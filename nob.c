@@ -3,6 +3,9 @@
 #define NOB_IMPLEMENTATION
 #include "nob.h"
 
+#define CN_IMPLEMENTATION
+#include "cnotes.h"
+
 #include <string.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -339,6 +342,7 @@ int test_command(int *argc, char ***argv);
 int record_command(int *argc, char ***argv);
 int clean_command(int *argc, char ***argv);
 int lib_command(int *argc, char ***argv);
+int cn_command(int *argc, char ***argv);
 
 const static Command commands[] = {
     { "help",       "",             "List all available commands.", help_command },
@@ -346,6 +350,7 @@ const static Command commands[] = {
     { "record",     "[FILE...]",    "Record file as a test and generate it's expected output.", record_command },
     { "clean",      "",             "Recursivly deletes "BUILD_DIR"/ and "BIN_DIR"/ directories.", clean_command },
     { "lib",        "",             "Will compile whole library into .o file and then produce static library.", lib_command },
+    { "cn",         "",             "Cleans, compiles library, runs tests, and uses library with compiler to pre-process and compile main.c file.", cn_command },
 };
 
 void commands_list(void) {
@@ -509,6 +514,50 @@ int lib_command(int *argc, char ***argv) {
     return 0;
 }
 
+int cn_command(int *argc, char ***argv) {
+    int    argc_ = 0;
+    char **argv_ = NULL;
+
+    clean_command(&argc_, &argv_);
+    if (lib_command(&argc_, &argv_) != 0) return 1;
+    if (test_command(&argc_, &argv_) != 0) return 1;
+
+    Nob_Cmd cmd = {0};
+
+    // Compiling main.i
+    nob_cc(&cmd);
+    nob_cc_flags(&cmd);
+    nob_cmd_append(&cmd, "-E");
+    nob_cc_inputs(&cmd, "main.c");
+    nob_cc_output(&cmd, "main.i");
+
+    if (!nob_cmd_run(&cmd)) {
+        nob_log(NOB_ERROR, "couldn't compile main intermediate file.");
+    }
+
+    // Library pre-processing.
+    Cn_Translation_Unit tu = cn_tu_make("main.i");
+    
+    cn_tu_process(&tu);
+
+    cn_tu_free(&tu);
+    
+    // Compiling main executable.
+    nob_cc(&cmd);
+    nob_cc_flags(&cmd);
+    nob_cmd_append(&cmd, "-c");
+    nob_cc_inputs(&cmd, "main.i");
+    nob_cc_output(&cmd, "main");
+
+    if (!nob_cmd_run(&cmd)) {
+        nob_log(NOB_ERROR, "couldn't produce main executable.");
+    }
+
+    NOB_FREE(cmd.items);
+
+    return 0;
+}
+
 
 
 int main(int argc, char **argv) {
@@ -518,9 +567,7 @@ int main(int argc, char **argv) {
     const char *program_name = shift(argv, argc);
     
     if (argc == 0) {
-        clean_command(&argc, &argv);
-        if (lib_command(&argc, &argv) != 0) return 1;
-        return test_command(&argc, &argv);
+        return cn_command(&argc, &argv);
     }
 
     const char *command_name;
