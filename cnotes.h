@@ -26,6 +26,44 @@
 #    define CN_LINE_END "\n"
 #endif // _WIN32
 
+#ifdef CN_ANSI_NO_COLOR
+#   define CN_ANSI_BLACK
+#   define CN_ANSI_RED
+#   define CN_ANSI_GREEN
+#   define CN_ANSI_YELLOW
+#   define CN_ANSI_BLUE
+#   define CN_ANSI_MAGENTA
+#   define CN_ANSI_CYAN
+#   define CN_ANSI_WHITE
+#   define CN_ANSI_RESET
+#   define CN_ANSI_BRIGHT_BLACK
+#   define CN_ANSI_BRIGHT_RED
+#   define CN_ANSI_BRIGHT_GREEN
+#   define CN_ANSI_BRIGHT_YELLOW
+#   define CN_ANSI_BRIGHT_BLUE
+#   define CN_ANSI_BRIGHT_MAGENTA
+#   define CN_ANSI_BRIGHT_CYAN
+#   define CN_ANSI_BRIGHT_WHITE
+#else
+#   define CN_ANSI_BLACK          "\x1b[30m"
+#   define CN_ANSI_RED            "\x1b[31m"
+#   define CN_ANSI_GREEN          "\x1b[32m"
+#   define CN_ANSI_YELLOW         "\x1b[33m"
+#   define CN_ANSI_BLUE           "\x1b[34m"
+#   define CN_ANSI_MAGENTA        "\x1b[35m"
+#   define CN_ANSI_CYAN           "\x1b[36m"
+#   define CN_ANSI_WHITE          "\x1b[37m"
+#   define CN_ANSI_RESET          "\x1b[0m"
+#   define CN_ANSI_BRIGHT_BLACK   "\x1b[90m"
+#   define CN_ANSI_BRIGHT_RED     "\x1b[91m"
+#   define CN_ANSI_BRIGHT_GREEN   "\x1b[92m"
+#   define CN_ANSI_BRIGHT_YELLOW  "\x1b[93m"
+#   define CN_ANSI_BRIGHT_BLUE    "\x1b[94m"
+#   define CN_ANSI_BRIGHT_MAGENTA "\x1b[95m"
+#   define CN_ANSI_BRIGHT_CYAN    "\x1b[96m"
+#   define CN_ANSI_BRIGHT_WHITE   "\x1b[97m"
+#endif
+
 #include <stdio.h>
 #include <stdbool.h>
 #include <stdarg.h>
@@ -565,13 +603,13 @@ CNDEF void cn_default_log_handler(Cn_Log_Level level, const char *format, va_lis
 
     switch (level) {
         case CN_INFO:
-            fprintf(stderr, "[INFO] ");
+            fprintf(stderr, CN_ANSI_BRIGHT_BLUE"[INFO]"CN_ANSI_RESET" ");
             break;
         case CN_WARNING:
-            fprintf(stderr, "[WARN] ");
+            fprintf(stderr, CN_ANSI_YELLOW"[WARNING]"CN_ANSI_RESET" ");
             break;
         case CN_ERROR:
-            fprintf(stderr, "[ERRO] ");
+            fprintf(stderr, CN_ANSI_BRIGHT_RED"[ERROR]"CN_ANSI_RESET" ");
             break;
         case CN_NO_LOGS: 
             return;
@@ -1702,7 +1740,7 @@ CNDEF Cn_Translation_Unit cn_tu_make(char *intermidiate_path) {
     uint64_t size = ftell(file);
     rewind(file);
 
-    uint8_t *buffer = CN_REALLOC(NULL, size);
+    void *buffer = CN_REALLOC(NULL, size);
     if (buffer == NULL) {
         cn_log(CN_ERROR, "Memory allocation for string buffer failed while reading the file '%s'.\n", intermidiate_path);
         fclose(file);
@@ -1778,12 +1816,38 @@ CNDEF void cn_tu_process(Cn_Translation_Unit *tu) {
     tu->content.length = size;
     tu->content.data = buffer;
 
-    printf("%.*s", CN_UNPACK(tu->content));
+    cn_log(CN_INFO, "Received main.i:\n"CN_ANSI_BRIGHT_BLACK"%.*s"CN_ANSI_RESET, CN_UNPACK(tu->content));
 
-    CN_TODO("AST building.");
+    // Setting up lexer.
+    Cn_Lexer lexer = {0};
+
+    // Logging tokens.
+    cn_lexer_init(&lexer, tu->content);
+
+    cn_log(CN_INFO, "Tokenized main.i:"CN_ANSI_CYAN);
+    do {
+        cn_lexer_next_token(&lexer);
+        fprintf(stderr, "TOKEN:     %.*s\n", CN_UNPACK(lexer.token.str));
+    } while (lexer.token.type != CN_TOKEN_ZERO);
+    fprintf(stderr, CN_ANSI_RESET"\n");
+    
+    // Building AST.
+    cn_lexer_init(&lexer, tu->content);
+    while (true) {
+        cn_lexer_next_token(&lexer);
+
+        if (lexer.token.type == CN_TOKEN_ZERO) break;
+
+        if (lexer.token.type == CN_TOKEN_PREPROC) continue; // For right now skip #... tokens.
+
+        
+        CN_TODO("AST building.");
+    };
+
 }
 
 CNDEF void cn_tu_free(Cn_Translation_Unit *tu) {
+    CN_UNUSED(tu);
     CN_TODO("Implement cn_tu_free.");
 }
 
