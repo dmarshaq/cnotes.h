@@ -484,6 +484,351 @@ CNDEF void cn_lexer_print_snippet(Cn_Lexer *lexer, uint64_t index, int64_t lengt
 
 CNDEF void cn_lexer_print_snippet_token(Cn_Lexer *lexer);
 
+// AST SECTION
+
+// TODO: REFACTOR THIS MACRO.
+#define FLAG_ORDINAL(flag) (__builtin_ctz(flag))
+
+
+typedef uint32_t Cn_Ast_Idx;
+
+#define CN_AST_NIL_IDX 0
+
+
+// TODO: Move these into implementation only section of the library.
+
+/**
+ * This list of strings keeps tracks of actual string saves in arena_strings.
+ * It acts like set, saving needed strings only once and then reusing them as needed.
+ * IMPORTANT: Use array_list_length(&string_list) to get the length of the list.
+ */
+extern Cn_String *cn__string_list;
+
+/**
+ * Linearly checks is string already exists, 
+ * if so reuses existing string rather then saving new.
+ */
+CNDEF Cn_String cn__string_list_save(Cn_String str);
+
+/**
+ * Saves string to the string list regardless of whether it is a duplicate or not.
+ */
+CNDEF Cn_String cn__string_list_force_save(Cn_String str);
+
+
+/**
+ * These flags correspond to existence of certain keyword in declaration, 
+ * for example TYPE_MODIFIER_SIGNED means there is 'signed' keyword, 
+ * it is intended to detect and report illegal combination of various keywords.
+ * Some of the following flags are mutually exclusive, 
+ * and cannot be simultaneously be active on a declaration, 
+ * but they are still grouped as the flags, because some them can be combined together. 
+ * Therefore whether the certain combination is legal or not doesn't matter, 
+ * because parser will make sure its valid, and if it is not for some reason it will result 
+ * in error at compilation stage of an actual program. 
+ */
+typedef enum cn_qualifier_flags : uint8_t {
+    CN_TYPE_QUALIFIER_CONST           = 0x01,
+    CN_TYPE_QUALIFIER_VOLATILE        = 0x02,
+    CN_TYPE_QUALIFIER_RESTRICT        = 0x04,
+} Cn_Qualifier_Flags;
+
+static const Cn_String CN_QUALIFIER_KEYWORDS[] = {
+    CN_STR_BUFFER("const"),
+    CN_STR_BUFFER("volatile"),
+    CN_STR_BUFFER("restrict"),
+};
+
+#define CN_QUALIFIER_KEYWORDS_LENGTH CN_ARRAY_LENGTH(CN_QUALIFIER_KEYWORDS)
+
+
+typedef enum cn_modifier_flags : uint8_t {
+    CN_TYPE_MODIFIER_SIGNED           = 0x01,
+    CN_TYPE_MODIFIER_UNSIGNED         = 0x02,
+    CN_TYPE_MODIFIER_SHORT            = 0x04,
+    CN_TYPE_MODIFIER_LONG             = 0x08,
+    CN_TYPE_MODIFIER_LONG_LONG        = 0x10,
+} Cn_Modifier_Flags;
+
+static const Cn_String CN_MODIFIER_KEYWORDS[] = {
+    CN_STR_BUFFER("signed"),
+    CN_STR_BUFFER("unsigned"),
+    CN_STR_BUFFER("short"),
+    CN_STR_BUFFER("long"),
+    CN_STR_BUFFER("long long"),
+};
+
+#define CN_MODIFIER_KEYWORDS_LENGTH CN_ARRAY_LENGTH(CN_MODIFIER_KEYWORDS)
+
+
+typedef enum cn_storage_specifier_flags : uint8_t {
+    CN_STORAGE_SPECIFIER_STATIC       = 0x01,
+    CN_STORAGE_SPECIFIER_EXTERN       = 0x02,
+    CN_STORAGE_SPECIFIER_REGISTER     = 0x04,
+    CN_STORAGE_SPECIFIER_AUTO         = 0x08,
+    CN_STORAGE_SPECIFIER_TYPEDEF      = 0x10,
+} Cn_Storage_Specifier_Flags;
+
+static const Cn_String CN_STORAGE_SPECIFIER_KEYWORDS[] = {
+    CN_STR_BUFFER("static"),
+    CN_STR_BUFFER("extern"),
+    CN_STR_BUFFER("register"),
+    CN_STR_BUFFER("auto"),
+    CN_STR_BUFFER("typedef"),
+};
+
+#define CN_STORAGE_SPECIFIER_KEYWORDS_LENGTH CN_ARRAY_LENGTH(CN_STORAGE_SPECIFIER_KEYWORDS)
+
+
+/**
+ * Tries to parse CN_TOKEN_SYMBOL as a storage specifier.
+ * OUTPUTS: It into supplied output destination.
+ * RETURNS: 0 if successful.
+ */
+int cn_try_parse_storage_specifier(Cn_Token symbol, Cn_Storage_Specifier_Flags *output);
+
+
+/**
+ * Tries to parse CN_TOKEN_SYMBOL as a qualifier.
+ * OUTPUTS: It into supplied output destination.
+ * RETURNS: 0 if successful.
+ */
+int cn_try_parse_qualifier(Cn_Token symbol, Cn_Qualifier_Flags *output);
+
+
+typedef enum cn_type_identifier_kind : uint8_t {
+    CN_TYPE_IDENTIFIER_INT = 0,
+    CN_TYPE_IDENTIFIER_CHAR,
+    CN_TYPE_IDENTIFIER_FLOAT,
+    CN_TYPE_IDENTIFIER_DOUBLE,
+    CN_TYPE_IDENTIFIER_BOOL,
+    CN_TYPE_IDENTIFIER_VOID,
+    CN_TYPE_IDENTIFIER_TYPEDEF,
+    CN_TYPE_IDENTIFIER_STRUCT,
+    CN_TYPE_IDENTIFIER_ENUM,
+    CN_TYPE_IDENTIFIER_UNION,
+} Cn_Type_Identifier_Kind;
+
+static const Cn_String CN_INT_STR         = CN_STR_BUFFER("int");
+static const Cn_String CN_CHAR_STR        = CN_STR_BUFFER("char");
+static const Cn_String CN_FLOAT_STR       = CN_STR_BUFFER("float");
+static const Cn_String CN_DOUBLE_STR      = CN_STR_BUFFER("double");
+static const Cn_String CN_BOOL_STR        = CN_STR_BUFFER("bool");
+static const Cn_String CN_VOID_STR        = CN_STR_BUFFER("void");
+static const Cn_String CN_STRUCT_STR      = CN_STR_BUFFER("struct");
+static const Cn_String CN_ENUM_STR        = CN_STR_BUFFER("enum");
+static const Cn_String CN_UNION_STR       = CN_STR_BUFFER("union");
+
+/**
+ * Type Specifiers are like base types, 
+ * that can both be user defined struct ..., enum ..., union ..., and even typedef. 
+ * Or built in types like int, float, double, long, long long, void, short char, 
+ * unsigned, signed char, etc...
+ */
+typedef struct cn_type_specifier {
+    Cn_Type_Identifier_Kind kind;
+    Cn_Modifier_Flags flags;
+    Cn_String name;
+    Cn_Ast_Idx definition_idx;
+} Cn_Type_Specifier;
+
+/**
+ * Tries to parse next token(s) as a type specifier.
+ * OUTPUTS: It into supplied output destination.
+ * RETURNS: 0 if successful.
+ */
+int cn_try_parse_type_specifier(Cn_Lexer *lexer, Cn_Type_Specifier *output);
+
+
+typedef struct cn_ast_node Cn_Ast_Node;
+
+typedef enum cn_ast_node_kind : uint8_t {
+    CN_AST_NODE_UNKNOWN                        = 0,
+    CN_AST_NODE_STRUCT_DEFINITION,
+    CN_AST_NODE_STRUCT_MEMBER_DECLARATION,
+    CN_AST_NODE_FUNCTION_PARAM_DECLARATION,
+    CN_AST_NODE_DECLARATION,
+    CN_AST_NODE_POINTER_DECLARATOR,
+    CN_AST_NODE_FUNCTION_DECLARATOR,
+    CN_AST_NODE_ARRAY_DECLARATOR,
+    CN_AST_NODE_IDENTIFIER_DECLARATOR,
+    CN_AST_NODE_ABSTRACT_DECLARATOR,
+    CN_AST_NODE_INTEGER,
+    CN_AST_NODE_FLOAT,
+    CN_AST_NODE_NOTE,
+} Cn_Ast_Node_Kind;
+
+
+typedef struct {
+    Cn_Ast_Idx members_idx;
+} Cn_Ast_Node_Struct_Definition;
+
+typedef struct {
+    Cn_Qualifier_Flags qualifier_flags;
+    Cn_Type_Specifier type_specifier;
+
+    Cn_Ast_Idx sibling_idx; // TODO: Find a better way to name 'sibling' node.
+    Cn_Ast_Idx declarators_idx;
+} Cn_Ast_Node_Struct_Member_Declaration;
+
+typedef struct {
+    Cn_Qualifier_Flags qualifier_flags;
+    Cn_Type_Specifier type_specifier;
+
+    Cn_Ast_Idx sibling_idx; // TODO: Find a better way to name 'sibling' node.
+    Cn_Ast_Idx declarator_idx;
+} Cn_Ast_Node_Function_Param_Declaration;
+
+typedef struct {
+    Cn_Storage_Specifier_Flags storage_specifier_flags;
+    Cn_Qualifier_Flags qualifier_flags;
+    Cn_Type_Specifier type_specifier;
+
+    Cn_Ast_Idx declarators_idx;
+} Cn_Ast_Node_Declaration;
+
+typedef struct {
+    Cn_String name;
+    
+    Cn_Ast_Idx sibling_idx; // TODO: Find a better way to name 'sibling' node.
+} Cn_Ast_Node_Identifier_Declarator;
+
+typedef struct {
+    Cn_Qualifier_Flags qualifier_flags;
+
+    Cn_Ast_Idx sibling_idx; // TODO: Find a better way to name 'sibling' node.
+    Cn_Ast_Idx direct_declarator_idx;
+} Cn_Ast_Node_Pointer_Declarator;
+
+typedef struct {
+    Cn_Ast_Idx sibling_idx; // TODO: Find a better way to name 'sibling' node.
+    Cn_Ast_Idx params_idx;
+    Cn_Ast_Idx direct_declarator_idx;
+} Cn_Ast_Node_Function_Declarator;
+
+typedef struct {
+    Cn_Ast_Idx constant_expression_idx;
+    Cn_Ast_Idx direct_declarator_idx;
+} Cn_Ast_Node_Array_Declarator;
+
+typedef struct {
+    int64_t value;
+} Cn_Ast_Node_Integer;
+
+typedef struct {
+    float value;
+} Cn_Ast_Node_Float;
+
+typedef struct cn_ast_node {
+    Cn_Ast_Node_Kind kind;
+
+    union {
+        Cn_Ast_Node_Struct_Definition           struct_definition;
+        Cn_Ast_Node_Struct_Member_Declaration   struct_member_declaration;
+        Cn_Ast_Node_Function_Param_Declaration  function_param_declaration;
+        Cn_Ast_Node_Declaration                 declaration;
+        Cn_Ast_Node_Pointer_Declarator          pointer_declarator;
+        Cn_Ast_Node_Function_Declarator         function_declarator;
+        Cn_Ast_Node_Array_Declarator            array_declarator;
+        Cn_Ast_Node_Identifier_Declarator       identifier_declarator;
+        Cn_Ast_Node_Integer                     integer;
+        Cn_Ast_Node_Float                       flt;
+    };
+} Cn_Ast_Node;
+
+/**
+ * Stores all nodes in growing array list.
+ * IMPORTANT: Access elements by indicies, so there are no unsafe situations occuring.
+ * First element is considered NIL element, it is reserved to identify illegal references.
+ */
+extern Cn_Ast_Node *cn_ast_node_list;
+
+// Will be uncommented as parser is build more complex.
+//
+// /**
+//  * Tag table uses tag names of struct, enum, union to store index of such definition.
+//  * IMPORTANT: If tag is declared but not defined, and it is not in the table yet it will be stored without definition, meaning index will be equal to CN_AST_NIL_IDX.
+//  */
+// extern Cn_Ast_Idx *cn_tag_definition_table;
+// 
+// /**
+//  * Typedef table acts similar to the tag table except. 
+//  * If typedef is declared but not yet defined it will error rather than storing typedef. 
+//  * Indicies stored should always be valid.
+//  * Primitives are not included here. Only typedefs.
+//  */
+// extern Cn_Ast_Idx *cn_typedef_definition_table;
+// 
+//
+// /**
+//  * TEMPORARY: For right now parser will not parse any complex constat expressions. 
+//  * Only one token and accept if it either integer or float.
+//  */
+// Cn_Ast_Node cn_ast_parse_constant_expression(Cn_Lexer *lexer);
+// 
+// Cn_Ast_Node cn_ast_parse_function_param_declaration(Cn_Lexer *lexer);
+// 
+// /**
+//  * Recursivly parse these kind of syntax: **a[10] where 'a' is identifier returned to the very top.
+//  * If end leaf doesn't contain identifier it recursivly returns empty string, meaning we parsed Abstract Declarator, for example: *[10].
+//  * Can be a case when you have a sizeof like:
+//  *
+//  *      sizeof(int *[10]) 
+//  *
+//  *
+//  *  declarator:
+//  *      pointer_opt direct_declarator
+//  *
+//  *  direct_declarator:
+//  *      identifier
+//  *      ( declarator )
+//  *      direct_declarator [ constant_expression_opt ]
+//  *      direct_declarator ( parameter_type_list_opt )*
+//  */
+// Cn_Ast_Node cn_ast_parse_declarator(Cn_Lexer *lexer);
+// 
+// /**
+//  *  direct_declarator:
+//  *      identifier
+//  *      ( declarator )
+//  *      direct_declarator [ constant_expression_opt ]
+//  *      direct_declarator ( parameter_type_list_opt )*
+//  */
+// Cn_Ast_Node cn_ast_parse_direct_declarator(Cn_Lexer *lexer);
+// 
+// /**
+//  *  direct_declarator (postfix):
+//  *      direct_declarator [ constant_expression_opt ]
+//  *      direct_declarator ( parameter_type_list_opt )*
+//  */
+// Cn_Ast_Node cn_ast_parse_direct_declarator_postfix(Cn_Lexer *lexer, Cn_Ast_Node child);
+// 
+// Cn_Ast_Node cn_ast_parse_struct_definition(Cn_Lexer *lexer);
+// 
+// /**
+//  * Basically declaration is a very broad abstraction and it is a valid declaration if it begins 
+//  * with any of the declaration specifiers like: StorageSpecifier, TypeQualifier, TypeSpecifier.
+//  * Most of the parsing is dealing with declarations properly.
+//  */
+// Cn_Ast_Node cn_ast_parse_declaration(Cn_Lexer *lexer);
+// 
+// /**
+//  * Recursivly prints passed ast node to stdout.
+//  */
+// void cn_ast_print(Cn_Ast_Node *node, int depth);
+// 
+// /**
+//  * Recursivly walks down declarator ast branch and returns declarator name if any.
+//  */
+// Cn_String cn_ast_get_declarator_name(Cn_Ast_Node *declarator);
+// 
+
+/**
+ * Inits ast functionality, called once before parsing begins.
+ */
+int cn_ast_init();
+
+
 // PRE-PROCESSING SECTION
 typedef enum {
     CN_INSERT,
