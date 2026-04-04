@@ -1,6 +1,10 @@
+;
+;
+;
+;
 
-int main(void) {
-    int a = 69;
-    return a;
-}
+// int main(void) {
+//     int a = 69;
+//     return a;
+// }
 

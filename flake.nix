@@ -12,7 +12,7 @@
         in
         {
             devShells.${system}.default = pkgs.mkShell {
-              packages = [ pkgs.gcc pkgs.clang-tools pkgs.linux-manual pkgs.man-pages pkgs.man-pages-posix ]; 
+              packages = [ pkgs.gcc pkgs.clang-tools pkgs.linux-manual pkgs.man-pages pkgs.man-pages-posix pkgs.gdb ]; 
 
 
 

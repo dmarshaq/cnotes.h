@@ -1,0 +1,10 @@
+CompileFlags:
+  Add: 
+    - -DCN_IMPLEMENTATION
+    - -Wno-missing-prototypes
+  
+Diagnostics:
+  ClangTidy:
+    Add: []
+    Remove:
+      - "*"

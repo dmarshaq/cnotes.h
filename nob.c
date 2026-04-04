@@ -536,6 +536,8 @@ int cn_command(int *argc, char ***argv) {
     }
 
     // Library pre-processing.
+    cn_ast_init();
+
     Cn_Translation_Unit tu = cn_tu_make("main.i");
     
     cn_tu_process(&tu);
