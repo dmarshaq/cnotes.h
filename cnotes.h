@@ -665,20 +665,20 @@ int cn_try_parse_type_specifier(Cn_Lexer *lexer, Cn_Type_Specifier *output);
  *      D
  *
  *  Where:
- *       A.child_idx -> B
- *       A.next_idx  -> NIL
+ *       A.child -> B
+ *       A.next  -> NIL
  *
- *       B.child_idx -> D
- *       B.next_idx  -> C
+ *       B.child -> D
+ *       B.next  -> C
  *
- *       C.child_idx -> NIL
- *       C.next_idx  -> NIL
+ *       C.child -> NIL
+ *       C.next  -> NIL
  *
- *       D.next_idx  -> NIL
- *       D.next_idx  -> NIL
+ *       D.next  -> NIL
+ *       D.next  -> NIL
  *
  *  Ast nodes in this implementation will adhere to the same logic.
- *  So that next_idx always means a sibling of a current node.
+ *  So that next always means a sibling of a current node.
  *  Or a child of current's node parent.
  */
 typedef struct cn_ast_node Cn_Ast_Node;
@@ -687,25 +687,15 @@ typedef enum cn_ast_node_kind : uint8_t {
     CN_AST_NODE_UNKNOWN                        = 0,
     CN_AST_NODE_TRANSLATION_UNIT,
     CN_AST_NODE_EXTERNAL_DECLARATION,
-    // CN_AST_NODE_STRUCT_DEFINITION,
-    // CN_AST_NODE_STRUCT_MEMBER_DECLARATION,
-    // CN_AST_NODE_FUNCTION_PARAM_DECLARATION,
-    // CN_AST_NODE_DECLARATION,
-    // CN_AST_NODE_POINTER_DECLARATOR,
-    // CN_AST_NODE_FUNCTION_DECLARATOR,
-    // CN_AST_NODE_ARRAY_DECLARATOR,
-    // CN_AST_NODE_IDENTIFIER_DECLARATOR,
-    // CN_AST_NODE_ABSTRACT_DECLARATOR,
-    // CN_AST_NODE_INTEGER,
-    // CN_AST_NODE_FLOAT,
-    // CN_AST_NODE_NOTE,
+    CN_AST_NODE_FUNCTION_DEFINITION,
+    CN_AST_NODE_DECLARATION,
+    CN_AST_NODE_ASM_DEFINITION,
 } Cn_Ast_Node_Kind;
 
 typedef struct {
     bool extension;
 } Cn_Ast_Node_External_Declaration;
 
-// 
 // typedef struct {
 //     Cn_Qualifier_Flags qualifier_flags;
 //     Cn_Type_Specifier type_specifier;
@@ -729,7 +719,81 @@ typedef struct {
 // 
 //     Cn_Ast_Idx declarators_idx;
 // } Cn_Ast_Node_Declaration;
-cn_ast_parse_external_declaration(Cn_Lexer *lexer);
+
+typedef struct cn_ast_node {
+    Cn_Ast_Node_Kind kind;
+
+    Cn_Ast_Idx  last_idx;
+    Cn_Ast_Idx  child_idx;
+    Cn_Ast_Idx  next_idx;
+
+    union {
+        Cn_Ast_Node_External_Declaration    external_declaration;
+    };
+} Cn_Ast_Node;
+
+/**
+ * Stores all nodes in growing array list.
+ * IMPORTANT: Access elements by indicies, so there are no unsafe situations occuring.
+ * First element is considered NIL element, it is reserved to identify illegal references.
+ */
+extern Cn_Ast_Node *cn_ast_node_list;
+
+/**
+ * Inits ast functionality, called once before parsing begins.
+ */
+CNDEF int cn_ast_init();
+
+/**
+ * Simple macro to get ast node based on its idx.
+ * It is abstracted away same way as append, if for some reason 
+ * underlying implementaion will change in the future.
+ */
+#define cn_ast_node_get(idx)    (cn_ast_node_list + (idx))
+
+/**
+ * It is a simple macro that unwrawps into for loop, where
+ * it is each child of a node parent.
+ */
+#define cn_ast_node_foreach_child(it, node) for (Cn_Ast_Node *it = cn_ast_node_get((node)->child_idx); it != cn_ast_node_get(CN_AST_NIL_IDX); it = cn_ast_node_get(it->next_idx))
+
+/**
+ * Appends specified node to the cn_ast_node_list. It doesn't add or change nodes parent.
+ * RETURNS: Cn_Ast_Idx of where the node was inserted.
+ */
+CNDEF Cn_Ast_Idx cn_ast_node_list_append(Cn_Ast_Node node);
+
+/**
+ * Adds child to the specified parent node. 
+ * If its not the only child the newer one is appended as last child.
+ * NOTE: All added children must already have their idx's.
+ */
+CNDEF void cn_ast_node_add_child(Cn_Ast_Node *node, Cn_Ast_Idx child_idx);
+
+/**
+ * Parses code starting of with lexer current token as translation unit.
+ *
+ *  translation_unit
+ *          : external_declaration* EOF
+ *          ;
+ *
+ */
+CNDEF Cn_Ast_Idx cn_ast_parse_translation_unit(Cn_Lexer *lexer);
+
+/**
+ * Parses code starting of with lexer current token as external declaration.
+ *
+ *  external_declaration
+ *          : '__extension__'? (
+ *              function_definition
+ *              | declaration
+ *              | ';'                       // Stray ';'
+ *              | asm_definition            // GCC
+ *              )
+ *          ;
+ *
+ */
+CNDEF Cn_Ast_Idx cn_ast_parse_external_declaration(Cn_Lexer *lexer);
 
 /**
  * Parses code starting of with lexer current token as function definition.
@@ -847,11 +911,6 @@ CNDEF Cn_Ast_Idx cn_ast_parse_asm_definition(Cn_Lexer *lexer);
 //  */
 // Cn_String cn_ast_get_declarator_name(Cn_Ast_Node *declarator);
 // 
-
-/**
- * Inits ast functionality, called once before parsing begins.
- */
-// int cn_ast_init();
 
 
 // PRE-PROCESSING SECTION
@@ -2112,29 +2171,29 @@ CNDEF Cn_Ast_Idx cn_ast_node_list_append(Cn_Ast_Node node) {
     return cn_array_list_length(&cn_ast_node_list) - 1;
 }
 
-CNDEF void cn_ast_node_append_child(Cn_Ast_Node *node, Cn_Ast_Idx child_idx) {
+CNDEF void cn_ast_node_add_child(Cn_Ast_Node *node, Cn_Ast_Idx child_idx) {
     if (node->child_idx == CN_AST_NIL_IDX) {
         node->child_idx = child_idx;
-        node->last_idx  = child_idx;
+        node->last_idx = child_idx;
     } else {
-        cn_ast_node_get(node->last_idx)->next_idx = child_idx
-        node->last_idx                            = child_idx
+        cn_ast_node_get(node->last_idx)->next_idx = child_idx;
+        node->last_idx                            = child_idx;
     }
 }
 
-CNDEF Cn_Ast_Idx cn_ast_parse_translation_unit(Cn_Lexer *lexer) {a
+CNDEF Cn_Ast_Idx cn_ast_parse_translation_unit(Cn_Lexer *lexer) {
     Lexer original_state = *lexer;
 
     Cn_Ast_Node node = { .kind = CN_AST_NODE_TRANSLATION_UNIT };
-    Cn_Ast_Idx next;
+    Cn_Ast_Idx next_idx;
 
     while (lexer->token.kind != CN_TOKEN_ZERO) {
-        next = ast_parse_external_declaration(lexer);
+        next_idx = ast_parse_external_declaration(lexer);
 
-        if (next == CN_AST_NIL_IDX)
+        if (next_idx == CN_AST_NIL_IDX)
             goto backtrack;
         
-        cn_ast_node_append_child(&node, next);
+        cn_ast_node_append_child(&node, next_idx);
     }
 
     return cn_ast_node_list_append(node);
