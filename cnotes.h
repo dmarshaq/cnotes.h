@@ -779,6 +779,12 @@ CNDEF Cn_Ast_Idx cn_ast_node_list_append(Cn_Ast_Node node);
 CNDEF void cn_ast_node_add_child(Cn_Ast_Node *node, Cn_Ast_Idx child_idx);
 
 /**
+ * Recursivly prints ast tree to stdout.
+ * IMPORTANT: Use starting depth as 0.
+ */
+CNDEF void cn_ast_print(Cn_Ast_Node *node, int depth);
+
+/**
  * Parses code starting of with lexer current token as translation unit.
  *
  *  translation_unit
@@ -2177,6 +2183,8 @@ Cn_Ast_Node *cn_ast_node_list = NULL;
 
 CNDEF int cn_ast_init() {
     cn_ast_node_list = cn_array_list_make(Cn_Ast_Node, CN_AST_NODE_LIST_INITIAL_CAP);
+    Cn_Ast_Node nil;
+    cn_array_list_append(&cn_ast_node_list, nil);
     if (cn_ast_node_list == NULL)
         return -1;
 
@@ -2197,6 +2205,83 @@ CNDEF void cn_ast_node_add_child(Cn_Ast_Node *node, Cn_Ast_Idx child_idx) {
         node->last_idx                            = child_idx;
     }
 }
+
+#define CN__ENUM_PRINT_CASE(enum_name)\
+    case enum_name: {\
+        printf("%s", #enum_name);\
+        break;\
+        }\
+
+#define CN__AST_PRINT_TABS(depth, prefix) for (int i = 0; i < depth - 1; i++) { printf("%s", CN_AST_PRINT_PREFIXES[i]); } printf("%s", prefix);
+
+CNDEF void cn__ast_print_kind(Cn_Ast_Node_Kind kind) {
+    switch(kind) {
+        CN__ENUM_PRINT_CASE(CN_AST_NODE_TRANSLATION_UNIT);
+        CN__ENUM_PRINT_CASE(CN_AST_NODE_EXTERNAL_DECLARATION);
+        CN__ENUM_PRINT_CASE(CN_AST_NODE_FUNCTION_DEFINITION);
+        CN__ENUM_PRINT_CASE(CN_AST_NODE_DECLARATION);
+        CN__ENUM_PRINT_CASE(CN_AST_NODE_ASM_DEFINITION);
+        CN__ENUM_PRINT_CASE(CN_AST_NODE_UNKNOWN);
+    }
+}
+
+char *CN_AST_PRINT_PREFIXES[32] = {0};
+
+char *CN_AST_PRINT_EMPTY_TAB = (char *)"    ";
+char *CN_AST_PRINT_FLAT_TAB  = (char *)"│   ";
+char *CN_AST_PRINT_SPLIT_TAB = (char *)"├── ";
+char *CN_AST_PRINT_LAST_TAB  = (char *)"└── ";
+
+CNDEF void cn_ast_print(Cn_Ast_Node *node, int depth) {
+    CN_ASSERT(depth < CN_ARRAY_LENGTH(CN_AST_PRINT_PREFIXES));
+
+    cn__ast_print_kind(node->kind);
+    
+    // Printing info about specific nodes.
+    switch(node->kind) {
+       case CN_AST_NODE_EXTERNAL_DECLARATION:
+            if (node->external_declaration.extension) {
+                printf(" '__extension__'");
+            }
+            if (node->child_idx == CN_AST_NIL_IDX) {
+                printf(" stray ';'");
+            }
+            break;
+    }
+    printf("\n");
+
+    CN_AST_PRINT_PREFIXES[depth] = CN_AST_PRINT_FLAT_TAB;
+    cn_ast_node_foreach_child(c, node) {
+        // If last child.
+        if (c->next_idx == CN_AST_NIL_IDX) {
+            CN_AST_PRINT_PREFIXES[depth] = CN_AST_PRINT_EMPTY_TAB;
+            CN__AST_PRINT_TABS(depth, CN_AST_PRINT_LAST_TAB);
+        } else {
+            CN__AST_PRINT_TABS(depth, CN_AST_PRINT_SPLIT_TAB);
+        }
+
+        cn_ast_print(c, depth + 1);
+    }
+
+    CN_AST_PRINT_PREFIXES[depth] = NULL;
+    
+    // .
+    // ├── bin
+    // │   └── libcnotes.a
+    // ├── build
+    // │   ├── obj
+    // │   │   └── cnotes.o
+    // │   ├── temp.c
+    // │   └── tests
+    // │       ├── array_list_append
+    // │       ├── array_list_append.stdout.txt
+    // │       ├── demo
+    // │       ├── demo.stdout.txt
+    // │       ├── hash_table_put
+    // │       └── hash_table_put.stdout.txt
+
+}
+
 
 CNDEF Cn_Ast_Idx cn_ast_parse_translation_unit(Cn_Lexer *lexer) {
     Cn_Lexer original_state = *lexer;
@@ -2224,16 +2309,19 @@ backtrack:
 CNDEF Cn_Ast_Idx cn_ast_parse_external_declaration(Cn_Lexer *lexer) {
     Cn_Lexer original_state = *lexer;
 
-    Cn_Ast_Node node = { .kind = CN_AST_NODE_TRANSLATION_UNIT };
+    Cn_Ast_Node node = { .kind = CN_AST_NODE_EXTERNAL_DECLARATION };
 
     if (lexer->token.type == CN_TOKEN_SYMBOL) {
         if (cn_str_equals(lexer->token.str, CN_CSTR("__extension__"))) {
             node.external_declaration.extension = true;
-
+            cn_ast_next_token(lexer);
         }
     }
-
-    return cn_ast_node_list_append(node);
+    
+    if (lexer->token.type == CN_TOKEN_SEMICOLON) {
+        cn_ast_next_token(lexer);
+        return cn_ast_node_list_append(node);
+    }
 
 backtrack:
     *lexer = original_state;
@@ -2268,7 +2356,7 @@ CNDEF Cn_Translation_Unit cn_tu_make(char *intermidiate_path) {
     uint64_t size = ftell(file);
     rewind(file);
 
-    void *buffer = CN_REALLOC(NULL, size);
+    void *buffer = CN_REALLOC(NULL, size); // LEAK.
     if (buffer == NULL) {
         cn_log(CN_ERROR, "Memory allocation for string buffer failed while reading the file '%s'.\n", intermidiate_path);
         fclose(file);
@@ -2363,14 +2451,22 @@ CNDEF int cn_tu_process(Cn_Translation_Unit *tu) {
     cn_lexer_init(&lexer, tu->content);
     cn_ast_next_token(&lexer);
 
-    cn_ast_parse_translation_unit(&lexer);
+
+
+    Cn_Ast_Idx idx = cn_ast_parse_translation_unit(&lexer);
+
+    if (idx == CN_AST_NIL_IDX) {
+        return -1;
+    }
+
+    cn_ast_print(cn_ast_node_get(idx), 0);
 
     return 0;
 }
 
 CNDEF void cn_tu_free(Cn_Translation_Unit *tu) {
-    CN_UNUSED(tu);
-    CN_TODO("Implement cn_tu_free.");
+    CN_FREE(tu->content.data);
+    cn_array_list_free(&tu->modification_list);
 }
 
 

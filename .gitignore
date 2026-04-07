@@ -3,6 +3,8 @@ bin
 build
 nob
 nob.old
+main.i
+main
 
 # Prerequisites
 *.d

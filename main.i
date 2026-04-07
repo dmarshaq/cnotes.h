@@ -4,7 +4,7 @@
 # 1 "/nix/store/j8irrc0mpx029dw0rmadsjylg7h31ync-glibc-2.42-51-dev/include/stdc-predef.h" 1 3 4
 # 0 "<command-line>" 2
 # 1 "main.c"
-;
+__extension__;
 ;
 ;
 ;
