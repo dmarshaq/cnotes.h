@@ -385,7 +385,7 @@ typedef struct {
     cn__hash_table_free((void **)(ptr_table))
 
 #define cn_hash_table_header(table_ptr)\
-    ((Cn_Hash_Table_Header *)(*((uint8_t **)table_ptr) - sizeof(Cn_Hash_Table_Header)))
+    ((Cn_Hash_Table_Header *)((uint8_t *)*table_ptr - sizeof(Cn_Hash_Table_Header)))
 
 CNDEF uint32_t cn_hashf(int64_t key_size, uint8_t *key);
 
@@ -799,10 +799,10 @@ CNDEF Cn_Ast_Idx cn_ast_parse_translation_unit(Cn_Lexer *lexer);
  *
  *  external_declaration
  *          : '__extension__'? (
- *              function_definition
- *              | declaration
- *              | ';'                       // Stray ';'
+ *              ';'                         // Stray ';'
  *              | asm_definition            // GCC
+ *              | function_definition
+ *              | declaration
  *              )
  *          ;
  *
@@ -810,26 +810,75 @@ CNDEF Cn_Ast_Idx cn_ast_parse_translation_unit(Cn_Lexer *lexer);
 CNDEF Cn_Ast_Idx cn_ast_parse_external_declaration(Cn_Lexer *lexer);
 
 /**
- * Parses code starting of with lexer current token as function definition.
+ * Parses code starting of with lexer current token as function definition 
+ * or declaration. Since we can't really know for certain which one until 
+ * parsed far enough ast structure to determine. Ultimetly existance of function 
+ * body at the end of the declaration signifies that function is definition is being parsed.
  *
  *  function_definition
- *          : attribute_specifier_sequence? declaration_specifiers? declarator declaration_list? function_body
+ *          : declaration_specifiers? declarator declaration_list? function_body
  *          ;
- */
-CNDEF Cn_Ast_Idx cn_ast_parse_function_definition(Cn_Lexer *lexer);
-
-/**
- * Parses code starting of with lexer current token as declaration.
  *
  *  declaration
  *          : (
  *          	declaration_specifiers init_declarator_list? ';'
  *          	| static_assert_declaration
- *          	| attribute_declaration
  *          )
  *          ;
  */
-CNDEF Cn_Ast_Idx cn_ast_parse_declaration(Cn_Lexer *lexer);
+CNDEF Cn_Ast_Idx cn_ast_parse_function_definition_or_declaration(Cn_Lexer *lexer);
+
+/**
+ * IMPORTANT: Attributes of C23 in theory have similar ideas to what this library is trying to implement.
+ * And this library could in theory use [[]] syntax for attributes. The problem is that this syntax might not scale really well.
+ * And regardless of whether this library adapts it, various code analysis tools will still view attributes as just transparent sequence of tokens.
+ * Yelling at anything more complex, even if it bases of recognized C syntax.
+ * This happens because this library is planned to be more complex than plain attachment of attributes.
+ *
+ * For example potential generic implementation using this library that adapts C attribute syntax might look like this:
+ *
+ * typedef int T;
+ * [[cn::generic(T: int, char, void *)]] T my_function(T my_var) {
+ *      T var = my_var;
+ *      return var;
+ * }
+ *
+ * Other example:
+ *
+ * typedef void * T;
+ * T my_function([[cn::generic]] T my_var) {
+ *      T var = my_var;
+ *      return var;
+ * }
+ *
+ * The problem is that this might not be intuitive, and contains garbage syntax to satisfy code analysis tools.
+ * So it doesn't really make sense to try to look like "C standard like" extension, if other tools won't understand it anyway.
+ * Alternative is just modern, cleaner syntax, for example:
+ * 
+ * @Generic(T: int, char, void *) T my_function(T my_var) {
+ *      T var = my_var;
+ *      return var;
+ * }
+ *
+ * Or even this, depending on generic implementation:
+ *
+ * T my_function(@Generic T my_var) {
+ *      T var = my_var;
+ *      return var;
+ * }
+ *
+ * Such intuitive syntax also means that power over [[...]] is fully left to the C compilers,
+ * so none of the future changes are likely to cause collisions or problems with the library.
+ * 
+ *
+ * Parses code starting of with lexer current token as attribute specifier sequence.
+ *
+ * attribute_specifier_sequence
+ *          : attribute_specifier+
+ *          ;
+ */
+CNDEF Cn_Ast_Idx cn_ast_parse_attribute_specifier_sequence(Cn_Lexer *lexer);
+
 
 /**
  * Parses code starting of with lexer current token as asm defintion.
@@ -2172,7 +2221,7 @@ CNDEF void cn_ast_next_token(Cn_Lexer *lexer) {
 next_token:
     cn_lexer_next_token(lexer);
 
-    for (int i = 0; i < CN_ARRAY_LENGTH(CN_TOKEN_BLACKLIST); i++) {
+    for (uint64_t i = 0; i < CN_ARRAY_LENGTH(CN_TOKEN_BLACKLIST); i++) {
         if (lexer->token.type == CN_TOKEN_BLACKLIST[i]) {
             goto next_token; // Skips token if current is in the blacklist.
         }
@@ -2183,7 +2232,7 @@ Cn_Ast_Node *cn_ast_node_list = NULL;
 
 CNDEF int cn_ast_init() {
     cn_ast_node_list = cn_array_list_make(Cn_Ast_Node, CN_AST_NODE_LIST_INITIAL_CAP);
-    Cn_Ast_Node nil;
+    Cn_Ast_Node nil = {};
     cn_array_list_append(&cn_ast_node_list, nil);
     if (cn_ast_node_list == NULL)
         return -1;
@@ -2212,8 +2261,6 @@ CNDEF void cn_ast_node_add_child(Cn_Ast_Node *node, Cn_Ast_Idx child_idx) {
         break;\
         }\
 
-#define CN__AST_PRINT_TABS(depth, prefix) for (int i = 0; i < depth - 1; i++) { printf("%s", CN_AST_PRINT_PREFIXES[i]); } printf("%s", prefix);
-
 CNDEF void cn__ast_print_kind(Cn_Ast_Node_Kind kind) {
     switch(kind) {
         CN__ENUM_PRINT_CASE(CN_AST_NODE_TRANSLATION_UNIT);
@@ -2225,15 +2272,17 @@ CNDEF void cn__ast_print_kind(Cn_Ast_Node_Kind kind) {
     }
 }
 
-char *CN_AST_PRINT_PREFIXES[32] = {0};
+const char *cn_ast_print_prefixes[32] = {0};
 
-char *CN_AST_PRINT_EMPTY_TAB = (char *)"    ";
-char *CN_AST_PRINT_FLAT_TAB  = (char *)"│   ";
-char *CN_AST_PRINT_SPLIT_TAB = (char *)"├── ";
-char *CN_AST_PRINT_LAST_TAB  = (char *)"└── ";
+const char *CN_AST_PRINT_EMPTY_TAB = "    ";
+const char *CN_AST_PRINT_FLAT_TAB  = "│   ";
+const char *CN_AST_PRINT_SPLIT_TAB = "├── ";
+const char *CN_AST_PRINT_LAST_TAB  = "└── ";
+
+#define CN__AST_PRINT_TABS(depth, prefix) for (int i = 0; i < depth - 1; i++) { printf("%s", cn_ast_print_prefixes[i]); } printf("%s", prefix);
 
 CNDEF void cn_ast_print(Cn_Ast_Node *node, int depth) {
-    CN_ASSERT(depth < CN_ARRAY_LENGTH(CN_AST_PRINT_PREFIXES));
+    CN_ASSERT(depth < (int)CN_ARRAY_LENGTH(cn_ast_print_prefixes));
 
     cn__ast_print_kind(node->kind);
     
@@ -2247,14 +2296,16 @@ CNDEF void cn_ast_print(Cn_Ast_Node *node, int depth) {
                 printf(" stray ';'");
             }
             break;
+        default:
+            break;
     }
     printf("\n");
 
-    CN_AST_PRINT_PREFIXES[depth] = CN_AST_PRINT_FLAT_TAB;
+    cn_ast_print_prefixes[depth] = CN_AST_PRINT_FLAT_TAB;
     cn_ast_node_foreach_child(c, node) {
         // If last child.
         if (c->next_idx == CN_AST_NIL_IDX) {
-            CN_AST_PRINT_PREFIXES[depth] = CN_AST_PRINT_EMPTY_TAB;
+            cn_ast_print_prefixes[depth] = CN_AST_PRINT_EMPTY_TAB;
             CN__AST_PRINT_TABS(depth, CN_AST_PRINT_LAST_TAB);
         } else {
             CN__AST_PRINT_TABS(depth, CN_AST_PRINT_SPLIT_TAB);
@@ -2263,23 +2314,7 @@ CNDEF void cn_ast_print(Cn_Ast_Node *node, int depth) {
         cn_ast_print(c, depth + 1);
     }
 
-    CN_AST_PRINT_PREFIXES[depth] = NULL;
-    
-    // .
-    // ├── bin
-    // │   └── libcnotes.a
-    // ├── build
-    // │   ├── obj
-    // │   │   └── cnotes.o
-    // │   ├── temp.c
-    // │   └── tests
-    // │       ├── array_list_append
-    // │       ├── array_list_append.stdout.txt
-    // │       ├── demo
-    // │       ├── demo.stdout.txt
-    // │       ├── hash_table_put
-    // │       └── hash_table_put.stdout.txt
-
+    cn_ast_print_prefixes[depth] = NULL;
 }
 
 
@@ -2294,14 +2329,14 @@ CNDEF Cn_Ast_Idx cn_ast_parse_translation_unit(Cn_Lexer *lexer) {
         next_idx = cn_ast_parse_external_declaration(lexer);
 
         if (next_idx == CN_AST_NIL_IDX)
-            goto backtrack;
+            goto error;
         
         cn_ast_node_add_child(&node, next_idx);
     }
 
     return cn_ast_node_list_append(node);
 
-backtrack:
+error:
     *lexer = original_state;
     return CN_AST_NIL_IDX;
 }
@@ -2311,6 +2346,7 @@ CNDEF Cn_Ast_Idx cn_ast_parse_external_declaration(Cn_Lexer *lexer) {
 
     Cn_Ast_Node node = { .kind = CN_AST_NODE_EXTERNAL_DECLARATION };
 
+    // Optional '__extension__' symbol.
     if (lexer->token.type == CN_TOKEN_SYMBOL) {
         if (cn_str_equals(lexer->token.str, CN_CSTR("__extension__"))) {
             node.external_declaration.extension = true;
@@ -2318,22 +2354,39 @@ CNDEF Cn_Ast_Idx cn_ast_parse_external_declaration(Cn_Lexer *lexer) {
         }
     }
     
+    // If stray ';' case.
     if (lexer->token.type == CN_TOKEN_SEMICOLON) {
         cn_ast_next_token(lexer);
         return cn_ast_node_list_append(node);
     }
 
-backtrack:
+
+    Cn_Ast_Idx child_idx;
+
+    // TODO: Parse asm definition here.
+    // ...
+
+    // Last possible case function definition or declaration.
+    child_idx = cn_ast_parse_function_definition_or_declaration(lexer);
+
+    if (child_idx == CN_AST_NIL_IDX)
+        goto error;
+
+    cn_ast_node_add_child(&node, child_idx);
+
+    return cn_ast_node_list_append(node);
+
+error:
     *lexer = original_state;
     return CN_AST_NIL_IDX;
 }
 
-CNDEF Cn_Ast_Idx cn_ast_parse_function_definition(Cn_Lexer *lexer) {
-    CN_TODO("AST function definition.");
+CNDEF Cn_Ast_Idx cn_ast_parse_function_definition_or_declaration(Cn_Lexer *lexer) {
+    CN_TODO("AST function definition or declaration.");
 }
 
-CNDEF Cn_Ast_Idx cn_ast_parse_declaration(Cn_Lexer *lexer) {
-    CN_TODO("AST declaration.");
+CNDEF Cn_Ast_Idx cn_ast_parse_attribute_specifier_sequence(Cn_Lexer *lexer) {
+    CN_TODO("AST attribute specifier sequence.");
 }
 
 CNDEF Cn_Ast_Idx cn_ast_parse_asm_definition(Cn_Lexer *lexer) {
