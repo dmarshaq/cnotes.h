@@ -529,17 +529,17 @@ CNDEF Cn_String cn__string_list_force_save(Cn_String str);
  */
 typedef enum cn_qualifier_flags : uint8_t {
     CN_TYPE_QUALIFIER_CONST           = 0x01,
-    CN_TYPE_QUALIFIER_VOLATILE        = 0x02,
-    CN_TYPE_QUALIFIER_RESTRICT        = 0x04,
+    CN_TYPE_QUALIFIER_RESTRICT        = 0x02,
+    CN_TYPE_QUALIFIER_VOLATILE        = 0x04,
+    CN_TYPE_QUALIFIER_ATOMIC          = 0x08,
 } Cn_Qualifier_Flags;
 
 static const Cn_String CN_QUALIFIER_KEYWORDS[] = {
     CN_STR_BUFFER("const"),
-    CN_STR_BUFFER("volatile"),
     CN_STR_BUFFER("restrict"),
+    CN_STR_BUFFER("volatile"),
+    CN_STR_BUFFER("_Atomic"),
 };
-
-#define CN_QUALIFIER_KEYWORDS_LENGTH CN_ARRAY_LENGTH(CN_QUALIFIER_KEYWORDS)
 
 
 typedef enum cn_modifier_flags : uint8_t {
@@ -558,8 +558,6 @@ static const Cn_String CN_MODIFIER_KEYWORDS[] = {
     CN_STR_BUFFER("long long"),
 };
 
-#define CN_MODIFIER_KEYWORDS_LENGTH CN_ARRAY_LENGTH(CN_MODIFIER_KEYWORDS)
-
 
 typedef enum cn_storage_specifier_flags : uint8_t {
     CN_STORAGE_SPECIFIER_STATIC       = 0x01,
@@ -576,24 +574,6 @@ static const Cn_String CN_STORAGE_SPECIFIER_KEYWORDS[] = {
     CN_STR_BUFFER("auto"),
     CN_STR_BUFFER("typedef"),
 };
-
-#define CN_STORAGE_SPECIFIER_KEYWORDS_LENGTH CN_ARRAY_LENGTH(CN_STORAGE_SPECIFIER_KEYWORDS)
-
-
-/**
- * Tries to parse CN_TOKEN_SYMBOL as a storage specifier.
- * OUTPUTS: It into supplied output destination.
- * RETURNS: 0 if successful.
- */
-int cn_try_parse_storage_specifier(Cn_Token symbol, Cn_Storage_Specifier_Flags *output);
-
-
-/**
- * Tries to parse CN_TOKEN_SYMBOL as a qualifier.
- * OUTPUTS: It into supplied output destination.
- * RETURNS: 0 if successful.
- */
-int cn_try_parse_qualifier(Cn_Token symbol, Cn_Qualifier_Flags *output);
 
 
 typedef enum cn_type_identifier_kind : uint8_t {
@@ -613,31 +593,11 @@ static const Cn_String CN_INT_STR         = CN_STR_BUFFER("int");
 static const Cn_String CN_CHAR_STR        = CN_STR_BUFFER("char");
 static const Cn_String CN_FLOAT_STR       = CN_STR_BUFFER("float");
 static const Cn_String CN_DOUBLE_STR      = CN_STR_BUFFER("double");
-static const Cn_String CN_BOOL_STR        = CN_STR_BUFFER("bool");
+static const Cn_String CN_BOOL_STR        = CN_STR_BUFFER("_Bool");
 static const Cn_String CN_VOID_STR        = CN_STR_BUFFER("void");
 static const Cn_String CN_STRUCT_STR      = CN_STR_BUFFER("struct");
 static const Cn_String CN_ENUM_STR        = CN_STR_BUFFER("enum");
 static const Cn_String CN_UNION_STR       = CN_STR_BUFFER("union");
-
-/**
- * Type Specifiers are like base types, 
- * that can both be user defined struct ..., enum ..., union ..., and even typedef. 
- * Or built in types like int, float, double, long, long long, void, short char, 
- * unsigned, signed char, etc...
- */
-typedef struct cn_type_specifier {
-    Cn_Type_Identifier_Kind kind;
-    Cn_Modifier_Flags flags;
-    Cn_String name;
-    Cn_Ast_Idx definition_idx;
-} Cn_Type_Specifier;
-
-/**
- * Tries to parse next token(s) as a type specifier.
- * OUTPUTS: It into supplied output destination.
- * RETURNS: 0 if successful.
- */
-int cn_try_parse_type_specifier(Cn_Lexer *lexer, Cn_Type_Specifier *output);
 
 /**
  * Grabs next token in the lexer the same way as lexer next token except,
@@ -691,8 +651,9 @@ typedef enum cn_ast_node_kind : uint8_t {
     CN_AST_NODE_UNKNOWN                        = 0,
     CN_AST_NODE_TRANSLATION_UNIT,
     CN_AST_NODE_EXTERNAL_DECLARATION,
-    CN_AST_NODE_FUNCTION_DEFINITION,
     CN_AST_NODE_DECLARATION,
+    CN_AST_NODE_FUNCTION_DEFINITION,
+    CN_AST_NODE_DECLARATION_SPECIFIERS,
     CN_AST_NODE_ASM_DEFINITION,
 } Cn_Ast_Node_Kind;
 
@@ -815,18 +776,88 @@ CNDEF Cn_Ast_Idx cn_ast_parse_external_declaration(Cn_Lexer *lexer);
  * parsed far enough ast structure to determine. Ultimetly existance of function 
  * body at the end of the declaration signifies that function is definition is being parsed.
  *
- *  function_definition
- *          : declaration_specifiers? declarator declaration_list? function_body
- *          ;
- *
  *  declaration
  *          : (
  *          	declaration_specifiers init_declarator_list? ';'
  *          	| static_assert_declaration
- *          )
+ *              )
+ *          ;
+ *
+ *  function_definition
+ *          : declaration_specifiers declarator declaration_list? function_body
  *          ;
  */
 CNDEF Cn_Ast_Idx cn_ast_parse_function_definition_or_declaration(Cn_Lexer *lexer);
+
+/**
+ * Parses code starting of with lexer current token as declaration specifiers.
+ *
+ *  declaration_specifiers
+ *          : (
+ *              storage_specifier
+ *              | qualifier
+ *              | type_specifier
+ *              )+
+ *          ;
+ *
+ */
+CNDEF Cn_Ast_Idx cn_ast_parse_declaration_specifiers(Cn_Lexer *lexer);
+
+/**
+ * Tries to parse CN_TOKEN_SYMBOL as a storage specifier.
+ * OUTPUTS: It into supplied output destination.
+ * RETURNS: 0 if successful.
+ *
+ *  storage_specifier
+ *          : 'static'
+ *          | 'extern'
+ *          | 'register'
+ *          | 'auto'
+ *          | 'typedef'
+ *          ;
+ */
+CNDEF int cn_try_parse_storage_specifier(Cn_Token symbol, Cn_Storage_Specifier_Flags *output);
+
+/**
+ * Tries to parse CN_TOKEN_SYMBOL as a qualifier.
+ * OUTPUTS: It into supplied output destination.
+ * RETURNS: 0 if successful.
+ *
+ *  qualifier
+ *          : 'const'
+ *          | 'restrict'
+ *          | 'volatile'
+ *          | '_Atomic'
+ *          ;
+ */
+CNDEF int cn_try_parse_qualifier(Cn_Token symbol, Cn_Qualifier_Flags *output);
+
+/**
+ * Parses code starting of with lexer current token as type specifier.
+ * IMPORTANT: This function will use specified output if its not NIL.
+ * It is done this way, because type specifier can be split on 
+ * multilpe tokens appearing apart from each other.
+ * RETURNS: NIL on error, idx of modified ast node on success.
+ *
+ *  type_specifier
+ *          : 'void'
+ *          | 'char'
+ *          | 'short'
+ *          | 'int'
+ *          | 'long'
+ *          | 'float'
+ *          | 'double'
+ *          | 'signed'
+ *          | 'unsigned'
+ *          | '_Bool'
+ *          | '_Complex'
+ *          | atomic_type_specifier
+ *          | struct_or_union_specifier
+ *          | enum_specifier
+ *          | typedef
+ *          ;
+ */
+CNDEF Cn_Ast_Idx cn_ast_parse_type_specifier(Cn_Lexer *lexer, Cn_Ast_Idx output_idx);
 
 /**
  * IMPORTANT: Attributes of C23 in theory have similar ideas to what this library is trying to implement.
@@ -878,7 +909,6 @@ CNDEF Cn_Ast_Idx cn_ast_parse_function_definition_or_declaration(Cn_Lexer *lexer
  *          ;
  */
 CNDEF Cn_Ast_Idx cn_ast_parse_attribute_specifier_sequence(Cn_Lexer *lexer);
-
 
 /**
  * Parses code starting of with lexer current token as asm defintion.
@@ -2269,6 +2299,7 @@ CNDEF void cn__ast_print_kind(Cn_Ast_Node_Kind kind) {
         CN__ENUM_PRINT_CASE(CN_AST_NODE_DECLARATION);
         CN__ENUM_PRINT_CASE(CN_AST_NODE_ASM_DEFINITION);
         CN__ENUM_PRINT_CASE(CN_AST_NODE_UNKNOWN);
+        default: break;
     }
 }
 
@@ -2382,8 +2413,26 @@ error:
 }
 
 CNDEF Cn_Ast_Idx cn_ast_parse_function_definition_or_declaration(Cn_Lexer *lexer) {
-    CN_TODO("AST function definition or declaration.");
+    Cn_Lexer original_state = *lexer;
+
+    Cn_Ast_Node node = {};
+
+    Cn_Ast_Idx child_idx;
+
+    child_idx = cn_ast_parse_declaration_specifiers(lexer);
+
+    if (child_idx == CN_AST_NIL_IDX)
+        goto error;
+
+    cn_ast_node_add_child(&node, child_idx);
+
+    return cn_ast_node_list_append(node);
+
+error:
+    *lexer = original_state;
+    return CN_AST_NIL_IDX;
 }
+
 
 CNDEF Cn_Ast_Idx cn_ast_parse_attribute_specifier_sequence(Cn_Lexer *lexer) {
     CN_TODO("AST attribute specifier sequence.");
