@@ -542,23 +542,6 @@ static const Cn_String CN_QUALIFIER_KEYWORDS[] = {
 };
 
 
-typedef enum cn_modifier_flags : uint8_t {
-    CN_TYPE_MODIFIER_SIGNED           = 0x01,
-    CN_TYPE_MODIFIER_UNSIGNED         = 0x02,
-    CN_TYPE_MODIFIER_SHORT            = 0x04,
-    CN_TYPE_MODIFIER_LONG             = 0x08,
-    CN_TYPE_MODIFIER_LONG_LONG        = 0x10,
-} Cn_Modifier_Flags;
-
-static const Cn_String CN_MODIFIER_KEYWORDS[] = {
-    CN_STR_BUFFER("signed"),
-    CN_STR_BUFFER("unsigned"),
-    CN_STR_BUFFER("short"),
-    CN_STR_BUFFER("long"),
-    CN_STR_BUFFER("long long"),
-};
-
-
 typedef enum cn_storage_specifier_flags : uint8_t {
     CN_STORAGE_SPECIFIER_STATIC       = 0x01,
     CN_STORAGE_SPECIFIER_EXTERN       = 0x02,
@@ -576,18 +559,38 @@ static const Cn_String CN_STORAGE_SPECIFIER_KEYWORDS[] = {
 };
 
 
-typedef enum cn_type_identifier_kind : uint8_t {
-    CN_TYPE_IDENTIFIER_INT = 0,
-    CN_TYPE_IDENTIFIER_CHAR,
-    CN_TYPE_IDENTIFIER_FLOAT,
-    CN_TYPE_IDENTIFIER_DOUBLE,
-    CN_TYPE_IDENTIFIER_BOOL,
-    CN_TYPE_IDENTIFIER_VOID,
-    CN_TYPE_IDENTIFIER_TYPEDEF,
-    CN_TYPE_IDENTIFIER_STRUCT,
-    CN_TYPE_IDENTIFIER_ENUM,
-    CN_TYPE_IDENTIFIER_UNION,
-} Cn_Type_Identifier_Kind;
+typedef enum : uint8_t {
+    CN_TYPE_SIGN_NODE = 0,
+    CN_TYPE_SIGN_SIGNED,
+    CN_TYPE_SIGN_UNSIGNED,
+} Cn_Type_Sign;
+
+static const Cn_String CN_SIGNED_STR   = CN_STR_BUFFER("signed");
+static const Cn_String CN_UNSIGNED_STR = CN_STR_BUFFER("unsigned");
+
+typedef enum : uint8_t {
+    CN_TYPE_WIDTH_NONE = 0,
+    CN_TYPE_WIDTH_SHORT,
+    CN_TYPE_WIDTH_LONG,
+    CN_TYPE_WIDTH_LONG_LONG,
+} Cn_Type_Width;
+
+static const Cn_String CN_SHORT_STR     = CN_STR_BUFFER("short");
+static const Cn_String CN_LONG_STR      = CN_STR_BUFFER("long");
+
+typedef enum : uint8_t {
+    CN_TYPE_NONE = 0,
+    CN_TYPE_INT,
+    CN_TYPE_CHAR,
+    CN_TYPE_FLOAT,
+    CN_TYPE_DOUBLE,
+    CN_TYPE_BOOL,
+    CN_TYPE_VOID,
+    CN_TYPE_TYPEDEF,
+    CN_TYPE_STRUCT,
+    CN_TYPE_ENUM,
+    CN_TYPE_UNION,
+} Cn_Type_Kind;
 
 static const Cn_String CN_INT_STR         = CN_STR_BUFFER("int");
 static const Cn_String CN_CHAR_STR        = CN_STR_BUFFER("char");
@@ -598,6 +601,7 @@ static const Cn_String CN_VOID_STR        = CN_STR_BUFFER("void");
 static const Cn_String CN_STRUCT_STR      = CN_STR_BUFFER("struct");
 static const Cn_String CN_ENUM_STR        = CN_STR_BUFFER("enum");
 static const Cn_String CN_UNION_STR       = CN_STR_BUFFER("union");
+
 
 /**
  * Grabs next token in the lexer the same way as lexer next token except,
@@ -661,6 +665,15 @@ typedef struct {
     bool extension;
 } Cn_Ast_Node_External_Declaration;
 
+typedef struct {
+    Cn_Storage_Specifier_Flags storage_specifiers;
+    Cn_Qualifier_Flags         qualifiers;
+} Cn_Ast_Node_Declaration_Specifiers;
+
+typedef struct {
+    
+} Cn_Ast_Node_Type_Specifier;
+
 // typedef struct {
 //     Cn_Qualifier_Flags qualifier_flags;
 //     Cn_Type_Specifier type_specifier;
@@ -694,6 +707,7 @@ typedef struct cn_ast_node {
 
     union {
         Cn_Ast_Node_External_Declaration    external_declaration;
+        Cn_Ast_Node_Declaration_Specifiers  declaration_specifiers;
     };
 } Cn_Ast_Node;
 
@@ -788,6 +802,17 @@ CNDEF Cn_Ast_Idx cn_ast_parse_external_declaration(Cn_Lexer *lexer);
  *          ;
  */
 CNDEF Cn_Ast_Idx cn_ast_parse_function_definition_or_declaration(Cn_Lexer *lexer);
+
+
+/**
+ * Parses code starting of with lexer current token as declaration specifiers.
+ *
+ *  init_declarator_list
+ *          : TODO
+ *          ;
+ *
+ */
+CNDEF Cn_Ast_Idx cn_ast_parse_init_declarator_list(Cn_Lexer *lexer);
 
 /**
  * Parses code starting of with lexer current token as declaration specifiers.
@@ -2262,7 +2287,7 @@ Cn_Ast_Node *cn_ast_node_list = NULL;
 
 CNDEF int cn_ast_init() {
     cn_ast_node_list = cn_array_list_make(Cn_Ast_Node, CN_AST_NODE_LIST_INITIAL_CAP);
-    Cn_Ast_Node nil = {};
+    Cn_Ast_Node nil = {0};
     cn_array_list_append(&cn_ast_node_list, nil);
     if (cn_ast_node_list == NULL)
         return -1;
@@ -2415,7 +2440,7 @@ error:
 CNDEF Cn_Ast_Idx cn_ast_parse_function_definition_or_declaration(Cn_Lexer *lexer) {
     Cn_Lexer original_state = *lexer;
 
-    Cn_Ast_Node node = {};
+    Cn_Ast_Node node = {0};
 
     Cn_Ast_Idx child_idx;
 
@@ -2426,6 +2451,9 @@ CNDEF Cn_Ast_Idx cn_ast_parse_function_definition_or_declaration(Cn_Lexer *lexer
 
     cn_ast_node_add_child(&node, child_idx);
 
+    // TODO: Finish the rest of the parsing.
+    node.kind = CN_AST_NODE_DECLARATION;
+
     return cn_ast_node_list_append(node);
 
 error:
@@ -2433,6 +2461,41 @@ error:
     return CN_AST_NIL_IDX;
 }
 
+CNDEF Cn_Ast_Idx cn_ast_parse_declaration_specifiers(Cn_Lexer *lexer) {
+    Cn_Lexer original_state = *lexer;
+
+    Cn_Ast_Node node = { .kind = CN_AST_NODE_DECLARATION_SPECIFIERS };
+
+    Cn_Ast_Idx child_idx;
+    while (true) {
+        if (cn_try_parse_storage_specifier(lexer->token, &node.declaration_specifiers.storage_specifiers) == 0) {
+            continue;
+        }
+
+        if (cn_try_parse_qualifier(lexer->token, &node.declaration_specifiers.qualifiers) == 0) {
+            continue;
+        }
+
+        child_idx = cn_ast_parse_type_specifier(lexer, node.child_idx);
+        if (child_idx != CN_AST_NIL_IDX) {
+            node.child_idx = child_idx;
+            continue;
+        }
+
+        break;
+    }
+
+    // TODO: Validation of type specifier.
+    
+
+error:
+    *lexer = original_state;
+    return CN_AST_NIL_IDX;
+}
+
+CNDEF Cn_Ast_Idx cn_ast_parse_init_declarator_list(Cn_Lexer *lexer) {
+    CN_TODO("AST init declarator list.");
+}
 
 CNDEF Cn_Ast_Idx cn_ast_parse_attribute_specifier_sequence(Cn_Lexer *lexer) {
     CN_TODO("AST attribute specifier sequence.");
