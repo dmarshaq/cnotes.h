@@ -1,4 +1,4 @@
-__extension__;
+static const long unsigned long int;
 ;
 ;
 ;

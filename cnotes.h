@@ -516,17 +516,6 @@ CNDEF Cn_String cn__string_list_save(Cn_String str);
 CNDEF Cn_String cn__string_list_force_save(Cn_String str);
 
 
-/**
- * These flags correspond to existence of certain keyword in declaration, 
- * for example TYPE_MODIFIER_SIGNED means there is 'signed' keyword, 
- * it is intended to detect and report illegal combination of various keywords.
- * Some of the following flags are mutually exclusive, 
- * and cannot be simultaneously be active on a declaration, 
- * but they are still grouped as the flags, because some them can be combined together. 
- * Therefore whether the certain combination is legal or not doesn't matter, 
- * because parser will make sure its valid, and if it is not for some reason it will result 
- * in error at compilation stage of an actual program. 
- */
 typedef enum cn_qualifier_flags : uint8_t {
     CN_TYPE_QUALIFIER_CONST           = 0x01,
     CN_TYPE_QUALIFIER_RESTRICT        = 0x02,
@@ -534,12 +523,10 @@ typedef enum cn_qualifier_flags : uint8_t {
     CN_TYPE_QUALIFIER_ATOMIC          = 0x08,
 } Cn_Qualifier_Flags;
 
-static const Cn_String CN_QUALIFIER_KEYWORDS[] = {
-    CN_STR_BUFFER("const"),
-    CN_STR_BUFFER("restrict"),
-    CN_STR_BUFFER("volatile"),
-    CN_STR_BUFFER("_Atomic"),
-};
+static const Cn_String CN_CONST_STR    = CN_STR_BUFFER("const");
+static const Cn_String CN_RESTRICT_STR = CN_STR_BUFFER("restrict");
+static const Cn_String CN_VOLATILE_STR = CN_STR_BUFFER("volatile");
+static const Cn_String CN_ATOMIC_STR   = CN_STR_BUFFER("_Atomic");
 
 
 typedef enum cn_storage_specifier_flags : uint8_t {
@@ -550,17 +537,15 @@ typedef enum cn_storage_specifier_flags : uint8_t {
     CN_STORAGE_SPECIFIER_TYPEDEF      = 0x10,
 } Cn_Storage_Specifier_Flags;
 
-static const Cn_String CN_STORAGE_SPECIFIER_KEYWORDS[] = {
-    CN_STR_BUFFER("static"),
-    CN_STR_BUFFER("extern"),
-    CN_STR_BUFFER("register"),
-    CN_STR_BUFFER("auto"),
-    CN_STR_BUFFER("typedef"),
-};
+static const Cn_String CN_STATIC_STR   = CN_STR_BUFFER("static");
+static const Cn_String CN_EXTERN_STR   = CN_STR_BUFFER("extern");
+static const Cn_String CN_REGISTER_STR = CN_STR_BUFFER("register");
+static const Cn_String CN_AUTO_STR     = CN_STR_BUFFER("auto");
+static const Cn_String CN_TYPEDEF_STR  = CN_STR_BUFFER("typedef");
 
 
 typedef enum : uint8_t {
-    CN_TYPE_SIGN_NODE = 0,
+    CN_TYPE_SIGN_NONE = 0,
     CN_TYPE_SIGN_SIGNED,
     CN_TYPE_SIGN_UNSIGNED,
 } Cn_Type_Sign;
@@ -579,25 +564,32 @@ static const Cn_String CN_SHORT_STR     = CN_STR_BUFFER("short");
 static const Cn_String CN_LONG_STR      = CN_STR_BUFFER("long");
 
 typedef enum : uint8_t {
-    CN_TYPE_NONE = 0,
-    CN_TYPE_INT,
-    CN_TYPE_CHAR,
-    CN_TYPE_FLOAT,
-    CN_TYPE_DOUBLE,
-    CN_TYPE_BOOL,
-    CN_TYPE_VOID,
+    // IMPORTANT: These primitive "base" types are mapped to constant array declared below.
+    // CN_TYPE_NONE at index 0 is NULL string.
+    CN_TYPE_NONE    = 0,
+    CN_TYPE_INT     = 1,
+    CN_TYPE_CHAR    = 2,
+    CN_TYPE_FLOAT   = 3,
+    CN_TYPE_DOUBLE  = 4,
+    CN_TYPE_BOOL    = 5,
+    CN_TYPE_VOID    = 6,
+
     CN_TYPE_TYPEDEF,
     CN_TYPE_STRUCT,
     CN_TYPE_ENUM,
     CN_TYPE_UNION,
 } Cn_Type_Kind;
 
-static const Cn_String CN_INT_STR         = CN_STR_BUFFER("int");
-static const Cn_String CN_CHAR_STR        = CN_STR_BUFFER("char");
-static const Cn_String CN_FLOAT_STR       = CN_STR_BUFFER("float");
-static const Cn_String CN_DOUBLE_STR      = CN_STR_BUFFER("double");
-static const Cn_String CN_BOOL_STR        = CN_STR_BUFFER("_Bool");
-static const Cn_String CN_VOID_STR        = CN_STR_BUFFER("void");
+static const Cn_String CN_TYPE_KINDS[] = {
+    {0},
+    CN_STR_BUFFER("int"),
+    CN_STR_BUFFER("char"),
+    CN_STR_BUFFER("float"),
+    CN_STR_BUFFER("double"),
+    CN_STR_BUFFER("_Bool"),
+    CN_STR_BUFFER("void"),
+};
+
 static const Cn_String CN_STRUCT_STR      = CN_STR_BUFFER("struct");
 static const Cn_String CN_ENUM_STR        = CN_STR_BUFFER("enum");
 static const Cn_String CN_UNION_STR       = CN_STR_BUFFER("union");
@@ -659,6 +651,7 @@ typedef enum cn_ast_node_kind : uint8_t {
     CN_AST_NODE_FUNCTION_DEFINITION,
     CN_AST_NODE_DECLARATION_SPECIFIERS,
     CN_AST_NODE_ASM_DEFINITION,
+    CN_AST_NODE_TYPE_SPECIFIER,
 } Cn_Ast_Node_Kind;
 
 typedef struct {
@@ -671,7 +664,9 @@ typedef struct {
 } Cn_Ast_Node_Declaration_Specifiers;
 
 typedef struct {
-    
+    Cn_Type_Kind  kind;
+    Cn_Type_Width width;
+    Cn_Type_Sign  sign;
 } Cn_Ast_Node_Type_Specifier;
 
 // typedef struct {
@@ -708,6 +703,7 @@ typedef struct cn_ast_node {
     union {
         Cn_Ast_Node_External_Declaration    external_declaration;
         Cn_Ast_Node_Declaration_Specifiers  declaration_specifiers;
+        Cn_Ast_Node_Type_Specifier          type_specifier;
     };
 } Cn_Ast_Node;
 
@@ -829,9 +825,11 @@ CNDEF Cn_Ast_Idx cn_ast_parse_init_declarator_list(Cn_Lexer *lexer);
 CNDEF Cn_Ast_Idx cn_ast_parse_declaration_specifiers(Cn_Lexer *lexer);
 
 /**
- * Tries to parse CN_TOKEN_SYMBOL as a storage specifier.
+ * Tries to parse code starting of with lexer current token as storage specifier.
+ *
  * OUTPUTS: It into supplied output destination.
- * RETURNS: 0 if successful.
+ *
+ * RETURNS: 0 on success, 1 if token wasn't accepted, 2 on error.
  *
  *  storage_specifier
  *          : 'static'
@@ -841,12 +839,14 @@ CNDEF Cn_Ast_Idx cn_ast_parse_declaration_specifiers(Cn_Lexer *lexer);
  *          | 'typedef'
  *          ;
  */
-CNDEF int cn_try_parse_storage_specifier(Cn_Token symbol, Cn_Storage_Specifier_Flags *output);
+CNDEF int cn_ast_try_parse_storage_specifier(Cn_Lexer *lexer, Cn_Storage_Specifier_Flags *output);
 
 /**
- * Tries to parse CN_TOKEN_SYMBOL as a qualifier.
+ * Tries to parse code starting of with lexer current token as qualifier.
+ *
  * OUTPUTS: It into supplied output destination.
- * RETURNS: 0 if successful.
+ *
+ * RETURNS: 0 on success, 1 if token wasn't accepted, 2 on error.
  *
  *  qualifier
  *          : 'const'
@@ -855,14 +855,21 @@ CNDEF int cn_try_parse_storage_specifier(Cn_Token symbol, Cn_Storage_Specifier_F
  *          | '_Atomic'
  *          ;
  */
-CNDEF int cn_try_parse_qualifier(Cn_Token symbol, Cn_Qualifier_Flags *output);
+CNDEF int cn_ast_try_parse_qualifier(Cn_Lexer *lexer, Cn_Qualifier_Flags *output);
 
 /**
- * Parses code starting of with lexer current token as type specifier.
- * IMPORTANT: This function will use specified output if its not NIL.
- * It is done this way, because type specifier can be split on 
- * multilpe tokens appearing apart from each other.
- * RETURNS: NIL on error, idx of modified ast node on success.
+ * Tries to parse code starting of with lexer current token as type specifier.
+ *
+ * OUTPUTS: It into supplied output ast node.
+ * Passing NIL as output_idx is an error.
+ * 
+ * IMPORTANT: This function can return 1, which is NOT an error.
+ * It will occure in a case where current token is not a valid token type specifier can accept.
+ * And that no errors occured. It is done so type specifier can check everything it needs 
+ * and if it has no work there to be done, 
+ * signifying outer function that current token is definitly not a type specifier.
+ *
+ * RETURNS: 0 on success, 1 if token wasn't accepted, 2 on error.
  *
  *  type_specifier
  *          : 'void'
@@ -882,7 +889,7 @@ CNDEF int cn_try_parse_qualifier(Cn_Token symbol, Cn_Qualifier_Flags *output);
  *          | typedef
  *          ;
  */
-CNDEF Cn_Ast_Idx cn_ast_parse_type_specifier(Cn_Lexer *lexer, Cn_Ast_Idx output_idx);
+CNDEF Cn_Ast_Idx cn_ast_try_parse_type_specifier(Cn_Lexer *lexer, Cn_Ast_Idx output_idx);
 
 /**
  * IMPORTANT: Attributes of C23 in theory have similar ideas to what this library is trying to implement.
@@ -2320,9 +2327,11 @@ CNDEF void cn__ast_print_kind(Cn_Ast_Node_Kind kind) {
     switch(kind) {
         CN__ENUM_PRINT_CASE(CN_AST_NODE_TRANSLATION_UNIT);
         CN__ENUM_PRINT_CASE(CN_AST_NODE_EXTERNAL_DECLARATION);
-        CN__ENUM_PRINT_CASE(CN_AST_NODE_FUNCTION_DEFINITION);
         CN__ENUM_PRINT_CASE(CN_AST_NODE_DECLARATION);
+        CN__ENUM_PRINT_CASE(CN_AST_NODE_FUNCTION_DEFINITION);
+        CN__ENUM_PRINT_CASE(CN_AST_NODE_DECLARATION_SPECIFIERS);
         CN__ENUM_PRINT_CASE(CN_AST_NODE_ASM_DEFINITION);
+        CN__ENUM_PRINT_CASE(CN_AST_NODE_TYPE_SPECIFIER);
         CN__ENUM_PRINT_CASE(CN_AST_NODE_UNKNOWN);
         default: break;
     }
@@ -2465,32 +2474,216 @@ CNDEF Cn_Ast_Idx cn_ast_parse_declaration_specifiers(Cn_Lexer *lexer) {
     Cn_Lexer original_state = *lexer;
 
     Cn_Ast_Node node = { .kind = CN_AST_NODE_DECLARATION_SPECIFIERS };
+    node.child_idx = cn_ast_node_list_append((Cn_Ast_Node) { .kind = CN_AST_NODE_TYPE_SPECIFIER });
 
-    Cn_Ast_Idx child_idx;
+
+
+    int ok;
     while (true) {
-        if (cn_try_parse_storage_specifier(lexer->token, &node.declaration_specifiers.storage_specifiers) == 0) {
+        ok = cn_ast_try_parse_storage_specifier(lexer, &node.declaration_specifiers.storage_specifiers);
+        if (ok == 0)
             continue;
-        }
+        if (ok == 2)
+            goto error;
 
-        if (cn_try_parse_qualifier(lexer->token, &node.declaration_specifiers.qualifiers) == 0) {
+        ok = cn_ast_try_parse_qualifier(lexer, &node.declaration_specifiers.qualifiers);
+        if (ok == 0)
             continue;
-        }
-
-        child_idx = cn_ast_parse_type_specifier(lexer, node.child_idx);
-        if (child_idx != CN_AST_NIL_IDX) {
-            node.child_idx = child_idx;
+        if (ok == 2)
+            goto error;
+    
+        ok = cn_ast_try_parse_type_specifier(lexer, node.child_idx);
+        if (ok == 0)
             continue;
-        }
+        if (ok == 2)
+            goto error;
 
         break;
     }
 
-    // TODO: Validation of type specifier.
-    
+    // Validation of type specifier.
+    Cn_Ast_Node *ts = cn_ast_node_get(node.child_idx);
+
+    // Implicit int case.
+    if (ts->type_specifier.kind == CN_TYPE_NONE) {
+        ts->type_specifier.kind = CN_TYPE_INT;
+    }
+
+    if (ts->type_specifier.width != CN_TYPE_WIDTH_NONE && ts->type_specifier.kind != CN_TYPE_INT) {
+        cn_log(CN_ERROR, "Specified type width on non 'int' type.");
+        goto error;
+    }
+
+    if (ts->type_specifier.sign != CN_TYPE_SIGN_NONE && ts->type_specifier.kind != CN_TYPE_INT && ts->type_specifier.kind != CN_TYPE_CHAR) {
+        cn_log(CN_ERROR, "Specified type sign on non 'int' or 'char' type.");
+        goto error;
+    }
+
+    return cn_ast_node_list_append(node);
 
 error:
     *lexer = original_state;
     return CN_AST_NIL_IDX;
+}
+
+CNDEF int cn_ast_try_parse_storage_specifier(Cn_Lexer *lexer, Cn_Storage_Specifier_Flags *output) {
+    Cn_Lexer original_state = *lexer;
+
+#define KEYWORD_CHECK(name)\
+    if (cn_str_equals(lexer->token.str, CN_##name##_STR)) {\
+        if (*output != 0) goto error_multiple_storage_specifier;\
+        cn_lexer_next_token(lexer);\
+        *output = CN_STORAGE_SPECIFIER_##name;\
+        return 0;\
+    }
+
+    KEYWORD_CHECK(STATIC);
+    KEYWORD_CHECK(EXTERN);
+    KEYWORD_CHECK(REGISTER);
+    KEYWORD_CHECK(AUTO);
+    KEYWORD_CHECK(TYPEDEF);
+
+#undef KEYWORD_CHECK
+
+    return 1;
+
+error_multiple_storage_specifier:
+    cn_log(CN_ERROR, "Multiple storage specifiers are not allowed.");
+    cn_lexer_print_snippet_token(lexer);
+    goto error;
+
+error:
+    *lexer = original_state;
+    return 2;
+}
+
+CNDEF int cn_ast_try_parse_qualifier(Cn_Lexer *lexer, Cn_Qualifier_Flags *output) {
+    Cn_Lexer original_state = *lexer;
+
+#define KEYWORD_CHECK(name)\
+    if (cn_str_equals(lexer->token.str, CN_##name##_STR)) {\
+        cn_lexer_next_token(lexer);\
+        *output = CN_TYPE_QUALIFIER_##name;\
+        return 0;\
+    }
+
+    KEYWORD_CHECK(CONST);
+    KEYWORD_CHECK(RESTRICT);
+    KEYWORD_CHECK(VOLATILE);
+
+#undef KEYWORD_CHECK
+
+    if (cn_str_equals(lexer->token.str, CN_ATOMIC_STR)) {
+        // Case where it is atomic specifier is not handled here, if such case appears just skip.
+        if (cn_lexer_peek(*lexer).type == CN_TOKEN_PARAN_OPEN) return 1;
+        cn_lexer_next_token(lexer);
+        *output = CN_TYPE_QUALIFIER_ATOMIC;
+        return 0;
+    }
+
+    return 1;
+error:
+    *lexer = original_state;
+    return 2;
+}
+
+CNDEF Cn_Ast_Idx cn_ast_try_parse_type_specifier(Cn_Lexer *lexer, Cn_Ast_Idx output_idx) {
+    Cn_Lexer original_state = *lexer;
+
+    CN_ASSERT(output_idx != CN_AST_NIL_IDX);
+    Cn_Ast_Node *node = cn_ast_node_get(output_idx);
+    
+    // Checking if token is primitive.
+    for (Cn_Type_Kind kind = 1; kind < CN_ARRAY_LENGTH(CN_TYPE_KINDS); kind++) {
+        if (cn_str_equals(lexer->token.str, CN_TYPE_KINDS[kind])) {
+
+            if (node->type_specifier.kind != CN_TYPE_NONE) {
+                cn_log(CN_ERROR, "Only single type specifier kind is allowed.");
+                cn_lexer_print_snippet_token(lexer);
+                goto error;
+            }
+            
+            cn_lexer_next_token(lexer);
+            node->type_specifier.kind = kind;
+            return 0;
+        }
+    }
+
+    // INCOMPLETE:
+    // Checking if token is typedef.
+    
+    // INCOMPLETE:
+    // Checking if token(s) is struct or union.
+
+    // INCOMPLETE:
+    // Checking if token(s) is enum specifier.
+
+    // Checking if token is type sign.
+    if (cn_str_equals(lexer->token.str, CN_SIGNED_STR)) {
+        if (node->type_specifier.sign != CN_TYPE_SIGN_NONE) {
+            cn_log(CN_ERROR, "Duplicate type sign '%.*s' is not allowed in type specifier.", CN_UNPACK(CN_SIGNED_STR));
+            cn_lexer_print_snippet_token(lexer);
+            goto error;
+        }
+
+        cn_lexer_next_token(lexer);
+        node->type_specifier.sign = CN_TYPE_SIGN_SIGNED;
+        return 0;
+    }
+
+    if (cn_str_equals(lexer->token.str, CN_UNSIGNED_STR)) {
+        if (node->type_specifier.sign != CN_TYPE_SIGN_NONE) {
+            cn_log(CN_ERROR, "Duplicate type sign '%.*s' is not allowed in type specifier.", CN_UNPACK(CN_UNSIGNED_STR));
+            cn_lexer_print_snippet_token(lexer);
+            goto error;
+        }
+
+        cn_lexer_next_token(lexer);
+        node->type_specifier.sign = CN_TYPE_SIGN_UNSIGNED;
+        return 0;
+    }
+
+    // Checking if token is type width.
+    if (cn_str_equals(lexer->token.str, CN_SHORT_STR)) {
+        if (node->type_specifier.width != CN_TYPE_WIDTH_NONE) {
+            cn_log(CN_ERROR, "Duplicate type width '%.*s' is not allowed in type specifier.", CN_UNPACK(CN_SHORT_STR));
+            cn_lexer_print_snippet_token(lexer);
+            goto error;
+        }
+
+        cn_lexer_next_token(lexer);
+        node->type_specifier.width = CN_TYPE_WIDTH_SHORT;
+        return 0;
+    }
+
+    if (cn_str_equals(lexer->token.str, CN_LONG_STR)) {
+        if (node->type_specifier.width != CN_TYPE_WIDTH_NONE) {
+            if (node->type_specifier.width == CN_TYPE_WIDTH_LONG) {
+                cn_lexer_next_token(lexer);
+                node->type_specifier.width = CN_TYPE_WIDTH_LONG_LONG;
+                return 0;
+            }
+
+            cn_log(CN_ERROR, "Duplicate type width '%.*s' is not allowed in type specifier.", CN_UNPACK(CN_LONG_STR));
+            cn_lexer_print_snippet_token(lexer);
+            goto error;
+        }
+
+        cn_lexer_next_token(lexer);
+        node->type_specifier.width = CN_TYPE_WIDTH_LONG;
+        return 0;
+    }
+
+
+    // INCOMPLETE:
+    // Checking if token(s) atomic_type_specifier.
+    
+
+    return 1;
+
+error:
+    *lexer = original_state;
+    return 2;
 }
 
 CNDEF Cn_Ast_Idx cn_ast_parse_init_declarator_list(Cn_Lexer *lexer) {
