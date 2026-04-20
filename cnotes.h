@@ -2333,7 +2333,9 @@ CNDEF void cn__ast_print_kind(Cn_Ast_Node_Kind kind) {
         CN__ENUM_PRINT_CASE(CN_AST_NODE_ASM_DEFINITION);
         CN__ENUM_PRINT_CASE(CN_AST_NODE_TYPE_SPECIFIER);
         CN__ENUM_PRINT_CASE(CN_AST_NODE_UNKNOWN);
-        default: break;
+        default: 
+            printf("??");
+            break;
     }
 }
 
@@ -2359,6 +2361,72 @@ CNDEF void cn_ast_print(Cn_Ast_Node *node, int depth) {
             }
             if (node->child_idx == CN_AST_NIL_IDX) {
                 printf(" stray ';'");
+            }
+            break;
+        case CN_AST_NODE_DECLARATION_SPECIFIERS:
+            for (int i = 0; i < 5; i++) {
+                switch (node->declaration_specifiers.storage_specifiers & 1 << i) {
+                    case CN_STORAGE_SPECIFIER_STATIC:
+                        printf(" '%.*s'", CN_UNPACK(CN_STATIC_STR));
+                        break;
+                    case CN_STORAGE_SPECIFIER_EXTERN:
+                        printf(" '%.*s'", CN_UNPACK(CN_EXTERN_STR));
+                        break;
+                    case CN_STORAGE_SPECIFIER_REGISTER:
+                        printf(" '%.*s'", CN_UNPACK(CN_REGISTER_STR));
+                        break;
+                    case CN_STORAGE_SPECIFIER_AUTO:
+                        printf(" '%.*s'", CN_UNPACK(CN_AUTO_STR));
+                        break;
+                    case CN_STORAGE_SPECIFIER_TYPEDEF:
+                        printf(" '%.*s'", CN_UNPACK(CN_TYPEDEF_STR));
+                        break;
+                }
+            }
+            for (int i = 0; i < 4; i++) {
+                switch (node->declaration_specifiers.qualifiers & 1 << i) {
+                    case CN_TYPE_QUALIFIER_CONST:
+                        printf(" '%.*s'", CN_UNPACK(CN_CONST_STR));
+                        break;
+                    case CN_TYPE_QUALIFIER_RESTRICT:
+                        printf(" '%.*s'", CN_UNPACK(CN_RESTRICT_STR));
+                        break;
+                    case CN_TYPE_QUALIFIER_VOLATILE:
+                        printf(" '%.*s'", CN_UNPACK(CN_VOLATILE_STR));
+                        break;
+                    case CN_TYPE_QUALIFIER_ATOMIC:
+                        printf(" '%.*s'", CN_UNPACK(CN_ATOMIC_STR));
+                        break;
+                }
+            }
+        case CN_AST_NODE_TYPE_SPECIFIER:
+            switch(node->type_specifier.sign) {
+                case CN_TYPE_SIGN_SIGNED:
+                    printf(" '%.*s'", CN_UNPACK(CN_SIGNED_STR));
+                    break;
+                case CN_TYPE_SIGN_UNSIGNED:
+                    printf(" '%.*s'", CN_UNPACK(CN_UNSIGNED_STR));
+                    break;
+                default:
+                    break;
+            }
+
+            switch(node->type_specifier.width) {
+                case CN_TYPE_WIDTH_SHORT:
+                    printf(" '%.*s'", CN_UNPACK(CN_SHORT_STR));
+                    break;
+                case CN_TYPE_WIDTH_LONG:
+                    printf(" '%.*s'", CN_UNPACK(CN_LONG_STR));
+                    break;
+                case CN_TYPE_WIDTH_LONG_LONG:
+                    printf(" '%.*s %.*s'", CN_UNPACK(CN_LONG_STR), CN_UNPACK(CN_LONG_STR));
+                    break;
+                default:
+                    break;
+            }
+
+            if (node->type_specifier.kind < CN_ARRAY_LENGTH(CN_TYPE_KINDS)) {
+                printf(" '%.*s'", CN_UNPACK(CN_TYPE_KINDS[node->type_specifier.kind]));
             }
             break;
         default:

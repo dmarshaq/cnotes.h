@@ -1,4 +1,4 @@
-static const long unsigned long int;
+static const unsigned char;
 ;
 ;
 ;
