@@ -785,6 +785,13 @@ CNDEF Cn_Ast_Idx cn_ast_parse_external_declaration(Cn_Lexer *lexer);
  * or declaration. Since we can't really know for certain which one until 
  * parsed far enough ast structure to determine. Ultimetly existance of function 
  * body at the end of the declaration signifies that function is definition is being parsed.
+ * 
+ * NOTE: function_definition doesn't include classic declaration list that are K&R styled function definitons.
+ *
+ * The deciding logic of whether declaration is a function definiton, 
+ * is solely determined by first trying to parse init declarator list 
+ * and if it is only a single declarator without init, simplified down to just one declarator ast node 
+ * and expecting function body right after.
  *
  *  declaration
  *          : (
@@ -794,7 +801,7 @@ CNDEF Cn_Ast_Idx cn_ast_parse_external_declaration(Cn_Lexer *lexer);
  *          ;
  *
  *  function_definition
- *          : declaration_specifiers declarator declaration_list? function_body
+ *          : declaration_specifiers declarator function_body
  *          ;
  */
 CNDEF Cn_Ast_Idx cn_ast_parse_function_definition_or_declaration(Cn_Lexer *lexer);
@@ -2346,7 +2353,7 @@ const char *CN_AST_PRINT_FLAT_TAB  = "│   ";
 const char *CN_AST_PRINT_SPLIT_TAB = "├── ";
 const char *CN_AST_PRINT_LAST_TAB  = "└── ";
 
-#define CN__AST_PRINT_TABS(depth, prefix) for (int i = 0; i < depth - 1; i++) { printf("%s", cn_ast_print_prefixes[i]); } printf("%s", prefix);
+#define CN__AST_PRINT_TABS(depth, prefix) for (int i = 0; i < depth; i++) { printf("%s", cn_ast_print_prefixes[i]); } printf("%s", prefix);
 
 CNDEF void cn_ast_print(Cn_Ast_Node *node, int depth) {
     CN_ASSERT(depth < (int)CN_ARRAY_LENGTH(cn_ast_print_prefixes));
@@ -2365,7 +2372,7 @@ CNDEF void cn_ast_print(Cn_Ast_Node *node, int depth) {
             break;
         case CN_AST_NODE_DECLARATION_SPECIFIERS:
             for (int i = 0; i < 5; i++) {
-                switch (node->declaration_specifiers.storage_specifiers & 1 << i) {
+                switch (node->declaration_specifiers.storage_specifiers & (1 << i)) {
                     case CN_STORAGE_SPECIFIER_STATIC:
                         printf(" '%.*s'", CN_UNPACK(CN_STATIC_STR));
                         break;
@@ -2384,7 +2391,7 @@ CNDEF void cn_ast_print(Cn_Ast_Node *node, int depth) {
                 }
             }
             for (int i = 0; i < 4; i++) {
-                switch (node->declaration_specifiers.qualifiers & 1 << i) {
+                switch (node->declaration_specifiers.qualifiers & (1 << i)) {
                     case CN_TYPE_QUALIFIER_CONST:
                         printf(" '%.*s'", CN_UNPACK(CN_CONST_STR));
                         break;
@@ -2399,6 +2406,7 @@ CNDEF void cn_ast_print(Cn_Ast_Node *node, int depth) {
                         break;
                 }
             }
+            break;
         case CN_AST_NODE_TYPE_SPECIFIER:
             switch(node->type_specifier.sign) {
                 case CN_TYPE_SIGN_SIGNED:
@@ -2546,27 +2554,41 @@ CNDEF Cn_Ast_Idx cn_ast_parse_declaration_specifiers(Cn_Lexer *lexer) {
 
 
 
+    bool at_least_one = false;
     int ok;
     while (true) {
         ok = cn_ast_try_parse_storage_specifier(lexer, &node.declaration_specifiers.storage_specifiers);
-        if (ok == 0)
+        if (ok == 0) {
+            at_least_one = true;
             continue;
+        }
         if (ok == 2)
             goto error;
 
         ok = cn_ast_try_parse_qualifier(lexer, &node.declaration_specifiers.qualifiers);
-        if (ok == 0)
+        if (ok == 0) {
+            at_least_one = true;
             continue;
+        }
         if (ok == 2)
             goto error;
     
         ok = cn_ast_try_parse_type_specifier(lexer, node.child_idx);
-        if (ok == 0)
+        if (ok == 0) {
+            at_least_one = true;
             continue;
+        }
         if (ok == 2)
             goto error;
 
         break;
+    }
+
+    // If at least one other declaration specifier present continue, if not error.
+    if (!at_least_one) {
+        cn_log(CN_ERROR, "At least one declaration specifier should be present.");
+        cn_lexer_print_snippet_token(lexer);
+        goto error;
     }
 
     // Validation of type specifier.

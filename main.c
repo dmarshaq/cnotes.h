@@ -1,4 +1,5 @@
-static const unsigned char;
+const char;
+;
 ;
 ;
 ;
