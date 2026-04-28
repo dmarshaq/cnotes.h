@@ -649,6 +649,13 @@ typedef enum cn_ast_node_kind : uint8_t {
     CN_AST_NODE_EXTERNAL_DECLARATION,
     CN_AST_NODE_DECLARATION,
     CN_AST_NODE_FUNCTION_DEFINITION,
+    CN_AST_NODE_INIT_DECLARATOR_LIST,
+    CN_AST_NODE_DECLARATOR,
+    CN_AST_NODE_POINTER,
+    CN_AST_NODE_DIRECT_DECLARATOR,
+    CN_AST_NODE_IDENTIFIER,
+    CN_AST_NODE_ASSIGNMENT_EXPRESSION,
+    CN_AST_NODE_PARAMETER_TYPE_LIST,
     CN_AST_NODE_DECLARATION_SPECIFIERS,
     CN_AST_NODE_ASM_DEFINITION,
     CN_AST_NODE_TYPE_SPECIFIER,
@@ -668,6 +675,11 @@ typedef struct {
     Cn_Type_Width width;
     Cn_Type_Sign  sign;
 } Cn_Ast_Node_Type_Specifier;
+
+typedef struct {
+    Cn_Qualifier_Flags         qualifiers;
+} Cn_Ast_Node_Pointer;
+
 
 // typedef struct {
 //     Cn_Qualifier_Flags qualifier_flags;
@@ -704,6 +716,7 @@ typedef struct cn_ast_node {
         Cn_Ast_Node_External_Declaration    external_declaration;
         Cn_Ast_Node_Declaration_Specifiers  declaration_specifiers;
         Cn_Ast_Node_Type_Specifier          type_specifier;
+        Cn_Ast_Node_Pointer                 pointer;
     };
 } Cn_Ast_Node;
 
@@ -808,7 +821,7 @@ CNDEF Cn_Ast_Idx cn_ast_parse_function_definition_or_declaration(Cn_Lexer *lexer
 
 
 /**
- * Parses code starting of with lexer current token as declaration specifiers.
+ * Parses code starting of with lexer current token as init declarator list.
  *
  *  init_declarator_list
  *          : TODO
@@ -816,6 +829,39 @@ CNDEF Cn_Ast_Idx cn_ast_parse_function_definition_or_declaration(Cn_Lexer *lexer
  *
  */
 CNDEF Cn_Ast_Idx cn_ast_parse_init_declarator_list(Cn_Lexer *lexer);
+
+/**
+ * Parses code starting of with lexer current token as declarator.
+ *
+ *  declarator
+ *          : pointer? direct_declarator
+ *          ;
+ *
+ */
+CNDEF Cn_Ast_Idx cn_ast_parse_declarator(Cn_Lexer *lexer);
+
+/**
+ * Parses code starting of with lexer current token as pointer.
+ *
+ *  pointer
+ *          : '*' qualifier* pointer?
+ *          ;
+ *
+ */
+CNDEF Cn_Ast_Idx cn_ast_parse_pointer(Cn_Lexer *lexer);
+
+/**
+ * Parses code starting of with lexer current token as direct declarator.
+ *
+ *  direct_declarator
+ *          : identifier
+ *          | '(' declarator ')'
+ *          | direct_declarator '[' assignment_expression? ']'
+ *          | direct_declarator '(' parameter_type_list? ')'
+ *          ;
+ *
+ */
+CNDEF Cn_Ast_Idx cn_ast_parse_direct_declarator(Cn_Lexer *lexer);
 
 /**
  * Parses code starting of with lexer current token as declaration specifiers.
@@ -979,70 +1025,6 @@ CNDEF Cn_Ast_Idx cn_ast_parse_asm_definition(Cn_Lexer *lexer);
 //  * Primitives are not included here. Only typedefs.
 //  */
 // extern Cn_Ast_Idx *cn_typedef_definition_table;
-// 
-//
-// /**
-//  * TEMPORARY: For right now parser will not parse any complex constat expressions. 
-//  * Only one token and accept if it either integer or float.
-//  */
-// Cn_Ast_Node cn_ast_parse_constant_expression(Cn_Lexer *lexer);
-// 
-// Cn_Ast_Node cn_ast_parse_function_param_declaration(Cn_Lexer *lexer);
-// 
-// /**
-//  * Recursivly parse these kind of syntax: **a[10] where 'a' is identifier returned to the very top.
-//  * If end leaf doesn't contain identifier it recursivly returns empty string, meaning we parsed Abstract Declarator, for example: *[10].
-//  * Can be a case when you have a sizeof like:
-//  *
-//  *      sizeof(int *[10]) 
-//  *
-//  *
-//  *  declarator:
-//  *      pointer_opt direct_declarator
-//  *
-//  *  direct_declarator:
-//  *      identifier
-//  *      ( declarator )
-//  *      direct_declarator [ constant_expression_opt ]
-//  *      direct_declarator ( parameter_type_list_opt )*
-//  */
-// Cn_Ast_Node cn_ast_parse_declarator(Cn_Lexer *lexer);
-// 
-// /**
-//  *  direct_declarator:
-//  *      identifier
-//  *      ( declarator )
-//  *      direct_declarator [ constant_expression_opt ]
-//  *      direct_declarator ( parameter_type_list_opt )*
-//  */
-// Cn_Ast_Node cn_ast_parse_direct_declarator(Cn_Lexer *lexer);
-// 
-// /**
-//  *  direct_declarator (postfix):
-//  *      direct_declarator [ constant_expression_opt ]
-//  *      direct_declarator ( parameter_type_list_opt )*
-//  */
-// Cn_Ast_Node cn_ast_parse_direct_declarator_postfix(Cn_Lexer *lexer, Cn_Ast_Node child);
-// 
-// Cn_Ast_Node cn_ast_parse_struct_definition(Cn_Lexer *lexer);
-// 
-// /**
-//  * Basically declaration is a very broad abstraction and it is a valid declaration if it begins 
-//  * with any of the declaration specifiers like: StorageSpecifier, TypeQualifier, TypeSpecifier.
-//  * Most of the parsing is dealing with declarations properly.
-//  */
-// Cn_Ast_Node cn_ast_parse_declaration(Cn_Lexer *lexer);
-// 
-// /**
-//  * Recursivly prints passed ast node to stdout.
-//  */
-// void cn_ast_print(Cn_Ast_Node *node, int depth);
-// 
-// /**
-//  * Recursivly walks down declarator ast branch and returns declarator name if any.
-//  */
-// Cn_String cn_ast_get_declarator_name(Cn_Ast_Node *declarator);
-// 
 
 
 // PRE-PROCESSING SECTION
@@ -1072,19 +1054,6 @@ typedef struct {
         Cn_Modification_Remove remove;
     };
 } Cn_Modification;
-
-
-// INCOMPLETE: Notes are still work in progress.
-//
-//  typedef int64_t Cn_Note_Idx;
-//  
-//  #define CN_NOTE_IDX_NIL 0
-//  
-//  typedef struct {
-//      int64_t          priority;
-//      int64_t          offset;
-//      Cn_Note_Idx      next_idx;
-//  } Cn_Note;
 
 
 
@@ -2336,6 +2305,13 @@ CNDEF void cn__ast_print_kind(Cn_Ast_Node_Kind kind) {
         CN__ENUM_PRINT_CASE(CN_AST_NODE_EXTERNAL_DECLARATION);
         CN__ENUM_PRINT_CASE(CN_AST_NODE_DECLARATION);
         CN__ENUM_PRINT_CASE(CN_AST_NODE_FUNCTION_DEFINITION);
+        CN__ENUM_PRINT_CASE(CN_AST_NODE_INIT_DECLARATOR_LIST);
+        CN__ENUM_PRINT_CASE(CN_AST_NODE_DECLARATOR);
+        CN__ENUM_PRINT_CASE(CN_AST_NODE_POINTER);
+        CN__ENUM_PRINT_CASE(CN_AST_NODE_DIRECT_DECLARATOR);
+        CN__ENUM_PRINT_CASE(CN_AST_NODE_IDENTIFIER);
+        CN__ENUM_PRINT_CASE(CN_AST_NODE_ASSIGNMENT_EXPRESSION);
+        CN__ENUM_PRINT_CASE(CN_AST_NODE_PARAMETER_TYPE_LIST);
         CN__ENUM_PRINT_CASE(CN_AST_NODE_DECLARATION_SPECIFIERS);
         CN__ENUM_PRINT_CASE(CN_AST_NODE_ASM_DEFINITION);
         CN__ENUM_PRINT_CASE(CN_AST_NODE_TYPE_SPECIFIER);
@@ -2530,14 +2506,15 @@ CNDEF Cn_Ast_Idx cn_ast_parse_function_definition_or_declaration(Cn_Lexer *lexer
     Cn_Ast_Idx child_idx;
 
     child_idx = cn_ast_parse_declaration_specifiers(lexer);
-
-    if (child_idx == CN_AST_NIL_IDX)
-        goto error;
-
+    if (child_idx == CN_AST_NIL_IDX) goto error;
     cn_ast_node_add_child(&node, child_idx);
 
     // TODO: Finish the rest of the parsing.
-    node.kind = CN_AST_NODE_DECLARATION;
+    node.kind = CN_AST_NODE_FUNCTION_DEFINITION;
+
+    child_idx = cn_ast_parse_declarator(lexer);
+    if (child_idx == CN_AST_NIL_IDX) goto error;
+    cn_ast_node_add_child(&node, child_idx);
 
     return cn_ast_node_list_append(node);
 
@@ -2778,6 +2755,89 @@ error:
 
 CNDEF Cn_Ast_Idx cn_ast_parse_init_declarator_list(Cn_Lexer *lexer) {
     CN_TODO("AST init declarator list.");
+}
+
+CNDEF Cn_Ast_Idx cn_ast_parse_declarator(Cn_Lexer *lexer) {
+    Cn_Lexer original_state = *lexer;
+
+    Cn_Ast_Node node = { .kind = CN_AST_NODE_DECLARATOR };
+
+    Cn_Ast_Idx child_idx;
+    
+    // Optional pointer in declarator.
+    if (cn_lexer_expect(lexer, CN_TOKEN_ASTERISK)) {
+        child_idx = cn_ast_parse_pointer(lexer);
+
+        if (child_idx == CN_AST_NIL_IDX) goto error;
+
+        cn_ast_node_add_child(&node, child_idx);
+    }
+    
+    // Direct declarator parsing.
+    child_idx = cn_ast_parse_direct_declarator(lexer);
+
+    if (child_idx == CN_AST_NIL_IDX) goto error;
+
+    cn_ast_node_add_child(&node, child_idx);
+
+    
+    return cn_ast_node_list_append(node);
+    
+error:
+    *lexer = original_state;
+    return CN_AST_NIL_IDX;
+}
+
+CNDEF Cn_Ast_Idx cn_ast_parse_pointer(Cn_Lexer *lexer) {
+    Cn_Lexer original_state = *lexer;
+
+    Cn_Ast_Node node = { .kind = CN_AST_NODE_POINTER };
+    
+    if (!cn_lexer_expect(lexer, CN_TOKEN_ASTERISK)) {
+        cn_log(CN_ERROR, "Expected '*' here when parsing pointer.");
+        cn_lexer_print_snippet_token(lexer);
+        goto error;
+    }
+
+    cn_lexer_next_token(lexer);
+    
+    int ok;
+    while (true) {
+        ok = cn_ast_try_parse_qualifier(lexer, &node.pointer.qualifiers);
+        if (ok == 0) continue;
+        if (ok == 2) goto error;
+
+        break;
+    }
+
+    if (cn_lexer_expect(lexer, CN_TOKEN_ASTERISK)) {
+        Cn_Ast_Idx child_idx;
+        child_idx = cn_ast_parse_pointer(lexer);
+
+        if (child_idx == CN_AST_NIL_IDX) goto error;
+
+        cn_ast_node_add_child(&node, child_idx);
+    }
+    
+    return cn_ast_node_list_append(node);
+    
+error:
+    *lexer = original_state;
+    return CN_AST_NIL_IDX;
+}
+
+CNDEF Cn_Ast_Idx cn_ast_parse_direct_declarator(Cn_Lexer *lexer) {
+    Cn_Lexer original_state = *lexer;
+
+    Cn_Ast_Node node = { .kind = CN_AST_NODE_DIRECT_DECLARATOR };
+    
+    
+    
+    return cn_ast_node_list_append(node);
+
+error:
+    *lexer = original_state;
+    return CN_AST_NIL_IDX;
 }
 
 CNDEF Cn_Ast_Idx cn_ast_parse_attribute_specifier_sequence(Cn_Lexer *lexer) {
