@@ -1,11 +1,5 @@
-const char * const * const *;
-;
-;
-;
-;
 
-// int main(void) {
+// int main() {
 //     int a = 69;
 //     return a;
 // }
-

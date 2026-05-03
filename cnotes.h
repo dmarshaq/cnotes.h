@@ -677,8 +677,23 @@ typedef struct {
 } Cn_Ast_Node_Type_Specifier;
 
 typedef struct {
-    Cn_Qualifier_Flags         qualifiers;
+    Cn_Qualifier_Flags qualifiers;
 } Cn_Ast_Node_Pointer;
+
+typedef enum {
+    CN_DD_IDENTIFIER,
+    CN_DD_GROUPED,
+    CN_DD_ARRAY,
+    CN_DD_FUNCTION,
+} Cn_Direct_Declarator_Kind;
+
+typedef struct {
+    Cn_Direct_Declarator_Kind kind;
+} Cn_Ast_Node_Direct_Declarator;
+
+typedef struct {
+    Cn_String name;
+} Cn_Ast_Node_Identifier;
 
 
 // typedef struct {
@@ -717,6 +732,8 @@ typedef struct cn_ast_node {
         Cn_Ast_Node_Declaration_Specifiers  declaration_specifiers;
         Cn_Ast_Node_Type_Specifier          type_specifier;
         Cn_Ast_Node_Pointer                 pointer;
+        Cn_Ast_Node_Direct_Declarator       direct_declarator;
+        Cn_Ast_Node_Identifier              identifier;
     };
 } Cn_Ast_Node;
 
@@ -824,7 +841,17 @@ CNDEF Cn_Ast_Idx cn_ast_parse_function_definition_or_declaration(Cn_Lexer *lexer
  * Parses code starting of with lexer current token as init declarator list.
  *
  *  init_declarator_list
- *          : TODO
+ *          : init_declarator (',' init_declarator)*
+ *          ;
+ *
+ */
+CNDEF Cn_Ast_Idx cn_ast_parse_init_declarator_list(Cn_Lexer *lexer);
+
+/**
+ * Parses code starting of with lexer current token as init declarator.
+ *
+ *  init_declarator
+ *          : declarator ('=' initializer)?
  *          ;
  *
  */
@@ -862,6 +889,13 @@ CNDEF Cn_Ast_Idx cn_ast_parse_pointer(Cn_Lexer *lexer);
  *
  */
 CNDEF Cn_Ast_Idx cn_ast_parse_direct_declarator(Cn_Lexer *lexer);
+
+/**
+ * Parses code starting of with lexer current token as identifier.
+ *
+ * IMPORTANT: Identifier is simply any CN_TOKEN_SYMBOL.
+ */
+CNDEF Cn_Ast_Idx cn_ast_parse_identifier(Cn_Lexer *lexer);
 
 /**
  * Parses code starting of with lexer current token as declaration specifiers.
@@ -2346,6 +2380,27 @@ CNDEF void cn_ast_print(Cn_Ast_Node *node, int depth) {
                 printf(" stray ';'");
             }
             break;
+        case CN_AST_NODE_DIRECT_DECLARATOR:
+            printf(" kind: ");
+            switch(node->direct_declarator.kind) {
+                case CN_DD_IDENTIFIER:
+                    printf("identifier");
+                    break;
+                case CN_DD_GROUPED:
+                    printf("grouped");
+                    break;
+                case CN_DD_ARRAY:
+                    printf("array");
+                    break;
+                case CN_DD_FUNCTION:
+                    printf("function");
+                    break;
+            }
+            
+            break;
+        case CN_AST_NODE_IDENTIFIER:
+            printf(" '%.*s'", CN_UNPACK(node->identifier.name));
+            break;
         case CN_AST_NODE_DECLARATION_SPECIFIERS:
             for (int i = 0; i < 5; i++) {
                 switch (node->declaration_specifiers.storage_specifiers & (1 << i)) {
@@ -2812,10 +2867,9 @@ CNDEF Cn_Ast_Idx cn_ast_parse_pointer(Cn_Lexer *lexer) {
 
     if (cn_lexer_expect(lexer, CN_TOKEN_ASTERISK)) {
         Cn_Ast_Idx child_idx;
+
         child_idx = cn_ast_parse_pointer(lexer);
-
         if (child_idx == CN_AST_NIL_IDX) goto error;
-
         cn_ast_node_add_child(&node, child_idx);
     }
     
@@ -2830,13 +2884,105 @@ CNDEF Cn_Ast_Idx cn_ast_parse_direct_declarator(Cn_Lexer *lexer) {
     Cn_Lexer original_state = *lexer;
 
     Cn_Ast_Node node = { .kind = CN_AST_NODE_DIRECT_DECLARATOR };
+
+    Cn_Ast_Idx child_idx;
     
+    // '(' declarator ')' case.
+    if (cn_lexer_expect(lexer, CN_TOKEN_PARAN_OPEN)) {
+        node.direct_declarator.kind = CN_DD_GROUPED;
+
+        cn_lexer_next_token(lexer);
+
+        child_idx = cn_ast_parse_declarator(lexer);
+        if (child_idx == CN_AST_NIL_IDX) goto error;
+        cn_ast_node_add_child(&node, child_idx);
+
+        if (!cn_lexer_expect(lexer, CN_TOKEN_PARAN_CLOSE)) {
+            cn_log(CN_ERROR, "Expected ')' when parsing direct declarator.");
+            cn_lexer_print_snippet_token(lexer);
+            goto error;
+        }
+
+        cn_lexer_next_token(lexer);
+    }
+    // identifier case.
+    else {
+        node.direct_declarator.kind = CN_DD_IDENTIFIER;
+
+        child_idx = cn_ast_parse_identifier(lexer);
+        if (child_idx == CN_AST_NIL_IDX) goto error;
+        cn_ast_node_add_child(&node, child_idx);
+    }
     
+    Cn_Ast_Idx direct_declarator_idx = cn_ast_node_list_append(node);
+
+    // Postfix cases.
+    // direct_declarator '[' assignment_expression? ']' case.
+    if (cn_lexer_expect(lexer, CN_TOKEN_SQR_BRACES_OPEN)) {
+        cn_lexer_next_token(lexer);
+
+        node = (Cn_Ast_Node) { .kind = CN_AST_NODE_DIRECT_DECLARATOR };
+        node.direct_declarator.kind = CN_DD_ARRAY;
+
+        // TODO: Parse assignment_expression.
+        
+        if (!cn_lexer_expect(lexer, CN_TOKEN_SQR_BRACES_CLOSE)) {
+            cn_log(CN_ERROR, "Expected ']' when parsing direct declarator.");
+            cn_lexer_print_snippet_token(lexer);
+            goto error;
+        }
+
+        cn_lexer_next_token(lexer);
+
+        cn_ast_node_add_child(&node, direct_declarator_idx);
+        return cn_ast_node_list_append(node);
+    }
+    // direct_declarator '(' parameter_type_list? ')' case.
+    else if (cn_lexer_expect(lexer, CN_TOKEN_PARAN_OPEN)) {
+        cn_lexer_next_token(lexer);
+
+        node = (Cn_Ast_Node) { .kind = CN_AST_NODE_DIRECT_DECLARATOR };
+        node.direct_declarator.kind = CN_DD_FUNCTION;
+
+        // TODO: Parse parameter_type_list.
+
+        if (!cn_lexer_expect(lexer, CN_TOKEN_PARAN_CLOSE)) {
+            cn_log(CN_ERROR, "Expected ')' when parsing direct declarator.");
+            cn_lexer_print_snippet_token(lexer);
+            goto error;
+        }
+
+        cn_lexer_next_token(lexer);
+
+        cn_ast_node_add_child(&node, direct_declarator_idx);
+        return cn_ast_node_list_append(node);
+    }
+
+    // No postfix case.
+    return direct_declarator_idx;
+
+error:
+    *lexer = original_state;
+    return CN_AST_NIL_IDX;
+}
+
+CNDEF Cn_Ast_Idx cn_ast_parse_identifier(Cn_Lexer *lexer) {
+    Cn_Ast_Node node = { .kind = CN_AST_NODE_IDENTIFIER };
+    
+    if (!cn_lexer_expect(lexer, CN_TOKEN_SYMBOL)) {
+        cn_log(CN_ERROR, "Expected symbol when parsing identifier.");
+        cn_lexer_print_snippet_token(lexer);
+        goto error;
+    }
+
+    // IMPORTANT: String preserving area.
+    node.identifier.name = lexer->token.str;
+
+    cn_lexer_next_token(lexer);
     
     return cn_ast_node_list_append(node);
 
 error:
-    *lexer = original_state;
     return CN_AST_NIL_IDX;
 }
 
