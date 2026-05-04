@@ -650,6 +650,8 @@ typedef enum cn_ast_node_kind : uint8_t {
     CN_AST_NODE_DECLARATION,
     CN_AST_NODE_FUNCTION_DEFINITION,
     CN_AST_NODE_INIT_DECLARATOR_LIST,
+    CN_AST_NODE_INIT_DECLARATOR,
+    CN_AST_NODE_INITIALIZER,
     CN_AST_NODE_DECLARATOR,
     CN_AST_NODE_POINTER,
     CN_AST_NODE_DIRECT_DECLARATOR,
@@ -855,7 +857,18 @@ CNDEF Cn_Ast_Idx cn_ast_parse_init_declarator_list(Cn_Lexer *lexer);
  *          ;
  *
  */
-CNDEF Cn_Ast_Idx cn_ast_parse_init_declarator_list(Cn_Lexer *lexer);
+CNDEF Cn_Ast_Idx cn_ast_parse_init_declarator(Cn_Lexer *lexer);
+
+/**
+ * Parses code starting of with lexer current token as initializer.
+ *
+ *  initializer
+ *          : assignment_expression
+ *          | TODO: Initializer list.
+ *          ;
+ *
+ */
+CNDEF Cn_Ast_Idx cn_ast_parse_initializer(Cn_Lexer *lexer);
 
 /**
  * Parses code starting of with lexer current token as declarator.
@@ -2564,12 +2577,50 @@ CNDEF Cn_Ast_Idx cn_ast_parse_function_definition_or_declaration(Cn_Lexer *lexer
     if (child_idx == CN_AST_NIL_IDX) goto error;
     cn_ast_node_add_child(&node, child_idx);
 
-    // TODO: Finish the rest of the parsing.
-    node.kind = CN_AST_NODE_FUNCTION_DEFINITION;
 
+    
+    // Deciding whether node is function definiton or declaration.
+    // Simple case, empty declaration.
+    if (cn_lexer_expect(lexer, CN_TOKEN_SEMICOLON)) {
+        cn_lexer_next_token(lexer);
+        node.kind = CN_AST_NODE_DECLARATION;
+        return cn_ast_node_list_append(node);
+    }
+    
+    // Then there MUST be declarator, which will be either part of init_declarator_list or just be by itself.
+    Cn_Lexer before_declarator = *lexer;
     child_idx = cn_ast_parse_declarator(lexer);
     if (child_idx == CN_AST_NIL_IDX) goto error;
-    cn_ast_node_add_child(&node, child_idx);
+
+    // Now finally we can decide if next token is '{' it is definitely a function definition because, it is part of function definition body, anything else could be part of init_declarator_list or ';'.
+    if (cn_lexer_expect(lexer, CN_TOKEN_CURLY_OPEN)) {
+
+        // TEMPORARY:
+        cn_lexer_next_token(lexer);
+        node.kind = CN_AST_NODE_FUNCTION_DEFINITION;
+
+        cn_ast_node_add_child(&node, child_idx);
+
+        // TODO: Parse function_body.
+
+    } else {
+        // IMPORTANT: It is a wasteful way of doing things since we reparse the same declarator twice, there might be better options in the future.
+        node.kind = CN_AST_NODE_INIT_DECLARATOR_LIST;
+
+        cn_array_list_pop(&cn_ast_node_list); // pop last parsed ast node (declarator).
+        *lexer = before_declarator;
+
+        child_idx = cn_ast_parse_init_declarator_list(lexer);
+        if (child_idx == CN_AST_NIL_IDX) goto error;
+        cn_ast_node_add_child(&node, child_idx);
+
+        if (!cn_lexer_expect(lexer, CN_TOKEN_SEMICOLON)) {
+            cn_log(CN_ERROR, "Expected ';' at the end of declaration.");
+            cn_lexer_print_snippet_token(lexer);
+            goto error;
+        }
+        cn_lexer_next_token(lexer);
+    }
 
     return cn_ast_node_list_append(node);
 
@@ -2809,7 +2860,68 @@ error:
 }
 
 CNDEF Cn_Ast_Idx cn_ast_parse_init_declarator_list(Cn_Lexer *lexer) {
-    CN_TODO("AST init declarator list.");
+    Cn_Lexer original_state = *lexer;
+
+    Cn_Ast_Node node = { .kind = CN_AST_NODE_INIT_DECLARATOR_LIST };
+    
+    Cn_Ast_Idx child_idx;
+
+    while(true) {
+        child_idx = cn_ast_parse_init_declarator(lexer);
+        if (child_idx == CN_AST_NIL_IDX) goto error;
+        cn_ast_node_add_child(&node, child_idx);
+
+        if (!cn_lexer_expect(lexer, CN_TOKEN_COMMA)) break;
+
+        cn_lexer_next_token(lexer);
+    }
+
+    return cn_ast_node_list_append(node);
+    
+error:
+    *lexer = original_state;
+    return CN_AST_NIL_IDX;
+}
+
+CNDEF Cn_Ast_Idx cn_ast_parse_init_declarator(Cn_Lexer *lexer) {
+    Cn_Lexer original_state = *lexer;
+
+    Cn_Ast_Node node = { .kind = CN_AST_NODE_INIT_DECLARATOR };
+    
+    Cn_Ast_Idx child_idx;
+
+    child_idx = cn_ast_parse_declarator(lexer);
+    if (child_idx == CN_AST_NIL_IDX) goto error;
+    cn_ast_node_add_child(&node, child_idx);
+
+
+    if (cn_lexer_expect(lexer, CN_TOKEN_ASSIGN)) {
+        cn_lexer_next_token(lexer);
+
+        child_idx = cn_ast_parse_initializer(lexer);
+        if (child_idx == CN_AST_NIL_IDX) goto error;
+        cn_ast_node_add_child(&node, child_idx);
+    }
+
+    return cn_ast_node_list_append(node);
+    
+error:
+    *lexer = original_state;
+    return CN_AST_NIL_IDX;
+}
+
+CNDEF Cn_Ast_Idx cn_ast_parse_initializer(Cn_Lexer *lexer) {
+    Cn_Lexer original_state = *lexer;
+
+    Cn_Ast_Node node = { .kind = CN_AST_NODE_INITIALIZER };
+
+    // TODO: Initializer implementation.
+
+    return cn_ast_node_list_append(node);
+    
+error:
+    *lexer = original_state;
+    return CN_AST_NIL_IDX;
 }
 
 CNDEF Cn_Ast_Idx cn_ast_parse_declarator(Cn_Lexer *lexer) {
