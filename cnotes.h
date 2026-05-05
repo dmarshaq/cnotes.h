@@ -649,6 +649,12 @@ typedef enum cn_ast_node_kind : uint8_t {
     CN_AST_NODE_EXTERNAL_DECLARATION,
     CN_AST_NODE_DECLARATION,
     CN_AST_NODE_FUNCTION_DEFINITION,
+    CN_AST_NODE_LABELED_STATEMENT,
+    CN_AST_NODE_COMPOUND_STATEMENT,
+    CN_AST_NODE_EXPRESSION_STATEMENT,
+    CN_AST_NODE_SELECTION_STATEMENT,
+    CN_AST_NODE_ITERATION_STATEMENT,
+    CN_AST_NODE_JUMP_STATEMENT,
     CN_AST_NODE_INIT_DECLARATOR_LIST,
     CN_AST_NODE_INIT_DECLARATOR,
     CN_AST_NODE_INITIALIZER,
@@ -833,11 +839,49 @@ CNDEF Cn_Ast_Idx cn_ast_parse_external_declaration(Cn_Lexer *lexer);
  *          ;
  *
  *  function_definition
- *          : declaration_specifiers declarator function_body
+ *          : declaration_specifiers declarator compound_statement
  *          ;
  */
 CNDEF Cn_Ast_Idx cn_ast_parse_function_definition_or_declaration(Cn_Lexer *lexer);
 
+/**
+ * Parses code starting of with lexer current token as statement.
+ *
+ * IMPORTANT: CN_AST_NODE_STATEMENT doesn't exist by itself instead there are nodes variation, 
+ * when calling this function to parse statement it returns on of the following types of nodes.
+ *
+ *  statement
+ *          : labeled_statement
+ *          | compound_statement
+ *          | expression_statement
+ *          | selection_statement
+ *          | iteration_statement
+ *          | jump_statement
+ *          | TODO: asm_statement
+ *          ;
+ *
+ */
+CNDEF Cn_Ast_Idx cn_ast_parse_statement(Cn_Lexer *lexer);
+
+/**
+ * Parses code starting of with lexer current token as labeled statement.
+ *
+ *  labeled_statement
+ *          : TODO: Labeled statement
+ *          ;
+ *
+ */
+CNDEF Cn_Ast_Idx cn_ast_parse_labeled_statement(Cn_Lexer *lexer);
+
+/**
+ * Parses code starting of with lexer current token as compound statement.
+ *
+ *  compound_statement
+ *          : '{' (statement | declaration)* '}'
+ *          ;
+ *
+ */
+CNDEF Cn_Ast_Idx cn_ast_parse_compound_statement(Cn_Lexer *lexer);
 
 /**
  * Parses code starting of with lexer current token as init declarator list.
@@ -2352,7 +2396,15 @@ CNDEF void cn__ast_print_kind(Cn_Ast_Node_Kind kind) {
         CN__ENUM_PRINT_CASE(CN_AST_NODE_EXTERNAL_DECLARATION);
         CN__ENUM_PRINT_CASE(CN_AST_NODE_DECLARATION);
         CN__ENUM_PRINT_CASE(CN_AST_NODE_FUNCTION_DEFINITION);
+        CN__ENUM_PRINT_CASE(CN_AST_NODE_LABELED_STATEMENT);
+        CN__ENUM_PRINT_CASE(CN_AST_NODE_COMPOUND_STATEMENT);
+        CN__ENUM_PRINT_CASE(CN_AST_NODE_EXPRESSION_STATEMENT);
+        CN__ENUM_PRINT_CASE(CN_AST_NODE_SELECTION_STATEMENT);
+        CN__ENUM_PRINT_CASE(CN_AST_NODE_ITERATION_STATEMENT);
+        CN__ENUM_PRINT_CASE(CN_AST_NODE_JUMP_STATEMENT);
         CN__ENUM_PRINT_CASE(CN_AST_NODE_INIT_DECLARATOR_LIST);
+        CN__ENUM_PRINT_CASE(CN_AST_NODE_INIT_DECLARATOR);
+        CN__ENUM_PRINT_CASE(CN_AST_NODE_INITIALIZER);
         CN__ENUM_PRINT_CASE(CN_AST_NODE_DECLARATOR);
         CN__ENUM_PRINT_CASE(CN_AST_NODE_POINTER);
         CN__ENUM_PRINT_CASE(CN_AST_NODE_DIRECT_DECLARATOR);
@@ -2573,11 +2625,10 @@ CNDEF Cn_Ast_Idx cn_ast_parse_function_definition_or_declaration(Cn_Lexer *lexer
 
     Cn_Ast_Idx child_idx;
 
+    // Getting declration specifiers.
     child_idx = cn_ast_parse_declaration_specifiers(lexer);
     if (child_idx == CN_AST_NIL_IDX) goto error;
     cn_ast_node_add_child(&node, child_idx);
-
-
     
     // Deciding whether node is function definiton or declaration.
     // Simple case, empty declaration.
@@ -2594,18 +2645,17 @@ CNDEF Cn_Ast_Idx cn_ast_parse_function_definition_or_declaration(Cn_Lexer *lexer
 
     // Now finally we can decide if next token is '{' it is definitely a function definition because, it is part of function definition body, anything else could be part of init_declarator_list or ';'.
     if (cn_lexer_expect(lexer, CN_TOKEN_CURLY_OPEN)) {
-
-        // TEMPORARY:
-        cn_lexer_next_token(lexer);
         node.kind = CN_AST_NODE_FUNCTION_DEFINITION;
 
         cn_ast_node_add_child(&node, child_idx);
 
-        // TODO: Parse function_body.
+        child_idx = cn_ast_parse_compound_statement(lexer);
+        if (child_idx == CN_AST_NIL_IDX) goto error;
+        cn_ast_node_add_child(&node, child_idx);
 
     } else {
         // IMPORTANT: It is a wasteful way of doing things since we reparse the same declarator twice, there might be better options in the future.
-        node.kind = CN_AST_NODE_INIT_DECLARATOR_LIST;
+        node.kind = CN_AST_NODE_DECLARATION;
 
         cn_array_list_pop(&cn_ast_node_list); // pop last parsed ast node (declarator).
         *lexer = before_declarator;
@@ -2628,6 +2678,99 @@ error:
     *lexer = original_state;
     return CN_AST_NIL_IDX;
 }
+
+CNDEF Cn_Ast_Idx cn_ast_parse_declaration_or_statement(Cn_Lexer *lexer) {
+    Cn_Lexer original_state = *lexer;
+
+    Cn_Ast_Node node = {0};
+
+    Cn_Ast_Idx child_idx;
+
+    // TODO: Decide whether to parse declaration or statement.
+    // Getting declration specifiers.
+    child_idx = cn_ast_parse_declaration_specifiers(lexer);
+    if (child_idx == CN_AST_NIL_IDX) goto error;
+    cn_ast_node_add_child(&node, child_idx);
+    
+    // Simple case, empty declaration.
+    if (cn_lexer_expect(lexer, CN_TOKEN_SEMICOLON)) {
+        cn_lexer_next_token(lexer);
+        node.kind = CN_AST_NODE_DECLARATION;
+        return cn_ast_node_list_append(node);
+    }
+    
+    // Declaration parsing.
+    node.kind = CN_AST_NODE_DECLARATION;
+
+    child_idx = cn_ast_parse_init_declarator_list(lexer);
+    if (child_idx == CN_AST_NIL_IDX) goto error;
+    cn_ast_node_add_child(&node, child_idx);
+
+    if (!cn_lexer_expect(lexer, CN_TOKEN_SEMICOLON)) {
+        cn_log(CN_ERROR, "Expected ';' at the end of declaration.");
+        cn_lexer_print_snippet_token(lexer);
+        goto error;
+    }
+    cn_lexer_next_token(lexer);
+
+    return cn_ast_node_list_append(node);
+
+error:
+    *lexer = original_state;
+    return CN_AST_NIL_IDX;
+}
+
+CNDEF Cn_Ast_Idx cn_ast_parse_statement(Cn_Lexer *lexer) {
+    // TODO: Based on tokens decide which parse statement to call.
+    return cn_ast_parse_compound_statement(lexer);
+}
+
+CNDEF Cn_Ast_Idx cn_ast_parse_labeled_statement(Cn_Lexer *lexer) {
+    Cn_Lexer original_state = *lexer;
+
+    Cn_Ast_Node node = { .kind = CN_AST_NODE_LABELED_STATEMENT };
+
+    Cn_Ast_Idx child_idx;
+
+    
+    
+    return cn_ast_node_list_append(node);
+
+error:
+    *lexer = original_state;
+    return CN_AST_NIL_IDX;
+}
+
+CNDEF Cn_Ast_Idx cn_ast_parse_compound_statement(Cn_Lexer *lexer) {
+    Cn_Lexer original_state = *lexer;
+
+    Cn_Ast_Node node = { .kind = CN_AST_NODE_COMPOUND_STATEMENT };
+
+    Cn_Ast_Idx child_idx;
+
+    if (!cn_lexer_expect(lexer, CN_TOKEN_CURLY_OPEN)) {
+        cn_log(CN_ERROR, "Expected '{' in the beginning of compound statement.");
+        cn_lexer_print_snippet_token(lexer);
+        goto error;
+    }
+    cn_lexer_next_token(lexer);
+
+    while (true) {
+        if (cn_lexer_expect(lexer, CN_TOKEN_CURLY_CLOSE)) {
+            cn_lexer_next_token(lexer);
+            return cn_ast_node_list_append(node);
+        }
+
+        child_idx = cn_ast_parse_declaration_or_statement(lexer);
+        if (child_idx == CN_AST_NIL_IDX) goto error;
+        cn_ast_node_add_child(&node, child_idx);
+    }
+
+error:
+    *lexer = original_state;
+    return CN_AST_NIL_IDX;
+}
+
 
 CNDEF Cn_Ast_Idx cn_ast_parse_declaration_specifiers(Cn_Lexer *lexer) {
     Cn_Lexer original_state = *lexer;
