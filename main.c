@@ -1,5 +1,8 @@
 int foo() {
-    int b, c;
+    int aboba;
+    {
+        { int b, c; }
+    }
     double bar();
 }
 
