@@ -933,11 +933,242 @@ CNDEF Cn_Ast_Idx cn_ast_parse_labeled_statement(Cn_Lexer *lexer);
  * Parses code starting of with lexer current token as expression statement.
  *
  *  expression_statement
- *          : TODO: Expression statement
+ *          : expression? ';'
  *          ;
  *
  */
 CNDEF Cn_Ast_Idx cn_ast_parse_expression_statement(Cn_Lexer *lexer);
+
+/**
+ * Parses code starting of with lexer current token as full expression.
+ *
+ *  full_expression
+ *          : expression (',' expression)*
+ *          ;
+ *  
+ */
+CNDEF Cn_Ast_Idx cn_ast_parse_full_expression(Cn_Lexer *lexer);
+
+/**
+ * Parses code starting of with lexer current token as expression.
+ * Utilizing following precedence table as guide to properly structure AST nodes in the right order.
+ *
+ *  C OPERATOR PRECEDENCE TABLE highest (14) to lowest (1)
+ *  ================================================
+ *  
+ *  14                              Associativity: Left-to-right
+ *  ---------------------------------------------------------------
+ *    ++  --        Postfix increment/decrement
+ *    ()            Function call
+ *    []            Array subscript
+ *    .             Member access
+ *    ->            Member access through pointer
+ *    (type){...}   Compound literal
+ *  
+ *  13                              Associativity: Right-to-left
+ *  ---------------------------------------------------------------
+ *    ++  --        Prefix increment/decrement
+ *    +   -         Unary plus/minus
+ *    !   ~         Logical NOT, bitwise NOT
+ *    (type)        Cast
+ *    *             Dereference
+ *    &             Address-of
+ *    sizeof        Size-of
+ *  
+ *  12                              Associativity: Left-to-right
+ *  ---------------------------------------------------------------
+ *    *   /   %     Multiplication, division, remainder
+ *  
+ *  11                              Associativity: Left-to-right
+ *  ---------------------------------------------------------------
+ *    +   -         Addition, subtraction
+ *  
+ *  10                              Associativity: Left-to-right
+ *  ---------------------------------------------------------------
+ *    <<  >>        Bitwise left/right shift
+ *  
+ *  9                               Associativity: Left-to-right
+ *  ---------------------------------------------------------------
+ *    <   <=        Less than, less-or-equal
+ *    >   >=        Greater than, greater-or-equal
+ *  
+ *  8                               Associativity: Left-to-right
+ *  ---------------------------------------------------------------
+ *    ==  !=        Equal, not equal
+ *  
+ *  7                               Associativity: Left-to-right
+ *  ---------------------------------------------------------------
+ *    &             Bitwise AND
+ *  
+ *  6                               Associativity: Left-to-right
+ *  ---------------------------------------------------------------
+ *    ^             Bitwise XOR
+ *  
+ *  5                               Associativity: Left-to-right
+ *  ---------------------------------------------------------------
+ *    |             Bitwise OR
+ *  
+ *  4                               Associativity: Left-to-right
+ *  ---------------------------------------------------------------
+ *    &&            Logical AND
+ *  
+ *  3                               Associativity: Left-to-right
+ *  ---------------------------------------------------------------
+ *    ||            Logical OR
+ *  
+ *  2                               Associativity: Right-to-left
+ *  ---------------------------------------------------------------
+ *    ? :           Ternary conditional
+ *  
+ *  1                               Associativity: Right-to-left
+ *  ---------------------------------------------------------------
+ *    =             Simple assignment
+ *    +=  -=        Compound assignment (additive)
+ *    *=  /=  %=    Compound assignment (multiplicative)
+ *    <<=  >>=      Compound assignment (shift)
+ *    &=  ^=  |=    Compound assignment (bitwise)
+ *
+ * Following are grammar rules to group expression into certain types, but in reality all parsing is based on precedence table.
+ * Grammars are just what is general logic, and what specific tokens parser might expect in certain expressions.
+ *
+ *  expression
+ *          : binary_expression
+ *          | unary_expression
+ *          | ternary_expression
+ *          | assignment_expression
+ *          | postfix_expression
+ *          | leaf_expression
+ *          ;
+ *
+ *  binary_expression
+ *          : expression binary_operator expression
+ *          ;
+ *
+ *  binary_operator
+ *          : '*'
+ *          | '/'
+ *          | '%'
+ *          | '+'
+ *          | '-'
+ *          | '<<'
+ *          | '>>'
+ *          | '<'
+ *          | '<='
+ *          | '>'
+ *          | '>='
+ *          | '=='
+ *          | '!='
+ *          | '&'
+ *          | '^'
+ *          | '|'
+ *          | '&&'
+ *          | '||'
+ *          ;
+ *  
+ *  unary_expression
+ *          : unary_operator expression
+ *          | '(' TODO: type ')' expression
+ *          | 'sizeof' expression
+ *          ;
+ *
+ *  unary_operator
+ *          : '++'
+ *          | '--'
+ *          | '+'
+ *          | '-'
+ *          | '!'
+ *          | '~'
+ *          | '*'
+ *          | '&'
+ *          ;
+ * 
+ *  ternary_expression
+ *          : expression '?' expression ':' expression
+ *          ;
+ * 
+ * NOTE: Assignment expression also checks if expression the left is a modifiable lvalue.
+ *
+ *  assignment_expression
+ *          : expression assignment_operator expression
+ *          ;
+ *
+ *  assignment_operator
+ *          : '=' 
+ *          | '*=' 
+ *          | '/=' 
+ *          | '%=' 
+ *          | '+=' 
+ *          | '-=' 
+ *          | '<<=' 
+ *          | '>>=' 
+ *          | '&=' 
+ *          | '^=' 
+ *          | '|='
+ *          ;
+ *
+ * NOTE: Some of postfix expressions have right side arguments, example: a[b], f(args), s.m, p->m.
+ * 
+ *  postfix_expression
+ *          : expression '[' expression ']'
+ *          | expression '(' argument_list ')'
+ *          | expression '.' identifier
+ *          | expression '->' identifier
+ *          | expression '++'
+ *          | expression '--'
+ *          | '(' TODO: type ')' '{' TODO: ... '}'
+ *          ;
+ *
+ *  primary_expression
+ *          : identifier
+ *          | integer
+ *          | float
+ *          ;
+ *
+ * IMPORTANT: Naturally this function constructs left leaning tree on binary expressions, but based of precedence it will 
+ * invoke function that constructs right leaning tree if precedence strictly increasing.
+ *
+ * Example: a + b * c (Strictly increasing precedence -> right leaning tree)
+ *  
+ *    +
+ *   /
+ *  a   
+ *    
+ *    +
+ *   / \
+ *  a   *
+ *     /
+ *    b
+ *
+ *    +
+ *   / \
+ *  a   *
+ *     / \
+ *    b   c
+ *
+ * Example: a + b - c (Same precedence -> left leaning tree)
+ *
+ *    +
+ *   /
+ *  a   
+ *
+ *      -
+ *     / 
+ *    +
+ *   / \
+ *  a   b
+ *
+ *      -
+ *     / \
+ *    +   c
+ *   / \
+ *  a   b
+ *
+ */
+CNDEF Cn_Ast_Idx cn_ast_parse_expression_increasing_precedence(Cn_Lexer *lexer, Cn_Ast_Idx left_idx, int min_precedence);
+
+CNDEF Cn_Ast_Idx cn_ast_parse_expression(Cn_Lexer *lexer, int min_precedence);
+
+CNDEF Cn_Ast_Idx cn_ast_parse_expression_leaf(Cn_Lexer *lexer);
 
 /**
  * Parses code starting of with lexer current token as init declarator list.
