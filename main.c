@@ -1,12 +1,5 @@
-int foo() {
-    int aboba;
-    {
-        { int b, c; }
-    }
-    double bar();
-}
+int main() {
+    int a, b, c;
 
-// int main() {
-//     int a = 69;
-//     return a;
-// }
+    int result = a + b * c + a * c;
+}
