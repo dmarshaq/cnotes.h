@@ -1,7 +1,4 @@
 int main() {
-    int *a, *b, *c;
-
-    char result = (char)*((*a + *b) + c);
-    
-
+    int *arr[(32, 8)];
+    int **a = (int**)(int (*)[32])arr;
 }
