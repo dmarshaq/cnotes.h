@@ -457,6 +457,16 @@ typedef enum {
     CN_TOKEN_OR,
     CN_TOKEN_EXCLAMATION,
     CN_TOKEN_TILDE,
+    CN_TOKEN_LSHIFT_ASSIGN,
+    CN_TOKEN_RSHIFT_ASSIGN,
+    CN_TOKEN_MULTIPLY_ASSIGN,
+    CN_TOKEN_DIVIDE_ASSIGN,
+    CN_TOKEN_MODULO_ASSIGN,
+    CN_TOKEN_PLUS_ASSIGN,
+    CN_TOKEN_MINUS_ASSIGN,
+    CN_TOKEN_BIT_AND_ASSIGN,
+    CN_TOKEN_BIT_XOR_ASSIGN,
+    CN_TOKEN_BIT_OR_ASSIGN,
 } Cn_Token_Type;
 
 typedef struct {
@@ -632,6 +642,10 @@ static const Cn_String CN_SIZEOF_STR        = CN_STR_BUFFER("sizeof");
 
 /**
  *  binary_operator
+ *          : '['
+ *          | '('
+ *          | '.'
+ *          | '->'
  *          | '*'
  *          | '/'
  *          | '%'
@@ -656,25 +670,28 @@ static const Cn_String CN_SIZEOF_STR        = CN_STR_BUFFER("sizeof");
 typedef enum : int8_t {
     CN_BINARY_OP_NONE           = -1,
     CN_BINARY_OP_ARRAY_SUB      = 0,
-    CN_BINARY_OP_MULTIPLICATION = 1,
-    CN_BINARY_OP_DIVISION       = 2,
-    CN_BINARY_OP_MODULO         = 3,
-    CN_BINARY_OP_ADDITION       = 4,
-    CN_BINARY_OP_SUBTRACTION    = 5,
-    CN_BINARY_OP_LSHIFT         = 6,
-    CN_BINARY_OP_RSHIFT         = 7,
-    CN_BINARY_OP_LESS           = 8,
-    CN_BINARY_OP_LESS_EQ        = 9,
-    CN_BINARY_OP_GREATER        = 10,
-    CN_BINARY_OP_GREATER_EQ     = 11,
-    CN_BINARY_OP_EQ             = 12,
-    CN_BINARY_OP_NOT_EQ         = 13,
-    CN_BINARY_OP_BIT_AND        = 14,
-    CN_BINARY_OP_BIT_XOR        = 15,
-    CN_BINARY_OP_BIT_OR         = 16,
-    CN_BINARY_OP_AND            = 17,
-    CN_BINARY_OP_OR             = 18,
-    CN_BINARY_OP_COMMA          = 19,
+    CN_BINARY_OP_FUNCTION       = 1,
+    CN_BINARY_OP_DOT            = 2,
+    CN_BINARY_OP_ARROW          = 3,
+    CN_BINARY_OP_MULTIPLICATION = 4,
+    CN_BINARY_OP_DIVISION       = 5,
+    CN_BINARY_OP_MODULO         = 6,
+    CN_BINARY_OP_ADDITION       = 7,
+    CN_BINARY_OP_SUBTRACTION    = 8,
+    CN_BINARY_OP_LSHIFT         = 9,
+    CN_BINARY_OP_RSHIFT         = 10,
+    CN_BINARY_OP_LESS           = 11,
+    CN_BINARY_OP_LESS_EQ        = 12,
+    CN_BINARY_OP_GREATER        = 13,
+    CN_BINARY_OP_GREATER_EQ     = 14,
+    CN_BINARY_OP_EQ             = 15,
+    CN_BINARY_OP_NOT_EQ         = 16,
+    CN_BINARY_OP_BIT_AND        = 17,
+    CN_BINARY_OP_BIT_XOR        = 18,
+    CN_BINARY_OP_BIT_OR         = 19,
+    CN_BINARY_OP_AND            = 20,
+    CN_BINARY_OP_OR             = 21,
+    CN_BINARY_OP_COMMA          = 22,
 } Cn_Binary_Operator_Kind;
 
 typedef struct {
@@ -715,14 +732,80 @@ typedef enum : int8_t {
 } Cn_Unary_Operator_Kind;
 
 typedef struct {
-    Cn_Unary_Operator_Kind kind;    // Kind of operator.
-    Cn_Token_Type token_identifier; // Token which identifies unary operator, if such present.
+    Cn_Unary_Operator_Kind kind;         // Kind of operator.
+    Cn_Token_Type token_identifier;      // Token which identifies unary operator, if such present.
 } Cn_Unary_Operator;
 
 /**
  * Checks table if current token is unary operator, returns it's kind, if not CN_UNARY_OP_NONE.
  */
 CNDEF Cn_Unary_Operator_Kind cn_ast_is_unary_operator(Cn_Lexer *lexer);
+
+/**
+ *  assignment_operator
+ *          : '=' 
+ *          | '*=' 
+ *          | '/=' 
+ *          | '%=' 
+ *          | '+=' 
+ *          | '-=' 
+ *          | '<<=' 
+ *          | '>>=' 
+ *          | '&=' 
+ *          | '^=' 
+ *          | '|='
+ *          ;
+ */
+#define CN_ASSIGNMENT_OPERATOR_PRECEDENCE 1
+
+typedef enum : int8_t {
+    CN_ASSIGNMENT_OP_NONE           = -1,
+    CN_ASSIGNMENT_OP_ASSIGN         = 0,
+    CN_ASSIGNMENT_OP_MULTIPLY       = 1,
+    CN_ASSIGNMENT_OP_DIVIDE         = 2,
+    CN_ASSIGNMENT_OP_MODULO         = 3,
+    CN_ASSIGNMENT_OP_PLUS           = 4,
+    CN_ASSIGNMENT_OP_MINUS          = 5,
+    CN_ASSIGNMENT_OP_LSHIFT         = 6,
+    CN_ASSIGNMENT_OP_RSHIFT         = 7,
+    CN_ASSIGNMENT_OP_BIT_AND        = 8,
+    CN_ASSIGNMENT_OP_BIT_XOR        = 9,
+    CN_ASSIGNMENT_OP_BIT_OR         = 10,
+} Cn_Assignment_Operator_Kind;
+
+typedef struct {
+    Cn_Assignment_Operator_Kind kind;    // Kind of operator.
+    Cn_Token_Type token_identifier;      // Token which identifies assignment operator, if such present.
+} Cn_Assignment_Operator;
+
+/**
+ * Checks table if current token is assignment operator, returns it's kind, if not CN_ASSIGNMENT_OP_NONE.
+ */
+CNDEF Cn_Assignment_Operator_Kind cn_ast_is_assignment_operator(Cn_Lexer *lexer);
+
+/**
+ *  postfix_operator
+ *          : '++'
+ *          | '--'
+ *          ;
+ */
+#define CN_POSTFIX_OPERATOR_PRECEDENCE 14
+
+typedef enum : int8_t {
+    CN_POSTFIX_OP_NONE              = -1,
+    CN_POSTFIX_OP_INCREMENT         = 0,
+    CN_POSTFIX_OP_DECREMENT         = 1,
+} Cn_Postfix_Operator_Kind;
+
+typedef struct {
+    Cn_Postfix_Operator_Kind kind;       // Kind of operator.
+    Cn_Token_Type token_identifier;      // Token which identifies postfix operator, if such present.
+} Cn_Postfix_Operator;
+
+/**
+ * Checks table if current token is postfix operator, returns it's kind, if not CN_POSTFIX_OP_NONE.
+ */
+CNDEF Cn_Postfix_Operator_Kind cn_ast_is_postfix_operator(Cn_Lexer *lexer);
 
 /**
  * Grabs next token in the lexer the same way as lexer next token except,
@@ -793,6 +876,8 @@ typedef enum cn_ast_node_kind : uint8_t {
     CN_AST_NODE_JUMP_STATEMENT,
     CN_AST_NODE_EXPRESSION_STATEMENT,
     CN_AST_NODE_BINARY_EXPRESSION,
+    CN_AST_NODE_ACCESS_EXPRESSION,
+    CN_AST_NODE_FUNCTION_EXPRESSION,
     CN_AST_NODE_UNARY_EXPRESSION,
     CN_AST_NODE_CAST_EXPRESSION,
     CN_AST_NODE_SIZEOF_EXPRESSION,
@@ -848,6 +933,17 @@ typedef struct {
 } Cn_Ast_Node_Binary_Expression;
 
 typedef struct {
+    Cn_Ast_Idx expression_idx;
+    bool pointer;
+    Cn_String member_identifier;
+} Cn_Ast_Node_Access_Expression;
+
+typedef struct {
+    Cn_Ast_Idx expression_idx;
+    Cn_Ast_Linked_List argument_list;
+} Cn_Ast_Node_Function_Expression;
+
+typedef struct {
     Cn_Unary_Operator_Kind operator_kind;
     Cn_Ast_Idx expression_idx;
 } Cn_Ast_Node_Unary_Expression;
@@ -869,11 +965,13 @@ typedef struct {
 
 typedef struct {
     Cn_Ast_Idx left_expression_idx;
+    Cn_Assignment_Operator_Kind operator_kind;
     Cn_Ast_Idx right_expression_idx;
 } Cn_Ast_Node_Assignment_Expression;
 
 typedef struct {
     Cn_Ast_Idx expression_idx;
+    Cn_Postfix_Operator_Kind operator_kind;
 } Cn_Ast_Node_Postfix_Expression;
 
 typedef struct {
@@ -962,6 +1060,8 @@ typedef struct cn_ast_node {
         // Cn_Ast_Node_Jump_Statement           jump_statement;
         Cn_Ast_Node_Expression_Statement        expression_statement;
         Cn_Ast_Node_Binary_Expression           binary_expression;
+        Cn_Ast_Node_Access_Expression           access_expression;
+        Cn_Ast_Node_Function_Expression         function_expression;
         Cn_Ast_Node_Unary_Expression            unary_expression;
         Cn_Ast_Node_Cast_Expression             cast_expression;
         Cn_Ast_Node_Sizeof_Expression           sizeof_expression;
@@ -1437,6 +1537,21 @@ CNDEF Cn_Ast_Idx cn_ast_parse_expression_leaf(Cn_Lexer *lexer, Cn_Expression_Par
  *  binary_expression
  *          : expression binary_operator expression
  *          | expression '[' expression ']'
+ *          | function_expression
+ *          | access_expression
+ *          ;
+ *
+ *  function_expression
+ *          : expression '(' argument_list? ')'
+ *          ;
+ *
+ *  argument_list
+ *          : expression (',' expression)*
+ *          ;
+ *
+ *  access_expression
+ *          : expression '.' identifier
+ *          | expression '->' identifier
  *          ;
  */
 
@@ -1450,6 +1565,11 @@ CNDEF Cn_Ast_Idx cn_ast_parse_expression_leaf(Cn_Lexer *lexer, Cn_Expression_Par
  *
  *  cast_expression
  *          : '(' type_name ')' expression
+ *          | compound_literal
+ *          ;
+ *
+ *  compound_literal
+ *          : '(' type_name ')' '{' TODO: ... '}'
  *          ;
  *  
  *  sizeof_expression
@@ -1478,19 +1598,6 @@ CNDEF Cn_Ast_Idx cn_ast_parse_expression_leaf(Cn_Lexer *lexer, Cn_Expression_Par
  *          : expression assignment_operator expression
  *          ;
  *
- *  assignment_operator
- *          : '=' 
- *          | '*=' 
- *          | '/=' 
- *          | '%=' 
- *          | '+=' 
- *          | '-=' 
- *          | '<<=' 
- *          | '>>=' 
- *          | '&=' 
- *          | '^=' 
- *          | '|='
- *          ;
  */
 
 
@@ -1498,12 +1605,8 @@ CNDEF Cn_Ast_Idx cn_ast_parse_expression_leaf(Cn_Lexer *lexer, Cn_Expression_Par
  * NOTE: Some of postfix expressions have right side arguments, example: a[b], f(args), s.m, p->m.
  * 
  *  postfix_expression
- *          : expression '(' argument_list ')'
- *          | expression '.' identifier
- *          | expression '->' identifier
- *          | expression '++'
+ *          : expression '++'
  *          | expression '--'
- *          | '(' TODO: type ')' '{' TODO: ... '}'
  *          ;
  */
 
@@ -2610,6 +2713,16 @@ CNDEF void cn__hash_table_remove(void **table, int64_t key_size, uint8_t *key) {
 
 // LEXER SECTION
 const Cn_Literal_Token CN_LITERAL_TOKENS[] = {
+    { CN_TOKEN_LSHIFT_ASSIGN,       CN_STR_BUFFER("<<=") },
+    { CN_TOKEN_RSHIFT_ASSIGN,       CN_STR_BUFFER(">>=") },
+    { CN_TOKEN_MULTIPLY_ASSIGN,     CN_STR_BUFFER("*=") },
+    { CN_TOKEN_DIVIDE_ASSIGN,       CN_STR_BUFFER("/=") },
+    { CN_TOKEN_MODULO_ASSIGN,       CN_STR_BUFFER("%=") },
+    { CN_TOKEN_PLUS_ASSIGN,         CN_STR_BUFFER("+=") },
+    { CN_TOKEN_MINUS_ASSIGN,        CN_STR_BUFFER("-=") },
+    { CN_TOKEN_BIT_AND_ASSIGN,      CN_STR_BUFFER("&=") },
+    { CN_TOKEN_BIT_XOR_ASSIGN,      CN_STR_BUFFER("^=") },
+    { CN_TOKEN_BIT_OR_ASSIGN,       CN_STR_BUFFER("|=") },
     { CN_TOKEN_ARROW,               CN_STR_BUFFER("->") },
     { CN_TOKEN_INCREMENT,           CN_STR_BUFFER("++") },
     { CN_TOKEN_DECREMENT,           CN_STR_BUFFER("--") },
@@ -2989,6 +3102,9 @@ CNDEF void cn_lexer_print_snippet(Cn_Lexer *lexer, uint64_t index, int64_t lengt
 
 const Cn_Binary_Operator CN_BINARY_OPERATORS[] = {
     { CN_BINARY_OP_ARRAY_SUB,       CN_TOKEN_SQR_BRACES_OPEN,   14  },
+    { CN_BINARY_OP_FUNCTION,        CN_TOKEN_PARAN_OPEN,        14  },
+    { CN_BINARY_OP_DOT,             CN_TOKEN_DOT,               14  },
+    { CN_BINARY_OP_ARROW,           CN_TOKEN_ARROW,             14  },
     { CN_BINARY_OP_MULTIPLICATION,  CN_TOKEN_ASTERISK,          12  },
     { CN_BINARY_OP_DIVISION,        CN_TOKEN_SLASH,             12  },
     { CN_BINARY_OP_MODULO,          CN_TOKEN_PERCENT,           12  },
@@ -3021,14 +3137,14 @@ CNDEF Cn_Binary_Operator_Kind cn_ast_is_binary_operator(Cn_Lexer *lexer) {
 }
 
 const Cn_Unary_Operator CN_UNARY_OPERATORS[] = {
-    { CN_UNARY_OP_INCREMENT,    CN_TOKEN_INCREMENT      },
-    { CN_UNARY_OP_DECREMENT,    CN_TOKEN_DECREMENT      },
-    { CN_UNARY_OP_POSITIVE,     CN_TOKEN_PLUS           },
-    { CN_UNARY_OP_NEGATIVE,     CN_TOKEN_MINUS          },
-    { CN_UNARY_OP_NOT,          CN_TOKEN_EXCLAMATION    },
-    { CN_UNARY_OP_BIT_NOT,      CN_TOKEN_TILDE          },
-    { CN_UNARY_OP_DEREF,        CN_TOKEN_ASTERISK       },
-    { CN_UNARY_OP_ADDROF,       CN_TOKEN_AMPERSAND      },
+    { CN_UNARY_OP_INCREMENT,    CN_TOKEN_INCREMENT   },
+    { CN_UNARY_OP_DECREMENT,    CN_TOKEN_DECREMENT   },
+    { CN_UNARY_OP_POSITIVE,     CN_TOKEN_PLUS        },
+    { CN_UNARY_OP_NEGATIVE,     CN_TOKEN_MINUS       },
+    { CN_UNARY_OP_NOT,          CN_TOKEN_EXCLAMATION },
+    { CN_UNARY_OP_BIT_NOT,      CN_TOKEN_TILDE       },
+    { CN_UNARY_OP_DEREF,        CN_TOKEN_ASTERISK    },
+    { CN_UNARY_OP_ADDROF,       CN_TOKEN_AMPERSAND   },
 };
 
 CNDEF Cn_Unary_Operator_Kind cn_ast_is_unary_operator(Cn_Lexer *lexer) {
@@ -3039,6 +3155,45 @@ CNDEF Cn_Unary_Operator_Kind cn_ast_is_unary_operator(Cn_Lexer *lexer) {
     }
 
     return CN_UNARY_OP_NONE;
+}
+
+const Cn_Assignment_Operator CN_ASSIGNMENT_OPERATORS[] = {
+    { CN_ASSIGNMENT_OP_ASSIGN,      CN_TOKEN_ASSIGN          },
+    { CN_ASSIGNMENT_OP_MULTIPLY,    CN_TOKEN_MULTIPLY_ASSIGN },
+    { CN_ASSIGNMENT_OP_DIVIDE,      CN_TOKEN_DIVIDE_ASSIGN   },
+    { CN_ASSIGNMENT_OP_MODULO,      CN_TOKEN_MODULO_ASSIGN   },
+    { CN_ASSIGNMENT_OP_PLUS,        CN_TOKEN_PLUS_ASSIGN     },
+    { CN_ASSIGNMENT_OP_MINUS,       CN_TOKEN_MINUS_ASSIGN    },
+    { CN_ASSIGNMENT_OP_LSHIFT,      CN_TOKEN_LSHIFT_ASSIGN   },
+    { CN_ASSIGNMENT_OP_RSHIFT,      CN_TOKEN_RSHIFT_ASSIGN   },
+    { CN_ASSIGNMENT_OP_BIT_AND,     CN_TOKEN_BIT_AND_ASSIGN  },
+    { CN_ASSIGNMENT_OP_BIT_XOR,     CN_TOKEN_BIT_XOR_ASSIGN  },
+    { CN_ASSIGNMENT_OP_BIT_OR,      CN_TOKEN_BIT_OR_ASSIGN   },
+};
+
+CNDEF Cn_Assignment_Operator_Kind cn_ast_is_assignment_operator(Cn_Lexer *lexer) {
+    for (int i = 0; i < CN_ARRAY_LENGTH(CN_ASSIGNMENT_OPERATORS); i++) {
+        if (lexer->token.type == CN_ASSIGNMENT_OPERATORS[i].token_identifier) {
+            return i;
+        }
+    }
+
+    return CN_ASSIGNMENT_OP_NONE;
+}
+
+const Cn_Postfix_Operator CN_POSTFIX_OPERATORS[] = {
+    { CN_POSTFIX_OP_INCREMENT,    CN_TOKEN_INCREMENT },
+    { CN_POSTFIX_OP_DECREMENT,    CN_TOKEN_DECREMENT },
+};
+
+CNDEF Cn_Postfix_Operator_Kind cn_ast_is_postfix_operator(Cn_Lexer *lexer) {
+    for (int i = 0; i < CN_ARRAY_LENGTH(CN_POSTFIX_OPERATORS); i++) {
+        if (lexer->token.type == CN_POSTFIX_OPERATORS[i].token_identifier) {
+            return i;
+        }
+    }
+
+    return CN_POSTFIX_OP_NONE;
 }
 
 const Cn_Token_Type CN_TOKEN_BLACKLIST[] = { CN_TOKEN_COMMENT, CN_TOKEN_PREPROC };
@@ -3121,6 +3276,8 @@ CNDEF void cn__ast_print_kind(Cn_Ast_Node_Kind kind) {
         CN__ENUM_PRINT_CASE(CN_AST_NODE_ITERATION_STATEMENT);
         CN__ENUM_PRINT_CASE(CN_AST_NODE_JUMP_STATEMENT);
         CN__ENUM_PRINT_CASE(CN_AST_NODE_BINARY_EXPRESSION);
+        CN__ENUM_PRINT_CASE(CN_AST_NODE_ACCESS_EXPRESSION);
+        CN__ENUM_PRINT_CASE(CN_AST_NODE_FUNCTION_EXPRESSION);
         CN__ENUM_PRINT_CASE(CN_AST_NODE_UNARY_EXPRESSION);
         CN__ENUM_PRINT_CASE(CN_AST_NODE_CAST_EXPRESSION);
         CN__ENUM_PRINT_CASE(CN_AST_NODE_SIZEOF_EXPRESSION);
@@ -3155,26 +3312,54 @@ const char *CN_AST_PRINT_LAST_TAB  = "└── ";
 
 #define CN__AST_PRINT_TABS(depth, prefix) for (int i = 0; i < depth; i++) { printf("%s", cn_ast_print_prefixes[i]); } printf("%s", prefix)
 
-CNDEF void cn_ast_print(Cn_Ast_Node *node, int depth) {
-    CN_ASSERT(depth < (int)CN_ARRAY_LENGTH(cn_ast_print_prefixes));
-
 #define LAST() do { cn_ast_print_prefixes[depth] = CN_AST_PRINT_EMPTY_TAB; CN__AST_PRINT_TABS(depth, CN_AST_PRINT_LAST_TAB); } while(0)
 #define SPLIT() do { CN__AST_PRINT_TABS(depth, CN_AST_PRINT_SPLIT_TAB); } while(0)
 
+CNDEF void cn__ast_print_list(Cn_Ast_Node *node, int depth) {
+    if (node == cn_ast_node_get(CN_AST_NIL_IDX)) {
+        printf("LINKED_LIST empty\n");
+        return;
+    }
+
+    printf("LINKED_LIST\n");
+
+    cn_ast_print_prefixes[depth] = CN_AST_PRINT_FLAT_TAB;
+
+    while (true) {
+        if (node->next_idx == CN_AST_NIL_IDX) {
+            LAST();
+            cn_ast_print(node, depth + 1);
+            break;
+        }
+        SPLIT();
+        cn_ast_print(node, depth + 1);
+        node = cn_ast_node_get(node->next_idx);
+    }
+
+    cn_ast_print_prefixes[depth] = NULL;
+}
+
+CNDEF void cn_ast_print(Cn_Ast_Node *node, int depth) {
+    CN_ASSERT(depth < (int)CN_ARRAY_LENGTH(cn_ast_print_prefixes));
+
     cn__ast_print_kind(node->kind);
     cn_ast_print_prefixes[depth] = CN_AST_PRINT_FLAT_TAB;
+    
+    int next = 0;
+    Cn_Ast_Idx idxs[4] = {0};
+    bool is_list[4]    = {0};
+
+#define ADD_IDX(idx) do { if (idx != CN_AST_NIL_IDX) { CN_ASSERT(next < CN_ARRAY_LENGTH(idxs)); idxs[next++] = idx; } } while(0)
+
+#define ADD_LIST(list) do { CN_ASSERT(next < CN_ARRAY_LENGTH(idxs)); idxs[next] = (list)->idx; is_list[next++] = true; } while(0)
     
     // Printing info about specific nodes.
     switch(node->kind) {
         case CN_AST_NODE_TRANSLATION_UNIT:
             {
                 printf("\n");
-                cn_ast_linked_list_foreach(n, &node->translation_unit.external_declaration_list)  {
-                    if (n->next_idx == CN_AST_NIL_IDX) LAST();
-                    else SPLIT();
 
-                    cn_ast_print(n, depth + 1);
-                }
+                ADD_LIST(&node->translation_unit.external_declaration_list);
                 break;
             }
         case CN_AST_NODE_EXTERNAL_DECLARATION:
@@ -3187,53 +3372,35 @@ CNDEF void cn_ast_print(Cn_Ast_Node *node, int depth) {
                     printf(" stray ';'\n");
                 } else {
                     printf("\n");
-
-                    LAST();
-                    cn_ast_print(cn_ast_node_get(node->external_declaration.child_idx), depth + 1);
+                    ADD_IDX(node->external_declaration.child_idx);
                 }
                 break;
             }
         case CN_AST_NODE_DECLARATION:
             {
                 printf("\n");
-                if (node->declaration.init_declarator_list_idx == CN_AST_NIL_IDX) { 
-                    LAST();
-                    cn_ast_print(cn_ast_node_get(node->declaration.declaration_specifiers_idx), depth + 1);
-                } else {
-                    SPLIT();
-                    cn_ast_print(cn_ast_node_get(node->declaration.declaration_specifiers_idx), depth + 1);
-                    LAST();
-                    cn_ast_print(cn_ast_node_get(node->declaration.init_declarator_list_idx), depth + 1);
-                }
+                ADD_IDX(node->declaration.declaration_specifiers_idx);
+                ADD_IDX(node->declaration.init_declarator_list_idx);
                 break;
             }
         case CN_AST_NODE_FUNCTION_DEFINITION:
             {
                 printf("\n");
-                SPLIT();
-                cn_ast_print(cn_ast_node_get(node->function_definition.declaration_specifiers_idx), depth + 1);
-                SPLIT();
-                cn_ast_print(cn_ast_node_get(node->function_definition.declarator_idx), depth + 1);
-                LAST();
-                cn_ast_print(cn_ast_node_get(node->function_definition.compound_statement_idx), depth + 1);
+                ADD_IDX(node->function_definition.declaration_specifiers_idx);
+                ADD_IDX(node->function_definition.declarator_idx);
+                ADD_IDX(node->function_definition.compound_statement_idx);
                 break;
             }
         case CN_AST_NODE_COMPOUND_STATEMENT:
             {
                 printf("\n");
-                cn_ast_linked_list_foreach(n, &node->compound_statement.statement_or_declaration_list)  {
-                    if (n->next_idx == CN_AST_NIL_IDX) LAST();
-                    else SPLIT();
-
-                    cn_ast_print(n, depth + 1);
-                }
+                ADD_LIST(&node->compound_statement.statement_or_declaration_list);
                 break;
             }
         case CN_AST_NODE_EXPRESSION_STATEMENT:
             {
                 printf("\n");
-                LAST();
-                cn_ast_print(cn_ast_node_get(node->expression_statement.expression_idx), depth + 1);
+                ADD_IDX(node->expression_statement.expression_idx);
                 break;
             }
         case CN_AST_NODE_BINARY_EXPRESSION:
@@ -3265,10 +3432,15 @@ CNDEF void cn_ast_print(Cn_Ast_Node *node, int depth) {
                         break;
                 }
                 printf("\n");
-                SPLIT();
-                cn_ast_print(cn_ast_node_get(node->binary_expression.left_expression_idx), depth + 1);
-                LAST();
-                cn_ast_print(cn_ast_node_get(node->binary_expression.right_expression_idx), depth + 1);
+                ADD_IDX(node->binary_expression.left_expression_idx);
+                ADD_IDX(node->binary_expression.right_expression_idx);
+                break;
+            }
+        case CN_AST_NODE_FUNCTION_EXPRESSION:
+            {
+                printf("\n");
+                ADD_IDX(node->function_expression.expression_idx);
+                ADD_LIST(&node->function_expression.argument_list);
                 break;
             }
         case CN_AST_NODE_UNARY_EXPRESSION:
@@ -3288,44 +3460,60 @@ CNDEF void cn_ast_print(Cn_Ast_Node *node, int depth) {
                         break;
                 }
                 printf("\n");
-                LAST();
-                cn_ast_print(cn_ast_node_get(node->unary_expression.expression_idx), depth + 1);
+                ADD_IDX(node->unary_expression.expression_idx);
                 break;
             }
         case CN_AST_NODE_CAST_EXPRESSION:
             {
                 printf("\n");
-                SPLIT();
-                cn_ast_print(cn_ast_node_get(node->cast_expression.type_name_idx), depth + 1);
-                LAST();
-                cn_ast_print(cn_ast_node_get(node->unary_expression.expression_idx), depth + 1);
+                ADD_IDX(node->cast_expression.type_name_idx);
+                ADD_IDX(node->cast_expression.expression_idx);
                 break;
             }
         case CN_AST_NODE_TERNARY_EXPRESSION:
             {
                 printf("\n");
-                SPLIT();
-                cn_ast_print(cn_ast_node_get(node->ternary_expression.condition_expression_idx), depth + 1);
-                SPLIT();
-                cn_ast_print(cn_ast_node_get(node->ternary_expression.true_expression_idx), depth + 1);
-                LAST();
-                cn_ast_print(cn_ast_node_get(node->ternary_expression.false_expression_idx), depth + 1);
+                ADD_IDX(node->ternary_expression.condition_expression_idx);
+                ADD_IDX(node->ternary_expression.true_expression_idx);
+                ADD_IDX(node->ternary_expression.false_expression_idx);
                 break;
             }
         case CN_AST_NODE_ASSIGNMENT_EXPRESSION:
             {
+                printf(" operator_kind: ");
+                switch(node->assignment_expression.operator_kind) {
+                    CN__ENUM_PRINT_CASE(CN_ASSIGNMENT_OP_ASSIGN);
+                    CN__ENUM_PRINT_CASE(CN_ASSIGNMENT_OP_MULTIPLY);
+                    CN__ENUM_PRINT_CASE(CN_ASSIGNMENT_OP_DIVIDE);
+                    CN__ENUM_PRINT_CASE(CN_ASSIGNMENT_OP_MODULO);
+                    CN__ENUM_PRINT_CASE(CN_ASSIGNMENT_OP_PLUS);
+                    CN__ENUM_PRINT_CASE(CN_ASSIGNMENT_OP_MINUS);
+                    CN__ENUM_PRINT_CASE(CN_ASSIGNMENT_OP_LSHIFT);
+                    CN__ENUM_PRINT_CASE(CN_ASSIGNMENT_OP_RSHIFT);
+                    CN__ENUM_PRINT_CASE(CN_ASSIGNMENT_OP_BIT_AND);
+                    CN__ENUM_PRINT_CASE(CN_ASSIGNMENT_OP_BIT_XOR);
+                    CN__ENUM_PRINT_CASE(CN_ASSIGNMENT_OP_BIT_OR);
+                    default: 
+                        printf("??");
+                        break;
+                }
                 printf("\n");
-                SPLIT();
-                cn_ast_print(cn_ast_node_get(node->assignment_expression.left_expression_idx), depth + 1);
-                LAST();
-                cn_ast_print(cn_ast_node_get(node->assignment_expression.right_expression_idx), depth + 1);
+                ADD_IDX(node->assignment_expression.left_expression_idx);
+                ADD_IDX(node->assignment_expression.right_expression_idx);
                 break;
             }
         case CN_AST_NODE_POSTFIX_EXPRESSION:
             {
+                printf(" operator_kind: ");
+                switch(node->postfix_expression.operator_kind) {
+                    CN__ENUM_PRINT_CASE(CN_POSTFIX_OP_INCREMENT);
+                    CN__ENUM_PRINT_CASE(CN_POSTFIX_OP_DECREMENT);
+                    default: 
+                        printf("??");
+                        break;
+                }
                 printf("\n");
-                LAST();
-                cn_ast_print(cn_ast_node_get(node->postfix_expression.expression_idx), depth + 1);
+                ADD_IDX(node->postfix_expression.expression_idx);
                 break;
             }
         case CN_AST_NODE_PRIMARY_EXPRESSION:
@@ -3336,55 +3524,28 @@ CNDEF void cn_ast_print(Cn_Ast_Node *node, int depth) {
         case CN_AST_NODE_INIT_DECLARATOR_LIST:
             {
                 printf("\n");
-                cn_ast_linked_list_foreach(n, &node->init_declarator_list.init_declarator_list)  {
-                    if (n->next_idx == CN_AST_NIL_IDX) LAST();
-                    else SPLIT();
-
-                    cn_ast_print(n, depth + 1);
-                }
+                ADD_LIST(&node->init_declarator_list.init_declarator_list);
                 break;
             }
         case CN_AST_NODE_INIT_DECLARATOR:
             {
                 printf("\n");
-                if (node->init_declarator.initializer_idx == CN_AST_NIL_IDX) { 
-                    LAST();
-                    cn_ast_print(cn_ast_node_get(node->init_declarator.declarator_idx), depth + 1);
-                } else {
-                    SPLIT();
-                    cn_ast_print(cn_ast_node_get(node->init_declarator.declarator_idx), depth + 1);
-                    LAST();
-                    cn_ast_print(cn_ast_node_get(node->init_declarator.initializer_idx), depth + 1);
-                }
+                ADD_IDX(node->init_declarator.declarator_idx);
+                ADD_IDX(node->init_declarator.initializer_idx);
                 break;
             }
         case CN_AST_NODE_INITIALIZER:
             {
                 printf("\n");
-                LAST();
-                cn_ast_print(cn_ast_node_get(node->initializer.expression_idx), depth + 1);
+                ADD_IDX(node->initializer.expression_idx);
                 break;
             }
         case CN_AST_NODE_ABSTRACT_DECLARATOR:
         case CN_AST_NODE_DECLARATOR:
             {
                 printf("\n");
-                if (node->declarator.pointer_idx == CN_AST_NIL_IDX) { 
-                    if (node->declarator.direct_declarator_idx != CN_AST_NIL_IDX) {
-                        LAST();
-                        cn_ast_print(cn_ast_node_get(node->declarator.direct_declarator_idx), depth + 1);
-                    }
-                } else {
-                    if (node->declarator.direct_declarator_idx != CN_AST_NIL_IDX) {
-                        SPLIT();
-                        cn_ast_print(cn_ast_node_get(node->declarator.pointer_idx), depth + 1);
-                        LAST();
-                        cn_ast_print(cn_ast_node_get(node->declarator.direct_declarator_idx), depth + 1);
-                    } else {
-                        LAST();
-                        cn_ast_print(cn_ast_node_get(node->declarator.pointer_idx), depth + 1);
-                    }
-                }
+                ADD_IDX(node->declarator.pointer_idx);
+                ADD_IDX(node->declarator.direct_declarator_idx);
                 break;
             }
         case CN_AST_NODE_POINTER:
@@ -3407,10 +3568,7 @@ CNDEF void cn_ast_print(Cn_Ast_Node *node, int depth) {
                 }
 
                 printf("\n");
-                if (node->pointer.pointer_idx != CN_AST_NIL_IDX) { 
-                    LAST();
-                    cn_ast_print(cn_ast_node_get(node->pointer.pointer_idx), depth + 1);
-                }
+                ADD_IDX(node->pointer.pointer_idx);
                 break;
             }
         case CN_AST_NODE_DIRECT_DECLARATOR:
@@ -3422,24 +3580,20 @@ CNDEF void cn_ast_print(Cn_Ast_Node *node, int depth) {
                         break;
                     case CN_DD_GROUPED:
                         printf("grouped\n");
-                        LAST();
-                        cn_ast_print(cn_ast_node_get(node->direct_declarator.declarator_idx), depth + 1);
+                        ADD_IDX(node->direct_declarator.declarator_idx);
                         break;
                     case CN_DD_ARRAY:
                         printf("array\n");
-                        if (node->direct_declarator.dd_array.direct_declarator_idx != CN_AST_NIL_IDX) {
-                            LAST();
-                            cn_ast_print(cn_ast_node_get(node->direct_declarator.dd_array.direct_declarator_idx), depth + 1);
-                        }
+                        ADD_IDX(node->direct_declarator.dd_array.expression_idx);
+                        ADD_IDX(node->direct_declarator.dd_array.direct_declarator_idx);
                         break;
                     case CN_DD_FUNCTION:
                         printf("function\n");
-                        if (node->direct_declarator.dd_array.direct_declarator_idx != CN_AST_NIL_IDX) {
-                            LAST();
-                            cn_ast_print(cn_ast_node_get(node->direct_declarator.dd_function.direct_declarator_idx), depth + 1);
-                        }
+                        ADD_IDX(node->direct_declarator.dd_function.parameter_type_list_idx);
+                        ADD_IDX(node->direct_declarator.dd_function.direct_declarator_idx);
                         break;
                 }
+
 
                 break;
             }
@@ -3482,8 +3636,7 @@ CNDEF void cn_ast_print(Cn_Ast_Node *node, int depth) {
                 }
                 printf("\n");
 
-                LAST();
-                cn_ast_print(cn_ast_node_get(node->declaration_specifiers.type_specifier_idx), depth + 1);
+                ADD_IDX(node->declaration_specifiers.type_specifier_idx);
                 break;
             }
         case CN_AST_NODE_TYPE_SPECIFIER:
@@ -3539,15 +3692,31 @@ CNDEF void cn_ast_print(Cn_Ast_Node *node, int depth) {
                 }
                 printf("\n");
 
-                SPLIT();
-                cn_ast_print(cn_ast_node_get(node->type_name.type_specifier_idx), depth + 1);
-
-                LAST();
-                cn_ast_print(cn_ast_node_get(node->type_name.abstract_declarator_idx), depth + 1);
+                ADD_IDX(node->type_name.type_specifier_idx);
+                ADD_IDX(node->type_name.abstract_declarator_idx);
                 break;
             }
         default:
             break;
+    }
+
+    for (int i = 0; i < next; i++) {
+        node = cn_ast_node_get(idxs[i]);
+
+        if (i == next - 1) {
+            LAST();
+            if (is_list[i]) 
+                cn__ast_print_list(node, depth + 1);
+            else 
+                cn_ast_print(node, depth + 1);
+        } else {
+            SPLIT();
+            if (is_list[i]) 
+                cn__ast_print_list(node, depth + 1);
+            else 
+                cn_ast_print(node, depth + 1);
+        }
+        
     }
 
 
@@ -3872,20 +4041,54 @@ error:
 CNDEF Cn_Ast_Idx cn_ast_parse_expression_increasing_precedence(Cn_Lexer *lexer, Cn_Ast_Idx left_idx, int min_precedence, Cn_Expression_Parsing_Flags flags) {
     Cn_Lexer original_state = *lexer;
 
-    Cn_Binary_Operator_Kind op_kind = cn_ast_is_binary_operator(lexer);
-    if (op_kind == CN_BINARY_OP_NONE) return left_idx;
+    int8_t op_kind;
 
-    int precedence = CN_BINARY_OPERATORS[op_kind].precedence; 
+    // Binary operator case.
+    op_kind = cn_ast_is_binary_operator(lexer);
+    if (op_kind != CN_BINARY_OP_NONE) {
+        int precedence = CN_BINARY_OPERATORS[op_kind].precedence; 
 
-    if (precedence <= min_precedence) {
-        return left_idx;
-    } else {
-        if (cn_lexer_expect(lexer, CN_TOKEN_COMMA) && (flags & CN_NO_COMMA_OPERATOR)) {
+        if (precedence <= min_precedence) {
             return left_idx;
         }
 
+        // Ignoring comma operator if flag is specified.
+        if (cn_lexer_expect(lexer, CN_TOKEN_COMMA) && (flags & CN_NO_COMMA_OPERATOR)) {
+            return left_idx;
+        }
+        
+        // Function call case.
+        if (cn_lexer_expect(lexer, CN_TOKEN_PARAN_OPEN)) {
+            cn_ast_next_token(lexer);
+
+            Cn_Ast_Node node = { .kind = CN_AST_NODE_FUNCTION_EXPRESSION };
+
+            node.function_expression.expression_idx = left_idx;
+            
+            if (!cn_lexer_expect(lexer, CN_TOKEN_PARAN_CLOSE)) {
+                while (true) {
+                    Cn_Ast_Idx expression_idx = cn_ast_parse_expression(lexer, -1, CN_NO_COMMA_OPERATOR);
+                    if (expression_idx == CN_AST_NIL_IDX) goto error;
+
+                    cn_ast_linked_list_add(&node.function_expression.argument_list, expression_idx);
+
+                    if (!cn_lexer_expect(lexer, CN_TOKEN_COMMA)) break;
+
+                    cn_ast_next_token(lexer);
+                }
+
+                if (!cn_lexer_expect(lexer, CN_TOKEN_PARAN_CLOSE)) {
+                    cn_log(CN_ERROR, "Expected ')' in function call expression.");
+                    goto error;
+                }
+            }
+            cn_ast_next_token(lexer);
+
+            return cn_ast_node_list_append(node); 
+        } 
+
+        // Array subscript case.
         if (cn_lexer_expect(lexer, CN_TOKEN_SQR_BRACES_OPEN)) {
-            // Array subscript case.
             cn_ast_next_token(lexer);
 
             Cn_Ast_Idx right_idx = cn_ast_parse_expression(lexer, precedence, flags);
@@ -3902,7 +4105,7 @@ CNDEF Cn_Ast_Idx cn_ast_parse_expression_increasing_precedence(Cn_Lexer *lexer, 
                         .binary_expression = ((Cn_Ast_Node_Binary_Expression) {.left_expression_idx = left_idx, .operator_kind = CN_BINARY_OP_ARRAY_SUB, .right_expression_idx = right_idx})
                         }));
         } 
-        
+
         // Regualar binary operator case.
         cn_ast_next_token(lexer);
 
@@ -3914,6 +4117,44 @@ CNDEF Cn_Ast_Idx cn_ast_parse_expression_increasing_precedence(Cn_Lexer *lexer, 
                     .binary_expression = ((Cn_Ast_Node_Binary_Expression) {.left_expression_idx = left_idx, .operator_kind = op_kind, .right_expression_idx = right_idx})
                     }));
     }
+
+    // Assignment operator case.
+    // TODO: Check if left_idx is assignable lvalue.
+    op_kind = cn_ast_is_assignment_operator(lexer);
+    if (op_kind != CN_ASSIGNMENT_OP_NONE) {
+
+        if (CN_ASSIGNMENT_OPERATOR_PRECEDENCE < min_precedence) {
+            return left_idx;
+        }
+
+        cn_ast_next_token(lexer);
+
+        Cn_Ast_Idx right_idx = cn_ast_parse_expression(lexer, CN_ASSIGNMENT_OPERATOR_PRECEDENCE, flags);
+        if (right_idx == CN_AST_NIL_IDX) goto error;
+
+        return cn_ast_node_list_append(((Cn_Ast_Node) { 
+                    .kind = CN_AST_NODE_ASSIGNMENT_EXPRESSION, 
+                    .assignment_expression = ((Cn_Ast_Node_Assignment_Expression) {.left_expression_idx = left_idx, .operator_kind = op_kind, .right_expression_idx = right_idx})
+                    }));
+    }
+
+    // Postfix operator case.
+    op_kind = cn_ast_is_postfix_operator(lexer);
+    if (op_kind != CN_POSTFIX_OP_NONE) {
+
+        if (CN_POSTFIX_OPERATOR_PRECEDENCE <= min_precedence) {
+            return left_idx;
+        }
+
+        cn_ast_next_token(lexer);
+
+        return cn_ast_node_list_append(((Cn_Ast_Node) { 
+                    .kind = CN_AST_NODE_POSTFIX_EXPRESSION, 
+                    .postfix_expression = ((Cn_Ast_Node_Postfix_Expression) {.expression_idx = left_idx, .operator_kind = op_kind })
+                    }));
+    }
+
+    return left_idx;
 
 error:
     *lexer = original_state;
@@ -3958,6 +4199,7 @@ CNDEF Cn_Ast_Idx cn_ast_parse_expression_leaf(Cn_Lexer *lexer, Cn_Expression_Par
             
             if (!cn_lexer_expect(lexer, CN_TOKEN_PARAN_CLOSE)) {
                 cn_log(CN_ERROR, "Expected ')' closing parenthesis at the end of cast expression.");
+                cn_lexer_print_snippet_token(lexer);
                 goto error;
             }
             cn_ast_next_token(lexer);
@@ -3980,6 +4222,7 @@ CNDEF Cn_Ast_Idx cn_ast_parse_expression_leaf(Cn_Lexer *lexer, Cn_Expression_Par
         
         if (!cn_lexer_expect(lexer, CN_TOKEN_PARAN_CLOSE)) {
             cn_log(CN_ERROR, "Expected ')' closing parenthesis at the end of parenthesized expression.");
+            cn_lexer_print_snippet_token(lexer);
             goto error;
         }
         cn_ast_next_token(lexer);
@@ -3991,7 +4234,39 @@ CNDEF Cn_Ast_Idx cn_ast_parse_expression_leaf(Cn_Lexer *lexer, Cn_Expression_Par
     if (cn_lexer_expect(lexer, CN_TOKEN_SYMBOL), cn_str_equals(lexer->token.str, CN_SIZEOF_STR)) {
         cn_ast_next_token(lexer);
 
-        CN_TODO("Sizeof expression parsing.");
+        if (cn_lexer_expect(lexer, CN_TOKEN_PARAN_OPEN)) {
+            Cn_Lexer peeking_lexer = *lexer;
+            cn_ast_next_token(&peeking_lexer);
+
+            if (cn_ast_starts_type(&peeking_lexer)) {
+                // Parsing type_name.
+                cn_ast_next_token(lexer);
+                
+                Cn_Ast_Idx type_name_idx = cn_ast_parse_type_name(lexer);
+                if (type_name_idx == CN_AST_NIL_IDX) goto error;
+
+
+                if (!cn_lexer_expect(lexer, CN_TOKEN_PARAN_CLOSE)) {
+                    cn_log(CN_ERROR, "Expected ')' closing parenthesis at the end of sizeof expression.");
+                    cn_lexer_print_snippet_token(lexer);
+                    goto error;
+                }
+                cn_ast_next_token(lexer);
+
+                return cn_ast_node_list_append(((Cn_Ast_Node) { 
+                            .kind = CN_AST_NODE_SIZEOF_EXPRESSION, 
+                            .sizeof_expression = ((Cn_Ast_Node_Sizeof_Expression) {.child_idx = type_name_idx})
+                            }));
+            }
+        }
+
+        Cn_Ast_Idx expression_idx = cn_ast_parse_expression(lexer, CN_UNARY_OPERATOR_PRECEDENCE, flags);
+        if (expression_idx == CN_AST_NIL_IDX) goto error;
+
+        return cn_ast_node_list_append(((Cn_Ast_Node) { 
+                    .kind = CN_AST_NODE_SIZEOF_EXPRESSION, 
+                    .sizeof_expression = ((Cn_Ast_Node_Sizeof_Expression) {.child_idx = expression_idx})
+                    }));
     }
 
     // Handling unary expression.
