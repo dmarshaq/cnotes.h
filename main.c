@@ -1,5 +1,5 @@
 #include <stdbool.h>
 
-int main() {
-    bool a = true;
+int func(int a) {
+    bool BOL = true;
 }
