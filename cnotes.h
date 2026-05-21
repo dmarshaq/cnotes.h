@@ -269,6 +269,63 @@ CNDEF Cn_String cn_str_format(Cn_String buffer, char *format, ...);
  */
 CNDEF bool cn_str_empty(Cn_String str);
 
+// CHAINED ARENA SECTION
+
+/**
+ * Chained arena is an allocator that linearly gives memory and when needed allocates next block.
+ * It pointers returned guranteed to point to valid memory at all times, till freed, or popped.
+ * Instead of making forward linked list of blocks.
+ * It makes reverse linked list of blocks and always points to the most recent block.
+ * 
+ *  block_capacity
+ *  <--------->         
+ *
+ *  -----------     -----------     -----------
+ *  | Block 1 | <-- | Block 2 | <-- | Block 3 |
+ *  -----------     -----------     -----------
+ *                                  ^      ^
+ *                                  *block *ptr
+ *  <------------- allocated ------------->
+ *
+ *
+ *  These setup allows quick append allocation and pop deallocation.
+ */
+typedef struct {
+    uint64_t block_capacity;
+    void *block;
+} Cn_Chained_Arena;
+
+#define CN_CHAINED_ARENA_BLOCK_HEADER(arena) (Cn_Chained_Arena_Block_Header *)((uint8_t *)(arena)->block - sizeof(Cn_Chained_Arena_Block_Header))
+
+typedef struct {
+    void *prev;
+    uint64_t allocated;
+} Cn_Chained_Arena_Block_Header;
+
+/**
+ * Initializes arena by allocating first block and setting all pointers.
+ */
+Cn_Chained_Arena cn_chained_arena_make(uint64_t block_capacity);
+
+/**
+ * Allocates specified memory size from the arena.
+ *
+ * RETURNS: Pointer to the memory segment.
+ *
+ * IMPORTANT: It will be invalid once arena is freed.
+ */
+void *cn_chained_arena_alloc(Cn_Chained_Arena *arena, uint64_t size);
+
+/**
+ * Dellocates specified memory size from the front of the arena.
+ * If specified size completely deallocates whole block, it is freed.
+ */
+void cn_chained_arena_dealloc(Cn_Chained_Arena *arena, uint64_t size);
+
+/**
+ * Completely frees all memory occupied by the arena.
+ */
+void cn_chained_arena_free(Cn_Chained_Arena *arena);
 
 // ARRAY LIST SECTION
 typedef struct {
@@ -337,12 +394,20 @@ CNDEF void cn__array_list_free(void **list);
 // HASH TABLE SECTION
 typedef uint32_t (Cn_Hashfunc)(int64_t, uint8_t *);
 
+typedef enum : uint8_t {
+    CN_HASH_TABLE_NO_INTERNAL_KEYS = 0x01,  // If this flag is set hash table won't store key data internally,
+                                            // and will use given key pointer to validate slot, trusting user to hold key memory valid.
+                                            // IMPORTANT: If flag is set, no memory will be allocated to store keys, 
+                                            // so keys pointer in the header will be NULL.
+} Cn_Hash_Table_Flags;
+
 typedef struct {
     int64_t capacity;
     int64_t count;
     int64_t item_size;
-    Cn_Hashfunc *hash_func; 
+    Cn_Hash_Table_Flags flags;
     uint8_t *keys;
+    Cn_Hashfunc *hash_func; 
 } Cn_Hash_Table_Header;
 
 typedef enum : uint8_t {
@@ -354,11 +419,20 @@ typedef enum : uint8_t {
 typedef struct {
     Cn_Hash_Table_Slot_State state;
     int64_t key_size;
-    int64_t key_idx;
+
+    // Depending on how hash table was initialized it either stores key data internally, 
+    // or uses given key pointer and trusts user to hold pointer valid.
+    union {
+        int64_t key_idx;
+        void *key;
+    };
 } Cn_Hash_Table_Slot;
 
 #define cn_hash_table_make(type, capacity)\
-    (type *)cn__hash_table_make(sizeof(type), capacity) 
+    (type *)cn__hash_table_make(sizeof(type), capacity, 0) 
+
+#define cn_hash_table_make_flags(type, capacity, flags)\
+    (type *)cn__hash_table_make(sizeof(type), capacity, flags) 
 
 #define cn_hash_table_count(ptr_table)\
     cn__hash_table_count((void *)*ptr_table)
@@ -391,7 +465,7 @@ CNDEF uint32_t cn_hashf(int64_t key_size, uint8_t *key);
 
 CNDEF void cn_hash_table_print(void **table);
 
-CNDEF void *cn__hash_table_make(int64_t item_size, int64_t initial_capacity);
+CNDEF void *cn__hash_table_make(int64_t item_size, int64_t initial_capacity, Cn_Hash_Table_Flags flags);
 
 CNDEF int64_t cn__hash_table_count(void *table);
 
@@ -632,6 +706,8 @@ static const Cn_String CN_ENUM_STR          = CN_STR_BUFFER("enum");
 static const Cn_String CN_UNION_STR         = CN_STR_BUFFER("union");
 
 static const Cn_String CN_IF_STR            = CN_STR_BUFFER("if");
+static const Cn_String CN_ELSE_STR          = CN_STR_BUFFER("else");
+static const Cn_String CN_SWITCH_STR        = CN_STR_BUFFER("switch");
 static const Cn_String CN_WHILE_STR         = CN_STR_BUFFER("while");
 static const Cn_String CN_DO_STR            = CN_STR_BUFFER("do");
 static const Cn_String CN_FOR_STR           = CN_STR_BUFFER("for");
@@ -925,6 +1001,18 @@ typedef struct {
     Cn_Ast_Linked_List statement_or_declaration_list;
 } Cn_Ast_Node_Compound_Statement;
 
+typedef enum {
+    CN_SELECTION_IF,
+    CN_SELECTION_SWITCH,
+} Cn_Selection_Kind;
+
+typedef struct {
+    Cn_Selection_Kind kind;
+    Cn_Ast_Idx condition_expression_idx;
+    Cn_Ast_Idx statement_idx;
+    Cn_Ast_Idx else_statement_idx;
+} Cn_Ast_Node_Selection_Statement;
+
 typedef struct {
     Cn_Ast_Idx expression_idx;
 } Cn_Ast_Node_Expression_Statement;
@@ -1067,7 +1155,7 @@ typedef struct cn_ast_node {
         Cn_Ast_Node_Function_Definition         function_definition;
         // Cn_Ast_Node_Asm_Definition           asm_definition;
         Cn_Ast_Node_Compound_Statement          compound_statement;
-        // Cn_Ast_Node_Selection_Statement      selection_statement;
+        Cn_Ast_Node_Selection_Statement         selection_statement;
         // Cn_Ast_Node_Iteration_Statement      iteration_statement;
         // Cn_Ast_Node_Jump_Statement           jump_statement;
         // Cn_Ast_Node_Labeled_Statement        labeled_statement;
@@ -1278,7 +1366,8 @@ CNDEF Cn_Ast_Idx cn_ast_parse_compound_statement(Cn_Lexer *lexer);
  * Parses code starting of with lexer current token as selection_statement
  *
  *  selection_statement
- *          : TODO: Selection statement
+ *          : 'if' '(' expression ')' statement ('else' statement)?
+ *          | 'switch' '(' expression ')' statement
  *          ;
  *
  */
@@ -2306,6 +2395,73 @@ CNDEF bool cn_str_empty(Cn_String str) {
     return str.length == 0;
 }
 
+// CHAINED ARENA SECTION
+Cn_Chained_Arena cn_chained_arena_make(uint64_t block_capacity) {
+    CN_ASSERT(block_capacity > 0);
+
+    Cn_Chained_Arena_Block_Header *header = (Cn_Chained_Arena_Block_Header *)CN_REALLOC(NULL, sizeof(Cn_Chained_Arena_Block_Header) + block_capacity);
+
+    header->prev = NULL;
+    
+    return (Cn_Chained_Arena) {
+        .block_capacity = block_capacity,
+        .block = header + 1,
+    };
+}
+
+void *cn_chained_arena_alloc(Cn_Chained_Arena *arena, uint64_t size) {
+    CN_ASSERT(size > 0);
+    CN_ASSERT(size <= arena->block_capacity);
+
+    Cn_Chained_Arena_Block_Header *header = CN_CHAINED_ARENA_BLOCK_HEADER(arena);
+
+    if ((header->allocated + size) > arena->block_capacity) {
+        header = (Cn_Chained_Arena_Block_Header *)CN_REALLOC(NULL, sizeof(Cn_Chained_Arena_Block_Header) + arena->block_capacity);
+
+        header->prev = arena->block;
+        arena->block = header + 1;
+    }
+
+    header->allocated += size;
+    return (uint8_t *)arena->block + header->allocated - size;
+}
+
+void cn_chained_arena_dealloc(Cn_Chained_Arena *arena, uint64_t size) {
+    Cn_Chained_Arena_Block_Header *header = CN_CHAINED_ARENA_BLOCK_HEADER(arena);
+    uint64_t decrease;
+
+    while (size > 0) {
+        if (header->allocated == 0) {
+            // No more blocks to deallocate simply return.
+            if (header->prev == NULL) return;
+            
+            // Freeing current block, going back to the previous.
+            arena->block = header->prev;
+            CN_FREE(header);
+        }
+
+        header = CN_CHAINED_ARENA_BLOCK_HEADER(arena);
+
+        decrease = size > header->allocated ? header->allocated : size;
+        header->allocated -= decrease;
+        size -= decrease;
+    }
+}
+
+void cn_chained_arena_free(Cn_Chained_Arena *arena) {
+    Cn_Chained_Arena_Block_Header *header = CN_CHAINED_ARENA_BLOCK_HEADER(arena);
+
+    while (header->prev != NULL) {
+        arena->block = header->prev;
+        CN_FREE(header);
+    }
+
+    CN_FREE(header);
+
+    arena->block = NULL;
+    arena->block_capacity = 0;
+}
+
 // ARRAY LIST SECTION
 CNDEF void *cn__array_list_make(int64_t item_size, int64_t capacity) {
     CN_ASSERT(item_size > 0);
@@ -2411,6 +2567,24 @@ CNDEF uint32_t cn__hash_table_hash_index_of(void **table, int64_t key_size, uint
 
 /**
  * Internal function.
+ * RETURNS: True if slot key equals given key.
+ */
+CNDEF bool cn__hash_table_key_equals(void **table, Cn_Hash_Table_Slot *slot, int64_t key_size, uint8_t *key) {
+    Cn_Hash_Table_Header *header = cn_hash_table_header(table);
+    
+    if (slot->key_size == key_size) {
+        if (header->flags & CN_HASH_TABLE_NO_INTERNAL_KEYS) {
+            return !memcmp(slot->key, key, key_size);
+        } else {
+            return !memcmp(header->keys + slot->key_idx, key, key_size);
+        }
+    }
+
+    return false;
+}
+
+/**
+ * Internal function.
  * Sets all occupied slots to depricated.
  */
 CNDEF void cn__hash_table_depricate_slots(void **table) {
@@ -2427,9 +2601,8 @@ CNDEF void cn__hash_table_depricate_slots(void **table) {
 /**
  * Internal function.
  */
-CNDEF void cn__hash_table_print_slot(void *item, int64_t item_size, uint8_t *keys, Cn_Hash_Table_Slot *slot) {
+CNDEF void cn__hash_table_print_slot(void *item, int64_t item_size, uint8_t *keys, Cn_Hash_Table_Slot *slot, bool no_internal_keys) {
     
-
     // Print the state and key_size as hex.
 
     if (slot->state == CN_SLOT_OCCUPIED) {
@@ -2439,7 +2612,7 @@ CNDEF void cn__hash_table_print_slot(void *item, int64_t item_size, uint8_t *key
             printf("%02x", *((uint8_t *)item + i));  // Print each byte of the item.
         }
 
-        printf(" | State: 0x%02x | Key Size: %ld | Key -> %.*s\n", slot->state, slot->key_size, (int)slot->key_size, (char *)keys + slot->key_idx);
+        printf(" | State: 0x%02x | Key Size: %ld | Key -> %.*s\n", slot->state, slot->key_size, (int)slot->key_size, no_internal_keys ? (char *)slot->key : (char *)keys + slot->key_idx);
     } else {
         printf("EMPTY   %*s | State: 0x%02x\n", (int)item_size * 2, "",  slot->state);
     }
@@ -2454,7 +2627,12 @@ CNDEF bool cn__hash_table_readdress(void **table, int64_t index) {
     Cn_Hash_Table_Header *header = cn_hash_table_header(table);
     Cn_Hash_Table_Slot *target_slot = cn__hash_table_get_slot(table, index);
 
-    int64_t new_index = cn__hash_table_hash_index_of(table, target_slot->key_size, header->keys + target_slot->key_idx);
+    int64_t new_index; 
+    if (header->flags & CN_HASH_TABLE_NO_INTERNAL_KEYS) {
+        new_index = cn__hash_table_hash_index_of(table, target_slot->key_size, target_slot->key);
+    } else {
+        new_index = cn__hash_table_hash_index_of(table, target_slot->key_size, header->keys + target_slot->key_idx);
+    }
     target_slot->state = CN_SLOT_EMPTY;
 
     Cn_Hash_Table_Slot *slot = NULL;
@@ -2465,9 +2643,13 @@ CNDEF bool cn__hash_table_readdress(void **table, int64_t index) {
             slot->state = CN_SLOT_OCCUPIED;
 
             slot->key_size = target_slot->key_size;
-            slot->key_idx = target_slot->key_idx;
+            if (header->flags & CN_HASH_TABLE_NO_INTERNAL_KEYS) {
+                slot->key = target_slot->key;
+            } else {
+                slot->key_idx = target_slot->key_idx;
+            }
 
-            memmove((uint8_t *)*table + ((new_index + i) % header->capacity) * header->item_size, (uint8_t *)*table + index * header->item_size, header->item_size);
+            memcpy((uint8_t *)*table + ((new_index + i) % header->capacity) * header->item_size, (uint8_t *)*table + index * header->item_size, header->item_size);
 
             return true;
         }
@@ -2479,9 +2661,13 @@ CNDEF bool cn__hash_table_readdress(void **table, int64_t index) {
                 slot->state = CN_SLOT_OCCUPIED;
 
                 slot->key_size = target_slot->key_size;
-                slot->key_idx = target_slot->key_idx;
+                if (header->flags & CN_HASH_TABLE_NO_INTERNAL_KEYS) {
+                    slot->key = target_slot->key;
+                } else {
+                    slot->key_idx = target_slot->key_idx;
+                }
 
-                memmove((uint8_t *)*table + ((new_index + i) % header->capacity) * header->item_size, (uint8_t *)*table + index * header->item_size, header->item_size);
+                memcpy((uint8_t *)*table + ((new_index + i) % header->capacity) * header->item_size, (uint8_t *)*table + index * header->item_size, header->item_size);
 
                 return true;
             }
@@ -2490,7 +2676,6 @@ CNDEF bool cn__hash_table_readdress(void **table, int64_t index) {
 
     cn_log(CN_ERROR, "Couldn't find new free hash slot when readdressing.\n");
     return false;
-
 }
 
 CNDEF uint32_t cn_hashf(int64_t key_size, uint8_t *key) {
@@ -2514,9 +2699,9 @@ CNDEF uint32_t cn_hashf(int64_t key_size, uint8_t *key) {
 CNDEF void cn_hash_table_print(void **table) {
     Cn_Hash_Table_Header *header = cn_hash_table_header(table);
 
-    printf("\n--------\tHash Table\t--------\n");
+    printf("\n--------Hash Table--------\n");
     for (int64_t i = 0; i < header->capacity; i++) {
-        cn__hash_table_print_slot((uint8_t *)*table + i * header->item_size, header->item_size, header->keys, cn__hash_table_get_slot(table, i));
+        cn__hash_table_print_slot((uint8_t *)*table + i * header->item_size, header->item_size, header->keys, cn__hash_table_get_slot(table, i), header->flags & CN_HASH_TABLE_NO_INTERNAL_KEYS);
     }
 }
 
@@ -2525,7 +2710,7 @@ CNDEF Cn_Hash_Table_Slot *cn__hash_table_get_slot(void **table, int64_t index) {
     return (Cn_Hash_Table_Slot *)((uint8_t *)*table + header->capacity * header->item_size + index * sizeof(Cn_Hash_Table_Slot));
 }
 
-CNDEF void *cn__hash_table_make(int64_t item_size, int64_t capacity) {
+CNDEF void *cn__hash_table_make(int64_t item_size, int64_t capacity, Cn_Hash_Table_Flags flags) {
     CN_ASSERT(item_size > 0);
     CN_ASSERT(capacity > 0);
 
@@ -2536,25 +2721,32 @@ CNDEF void *cn__hash_table_make(int64_t item_size, int64_t capacity) {
         return NULL;
     }
     
-    // IMPORTANT: Using separately allocated array list for keys, because keys are variable size, 
-    // and we do NOT want to reallocate whole hash table every time a long key is added. 
-    // But it is also useful to allow hash table to store keys, 
-    // so user doesn't have to worry about saving keys manually. 
-    // And it also allows table to check whether certain key value pair is legal or not.
-    uint8_t *keys = cn_array_list_make(uint8_t, capacity * 8);    
+    // If user didn't explicitely specify no keys flag, allocate keys array for future use.
+    uint8_t *keys;
+    if (!(flags & CN_HASH_TABLE_NO_INTERNAL_KEYS)) {
+        // IMPORTANT: Using separately allocated array list for keys, because keys are variable size, 
+        // and we do NOT want to reallocate whole hash table every time a long key is added. 
+        // But it is also useful to allow hash table to store keys, 
+        // so user doesn't have to worry about saving keys manually. 
+        // And it also allows table to check whether certain key value pair is legal or not.
+        keys = cn_array_list_make(uint8_t, capacity * 8);    
 
-    if (keys == NULL) {
-        cn_log(CN_ERROR, "Couldn't allocate more memory of size: %ld bytes, for the keys needed for the hash table.\n", sizeof(uint8_t) * capacity * 8);
-        CN_FREE(header);
-        return NULL;
+        if (keys == NULL) {
+            cn_log(CN_ERROR, "Couldn't allocate more memory of size: %ld bytes, for the keys needed for the hash table.\n", sizeof(uint8_t) * capacity * 8);
+            CN_FREE(header);
+            return NULL;
+        }
+    } else {
+        keys = NULL;
     }
 
     // Setting all hash table header members.
     header->capacity   = capacity;
     header->item_size  = item_size;
     header->count      = 0;
-    header->hash_func  = cn_hashf;
+    header->flags      = flags;
     header->keys       = keys;
+    header->hash_func  = cn_hashf;
 
     // IMPORTANT: Because header is of type "Cn_Hash_Table_Header *", compiler will automatically translate "header + 1" to "(void*)(header) + sizeof(Cn_Hash_Table_Header)".
     void *data = header + 1;
@@ -2683,21 +2875,24 @@ CNDEF int64_t cn__hash_table_push_key(void **table, int64_t key_size, uint8_t *k
 
             slot->key_size = key_size;
             
-            /**
-             * Is this still an issue?
-             *
-             * IMPORTANT: "cn_array_list_append_multiple" is not inlined because it might change the "header->keys" value when resizing array list.
-             * So it is neccessary to call this macro like function in a separate line, otherwise undefined behaviour will occure.
-             */
-            int64_t key_index = cn_array_list_append_multiple(&(header->keys), key, key_size);
-            slot->key_idx = key_index;
+            if ((header->flags & CN_HASH_TABLE_NO_INTERNAL_KEYS) != 0) {
+                slot->key = key;
+            } else {
+                // Is this still an issue?
+                //
+                // IMPORTANT: "cn_array_list_append_multiple" is not inlined because it 
+                // might change the "header->keys" value when resizing array list.
+                // So it is neccessary to call this macro like function in a separate line, 
+                // otherwise undefined behaviour will occure.
+                int64_t key_index = cn_array_list_append_multiple(&(header->keys), key, key_size);
+                slot->key_idx = key_index;
+            }
 
             header->count++;
            
             return (index + i) % header->capacity;
 
-        } else if (slot->key_size == key_size && !memcmp(header->keys + slot->key_idx, key, key_size)) {
-            // Key already exists, return index of that slot.
+        } else if (cn__hash_table_key_equals(table, slot, key_size, key)) {
             return (index + i) % header->capacity;
         }
     }
@@ -2717,7 +2912,7 @@ CNDEF void *cn__hash_table_get(void **table, int64_t key_size, uint8_t *key) {
         if (slot->state == CN_SLOT_EMPTY)
             return NULL;
         
-        if (slot->key_size == key_size && !memcmp(header->keys + slot->key_idx, key, key_size)) {
+        if (cn__hash_table_key_equals(table, slot, key_size, key)) {
             // Right key is found, return.
             return (uint8_t *)*table + ((index + i) % header->capacity) * header->item_size;
         }
@@ -2730,18 +2925,55 @@ CNDEF void cn__hash_table_remove(void **table, int64_t key_size, uint8_t *key) {
     int64_t index = cn__hash_table_hash_index_of(table, key_size, key);
     Cn_Hash_Table_Header *header = cn_hash_table_header(table);
 
-    Cn_Hash_Table_Slot *slot = NULL;
+    Cn_Hash_Table_Slot *slot;
     for (int64_t i = 0; i < header->capacity; i++) {
         slot = cn__hash_table_get_slot(table, (index + i) % header->capacity);
 
         if (slot->state == CN_SLOT_EMPTY)
             return;
 
-        if (slot->key_size == key_size && !memcmp(header->keys + slot->key_idx, key, key_size)) {
+        if (cn__hash_table_key_equals(table, slot, key_size, key)) {
             // Right key is found.
-            // LEAK: INCOMPLETE: Doesn't delete key.
+            // LEAK: Doesn't delete key, therefore reuse memory, if key is stored internally.
             header->count--;
             slot->state = CN_SLOT_EMPTY;
+
+            // Fixing slots, if next slots have same hash idx, sliding them back one by one.
+            int64_t desired_index; 
+            int64_t curr_index;
+            Cn_Hash_Table_Slot *next;
+            for (int64_t j = 1; j < header->capacity; j++) {
+                curr_index = (index + i + j) % header->capacity;
+                next = cn__hash_table_get_slot(table, curr_index);
+                
+                // Empty slot reached, nothing to fix left.
+                if (next->state == CN_SLOT_EMPTY) break;
+
+                if (header->flags & CN_HASH_TABLE_NO_INTERNAL_KEYS) {
+                    desired_index = cn__hash_table_hash_index_of(table, next->key_size, next->key);
+                } else {
+                    desired_index = cn__hash_table_hash_index_of(table, next->key_size, header->keys + next->key_idx);
+                }
+                
+                if (curr_index == desired_index) break;
+
+                // If current index doesn't equal to the desired index of a slot, 
+                // it means it was pushed from to the right, so we need to fix it by pushing it to the left.
+                // Copy data to a previous slot.
+                slot->state = CN_SLOT_OCCUPIED;
+
+                slot->key_size = next->key_size;
+                if (header->flags & CN_HASH_TABLE_NO_INTERNAL_KEYS) {
+                    slot->key = next->key;
+                } else {
+                    slot->key_idx = next->key_idx;
+                }
+
+                memcpy((uint8_t *)*table + ((index + i + j - 1) % header->capacity) * header->item_size, (uint8_t *)*table + curr_index * header->item_size, header->item_size);
+
+                slot = next;
+                slot->state = CN_SLOT_EMPTY;
+            }
             return;
         }
     }
@@ -3438,6 +3670,21 @@ CNDEF void cn_ast_print(Cn_Ast_Node *node, int depth) {
                 ADD_LIST(&node->compound_statement.statement_or_declaration_list);
                 break;
             }
+        case CN_AST_NODE_SELECTION_STATEMENT:
+            {   
+                ADD_IDX(node->selection_statement.condition_expression_idx);
+                ADD_IDX(node->selection_statement.statement_idx);
+
+                if (node->selection_statement.kind == CN_SELECTION_IF) {
+                    printf(" kind: if\n");
+                    ADD_IDX(node->selection_statement.else_statement_idx);
+                }
+                else {
+                    printf(" kind: switch\n");
+                }
+
+                break;
+            }
         case CN_AST_NODE_EXPRESSION_STATEMENT:
             {
                 printf("\n");
@@ -3954,7 +4201,7 @@ CNDEF Cn_Ast_Idx cn_ast_parse_statement(Cn_Lexer *lexer) {
         return cn_ast_parse_compound_statement(lexer);
     }
 
-    if (cn_str_equals(lexer->token.str, CN_IF_STR)) {
+    if (cn_str_equals(lexer->token.str, CN_IF_STR) || cn_str_equals(lexer->token.str, CN_SWITCH_STR)) {
         return cn_ast_parse_selection_statement(lexer);
     }
 
@@ -4012,12 +4259,58 @@ CNDEF Cn_Ast_Idx cn_ast_parse_selection_statement(Cn_Lexer *lexer) {
     Cn_Lexer original_state = *lexer;
 
     Cn_Ast_Node node = { .kind = CN_AST_NODE_SELECTION_STATEMENT };
-
-    Cn_Ast_Idx child_idx;
-
     
-    
-    return cn_ast_node_list_append(node);
+    if (cn_lexer_expect(lexer, CN_TOKEN_SYMBOL)) {
+
+        if (cn_str_equals(lexer->token.str, CN_IF_STR)) {
+            node.selection_statement.kind = CN_SELECTION_IF;
+
+        } else if (cn_str_equals(lexer->token.str, CN_SWITCH_STR)) {
+            node.selection_statement.kind = CN_SELECTION_SWITCH;
+
+        } else {
+            cn_log(CN_ERROR, "Expected 'if' or 'switch' in selection statement.");
+            cn_lexer_print_snippet_token(lexer);
+            goto error;
+        }
+
+        cn_ast_next_token(lexer);
+
+        Cn_Ast_Idx condition_expression_idx, statement_idx;
+
+        if (!cn_lexer_expect(lexer, CN_TOKEN_PARAN_OPEN)) {
+            cn_log(CN_ERROR, "Expected '(' in selection statement.");
+            cn_lexer_print_snippet_token(lexer);
+        }
+        cn_ast_next_token(lexer);
+
+        condition_expression_idx = cn_ast_parse_expression(lexer, -1, 0);
+        if (condition_expression_idx == CN_AST_NIL_IDX) goto error;
+        node.selection_statement.condition_expression_idx = condition_expression_idx;
+
+        if (!cn_lexer_expect(lexer, CN_TOKEN_PARAN_CLOSE)) {
+            cn_log(CN_ERROR, "Expected ')' in selection statement.");
+            cn_lexer_print_snippet_token(lexer);
+        }
+        cn_ast_next_token(lexer);
+
+        statement_idx = cn_ast_parse_statement(lexer);
+        if (statement_idx == CN_AST_NIL_IDX) goto error;
+        node.selection_statement.statement_idx = statement_idx;
+
+        if (node.selection_statement.kind == CN_SELECTION_IF && cn_lexer_expect(lexer, CN_TOKEN_SYMBOL) && cn_str_equals(lexer->token.str, CN_ELSE_STR)) {
+            cn_ast_next_token(lexer);
+
+            Cn_Ast_Idx else_statement_idx = cn_ast_parse_statement(lexer);
+            if (else_statement_idx == CN_AST_NIL_IDX) goto error;
+            node.selection_statement.else_statement_idx = else_statement_idx;
+        }
+
+        return cn_ast_node_list_append(node);
+    }
+   
+    cn_log(CN_ERROR, "No 'if' or 'switch' in selection statement.");
+    cn_lexer_print_snippet_token(lexer);
 
 error:
     *lexer = original_state;

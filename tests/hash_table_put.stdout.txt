@@ -1,13 +1,13 @@
 
---------	Hash Table	--------
+--------Hash Table--------
 EMPTY            | State: 0x00
 EMPTY            | State: 0x00
 
---------	Hash Table	--------
+--------Hash Table--------
 Item: 0x47000000 | State: 0x01 | Key Size: 3 | Key -> foo
 Item: 0xf7ffffff | State: 0x01 | Key Size: 3 | Key -> bar
 
---------	Hash Table	--------
+--------Hash Table--------
 EMPTY            | State: 0x00
 Item: 0x00000000 | State: 0x01 | Key Size: 2 | Key -> az
 Item: 0x01000000 | State: 0x01 | Key Size: 2 | Key -> by
@@ -25,7 +25,7 @@ EMPTY            | State: 0x00
 EMPTY            | State: 0x00
 EMPTY            | State: 0x00
 
---------	Hash Table	--------
+--------Hash Table--------
 Item: 0x08000000 | State: 0x01 | Key Size: 3 | Key -> phi
 Item: 0x00000000 | State: 0x01 | Key Size: 2 | Key -> az
 Item: 0x01000000 | State: 0x01 | Key Size: 2 | Key -> by

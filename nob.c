@@ -1,4 +1,4 @@
-#define nob_cc_flags(cmd) nob_cmd_append(cmd, "-Wall", "-Wextra", "-std=c99")
+#define nob_cc_flags(cmd) nob_cmd_append(cmd, "-g", "-Wall", "-Wextra", "-std=c99")
 
 #define NOB_IMPLEMENTATION
 #include "nob.h"
