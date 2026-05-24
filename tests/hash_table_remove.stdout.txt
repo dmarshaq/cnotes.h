@@ -1,0 +1,68 @@
+
+--------Hash Table--------
+EMPTY            | State: 0x00
+Item: 0x15000000 | State: 0x01 | Key Size: 5 | Key -> alpha
+Item: 0x5a000000 | State: 0x01 | Key Size: 4 | Key -> beta
+EMPTY            | State: 0x00
+Item: 0x4a000000 | State: 0x01 | Key Size: 5 | Key -> delta
+Item: 0xffffffff | State: 0x01 | Key Size: 7 | Key -> epsilon
+Item: 0xdaffffff | State: 0x01 | Key Size: 3 | Key -> eta
+Item: 0x0c000000 | State: 0x01 | Key Size: 5 | Key -> gamma
+EMPTY            | State: 0x00
+Item: 0x17000000 | State: 0x01 | Key Size: 4 | Key -> iota
+EMPTY            | State: 0x00
+Item: 0x36feffff | State: 0x01 | Key Size: 5 | Key -> kappa
+Item: 0x20000000 | State: 0x01 | Key Size: 6 | Key -> lambda
+Item: 0x01000000 | State: 0x01 | Key Size: 2 | Key -> mu
+Item: 0x0c000000 | State: 0x01 | Key Size: 2 | Key -> nu
+Item: 0x00000000 | State: 0x01 | Key Size: 7 | Key -> omicron
+Item: 0x00000000 | State: 0x01 | Key Size: 2 | Key -> pi
+Item: 0x08000000 | State: 0x01 | Key Size: 3 | Key -> phi
+Item: 0xf0ffffff | State: 0x01 | Key Size: 3 | Key -> rho
+Item: 0x10000000 | State: 0x01 | Key Size: 5 | Key -> sigma
+Item: 0xd0ffffff | State: 0x01 | Key Size: 5 | Key -> theta
+Item: 0x08000000 | State: 0x01 | Key Size: 7 | Key -> upsilon
+EMPTY            | State: 0x00
+EMPTY            | State: 0x00
+Item: 0x00000000 | State: 0x01 | Key Size: 2 | Key -> xi
+EMPTY            | State: 0x00
+Item: 0x02000000 | State: 0x01 | Key Size: 4 | Key -> zeta
+EMPTY            | State: 0x00
+EMPTY            | State: 0x00
+EMPTY            | State: 0x00
+EMPTY            | State: 0x00
+EMPTY            | State: 0x00
+
+--------Hash Table--------
+EMPTY            | State: 0x00
+EMPTY            | State: 0x00
+EMPTY            | State: 0x00
+EMPTY            | State: 0x00
+EMPTY            | State: 0x00
+EMPTY            | State: 0x00
+EMPTY            | State: 0x00
+EMPTY            | State: 0x00
+EMPTY            | State: 0x00
+EMPTY            | State: 0x00
+EMPTY            | State: 0x00
+EMPTY            | State: 0x00
+EMPTY            | State: 0x00
+EMPTY            | State: 0x00
+EMPTY            | State: 0x00
+EMPTY            | State: 0x00
+EMPTY            | State: 0x00
+EMPTY            | State: 0x00
+EMPTY            | State: 0x00
+EMPTY            | State: 0x00
+EMPTY            | State: 0x00
+EMPTY            | State: 0x00
+EMPTY            | State: 0x00
+EMPTY            | State: 0x00
+EMPTY            | State: 0x00
+EMPTY            | State: 0x00
+EMPTY            | State: 0x00
+EMPTY            | State: 0x00
+EMPTY            | State: 0x00
+EMPTY            | State: 0x00
+EMPTY            | State: 0x00
+EMPTY            | State: 0x00

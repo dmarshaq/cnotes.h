@@ -133,6 +133,34 @@ CNDEF Cn_Log_Handler cn_null_log_handler;
  */
 CNDEF void cn_log(Cn_Log_Level level, const char *format, ...);
 
+// HASHING SECTION
+typedef uint64_t (Cn_Hash_Function)(const void *data);
+
+typedef bool (Cn_Equals_Function)(const void *a, const void *b);
+
+/**
+ * Unsigned 64 integer hashing using splitmix64 algorithm.
+ */
+CNDEF uint64_t cn_hash_u64(uint64_t value);
+
+/**
+ * Hashing of specified address.
+ *
+ * IMPORTANT: Wraps around cn_hash_u64 function.
+ */
+CNDEF uint64_t cn_hash_ptr(void *ptr);
+
+/**
+ * Hashing sequence of bytes using FNV-1a implementation.
+ */
+CNDEF uint64_t cn_hash_bytes(void *data, int64_t length);
+
+/**
+ * Mixes two hashes a and b. Order matters, since it 
+ * uses bit shifts to ensure mix(a, b) != mix(b, a).
+ */
+CNDEF uint64_t cn_hash_mix(uint64_t a, uint64_t b);
+
 // STRING SECTION
 typedef struct {
     int64_t length;
@@ -157,12 +185,6 @@ typedef struct {
  * IMPORTANT: DOESN'T COPY MEMORY. If "str" memory is freed later, returned string will not point to valid address anymore.
  */
 CNDEF Cn_String cn_str_substring(Cn_String str, int64_t start, int64_t end);
-
-/**
- * Compares "str1" and "str2", checks for lengths equality first and then compares symbol by symbol.
- * RETURNS: True if strings are identical.
- */
-CNDEF bool cn_str_equals(Cn_String str1, Cn_String str2);
 
 /**
  * Linearly searches for the first occurnse of "search" in "str" from the LEFT, by comparing them through "cn_str_equals()" function.
@@ -268,6 +290,23 @@ CNDEF Cn_String cn_str_format(Cn_String buffer, char *format, ...);
  * Checks whether the string is empty by checking whether the length of the string is 0.
  */
 CNDEF bool cn_str_empty(Cn_String str);
+
+/**
+ * Compares "str1" and "str2", checks for lengths equality first and then compares symbol by symbol.
+ * RETURNS: True if strings are identical.
+ *
+ * IMPORTANT: It uses pointers to strings to be compatible with Cn_Equals_Function,
+ * which allows it to be used in hash table and hash set.
+ */
+CNDEF bool cn_str_equals(const Cn_String *str1, const Cn_String *str2);
+
+/**
+ * RETURNS: Hash of specified string.
+ *
+ * IMPORTANT: It uses pointers to strings to be compatible with Cn_Hash_Function,
+ * which allows it to be used in hash table and hash set.
+ */
+CNDEF uint64_t cn_str_hash(const Cn_String *str);
 
 // CHAINED ARENA SECTION
 
@@ -392,7 +431,6 @@ CNDEF void cn__array_list_unordered_remove(void *list, int64_t index);
 CNDEF void cn__array_list_free(void **list);
 
 // HASH TABLE SECTION
-typedef uint32_t (Cn_Hashfunc)(int64_t, uint8_t *);
 
 typedef enum : uint8_t {
     CN_HASH_TABLE_NO_INTERNAL_KEYS = 0x01,  // If this flag is set hash table won't store key data internally,
@@ -405,34 +443,25 @@ typedef struct {
     int64_t capacity;
     int64_t count;
     int64_t item_size;
-    Cn_Hash_Table_Flags flags;
-    uint8_t *keys;
-    Cn_Hashfunc *hash_func; 
+    int64_t key_size;
+    Cn_Hash_Function *hash_func; 
+    Cn_Equals_Function *equals_func; 
+    float load_factor;
 } Cn_Hash_Table_Header;
 
-typedef enum : uint8_t {
-    CN_SLOT_EMPTY      = 0x00,
-    CN_SLOT_OCCUPIED   = 0x01,
-    CN_SLOT_DEPRICATED = 0x02,
+typedef enum {
+    CN_HASH_TABLE_SLOT_EMPTY,
+    CN_HASH_TABLE_SLOT_OCCUPIED,
+    CN_HASH_TABLE_SLOT_DELETED,
 } Cn_Hash_Table_Slot_State;
 
 typedef struct {
     Cn_Hash_Table_Slot_State state;
-    int64_t key_size;
-
-    // Depending on how hash table was initialized it either stores key data internally, 
-    // or uses given key pointer and trusts user to hold pointer valid.
-    union {
-        int64_t key_idx;
-        void *key;
-    };
+    uint64_t hash;
 } Cn_Hash_Table_Slot;
 
-#define cn_hash_table_make(type, capacity)\
-    (type *)cn__hash_table_make(sizeof(type), capacity, 0) 
-
-#define cn_hash_table_make_flags(type, capacity, flags)\
-    (type *)cn__hash_table_make(sizeof(type), capacity, flags) 
+#define cn_hash_table_make(key_type, value_type, capacity, hash_func, equals_func)\
+    (value_type *)cn__hash_table_make(sizeof(key_type), sizeof(value_type), capacity, hash_func, equals_func) 
 
 #define cn_hash_table_count(ptr_table)\
     cn__hash_table_count((void *)*ptr_table)
@@ -443,17 +472,17 @@ typedef struct {
 #define cn_hash_table_item_size(ptr_table)\
     cn__hash_table_item_size((void *)*ptr_table)
 
-#define cn_hash_table_put(ptr_table, item, ...)\
+#define cn_hash_table_put(ptr_table, item, ptr_key)\
     do {\
         cn__hash_table_resize_to_fit((void **)(ptr_table), cn_hash_table_count(ptr_table) + 1);\
-        (*ptr_table)[cn__hash_table_push_key((void **)(ptr_table), __VA_ARGS__)] = item;\
+        (*ptr_table)[cn__hash_table_push_key((void **)(ptr_table), ptr_key)] = item;\
     } while(0)
 
-#define cn_hash_table_get(ptr_table, ...)\
-    cn__hash_table_get((void **)(ptr_table), __VA_ARGS__)
+#define cn_hash_table_get(ptr_table, ptr_key)\
+    cn__hash_table_get((void **)(ptr_table), ptr_key)
 
-#define cn_hash_table_remove(ptr_table, ...)\
-    cn__hash_table_remove((void **)(ptr_table), __VA_ARGS__) 
+#define cn_hash_table_remove(ptr_table, ptr_key)\
+    cn__hash_table_remove((void **)(ptr_table), ptr_key) 
 
 #define cn_hash_table_free(ptr_table)\
     cn__hash_table_free((void **)(ptr_table))
@@ -461,11 +490,9 @@ typedef struct {
 #define cn_hash_table_header(table_ptr)\
     ((Cn_Hash_Table_Header *)((uint8_t *)*table_ptr - sizeof(Cn_Hash_Table_Header)))
 
-CNDEF uint32_t cn_hashf(int64_t key_size, uint8_t *key);
-
 CNDEF void cn_hash_table_print(void **table);
 
-CNDEF void *cn__hash_table_make(int64_t item_size, int64_t initial_capacity, Cn_Hash_Table_Flags flags);
+CNDEF void *cn__hash_table_make(int64_t key_size, int64_t item_size, int64_t capacity, Cn_Hash_Function *hash_func, Cn_Equals_Function *equals_func);
 
 CNDEF int64_t cn__hash_table_count(void *table);
 
@@ -475,17 +502,77 @@ CNDEF int64_t cn__hash_table_item_size(void *table);
 
 CNDEF void cn__hash_table_resize_to_fit(void **table, int64_t requiered_length);
 
-CNDEF int64_t cn__hash_table_push_key(void **table, int64_t key_size, uint8_t *key);
+CNDEF int64_t cn__hash_table_push_key(void **table, void *key);
 
-CNDEF void *cn__hash_table_get(void **table, int64_t key_size, uint8_t *key);
+CNDEF void *cn__hash_table_get(void **table, void *key);
 
-CNDEF void cn__hash_table_remove(void **table, int64_t key_size, uint8_t *key);
+CNDEF void cn__hash_table_remove(void **table, void *key);
 
 CNDEF void cn__hash_table_free(void **table);
 
-CNDEF Cn_Hash_Table_Slot *cn__hash_table_get_slot(void **table, int64_t index);
+// HASH SET SECTION
+
+typedef struct {
+    int64_t capacity;
+    int64_t count;
+    int64_t item_size;
+    Cn_Hash_Function *hash_func; 
+    Cn_Equals_Function *equals_func;
+} Cn_Hash_Set_Header;
+
+typedef struct {
+    bool occupied;
+} Cn_Hash_Set_Slot;
+
+#define cn_hash_set_make(type, capacity, hash_func, equals_func)\
+    (type *)cn__hash_set_make(sizeof(type), capacity, hash_func, equals_func) 
+
+#define cn_hash_set_count(ptr_set)\
+    cn__hash_set_count((void *)*ptr_set)
+
+#define cn_hash_set_capacity(ptr_set)\
+    cn__hash_set_capacity((void *)*ptr_set)
+
+#define cn_hash_set_item_size(ptr_set)\
+    cn__hash_set_item_size((void *)*ptr_set)
+
+#define cn_hash_set_put(ptr_set, item_ptr)\
+    cn__hash_set_put((void **)(ptr_set), item_ptr)
+
+#define cn_hash_set_contains(ptr_set, item_ptr)\
+    cn__hash_set_contains((void *)(ptr_set), item_ptr)
+
+#define cn_hash_set_remove(ptr_set, item_ptr)\
+    cn__hash_set_remove((void **)(ptr_set), item_ptr) 
+
+#define cn_hash_set_free(ptr_set)\
+    cn__hash_set_free((void **)(ptr_set))
+
+#define cn_hash_set_header(ptr_set)\
+    ((Cn_Hash_Set_Header *)((uint8_t *)*ptr_set - sizeof(Cn_Hash_Set_Header)))
+
+CNDEF void cn_hash_set_print(void **set);
+
+CNDEF void *cn__hash_set_make(int64_t item_size, int64_t capacity, Cn_Hash_Function *hash_func, Cn_Equals_Function *equals_func);
+
+CNDEF int64_t cn__hash_set_count(void *set);
+
+CNDEF int64_t cn__hash_set_capacity(void *set);
+
+CNDEF int64_t cn__hash_set_item_size(void *set);
+
+CNDEF void cn__hash_set_put(void **set, void *item);
+
+CNDEF bool cn__hash_set_contains(void **set, void *item);
+
+CNDEF void cn__hash_set_remove(void **set, void *item);
+
+CNDEF void cn__hash_set_free(void **set);
+
+#ifdef CNOTES_CORE
 
 // LEXER SECTION
+
 typedef enum {
     CN_TOKEN_ZERO,
     CN_TOKEN_UNKNOWN,
@@ -591,6 +678,96 @@ CNDEF void cn_lexer_print_snippet(Cn_Lexer *lexer, uint64_t index, int64_t lengt
 
 CNDEF void cn_lexer_print_snippet_token(Cn_Lexer *lexer);
 
+// TYPE SECTION
+
+typedef struct cn_type Cn_Type;
+
+typedef enum : uint8_t {
+    CN_INTEGER,
+    CN_FLOAT,
+    CN_BOOL,
+    CN_POINTER,
+    CN_FUNCTION,
+    CN_ARRAY,
+    CN_VOID,
+    CN_STRUCT,
+    CN_ENUM,
+    CN_UNION,
+    CN_TYPEDEF,
+    CN_UNKNOWN,
+} Cn_Type_Kind;
+
+typedef struct {
+    bool is_signed;
+} Cn_Type_Integer;
+
+typedef struct {
+    Cn_Type *ptr_to;
+} Cn_Type_Pointer;
+
+typedef struct {
+    Cn_Type *type;
+    Cn_String name;
+} Cn_Type_Function_Param;
+
+typedef struct {
+    Cn_Type *return_type;
+
+    int64_t params_length;
+    Cn_Type_Function_Param *params;
+
+    Cn_String definition_file;
+} Cn_Type_Function;
+
+typedef struct {
+    Cn_Type *type;
+    Cn_String name;
+    int64_t offset;
+} Cn_Type_Struct_Member;
+
+typedef struct {
+    int64_t members_length;
+    Cn_Type_Struct_Member *members;
+    Cn_String tag;
+} Cn_Type_Struct;
+
+typedef struct {
+    Cn_Type *element_type;
+    int64_t length;
+} Cn_Type_Array;
+
+typedef struct {
+    Cn_String name;
+    int64_t value;
+} Cn_Type_Enum_Member;
+
+typedef struct {
+    bool is_signed;
+    int64_t members_length;
+    Cn_Type_Enum_Member *members;
+} Cn_Type_Enum;
+
+typedef struct {
+    Cn_Type *typedef_of;
+} Cn_Type_Typedef;
+
+struct type_info {
+    Cn_String name;
+    int64_t size;
+    int64_t align;
+    
+    Cn_Type_Kind kind;
+    union {
+        Cn_Type_Integer   t_integer;
+        Cn_Type_Pointer   t_pointer;
+        Cn_Type_Function  t_function;
+        Cn_Type_Struct    t_struct;
+        Cn_Type_Array     t_array;
+        Cn_Type_Enum      t_enum;
+        Cn_Type_Typedef   t_typedef;
+    };
+};
+
 // AST SECTION
 
 // TODO: REFACTOR THIS MACRO.
@@ -606,32 +783,11 @@ typedef struct {
     Cn_Ast_Idx idx;
 } Cn_Ast_Linked_List;
 
-// TODO: Move these into implementation only section of the library.
-
-/**
- * This list of strings keeps tracks of actual string saves in arena_strings.
- * It acts like set, saving needed strings only once and then reusing them as needed.
- * IMPORTANT: Use array_list_length(&string_list) to get the length of the list.
- */
-extern Cn_String *cn__string_list;
-
-/**
- * Linearly checks is string already exists, 
- * if so reuses existing string rather then saving new.
- */
-CNDEF Cn_String cn__string_list_save(Cn_String str);
-
-/**
- * Saves string to the string list regardless of whether it is a duplicate or not.
- */
-CNDEF Cn_String cn__string_list_force_save(Cn_String str);
-
-
 typedef enum : uint8_t {
-    CN_TYPE_QUALIFIER_CONST           = 0x01,
-    CN_TYPE_QUALIFIER_RESTRICT        = 0x02,
-    CN_TYPE_QUALIFIER_VOLATILE        = 0x04,
-    CN_TYPE_QUALIFIER_ATOMIC          = 0x08,
+    CN_AST_TYPE_QUALIFIER_CONST           = 0x01,
+    CN_AST_TYPE_QUALIFIER_RESTRICT        = 0x02,
+    CN_AST_TYPE_QUALIFIER_VOLATILE        = 0x04,
+    CN_AST_TYPE_QUALIFIER_ATOMIC          = 0x08,
 } Cn_Qualifier_Flags;
 
 static const Cn_String CN_CONST_STR    = CN_STR_BUFFER("const");
@@ -656,42 +812,42 @@ static const Cn_String CN_TYPEDEF_STR  = CN_STR_BUFFER("typedef");
 
 
 typedef enum : uint8_t {
-    CN_TYPE_SIGN_NONE = 0,
-    CN_TYPE_SIGN_SIGNED,
-    CN_TYPE_SIGN_UNSIGNED,
-} Cn_Type_Sign;
+    CN_AST_TYPE_SIGN_NONE = 0,
+    CN_AST_TYPE_SIGN_SIGNED,
+    CN_AST_TYPE_SIGN_UNSIGNED,
+} Cn_Ast_Type_Sign;
 
 static const Cn_String CN_SIGNED_STR   = CN_STR_BUFFER("signed");
 static const Cn_String CN_UNSIGNED_STR = CN_STR_BUFFER("unsigned");
 
 typedef enum : uint8_t {
-    CN_TYPE_WIDTH_NONE = 0,
-    CN_TYPE_WIDTH_SHORT,
-    CN_TYPE_WIDTH_LONG,
-    CN_TYPE_WIDTH_LONG_LONG,
-} Cn_Type_Width;
+    CN_AST_TYPE_WIDTH_NONE = 0,
+    CN_AST_TYPE_WIDTH_SHORT,
+    CN_AST_TYPE_WIDTH_LONG,
+    CN_AST_TYPE_WIDTH_LONG_LONG,
+} Cn_Ast_Type_Width;
 
 static const Cn_String CN_SHORT_STR     = CN_STR_BUFFER("short");
 static const Cn_String CN_LONG_STR      = CN_STR_BUFFER("long");
 
 typedef enum : uint8_t {
     // IMPORTANT: These primitive "base" types are mapped to constant array declared below.
-    // CN_TYPE_NONE at index 0 is NULL string.
-    CN_TYPE_NONE    = 0,
-    CN_TYPE_INT     = 1,
-    CN_TYPE_CHAR    = 2,
-    CN_TYPE_FLOAT   = 3,
-    CN_TYPE_DOUBLE  = 4,
-    CN_TYPE_BOOL    = 5,
-    CN_TYPE_VOID    = 6,
+    // CN_AST_TYPE_NONE at index 0 is NULL string.
+    CN_AST_TYPE_NONE    = 0,
+    CN_AST_TYPE_INT     = 1,
+    CN_AST_TYPE_CHAR    = 2,
+    CN_AST_TYPE_FLOAT   = 3,
+    CN_AST_TYPE_DOUBLE  = 4,
+    CN_AST_TYPE_BOOL    = 5,
+    CN_AST_TYPE_VOID    = 6,
 
-    CN_TYPE_TYPEDEF,
-    CN_TYPE_STRUCT,
-    CN_TYPE_ENUM,
-    CN_TYPE_UNION,
-} Cn_Type_Kind;
+    CN_AST_TYPE_TYPEDEF,
+    CN_AST_TYPE_STRUCT,
+    CN_AST_TYPE_ENUM,
+    CN_AST_TYPE_UNION,
+} Cn_Ast_Type_Kind;
 
-static const Cn_String CN_TYPE_KINDS[] = {
+static const Cn_String CN_AST_TYPE_KINDS[] = {
     {0},
     CN_STR_BUFFER("int"),
     CN_STR_BUFFER("char"),
@@ -1118,9 +1274,9 @@ typedef struct {
 } Cn_Ast_Node_Declaration_Specifiers;
 
 typedef struct {
-    Cn_Type_Kind  kind;
-    Cn_Type_Width width;
-    Cn_Type_Sign  sign;
+    Cn_Ast_Type_Kind  kind;
+    Cn_Ast_Type_Width width;
+    Cn_Ast_Type_Sign  sign;
 } Cn_Ast_Node_Type_Specifier;
 
 typedef struct {
@@ -1184,38 +1340,129 @@ typedef struct cn_ast_node {
     };
 } Cn_Ast_Node;
 
-#ifndef CN_AST_NODE_LIST_INITIAL_CAP
-#   define CN_AST_NODE_LIST_INITIAL_CAP 32
-#endif // CN_AST_NODE_LIST_INITIAL_CAP
 
 /**
  * Stores all nodes in growing array list.
+ *
  * IMPORTANT: Access elements by indicies, so there are no unsafe situations occuring.
  * First element is considered NIL element, it is reserved to identify illegal references.
  */
 extern Cn_Ast_Node *cn_ast_node_list;
 
-#ifndef CN_AST_TAG_DEFINITION_TABLE_INITIAL_CAP
-#   define CN_AST_TAG_DEFINITION_TABLE_INITIAL_CAP 16
-#endif // CN_AST_TAG_DEFINITION_TABLE_INITIAL_CAP
+#ifndef CN_AST_NODE_LIST_INITIAL_CAP
+#   define CN_AST_NODE_LIST_INITIAL_CAP 32
+#endif // CN_AST_NODE_LIST_INITIAL_CAP
+
+typedef uint32_t Cn_Ast_Binding_Idx;
+
+#define CN_AST_NIL_BINDING_IDX 0
+
+typedef enum : uint8_t {
+    CN_BINDING_TAG,
+    CN_BINDING_VARIABLE,
+    CN_BINDING_FUCNTION,
+    CN_BINDING_TYPEDEF,
+    CN_BINDING_ENUM_CONSTANT,
+} Cn_Ast_Binding_Kind;
+
+typedef struct {
+    Cn_Ast_Binding_Kind kind;           
+
+    Cn_String name;                     // Name of the binding is a single keyword that identifies it,
+                                        // could be a variable name, typedef name or tag name.
+                                        // Depends on the kind of the binding.
+    
+    Cn_Type *type;                      // Resolved type of the binding.
+
+    Cn_Ast_Idx definition_idx;          // Idx of ast node which contains 
+                                        // information about definition of the binding.
+                                        // Different binding kinds will reference different definitions.
+
+    int64_t declarator_oridnal;         // Which declarator inside declaration does this binding relate to.
+                                        // starting with 0 as first declarator. For example
+                                        // Value of 1 would relate to declarator b, in following declaration: int a[10], **b;
+
+    Cn_Ast_Binding_Idx next_idx;        // Each binding can "shadow" previous binding,
+                                        // therefore if such case appears most recent binding
+                                        // will be at the head of linked list.
+
+    int64_t scope_idx;                  // Idx of a scope in which this binding was added.
+                                        // IMPORTANT: Binding should not be used if it's scope doesn't exist.
+} Cn_Ast_Binding;
+
+extern Cn_Ast_Binding *cn_ast_binding_list;
+
+#ifndef CN_AST_BINDING_LIST_INITIAL_CAP
+#   define CN_AST_BINDING_LIST_INITIAL_CAP 64
+#endif // CN_AST_BINDING_LIST_INITIAL_CAP
 
 /**
- * Tag table uses tag names of struct, enum, union to store index of such definition.
- * IMPORTANT: If tag is declared but not defined, and it is not in the table yet it will be stored without definition, meaning index will be equal to CN_AST_NIL_IDX.
+ * Tag table use tag names of struct, enum, union as keys and bindings as values.
  */
-extern Cn_Ast_Idx *cn_ast_tag_definition_table;
+extern Cn_Ast_Binding_Idx *cn_ast_tag_binding_table;
 
-#ifndef CN_AST_TYPEDEF_DEFINITION_TABLE_INITIAL_CAP
-#   define CN_AST_TYPEDEF_DEFINITION_TABLE_INITIAL_CAP 16
-#endif // CN_AST_TYPEDEF_DEFINITION_TABLE_INITIAL_CAP
+#ifndef CN_AST_TAG_BINDING_TABLE_INITIAL_CAP
+#   define CN_AST_TAG_BINDING_TABLE_INITIAL_CAP 16
+#endif // CN_AST_TAG_BINDING_TABLE_INITIAL_CAP
 
 /**
- * Typedef table acts similar to the tag table except. 
- * If typedef is declared but not yet defined it will error rather than storing typedef. 
- * Indicies stored should always be valid.
- * Only typedefs are included here.
+ * Symbol table acts similar to the tag table except. 
+ * It contains: variables, functions, typedefs, enum constants.
  */
-extern Cn_Ast_Idx *cn_ast_typedef_definition_table;
+extern Cn_Ast_Binding_Idx *cn_ast_symbol_binding_table;
+
+#ifndef CN_AST_SYMBOL_BINDING_TABLE_INITIAL_CAP
+#   define CN_AST_SYMBOL_BINDING_TABLE_INITIAL_CAP 16
+#endif // CN_AST_SYMBOL_BINDING_TABLE_INITIAL_CAP
+
+/**
+ * Saved strings arena is used to store every scoped string data.
+ * Pointers to the data remain the same throughout the execution.
+ * since chained arena gurantees that memory once allocated is not moved.
+ * Deallocation mechanism is used in the arena to "pop" string data once
+ * it is out of scope.
+ */
+extern Cn_Chained_Arena cn_ast_saved_strings_data_arena;
+
+#ifndef CN_AST_SAVED_STRINGS_DATA_ARENA_BLOCK_CAP
+#   define CN_AST_SAVED_STRINGS_DATA_ARENA_BLOCK_CAP 4096
+#endif // CN_AST_SAVED_STRINGS_DATA_ARENA_BLOCK_CAP
+
+/**
+ * Saved strings list is used to store every scoped string reference.
+ * By storing struct Cn_String which contains both pointer to the string
+ * and it's length.
+ */
+extern Cn_String *cn_ast_saved_strings_list;
+
+#ifndef CN_AST_SAVED_STRINGS_LIST_INITIAL_CAP
+#   define CN_AST_SAVED_STRINGS_LIST_INITIAL_CAP 64
+#endif // CN_AST_SAVED_STRINGS_LIST_INITIAL_CAP
+
+/**
+ * This struct simply contains information that each scope will have.
+ */
+typedef struct {
+    int64_t saved_strings_idx;
+    int64_t binding_idx;
+} Cn_Ast_Scope;
+
+extern Cn_Ast_Scope *cn_ast_scope_stack;
+
+#ifndef CN_AST_SCOPE_STACK_INITIAL_CAP
+#   define CN_AST_SCOPE_STACK_INITIAL_CAP 64
+#endif // CN_AST_SCOPE_STACK_INITIAL_CAP
+
+CNDEF void cn_ast_scope_stack_push();
+
+CNDEF void cn_ast_scope_stack_pop();
+
+/**
+ * Adds new binding to the current scope.
+ * 
+ * RETURNS: Empty string if error occured, valid saved name if binding was added.
+ */
+CNDEF Cn_String cn_ast_scope_stack_add_binding(Cn_String name, Cn_Ast_Binding_Kind kind, Cn_Ast_Idx node_idx);
 
 /**
  * Inits ast functionality, called once before parsing begins.
@@ -2055,6 +2302,7 @@ typedef void (Cn_Message_Handler)(Cn_Message *message);
 
 extern Cn_Message_Handler *cn_message_handler;
 
+#endif
 
 #endif // CN_H_
        
@@ -2110,19 +2358,12 @@ CNDEF Cn_String cn_str_substring(Cn_String str, int64_t start, int64_t end) {
     return CN_STR(end - start, str.data + start);
 }
 
-CNDEF bool cn_str_equals(Cn_String str1, Cn_String str2) {
-    if (str1.length != str2.length) {
-        return false;
-    }
-    return !memcmp(str1.data, str2.data, str1.length);
-}
-
 CNDEF int64_t cn_str_find(Cn_String str, Cn_String search) {
     Cn_String substr;
     for (int64_t i = 0; i + search.length <= str.length; i++) {
         if (str.data[i] == search.data[0]) {
             substr = cn_str_substring(str, i, i + search.length);
-            if (cn_str_equals(substr, search)) {
+            if (cn_str_equals(&substr, &search)) {
                 return i;
             }
         }
@@ -2395,6 +2636,18 @@ CNDEF bool cn_str_empty(Cn_String str) {
     return str.length == 0;
 }
 
+CNDEF bool cn_str_equals(const Cn_String *str1, const Cn_String *str2) {
+    if (str1 == str2) return true;
+
+    if (str1->length != str2->length) return false;
+
+    return !memcmp(str1->data, str2->data, str1->length);
+}
+
+CNDEF uint64_t cn_str_hash(const Cn_String *str) {
+    return cn_hash_bytes(str->data, str->length);
+}
+
 // CHAINED ARENA SECTION
 Cn_Chained_Arena cn_chained_arena_make(uint64_t block_capacity) {
     CN_ASSERT(block_capacity > 0);
@@ -2553,207 +2806,250 @@ CNDEF void cn__array_list_unordered_remove(void *list, int64_t index) {
     cn__array_list_pop(list, 1);
 }
 
+// HASHING SECTION
+
+CNDEF uint64_t cn_hash_u64(uint64_t value) {
+    value = (value ^ (value >> 30)) * 0xbf58476d1ce4e5b9ULL;
+    value = (value ^ (value >> 27)) * 0x94d049bb133111ebULL;
+    value = value ^ (value >> 31);
+    return value;
+}
+
+CNDEF uint64_t cn_hash_ptr(void *ptr) {
+    return cn_hash_u64((uint64_t)ptr);
+}
+
+CNDEF uint64_t cn_hash_bytes(void *data, int64_t length) {
+    uint8_t *p = (uint8_t *)data;
+    uint64_t h = 0xcbf29ce484222325ULL;
+    for (size_t i = 0; i < length; i++) {
+        h ^= p[i];
+        h *= 0x100000001b3ULL;
+    }
+    return h;
+}
+
+CNDEF uint64_t cn_hash_mix(uint64_t a, uint64_t b) {
+    return cn_hash_u64(a ^ (b + 0x9e3779b97f4a7c15ULL + (a << 6) + (a >> 2)));
+}
+
 // HASH TABLE SECTION
 
-/**
- * Internal function.
- * RETURNS: Index of the corresponding key by calculating hash.
- * IMPORTANT: Doesn't perfom any slot checks.
- */
-CNDEF uint32_t cn__hash_table_hash_index_of(void **table, int64_t key_size, uint8_t *key) {
-    Cn_Hash_Table_Header *header = cn_hash_table_header(table);
-    return header->hash_func(key_size, key) % header->capacity;
+// /**
+//  * Internal function.
+//  * RETURNS: Index of the corresponding key by calculating hash.
+//  * IMPORTANT: Doesn't perfom any slot checks.
+//  */
+// CNDEF int64_t cn__hash_table_hash_index_of(void **table, int64_t key_size, uint8_t *key) {
+//     Cn_Hash_Table_Header *header = cn_hash_table_header(table);
+//     Cn_String str = CN_STR(key_size, key);
+//     return header->hash_func(&str) % header->capacity;
+// }
+// 
+// /**
+//  * Internal function.
+//  * RETURNS: True if slot key equals given key.
+//  */
+// CNDEF bool cn__hash_table_key_equals(void **table, Cn_Hash_Table_Slot *slot, int64_t key_size, uint8_t *key) {
+//     Cn_Hash_Table_Header *header = cn_hash_table_header(table);
+//     
+//     if (slot->key_size == key_size) {
+//         Cn_String a, b;
+//         a = CN_STR(key_size, key);
+//         if (header->flags & CN_HASH_TABLE_NO_INTERNAL_KEYS) {
+//             b = CN_STR(key_size, slot->key);
+//         } else {
+//             b = CN_STR(key_size, header->keys + slot->key_idx);
+//         }
+//         return header->equals_func(&a, &b);
+//     }
+// 
+//     return false;
+// }
+// 
+// /**
+//  * Internal function.
+//  * Sets all occupied slots to depricated.
+//  */
+// CNDEF void cn__hash_table_depricate_slots(void **table) {
+//     int64_t cap = cn_hash_table_capacity(table);
+//     Cn_Hash_Table_Slot *slot = NULL;
+//     for (int64_t i = 0; i < cap; i++) {
+//         slot = cn__hash_table_get_slot(table, i);
+//         if (slot->state == CN_SLOT_OCCUPIED) {
+//             slot->state = CN_SLOT_DEPRICATED;
+//         }
+//     }
+// }
+// 
+// /**
+//  * Internal function.
+//  */
+// CNDEF void cn__hash_table_print_slot(void *item, int64_t item_size, uint8_t *keys, Cn_Hash_Table_Slot *slot, bool no_internal_keys) {
+//     
+//     // Print the state and key_size as hex.
+// 
+// }
+// 
+// /**
+//  * Internal function.
+//  * RECURSION: Recursivly readdresses slots if they are depricated.
+//  * RETURNS: True, if it succesfully readdressed a slot.
+//  */
+// CNDEF bool cn__hash_table_readdress(void **table, int64_t index) {
+//     Cn_Hash_Table_Header *header = cn_hash_table_header(table);
+//     Cn_Hash_Table_Slot *target_slot = cn__hash_table_get_slot(table, index);
+// 
+//     int64_t new_index; 
+//     if (header->flags & CN_HASH_TABLE_NO_INTERNAL_KEYS) {
+//         new_index = cn__hash_table_hash_index_of(table, target_slot->key_size, target_slot->key);
+//     } else {
+//         new_index = cn__hash_table_hash_index_of(table, target_slot->key_size, header->keys + target_slot->key_idx);
+//     }
+//     target_slot->state = CN_SLOT_EMPTY;
+// 
+//     Cn_Hash_Table_Slot *slot = NULL;
+//     for (int64_t i = 0; i < header->capacity; i++) {
+//         slot = cn__hash_table_get_slot(table, (new_index + i) % header->capacity);
+//         if (slot->state == CN_SLOT_EMPTY) {
+//             // Copy data to a new slot.
+//             slot->state = CN_SLOT_OCCUPIED;
+// 
+//             slot->key_size = target_slot->key_size;
+//             if (header->flags & CN_HASH_TABLE_NO_INTERNAL_KEYS) {
+//                 slot->key = target_slot->key;
+//             } else {
+//                 slot->key_idx = target_slot->key_idx;
+//             }
+// 
+//             memcpy((uint8_t *)*table + ((new_index + i) % header->capacity) * header->item_size, (uint8_t *)*table + index * header->item_size, header->item_size);
+// 
+//             return true;
+//         }
+//         else if (slot->state == CN_SLOT_DEPRICATED && cn__hash_table_readdress(table, (new_index + i) % header->capacity)) {
+// 
+//             // IMPORTANT: There is an additional is CN_SLOT_OCCUPIED check, because cn__hash_table_readdress can possbily readdress slot to the same index as it was before, therefore additional check is needed.
+//             if (slot->state != CN_SLOT_OCCUPIED) {
+//                 // Copy data to a new slot.
+//                 slot->state = CN_SLOT_OCCUPIED;
+// 
+//                 slot->key_size = target_slot->key_size;
+//                 if (header->flags & CN_HASH_TABLE_NO_INTERNAL_KEYS) {
+//                     slot->key = target_slot->key;
+//                 } else {
+//                     slot->key_idx = target_slot->key_idx;
+//                 }
+// 
+//                 memcpy((uint8_t *)*table + ((new_index + i) % header->capacity) * header->item_size, (uint8_t *)*table + index * header->item_size, header->item_size);
+// 
+//                 return true;
+//             }
+//         }
+//     }
+// 
+//     cn_log(CN_ERROR, "Couldn't find new free hash slot when readdressing.\n");
+//     return false;
+// }
+// 
+// CNDEF uint32_t cn_hashf(int64_t key_size, uint8_t *key) {
+//     CN_ASSERT(key != NULL);         // Do we need to assert this?
+//     CN_ASSERT(key_size > 0);
+// 
+//     if (key_size < 2) {
+//         return *(uint8_t *)(key);
+//     }
+//     
+//     uint32_t hash = 0;
+//     uint8_t *hash_ptr = (uint8_t *)&(hash);
+//     hash_ptr[0] = *((uint8_t *)(key) + 0);
+//     hash_ptr[1] = *((uint8_t *)(key) + 1);
+//     hash_ptr[2] = *((uint8_t *)(key) + key_size - 1);
+//     hash_ptr[3] = *((uint8_t *)(key) + key_size - 2);
+// 
+//     return hash;
+// }
+CNDEF Cn_Hash_Table_Slot *cn__hash_table_get_slot(Cn_Hash_Table_Header *header, int64_t idx) {
+    return (Cn_Hash_Table_Slot *)( ((uint8_t *)(header + 1)) + (header->capacity * header->item_size) + (idx * (sizeof(Cn_Hash_Table_Slot) + header->key_size)));
 }
 
-/**
- * Internal function.
- * RETURNS: True if slot key equals given key.
- */
-CNDEF bool cn__hash_table_key_equals(void **table, Cn_Hash_Table_Slot *slot, int64_t key_size, uint8_t *key) {
-    Cn_Hash_Table_Header *header = cn_hash_table_header(table);
-    
-    if (slot->key_size == key_size) {
-        if (header->flags & CN_HASH_TABLE_NO_INTERNAL_KEYS) {
-            return !memcmp(slot->key, key, key_size);
-        } else {
-            return !memcmp(header->keys + slot->key_idx, key, key_size);
-        }
-    }
-
-    return false;
-}
-
-/**
- * Internal function.
- * Sets all occupied slots to depricated.
- */
-CNDEF void cn__hash_table_depricate_slots(void **table) {
-    int64_t cap = cn_hash_table_capacity(table);
-    Cn_Hash_Table_Slot *slot = NULL;
-    for (int64_t i = 0; i < cap; i++) {
-        slot = cn__hash_table_get_slot(table, i);
-        if (slot->state == CN_SLOT_OCCUPIED) {
-            slot->state = CN_SLOT_DEPRICATED;
-        }
-    }
-}
-
-/**
- * Internal function.
- */
-CNDEF void cn__hash_table_print_slot(void *item, int64_t item_size, uint8_t *keys, Cn_Hash_Table_Slot *slot, bool no_internal_keys) {
-    
-    // Print the state and key_size as hex.
-
-    if (slot->state == CN_SLOT_OCCUPIED) {
-        // Print the item in hex based on item_size.
-        printf("Item: 0x");
-        for (int64_t i = 0; i < item_size; i++) {
-            printf("%02x", *((uint8_t *)item + i));  // Print each byte of the item.
-        }
-
-        printf(" | State: 0x%02x | Key Size: %ld | Key -> %.*s\n", slot->state, slot->key_size, (int)slot->key_size, no_internal_keys ? (char *)slot->key : (char *)keys + slot->key_idx);
-    } else {
-        printf("EMPTY   %*s | State: 0x%02x\n", (int)item_size * 2, "",  slot->state);
-    }
-}
-
-/**
- * Internal function.
- * RECURSION: Recursivly readdresses slots if they are depricated.
- * RETURNS: True, if it succesfully readdressed a slot.
- */
-CNDEF bool cn__hash_table_readdress(void **table, int64_t index) {
-    Cn_Hash_Table_Header *header = cn_hash_table_header(table);
-    Cn_Hash_Table_Slot *target_slot = cn__hash_table_get_slot(table, index);
-
-    int64_t new_index; 
-    if (header->flags & CN_HASH_TABLE_NO_INTERNAL_KEYS) {
-        new_index = cn__hash_table_hash_index_of(table, target_slot->key_size, target_slot->key);
-    } else {
-        new_index = cn__hash_table_hash_index_of(table, target_slot->key_size, header->keys + target_slot->key_idx);
-    }
-    target_slot->state = CN_SLOT_EMPTY;
-
-    Cn_Hash_Table_Slot *slot = NULL;
+CNDEF int64_t cn__hash_table_probe_insert(void *data, Cn_Hash_Table_Header *header, void *item, int64_t idx) {
+    Cn_Hash_Table_Slot *slot;
+    int64_t insertion_idx;
     for (int64_t i = 0; i < header->capacity; i++) {
-        slot = cn__hash_table_get_slot(table, (new_index + i) % header->capacity);
-        if (slot->state == CN_SLOT_EMPTY) {
-            // Copy data to a new slot.
-            slot->state = CN_SLOT_OCCUPIED;
-
-            slot->key_size = target_slot->key_size;
-            if (header->flags & CN_HASH_TABLE_NO_INTERNAL_KEYS) {
-                slot->key = target_slot->key;
-            } else {
-                slot->key_idx = target_slot->key_idx;
-            }
-
-            memcpy((uint8_t *)*table + ((new_index + i) % header->capacity) * header->item_size, (uint8_t *)*table + index * header->item_size, header->item_size);
-
-            return true;
+        insertion_idx = (idx + i) % header->capacity;
+        slot = cn__hash_table_get_slot(header, insertion_idx);
+        if (slot->state != CN_HASH_TABLE_SLOT_OCCUPIED) {
+            memcpy((uint8_t *)data + insertion_idx * header->item_size, item, header->item_size);
+            return insertion_idx;
         }
-        else if (slot->state == CN_SLOT_DEPRICATED && cn__hash_table_readdress(table, (new_index + i) % header->capacity)) {
-
-            // IMPORTANT: There is an additional is CN_SLOT_OCCUPIED check, because cn__hash_table_readdress can possbily readdress slot to the same index as it was before, therefore additional check is needed.
-            if (slot->state != CN_SLOT_OCCUPIED) {
-                // Copy data to a new slot.
-                slot->state = CN_SLOT_OCCUPIED;
-
-                slot->key_size = target_slot->key_size;
-                if (header->flags & CN_HASH_TABLE_NO_INTERNAL_KEYS) {
-                    slot->key = target_slot->key;
-                } else {
-                    slot->key_idx = target_slot->key_idx;
-                }
-
-                memcpy((uint8_t *)*table + ((new_index + i) % header->capacity) * header->item_size, (uint8_t *)*table + index * header->item_size, header->item_size);
-
-                return true;
-            }
-        }
-    }
-
-    cn_log(CN_ERROR, "Couldn't find new free hash slot when readdressing.\n");
-    return false;
-}
-
-CNDEF uint32_t cn_hashf(int64_t key_size, uint8_t *key) {
-    CN_ASSERT(key != NULL);         // Do we need to assert this?
-    CN_ASSERT(key_size > 0);
-
-    if (key_size < 2) {
-        return *(uint8_t *)(key);
     }
     
-    uint32_t hash = 0;
-    uint8_t *hash_ptr = (uint8_t *)&(hash);
-    hash_ptr[0] = *((uint8_t *)(key) + 0);
-    hash_ptr[1] = *((uint8_t *)(key) + 1);
-    hash_ptr[2] = *((uint8_t *)(key) + key_size - 1);
-    hash_ptr[3] = *((uint8_t *)(key) + key_size - 2);
-
-    return hash;
+    cn_log(CN_ERROR, "No valid entry in the hash table.");
+    return -1;
 }
 
 CNDEF void cn_hash_table_print(void **table) {
     Cn_Hash_Table_Header *header = cn_hash_table_header(table);
 
     printf("\n--------Hash Table--------\n");
+    Cn_Hash_Table_Slot *slot;
+    uint8_t *item;
+
     for (int64_t i = 0; i < header->capacity; i++) {
-        cn__hash_table_print_slot((uint8_t *)*table + i * header->item_size, header->item_size, header->keys, cn__hash_table_get_slot(table, i), header->flags & CN_HASH_TABLE_NO_INTERNAL_KEYS);
+        slot = cn__hash_table_get_slot(header, i);
+        item = (uint8_t *)*table + i * header->item_size;
+
+        if (slot->state == CN_HASH_TABLE_SLOT_OCCUPIED) {
+            // Print the item in hex based on item_size.
+            printf("item: 0x");
+            for (int64_t i = 0; i < header->item_size; i++) {
+                printf("%02x", *(item + i)); // Print each byte of the item.
+            }
+
+            printf(" | state: 0x%02x, ", slot->state);
+            printf("hash: 0x");
+            for (int64_t i = 0; i < 8; i++) {
+                printf("%02x", *((uint8_t *)(&slot->hash) + i)); // Print each byte of the hash.
+            }
+
+            printf(", key: 0x");
+            for (int64_t i = 0; i < header->key_size; i++) {
+                printf("%02x", *((uint8_t *)(slot + 1) + i)); // Print each byte of the key.
+            }
+            printf("\n");
+        } else {
+            printf("EMPTY   %*s |\n", (int)header->item_size * 2, "");
+        }
     }
 }
 
-CNDEF Cn_Hash_Table_Slot *cn__hash_table_get_slot(void **table, int64_t index) {
-    Cn_Hash_Table_Header *header = cn_hash_table_header(table);
-    return (Cn_Hash_Table_Slot *)((uint8_t *)*table + header->capacity * header->item_size + index * sizeof(Cn_Hash_Table_Slot));
-}
-
-CNDEF void *cn__hash_table_make(int64_t item_size, int64_t capacity, Cn_Hash_Table_Flags flags) {
+CNDEF void *cn__hash_table_make(int64_t key_size, int64_t item_size, int64_t capacity, Cn_Hash_Function *hash_func, Cn_Equals_Function *equals_func) {
     CN_ASSERT(item_size > 0);
     CN_ASSERT(capacity > 0);
 
-    Cn_Hash_Table_Header *header = (Cn_Hash_Table_Header *)CN_REALLOC(NULL, sizeof(Cn_Hash_Table_Header) + (sizeof(Cn_Hash_Table_Slot) + item_size) * capacity);
+    Cn_Hash_Table_Header *header = (Cn_Hash_Table_Header *)CN_REALLOC(NULL, sizeof(Cn_Hash_Table_Header) + (item_size + sizeof(Cn_Hash_Table_Slot) + key_size) * capacity);
 
     if (header == NULL) {
-        cn_log(CN_ERROR, "Couldn't allocate more memory of size: %ld bytes, for the hash table.", sizeof(Cn_Hash_Table_Header) + (sizeof(Cn_Hash_Table_Slot) + item_size) * capacity);
+        cn_log(CN_ERROR, "Couldn't allocate more memory of size: %ld bytes, for the hash table.", sizeof(Cn_Hash_Table_Header) + (item_size + sizeof(Cn_Hash_Table_Slot) + key_size) * capacity);
         return NULL;
     }
     
-    // If user didn't explicitely specify no keys flag, allocate keys array for future use.
-    uint8_t *keys;
-    if (!(flags & CN_HASH_TABLE_NO_INTERNAL_KEYS)) {
-        // IMPORTANT: Using separately allocated array list for keys, because keys are variable size, 
-        // and we do NOT want to reallocate whole hash table every time a long key is added. 
-        // But it is also useful to allow hash table to store keys, 
-        // so user doesn't have to worry about saving keys manually. 
-        // And it also allows table to check whether certain key value pair is legal or not.
-        keys = cn_array_list_make(uint8_t, capacity * 8);    
-
-        if (keys == NULL) {
-            cn_log(CN_ERROR, "Couldn't allocate more memory of size: %ld bytes, for the keys needed for the hash table.\n", sizeof(uint8_t) * capacity * 8);
-            CN_FREE(header);
-            return NULL;
-        }
-    } else {
-        keys = NULL;
-    }
-
     // Setting all hash table header members.
-    header->capacity   = capacity;
-    header->item_size  = item_size;
-    header->count      = 0;
-    header->flags      = flags;
-    header->keys       = keys;
-    header->hash_func  = cn_hashf;
+    header->capacity    = capacity;
+    header->item_size   = item_size;
+    header->key_size    = key_size;
+    header->count       = 0;
+    header->hash_func   = hash_func;
+    header->equals_func = equals_func;
+    header->load_factor = 0.9f;
 
-    // IMPORTANT: Because header is of type "Cn_Hash_Table_Header *", compiler will automatically translate "header + 1" to "(void*)(header) + sizeof(Cn_Hash_Table_Header)".
-    void *data = header + 1;
+    uint8_t *data = (uint8_t *)(header + 1);
+    Cn_Hash_Table_Slot *slot;
     
-    // Set all slots to CN_SLOT_EMPTY.
+    // Make all slots free.
     for (int64_t i = 0; i < header->capacity; i++) {
-        cn__hash_table_get_slot(&data, i)->state = CN_SLOT_EMPTY;
+        slot = (Cn_Hash_Table_Slot *)(data + (header->capacity * header->item_size) + (i * (sizeof(Cn_Hash_Table_Slot) + header->key_size)));
+        slot->state = CN_HASH_TABLE_SLOT_EMPTY;
     }
     
     return data;
@@ -2771,214 +3067,191 @@ CNDEF int64_t cn__hash_table_item_size(void *table) {
     return ((Cn_Hash_Table_Header *)((uint8_t *)table - sizeof(Cn_Hash_Table_Header)))->item_size;
 }
 
-CNDEF void cn__hash_table_free(void **table) {
-    Cn_Hash_Table_Header *header = cn_hash_table_header(table);
-    cn_array_list_free(&(header->keys));
-    CN_FREE(header);
-    *table = NULL;
-}
-
 CNDEF void cn__hash_table_resize_to_fit(void **table, int64_t requiered_length) {
     Cn_Hash_Table_Header *header = cn_hash_table_header(table);
 
-    if (requiered_length > header->capacity) {
-        // Before resizing, depricate slots.
-        cn__hash_table_depricate_slots(table);
-
+    if (requiered_length > header->capacity * header->load_factor) {
         // IMPORTANT: To understand where this calculation comes from check cn__array_list_resize_to_fit implementation.
         // It uses same calculation that simplifies pow and log of base 2 caluclation to just using bit manipulation.
         int64_t ratio = requiered_length / header->capacity;
+        if (ratio < 1) ratio = 1;
         int highest_bit_pos = 63 - CN_COUNT_LEADING_ZEROS(ratio);
         CN_ASSERT(highest_bit_pos >= 0);
         int64_t capacity_multiplier = (int64_t)(1 << (highest_bit_pos + 1));
 
-        header = (Cn_Hash_Table_Header *)CN_REALLOC(header, sizeof(Cn_Hash_Table_Header) + header->capacity * capacity_multiplier * (header->item_size + sizeof(Cn_Hash_Table_Slot)));
+        Cn_Hash_Table_Header *h = (Cn_Hash_Table_Header *)CN_REALLOC(NULL, sizeof(Cn_Hash_Table_Header) + (header->capacity * capacity_multiplier + 1) * (header->item_size + sizeof(Cn_Hash_Table_Slot) + header->key_size)); // Adding 1 to make next capacity odd.
 
-        if (header == NULL) {
-            cn_log(CN_ERROR, "Couldn't reallocate more memory to fit new size of: %ld bytes, for the hash table.", sizeof(Cn_Hash_Table_Header) + header->capacity * capacity_multiplier * (header->item_size + sizeof(Cn_Hash_Table_Slot)));
+        if (h == NULL) {
+            cn_log(CN_ERROR, "Couldn't allocate more memory to fit new size of: %ld bytes, for the hash table.", sizeof(Cn_Hash_Table_Header) + (header->capacity * capacity_multiplier + 1) * (header->item_size + sizeof(Cn_Hash_Table_Slot)));
             return;
         }
 
-        *table = header + 1; // IMPORTANT: Updating pointer to the table data after resizing.
-        header->capacity *= capacity_multiplier; // IMPORTANT: Updating capacity after, because if resize fails capacity should not change.
+        h->capacity = header->capacity * capacity_multiplier + 1;
+        h->count = header->count;
+        h->item_size = header->item_size;
+        h->key_size = header->key_size;
+        h->hash_func = header->hash_func;
+        h->equals_func = header->equals_func;
+        h->load_factor = header->load_factor;
 
-        /**
-         * After resize, all data is copied and buffer is expanded to the right.
-         * But due to the nature of hash table structure the slot area of the buffer would not be properly shift in the resulting array.
-         * For example diagrams (NOT TO SCALE):
-         *
-         *      BEFORE:
-         *                  
-         *                  |-----------------------------Buffer-Capacity-4-------------------------------|
-         *                  |                                                                             |
-         *                  |------Array-of-Data-------|-----------------Array-of-Slots-------------------|
-         *      Indicies:   | 0     1     2     3      | 0           1           2           3            |
-         *      Data:       | [1111][1111][1111][____] | [10][0x2342][01][0x2344][11][0x2348][__][______] |
-         *                  ^
-         *                  |
-         *                  *table
-         *
-         *
-         *      AFTER RESIZE (BAD):
-         *                  
-         *                  |-------------------------------------------------------------------Buffer-Capacity-8-----------------------------------------------------------------------|
-         *                  |                                                                                                                                                           |
-         *                  |------Array-of-Data-------|-----------------Array-of-Slots-------------------|--------------------------|--------------------------------------------------|
-         *      Indicies:   | 0     1     2     3      | 0           1           2           3            |                          |                                                  |
-         *      Data:       | [1111][1111][1111][____] | [10][0x2342][01][0x2344][11][0x2348][__][______] | [____][____][____][____] | [__][______][__][______][__][______][__][______] |
-         *                  ^
-         *                  |
-         *                  *table
-         *
-         *
-         *      WHAT IS EXPECTED / NEEDED (GOOD):
-         *                  
-         *                  |----------------------------------------------------------------Buffer-Capacity-8--------------------------------------------------------------------|
-         *                  |                                                                                                                                                     |
-         *                  |------------------Array-of-Data-------------------|------------------------------------------Array-of-Slots------------------------------------------|
-         *      Indicies:   | 0     1     2     3     4     5     6     7      | 0           1           2           3           4           5           6           7            |
-         *      Data:       | [1111][1111][1111][____][____][____][____][____] | [10][0x2342][01][0x2344][11][0x2348][__][______][__][______][__][______][__][______][__][______] |
-         *                  ^
-         *                  |
-         *                  *table
-         *
-         * To achieve this good layout, it is needed to shift array of slots to the right.
-         * And it must be done with memmove cause, destination and source may overlap.
-         */
 
-        memmove((uint8_t *)*table + header->capacity * header->item_size, (uint8_t *)*table + (header->capacity / capacity_multiplier) * header->item_size, (header->capacity / capacity_multiplier) * sizeof(Cn_Hash_Table_Slot));
+        // Free new slots to.
+        uint8_t *new_data = (uint8_t *)(h + 1);
 
-        // Set new slots to CN_SLOT_EMPTY.
-        for (int64_t i = header->capacity / capacity_multiplier; i < header->capacity; i++) {
-            cn__hash_table_get_slot(table, i)->state = CN_SLOT_EMPTY;
-        }
-
-        // Readdress slots after resizing.
-        for (int64_t i = 0; i < header->capacity; i++) {
-            if (cn__hash_table_get_slot(table, i)->state == CN_SLOT_DEPRICATED) {
-                cn__hash_table_readdress(table, i);
+        {
+            Cn_Hash_Table_Slot *slot;
+            for (int64_t i = 0; i < h->capacity; i++) {
+                slot = (Cn_Hash_Table_Slot *)(new_data + (h->capacity * h->item_size) + (i * (sizeof(Cn_Hash_Table_Slot) + h->key_size)));
+                slot->state = CN_HASH_TABLE_SLOT_EMPTY;
             }
         }
+
+        // Readdressing into new hash table.
+        uint8_t *old_data = (uint8_t *)(header + 1);
+
+        {
+            Cn_Hash_Table_Slot *old_slot, *new_slot;
+            int64_t idx;
+            for (int64_t i = 0; i < header->capacity; i++) {
+                old_slot = cn__hash_table_get_slot(header, i);
+
+                if (old_slot->state == CN_HASH_TABLE_SLOT_OCCUPIED) {
+                    idx = old_slot->hash % h->capacity;
+                    
+                    idx = cn__hash_table_probe_insert(new_data, h, old_data + i * header->item_size, idx);
+                    new_slot = cn__hash_table_get_slot(h, idx);
+                    new_slot->state = CN_HASH_TABLE_SLOT_OCCUPIED;
+                    new_slot->hash = old_slot->hash;
+                    memcpy(new_slot + 1, old_slot + 1, header->key_size);
+
+                    header->count--;
+                }
+
+                if (header->count == 0) break;
+            }
+        }
+
+
+        CN_FREE(header);
+        
+        *table = new_data;
     }
 }
 
-CNDEF int64_t cn__hash_table_push_key(void **table, int64_t key_size, uint8_t *key) {
-    int64_t index = cn__hash_table_hash_index_of(table, key_size, key);
+CNDEF int64_t cn__hash_table_push_key(void **table, void *key) {
     Cn_Hash_Table_Header *header = cn_hash_table_header(table);
 
-    Cn_Hash_Table_Slot *slot = NULL;
-    for (int64_t i = 0; i < header->capacity; i++) {
-        slot = cn__hash_table_get_slot(table, (index + i) % header->capacity);
-        if (slot->state == CN_SLOT_EMPTY) {
-            // Write all data to hash table by corresponding index.
-            slot->state = CN_SLOT_OCCUPIED;
+    uint64_t hash = header->hash_func(key);
+    int64_t idx = hash % header->capacity;
 
-            slot->key_size = key_size;
-            
-            if ((header->flags & CN_HASH_TABLE_NO_INTERNAL_KEYS) != 0) {
-                slot->key = key;
-            } else {
-                // Is this still an issue?
-                //
-                // IMPORTANT: "cn_array_list_append_multiple" is not inlined because it 
-                // might change the "header->keys" value when resizing array list.
-                // So it is neccessary to call this macro like function in a separate line, 
-                // otherwise undefined behaviour will occure.
-                int64_t key_index = cn_array_list_append_multiple(&(header->keys), key, key_size);
-                slot->key_idx = key_index;
-            }
+    Cn_Hash_Table_Slot *slot;
+    int64_t insertion_idx;
+    for (int64_t i = 0; i < header->capacity; i++) {
+        insertion_idx = (idx + i) % header->capacity;
+        slot = cn__hash_table_get_slot(header, insertion_idx);
+
+        if (slot->state != CN_HASH_TABLE_SLOT_OCCUPIED) {
+            slot->state = CN_HASH_TABLE_SLOT_OCCUPIED;
+            slot->hash = hash;
+            memcpy(slot + 1, key, header->key_size);
 
             header->count++;
-           
-            return (index + i) % header->capacity;
 
-        } else if (cn__hash_table_key_equals(table, slot, key_size, key)) {
-            return (index + i) % header->capacity;
+            return insertion_idx;
+        } else if (slot->hash == hash && header->equals_func(key, slot + 1)) {
+            return insertion_idx;
         }
     }
 
-    cn_log(CN_ERROR, "Couldn't find free hash table slot for the new key.\n");
+    cn_log(CN_ERROR, "No free hash table slot for the new key in the hash table.");
     return -1;
 }
 
-CNDEF void *cn__hash_table_get(void **table, int64_t key_size, uint8_t *key) {
-    int64_t index = cn__hash_table_hash_index_of(table, key_size, key);
+CNDEF void *cn__hash_table_get(void **table, void *key) {
     Cn_Hash_Table_Header *header = cn_hash_table_header(table);
 
-    Cn_Hash_Table_Slot *slot = NULL;
-    for (int64_t i = 0; i < header->capacity; i++) {
-        slot = cn__hash_table_get_slot(table, (index + i) % header->capacity);
+    uint64_t hash = header->hash_func(key);
+    int64_t idx = hash % header->capacity;
 
-        if (slot->state == CN_SLOT_EMPTY)
-            return NULL;
-        
-        if (cn__hash_table_key_equals(table, slot, key_size, key)) {
-            // Right key is found, return.
-            return (uint8_t *)*table + ((index + i) % header->capacity) * header->item_size;
+    Cn_Hash_Table_Slot *slot;
+    int64_t probe_idx;
+    for (int64_t i = 0; i < header->capacity; i++) {
+        probe_idx = (idx + i) % header->capacity;
+        slot = cn__hash_table_get_slot(header, probe_idx);
+
+        if (slot->state == CN_HASH_TABLE_SLOT_OCCUPIED && slot->hash == hash && header->equals_func(key, slot + 1)) {
+            return (uint8_t *)*table + probe_idx * header->item_size;
         }
     }
 
     return NULL;
 }
 
-CNDEF void cn__hash_table_remove(void **table, int64_t key_size, uint8_t *key) {
-    int64_t index = cn__hash_table_hash_index_of(table, key_size, key);
-    Cn_Hash_Table_Header *header = cn_hash_table_header(table);
-
-    Cn_Hash_Table_Slot *slot;
-    for (int64_t i = 0; i < header->capacity; i++) {
-        slot = cn__hash_table_get_slot(table, (index + i) % header->capacity);
-
-        if (slot->state == CN_SLOT_EMPTY)
-            return;
-
-        if (cn__hash_table_key_equals(table, slot, key_size, key)) {
-            // Right key is found.
-            // LEAK: Doesn't delete key, therefore reuse memory, if key is stored internally.
-            header->count--;
-            slot->state = CN_SLOT_EMPTY;
-
-            // Fixing slots, if next slots have same hash idx, sliding them back one by one.
-            int64_t desired_index; 
-            int64_t curr_index;
-            Cn_Hash_Table_Slot *next;
-            for (int64_t j = 1; j < header->capacity; j++) {
-                curr_index = (index + i + j) % header->capacity;
-                next = cn__hash_table_get_slot(table, curr_index);
-                
-                // Empty slot reached, nothing to fix left.
-                if (next->state == CN_SLOT_EMPTY) break;
-
-                if (header->flags & CN_HASH_TABLE_NO_INTERNAL_KEYS) {
-                    desired_index = cn__hash_table_hash_index_of(table, next->key_size, next->key);
-                } else {
-                    desired_index = cn__hash_table_hash_index_of(table, next->key_size, header->keys + next->key_idx);
-                }
-                
-                if (curr_index == desired_index) break;
-
-                // If current index doesn't equal to the desired index of a slot, 
-                // it means it was pushed from to the right, so we need to fix it by pushing it to the left.
-                // Copy data to a previous slot.
-                slot->state = CN_SLOT_OCCUPIED;
-
-                slot->key_size = next->key_size;
-                if (header->flags & CN_HASH_TABLE_NO_INTERNAL_KEYS) {
-                    slot->key = next->key;
-                } else {
-                    slot->key_idx = next->key_idx;
-                }
-
-                memcpy((uint8_t *)*table + ((index + i + j - 1) % header->capacity) * header->item_size, (uint8_t *)*table + curr_index * header->item_size, header->item_size);
-
-                slot = next;
-                slot->state = CN_SLOT_EMPTY;
-            }
-            return;
-        }
-    }
+CNDEF void cn__hash_table_remove(void **table, void *key) {
+    CN_TODO("Implement this.");
 }
 
+CNDEF void cn__hash_table_free(void **table) {
+    Cn_Hash_Table_Header *header = cn_hash_table_header(table);
+    CN_FREE(header);
+    *table = NULL;
+}
+
+// HASH SET SECTION
+
+CNDEF void cn_hash_set_print(void **set) {
+    CN_TODO("Hash set print.");
+}
+
+CNDEF void *cn__hash_set_make(int64_t item_size, int64_t capacity, Cn_Hash_Function *hash_func, Cn_Equals_Function *equals_func) {
+    CN_ASSERT(item_size > 0);
+    CN_ASSERT(capacity > 0);
+
+    Cn_Hash_Set_Header *header = (Cn_Hash_Set_Header *)CN_REALLOC(NULL, sizeof(Cn_Hash_Set_Header) + item_size * capacity);
+
+    if (header == NULL) {
+        cn_log(CN_ERROR, "Couldn't allocate more memory of size: %lld bytes, for the hash set.", sizeof(Cn_Hash_Set_Header) + item_size * capacity);
+        return NULL;
+    }
+
+    header->capacity    = capacity;
+    header->item_size   = item_size;
+    header->count       = 0;
+    header->hash_func   = hash_func;
+    header->equals_func = equals_func;
+
+    return header + 1;
+}
+
+CNDEF int64_t cn__hash_set_count(void *set) {
+
+}
+
+CNDEF int64_t cn__hash_set_capacity(void *set) {
+
+}
+
+CNDEF int64_t cn__hash_set_item_size(void *set) {
+
+}
+
+CNDEF void cn__hash_set_put(void **set, void *item) {
+
+}
+
+CNDEF bool cn__hash_set_contains(void **set, void *item) {
+
+}
+
+CNDEF void cn__hash_set_remove(void **set, void *item) {
+
+}
+
+CNDEF void cn__hash_set_free(void **set) {
+
+}
+
+#ifdef CNOTES_CORE
 
 // LEXER SECTION
 const Cn_Literal_Token CN_LITERAL_TOKENS[] = {
@@ -3209,12 +3482,16 @@ CNDEF void cn_lexer_next_token(Cn_Lexer *l) {
     }
 number_lexer_fail:
 
+    Cn_String comp;
     for (uint64_t i = 0; i < CN_ARRAY_LENGTH(CN_LITERAL_TOKENS); i++) {
-        if (l->content.length - l->cursor > CN_LITERAL_TOKENS[i].literal.length && cn_str_equals(CN_LITERAL_TOKENS[i].literal, CN_STR(CN_LITERAL_TOKENS[i].literal.length, l->content.data + l->cursor))) {
-            l->token.type = CN_LITERAL_TOKENS[i].type;
-            l->token.str = CN_STR(CN_LITERAL_TOKENS[i].literal.length, l->content.data + l->cursor);
-            l->cursor += l->token.str.length;
-            return;
+        if (l->content.length - l->cursor > CN_LITERAL_TOKENS[i].literal.length) {
+            comp = CN_STR(CN_LITERAL_TOKENS[i].literal.length, l->content.data + l->cursor);
+            if (cn_str_equals((Cn_String *)&CN_LITERAL_TOKENS[i].literal, &comp)) {
+                l->token.type = CN_LITERAL_TOKENS[i].type;
+                l->token.str = CN_STR(CN_LITERAL_TOKENS[i].literal.length, l->content.data + l->cursor);
+                l->cursor += l->token.str.length;
+                return;
+            }
         }
     }
 
@@ -3494,20 +3771,83 @@ next_token:
 }
 
 Cn_Ast_Node *cn_ast_node_list = NULL;
-Cn_Ast_Idx *cn_ast_tag_definition_table = NULL;
-Cn_Ast_Idx *cn_ast_typedef_definition_table = NULL;
-int *cn_precedence_table = NULL;
+
+Cn_Ast_Binding *cn_ast_binding_list = NULL;
+Cn_Ast_Binding_Idx *cn_ast_tag_binding_table = NULL;
+Cn_Ast_Binding_Idx *cn_ast_symbol_binding_table = NULL;
+Cn_Chained_Arena cn_ast_saved_strings_data_arena = {0};
+Cn_String *cn_ast_saved_strings_list = NULL;
+Cn_Ast_Scope *cn_ast_scope_stack = NULL;
+
+CNDEF void cn_ast_scope_stack_push() {
+    cn_array_list_append(&cn_ast_scope_stack, ((Cn_Ast_Scope) { .saved_strings_idx = cn_array_list_length(&cn_ast_saved_strings_list), .binding_idx = cn_array_list_length(&cn_ast_binding_list) } ));
+}
+
+CNDEF void cn_ast_scope_stack_pop() {
+    CN_ASSERT(cn_array_list_length(&cn_ast_scope_stack) > 0);
+
+    // cn_array_list_pop_multiple(&cn_ast_saved_strings_list, cn_array_list_length(&cn_ast_saved_strings_list) - cn_ast_scope_stack[cn_array_list_length(&cn_ast_scope_stack) - 1].saved_strings_idx);
+    // cn_chained_arena_dealloc(&cn_ast_saved_strings_data_arena, cn_ast_scope_stack[cn_array_list_length(&cn_ast_scope_stack) - 1].saved_strings_length);
+    // cn_array_list_pop(&cn_ast_scope_stack);
+}
+
+CNDEF Cn_String cn__ast_scope_stack_save_string(Cn_String str) {
+    void *data = cn_chained_arena_alloc(&cn_ast_saved_strings_data_arena, str.length);
+    cn_str_copy_to(str, data);
+    str.data = data;
+
+    cn_array_list_append(&cn_ast_saved_strings_list, str);
+
+    return str;
+}
+
+CNDEF Cn_String cn_ast_scope_stack_add_binding(Cn_String name, Cn_Ast_Binding_Kind kind, Cn_Ast_Idx node_idx) {
+    CN_ASSERT(cn_array_list_length(&cn_ast_scope_stack) > 0);
+
+    Cn_Ast_Binding_Idx *binding_table;
+    if (kind == CN_BINDING_TAG) {
+        binding_table = cn_ast_tag_binding_table;
+    } else {
+        binding_table = cn_ast_symbol_binding_table;
+    }
+
+    Cn_Ast_Binding_Idx *ref = cn_hash_table_get(&binding_table, name.length, (uint8_t *)name.data);
+    if (ref == NULL) {
+        name = cn__ast_scope_stack_save_string(name);
+
+        cn_array_list_append(&cn_ast_binding_list, ((Cn_Ast_Binding) { .name = name, .kind = kind, .definition_idx = node_idx, .next_idx = CN_AST_NIL_BINDING_IDX, .scope_idx = cn_array_list_length(&cn_ast_scope_stack) - 1 }));
+        cn_hash_table_put(&binding_table, cn_array_list_length(&cn_ast_binding_list) - 1, name.length, (uint8_t *)name.data);
+
+        return name;
+    }
+
+    Cn_Ast_Binding *existing_binding = cn_ast_binding_list + *ref;
+
+    if (existing_binding->scope_idx == cn_array_list_length(&cn_ast_scope_stack) - 1) {
+        CN_TODO("Handle redeclarations and redefinitions.");
+    }
+
+    cn_array_list_append(&cn_ast_binding_list, ((Cn_Ast_Binding) { .name = existing_binding->name, .kind = kind, .definition_idx = node_idx, .next_idx = *ref, .scope_idx = cn_array_list_length(&cn_ast_scope_stack) - 1 }));
+
+    cn_hash_table_put(&binding_table, cn_array_list_length(&cn_ast_binding_list) - 1, name.length, (uint8_t *)name.data);
+
+    return existing_binding->name;
+}
 
 CNDEF int cn_ast_init() {
     cn_ast_node_list = cn_array_list_make(Cn_Ast_Node, CN_AST_NODE_LIST_INITIAL_CAP);
-    cn_ast_tag_definition_table = cn_hash_table_make(Cn_Ast_Idx, CN_AST_TAG_DEFINITION_TABLE_INITIAL_CAP);
-    cn_ast_typedef_definition_table = cn_hash_table_make(Cn_Ast_Idx, CN_AST_TYPEDEF_DEFINITION_TABLE_INITIAL_CAP);
 
     // Inserting first element as NIL.
     Cn_Ast_Node nil = {0};
     cn_array_list_append(&cn_ast_node_list, nil);
     if (cn_ast_node_list == NULL)
         return -1;
+
+    cn_ast_tag_binding_table = cn_hash_table_make(Cn_Ast_Idx, CN_AST_TAG_BINDING_TABLE_INITIAL_CAP);
+    cn_ast_symbol_binding_table = cn_hash_table_make(Cn_Ast_Idx, CN_AST_SYMBOL_BINDING_TABLE_INITIAL_CAP);
+    cn_ast_saved_strings_data_arena = cn_chained_arena_make(CN_AST_SAVED_STRINGS_DATA_ARENA_BLOCK_CAP);
+    cn_ast_saved_strings_list = cn_array_list_make(Cn_String, CN_AST_SAVED_STRINGS_LIST_INITIAL_CAP);
+    cn_ast_scope_stack = cn_array_list_make(Cn_Ast_Scope, CN_AST_SCOPE_STACK_INITIAL_CAP);
 
     return 0;
 }
@@ -3840,16 +4180,16 @@ CNDEF void cn_ast_print(Cn_Ast_Node *node, int depth) {
             {
                 for (int i = 0; i < 4; i++) {
                     switch (node->pointer.qualifiers & (1 << i)) {
-                        case CN_TYPE_QUALIFIER_CONST:
+                        case CN_AST_TYPE_QUALIFIER_CONST:
                             printf(" '%.*s'", CN_UNPACK(CN_CONST_STR));
                             break;
-                        case CN_TYPE_QUALIFIER_RESTRICT:
+                        case CN_AST_TYPE_QUALIFIER_RESTRICT:
                             printf(" '%.*s'", CN_UNPACK(CN_RESTRICT_STR));
                             break;
-                        case CN_TYPE_QUALIFIER_VOLATILE:
+                        case CN_AST_TYPE_QUALIFIER_VOLATILE:
                             printf(" '%.*s'", CN_UNPACK(CN_VOLATILE_STR));
                             break;
-                        case CN_TYPE_QUALIFIER_ATOMIC:
+                        case CN_AST_TYPE_QUALIFIER_ATOMIC:
                             printf(" '%.*s'", CN_UNPACK(CN_ATOMIC_STR));
                             break;
                     }
@@ -3908,16 +4248,16 @@ CNDEF void cn_ast_print(Cn_Ast_Node *node, int depth) {
                 }
                 for (int i = 0; i < 4; i++) {
                     switch (node->declaration_specifiers.qualifiers & (1 << i)) {
-                        case CN_TYPE_QUALIFIER_CONST:
+                        case CN_AST_TYPE_QUALIFIER_CONST:
                             printf(" '%.*s'", CN_UNPACK(CN_CONST_STR));
                             break;
-                        case CN_TYPE_QUALIFIER_RESTRICT:
+                        case CN_AST_TYPE_QUALIFIER_RESTRICT:
                             printf(" '%.*s'", CN_UNPACK(CN_RESTRICT_STR));
                             break;
-                        case CN_TYPE_QUALIFIER_VOLATILE:
+                        case CN_AST_TYPE_QUALIFIER_VOLATILE:
                             printf(" '%.*s'", CN_UNPACK(CN_VOLATILE_STR));
                             break;
-                        case CN_TYPE_QUALIFIER_ATOMIC:
+                        case CN_AST_TYPE_QUALIFIER_ATOMIC:
                             printf(" '%.*s'", CN_UNPACK(CN_ATOMIC_STR));
                             break;
                     }
@@ -3930,10 +4270,10 @@ CNDEF void cn_ast_print(Cn_Ast_Node *node, int depth) {
         case CN_AST_NODE_TYPE_SPECIFIER:
             {
                 switch(node->type_specifier.sign) {
-                    case CN_TYPE_SIGN_SIGNED:
+                    case CN_AST_TYPE_SIGN_SIGNED:
                         printf(" '%.*s'", CN_UNPACK(CN_SIGNED_STR));
                         break;
-                    case CN_TYPE_SIGN_UNSIGNED:
+                    case CN_AST_TYPE_SIGN_UNSIGNED:
                         printf(" '%.*s'", CN_UNPACK(CN_UNSIGNED_STR));
                         break;
                     default:
@@ -3941,21 +4281,21 @@ CNDEF void cn_ast_print(Cn_Ast_Node *node, int depth) {
                 }
 
                 switch(node->type_specifier.width) {
-                    case CN_TYPE_WIDTH_SHORT:
+                    case CN_AST_TYPE_WIDTH_SHORT:
                         printf(" '%.*s'", CN_UNPACK(CN_SHORT_STR));
                         break;
-                    case CN_TYPE_WIDTH_LONG:
+                    case CN_AST_TYPE_WIDTH_LONG:
                         printf(" '%.*s'", CN_UNPACK(CN_LONG_STR));
                         break;
-                    case CN_TYPE_WIDTH_LONG_LONG:
+                    case CN_AST_TYPE_WIDTH_LONG_LONG:
                         printf(" '%.*s %.*s'", CN_UNPACK(CN_LONG_STR), CN_UNPACK(CN_LONG_STR));
                         break;
                     default:
                         break;
                 }
 
-                if (node->type_specifier.kind < CN_ARRAY_LENGTH(CN_TYPE_KINDS)) {
-                    printf(" '%.*s'", CN_UNPACK(CN_TYPE_KINDS[node->type_specifier.kind]));
+                if (node->type_specifier.kind < CN_ARRAY_LENGTH(CN_AST_TYPE_KINDS)) {
+                    printf(" '%.*s'", CN_UNPACK(CN_AST_TYPE_KINDS[node->type_specifier.kind]));
                 }
                 printf("\n");
                 break;
@@ -3964,16 +4304,16 @@ CNDEF void cn_ast_print(Cn_Ast_Node *node, int depth) {
             {
                 for (int i = 0; i < 4; i++) {
                     switch (node->type_name.qualifiers & (1 << i)) {
-                        case CN_TYPE_QUALIFIER_CONST:
+                        case CN_AST_TYPE_QUALIFIER_CONST:
                             printf(" '%.*s'", CN_UNPACK(CN_CONST_STR));
                             break;
-                        case CN_TYPE_QUALIFIER_RESTRICT:
+                        case CN_AST_TYPE_QUALIFIER_RESTRICT:
                             printf(" '%.*s'", CN_UNPACK(CN_RESTRICT_STR));
                             break;
-                        case CN_TYPE_QUALIFIER_VOLATILE:
+                        case CN_AST_TYPE_QUALIFIER_VOLATILE:
                             printf(" '%.*s'", CN_UNPACK(CN_VOLATILE_STR));
                             break;
-                        case CN_TYPE_QUALIFIER_ATOMIC:
+                        case CN_AST_TYPE_QUALIFIER_ATOMIC:
                             printf(" '%.*s'", CN_UNPACK(CN_ATOMIC_STR));
                             break;
                     }
@@ -4033,6 +4373,9 @@ CNDEF Cn_Ast_Idx cn_ast_parse_translation_unit(Cn_Lexer *lexer) {
 
     Cn_Ast_Idx next_idx;
 
+    // Pushing first scope that will act as a global scope.
+    cn_ast_scope_stack_push();
+
     while (lexer->token.type != CN_TOKEN_ZERO) {
         next_idx = cn_ast_parse_external_declaration(lexer);
 
@@ -4056,7 +4399,8 @@ CNDEF Cn_Ast_Idx cn_ast_parse_external_declaration(Cn_Lexer *lexer) {
 
     // Optional '__extension__' symbol.
     if (lexer->token.type == CN_TOKEN_SYMBOL) {
-        if (cn_str_equals(lexer->token.str, CN_CSTR("__extension__"))) {
+        Cn_String extension = CN_CSTR("__extension__");
+        if (cn_str_equals(&lexer->token.str, &extension)) {
             node.external_declaration.extension = true;
             cn_ast_next_token(lexer);
         }
@@ -4158,11 +4502,11 @@ CNDEF Cn_Ast_Idx cn_ast_parse_asm_definition(Cn_Lexer *lexer) {
 
 CNDEF bool cn_ast_starts_declaration(Cn_Lexer *lexer) {
     return 
-            cn_str_equals(lexer->token.str, CN_STATIC_STR) ||
-            cn_str_equals(lexer->token.str, CN_EXTERN_STR) ||
-            cn_str_equals(lexer->token.str, CN_REGISTER_STR) ||
-            cn_str_equals(lexer->token.str, CN_AUTO_STR) ||
-            cn_str_equals(lexer->token.str, CN_TYPEDEF_STR) ||
+            cn_str_equals(&lexer->token.str, &CN_STATIC_STR) ||
+            cn_str_equals(&lexer->token.str, &CN_EXTERN_STR) ||
+            cn_str_equals(&lexer->token.str, &CN_REGISTER_STR) ||
+            cn_str_equals(&lexer->token.str, &CN_AUTO_STR) ||
+            cn_str_equals(&lexer->token.str, &CN_TYPEDEF_STR) ||
 
             cn_ast_starts_type(lexer)
             ;
@@ -4170,29 +4514,29 @@ CNDEF bool cn_ast_starts_declaration(Cn_Lexer *lexer) {
 
 CNDEF bool cn_ast_starts_type(Cn_Lexer *lexer) {
     return 
-            cn_str_equals(lexer->token.str, CN_CONST_STR) ||
-            cn_str_equals(lexer->token.str, CN_RESTRICT_STR) ||
-            cn_str_equals(lexer->token.str, CN_VOLATILE_STR) ||
-            cn_str_equals(lexer->token.str, CN_ATOMIC_STR) ||
+            cn_str_equals(&lexer->token.str, &CN_CONST_STR) ||
+            cn_str_equals(&lexer->token.str, &CN_RESTRICT_STR) ||
+            cn_str_equals(&lexer->token.str, &CN_VOLATILE_STR) ||
+            cn_str_equals(&lexer->token.str, &CN_ATOMIC_STR) ||
 
-            cn_str_equals(lexer->token.str, CN_SIGNED_STR) ||
-            cn_str_equals(lexer->token.str, CN_UNSIGNED_STR) ||
+            cn_str_equals(&lexer->token.str, &CN_SIGNED_STR) ||
+            cn_str_equals(&lexer->token.str, &CN_UNSIGNED_STR) ||
 
-            cn_str_equals(lexer->token.str, CN_SHORT_STR) ||
-            cn_str_equals(lexer->token.str, CN_LONG_STR) ||
+            cn_str_equals(&lexer->token.str, &CN_SHORT_STR) ||
+            cn_str_equals(&lexer->token.str, &CN_LONG_STR) ||
 
-            cn_str_equals(lexer->token.str, CN_TYPE_KINDS[CN_TYPE_INT]) ||
-            cn_str_equals(lexer->token.str, CN_TYPE_KINDS[CN_TYPE_CHAR]) ||
-            cn_str_equals(lexer->token.str, CN_TYPE_KINDS[CN_TYPE_FLOAT]) ||
-            cn_str_equals(lexer->token.str, CN_TYPE_KINDS[CN_TYPE_DOUBLE]) ||
-            cn_str_equals(lexer->token.str, CN_TYPE_KINDS[CN_TYPE_BOOL]) ||
-            cn_str_equals(lexer->token.str, CN_TYPE_KINDS[CN_TYPE_VOID]) ||
+            cn_str_equals(&lexer->token.str, &CN_AST_TYPE_KINDS[CN_AST_TYPE_INT]) ||
+            cn_str_equals(&lexer->token.str, &CN_AST_TYPE_KINDS[CN_AST_TYPE_CHAR]) ||
+            cn_str_equals(&lexer->token.str, &CN_AST_TYPE_KINDS[CN_AST_TYPE_FLOAT]) ||
+            cn_str_equals(&lexer->token.str, &CN_AST_TYPE_KINDS[CN_AST_TYPE_DOUBLE]) ||
+            cn_str_equals(&lexer->token.str, &CN_AST_TYPE_KINDS[CN_AST_TYPE_BOOL]) ||
+            cn_str_equals(&lexer->token.str, &CN_AST_TYPE_KINDS[CN_AST_TYPE_VOID]) ||
 
-            cn_str_equals(lexer->token.str, CN_STRUCT_STR) ||
-            cn_str_equals(lexer->token.str, CN_ENUM_STR) ||
-            cn_str_equals(lexer->token.str, CN_UNION_STR) ||
+            cn_str_equals(&lexer->token.str, &CN_STRUCT_STR) ||
+            cn_str_equals(&lexer->token.str, &CN_ENUM_STR) ||
+            cn_str_equals(&lexer->token.str, &CN_UNION_STR)
 
-            cn_hash_table_get(&cn_ast_typedef_definition_table, lexer->token.str.length, (uint8_t *)lexer->token.str.data) != NULL
+            // TODO: Replace it with proper typedef check. cn_hash_table_get(&cn_ast_typedef_definition_table, lexer->token.str.length, (uint8_t *)lexer->token.str.data) != NULL
             ;
 }
 
@@ -4201,15 +4545,15 @@ CNDEF Cn_Ast_Idx cn_ast_parse_statement(Cn_Lexer *lexer) {
         return cn_ast_parse_compound_statement(lexer);
     }
 
-    if (cn_str_equals(lexer->token.str, CN_IF_STR) || cn_str_equals(lexer->token.str, CN_SWITCH_STR)) {
+    if (cn_str_equals(&lexer->token.str, &CN_IF_STR) || cn_str_equals(&lexer->token.str, &CN_SWITCH_STR)) {
         return cn_ast_parse_selection_statement(lexer);
     }
 
-    if (cn_str_equals(lexer->token.str, CN_WHILE_STR) || cn_str_equals(lexer->token.str, CN_DO_STR) || cn_str_equals(lexer->token.str, CN_FOR_STR)) {
+    if (cn_str_equals(&lexer->token.str, &CN_WHILE_STR) || cn_str_equals(&lexer->token.str, &CN_DO_STR) || cn_str_equals(&lexer->token.str, &CN_FOR_STR)) {
         return cn_ast_parse_iteration_statement(lexer);
     }
 
-    if (cn_str_equals(lexer->token.str, CN_GOTO_STR) || cn_str_equals(lexer->token.str, CN_CONTINUE_STR) || cn_str_equals(lexer->token.str, CN_BREAK_STR) || cn_str_equals(lexer->token.str, CN_RETURN_STR)) {
+    if (cn_str_equals(&lexer->token.str, &CN_GOTO_STR) || cn_str_equals(&lexer->token.str, &CN_CONTINUE_STR) || cn_str_equals(&lexer->token.str, &CN_BREAK_STR) || cn_str_equals(&lexer->token.str, &CN_RETURN_STR)) {
         return cn_ast_parse_jump_statement(lexer);
     }
 
@@ -4262,10 +4606,10 @@ CNDEF Cn_Ast_Idx cn_ast_parse_selection_statement(Cn_Lexer *lexer) {
     
     if (cn_lexer_expect(lexer, CN_TOKEN_SYMBOL)) {
 
-        if (cn_str_equals(lexer->token.str, CN_IF_STR)) {
+        if (cn_str_equals(&lexer->token.str, &CN_IF_STR)) {
             node.selection_statement.kind = CN_SELECTION_IF;
 
-        } else if (cn_str_equals(lexer->token.str, CN_SWITCH_STR)) {
+        } else if (cn_str_equals(&lexer->token.str, &CN_SWITCH_STR)) {
             node.selection_statement.kind = CN_SELECTION_SWITCH;
 
         } else {
@@ -4298,7 +4642,7 @@ CNDEF Cn_Ast_Idx cn_ast_parse_selection_statement(Cn_Lexer *lexer) {
         if (statement_idx == CN_AST_NIL_IDX) goto error;
         node.selection_statement.statement_idx = statement_idx;
 
-        if (node.selection_statement.kind == CN_SELECTION_IF && cn_lexer_expect(lexer, CN_TOKEN_SYMBOL) && cn_str_equals(lexer->token.str, CN_ELSE_STR)) {
+        if (node.selection_statement.kind == CN_SELECTION_IF && cn_lexer_expect(lexer, CN_TOKEN_SYMBOL) && cn_str_equals(&lexer->token.str, &CN_ELSE_STR)) {
             cn_ast_next_token(lexer);
 
             Cn_Ast_Idx else_statement_idx = cn_ast_parse_statement(lexer);
@@ -4616,7 +4960,7 @@ CNDEF Cn_Ast_Idx cn_ast_parse_expression_leaf(Cn_Lexer *lexer, Cn_Expression_Par
     }
 
     // Handling sizeof expression.
-    if (cn_lexer_expect(lexer, CN_TOKEN_SYMBOL), cn_str_equals(lexer->token.str, CN_SIZEOF_STR)) {
+    if (cn_lexer_expect(lexer, CN_TOKEN_SYMBOL), cn_str_equals(&lexer->token.str, &CN_SIZEOF_STR)) {
         cn_ast_next_token(lexer);
 
         if (cn_lexer_expect(lexer, CN_TOKEN_PARAN_OPEN)) {
@@ -4912,7 +5256,7 @@ CNDEF Cn_Ast_Idx cn_ast_parse_direct_declarator(Cn_Lexer *lexer, bool *is_abstra
 
         if (!cn_lexer_expect(lexer, CN_TOKEN_PARAN_CLOSE)) {
             // If not '(' 'void' ')' case.
-            if ((cn_lexer_expect(lexer, CN_TOKEN_SYMBOL) && cn_str_equals(lexer->token.str, CN_TYPE_KINDS[CN_TYPE_VOID]) && cn_ast_peek(*lexer).type == CN_TOKEN_PARAN_CLOSE)) {
+            if ((cn_lexer_expect(lexer, CN_TOKEN_SYMBOL) && cn_str_equals(&lexer->token.str, &CN_AST_TYPE_KINDS[CN_AST_TYPE_VOID]) && cn_ast_peek(*lexer).type == CN_TOKEN_PARAN_CLOSE)) {
                 cn_ast_next_token(lexer);
             } else {
                 Cn_Ast_Idx parameter_type_list_idx = cn_ast_parse_parameter_type_list(lexer);
@@ -5004,16 +5348,16 @@ CNDEF Cn_Ast_Idx cn_ast_parse_declaration_specifiers(Cn_Lexer *lexer) {
     Cn_Ast_Node *ts = cn_ast_node_get(node.declaration_specifiers.type_specifier_idx);
 
     // Implicit int case.
-    if (ts->type_specifier.kind == CN_TYPE_NONE) {
-        ts->type_specifier.kind = CN_TYPE_INT;
+    if (ts->type_specifier.kind == CN_AST_TYPE_NONE) {
+        ts->type_specifier.kind = CN_AST_TYPE_INT;
     }
 
-    if (ts->type_specifier.width != CN_TYPE_WIDTH_NONE && ts->type_specifier.kind != CN_TYPE_INT) {
+    if (ts->type_specifier.width != CN_AST_TYPE_WIDTH_NONE && ts->type_specifier.kind != CN_AST_TYPE_INT) {
         cn_log(CN_ERROR, "Specified type width on non 'int' type.");
         goto error;
     }
 
-    if (ts->type_specifier.sign != CN_TYPE_SIGN_NONE && ts->type_specifier.kind != CN_TYPE_INT && ts->type_specifier.kind != CN_TYPE_CHAR) {
+    if (ts->type_specifier.sign != CN_AST_TYPE_SIGN_NONE && ts->type_specifier.kind != CN_AST_TYPE_INT && ts->type_specifier.kind != CN_AST_TYPE_CHAR) {
         cn_log(CN_ERROR, "Specified type sign on non 'int' or 'char' type.");
         goto error;
     }
@@ -5029,7 +5373,7 @@ CNDEF int cn_ast_try_parse_storage_specifier(Cn_Lexer *lexer, Cn_Storage_Specifi
     Cn_Lexer original_state = *lexer;
 
 #define KEYWORD_CHECK(name)\
-    if (cn_str_equals(lexer->token.str, CN_##name##_STR)) {\
+    if (cn_str_equals(&lexer->token.str, &CN_##name##_STR)) {\
         if (*output != 0) goto error_multiple_storage_specifier;\
         cn_ast_next_token(lexer);\
         *output = CN_STORAGE_SPECIFIER_##name;\
@@ -5060,9 +5404,9 @@ CNDEF int cn_ast_try_parse_qualifier(Cn_Lexer *lexer, Cn_Qualifier_Flags *output
     Cn_Lexer original_state = *lexer;
 
 #define KEYWORD_CHECK(name)\
-    if (cn_str_equals(lexer->token.str, CN_##name##_STR)) {\
+    if (cn_str_equals(&lexer->token.str, &CN_##name##_STR)) {\
         cn_ast_next_token(lexer);\
-        *output = CN_TYPE_QUALIFIER_##name;\
+        *output = CN_AST_TYPE_QUALIFIER_##name;\
         return 0;\
     }
 
@@ -5072,11 +5416,11 @@ CNDEF int cn_ast_try_parse_qualifier(Cn_Lexer *lexer, Cn_Qualifier_Flags *output
 
 #undef KEYWORD_CHECK
 
-    if (cn_str_equals(lexer->token.str, CN_ATOMIC_STR)) {
+    if (cn_str_equals(&lexer->token.str, &CN_ATOMIC_STR)) {
         // Case where it is atomic specifier is not handled here, if such case appears just skip.
         if (cn_ast_peek(*lexer).type == CN_TOKEN_PARAN_OPEN) return 1;
         cn_ast_next_token(lexer);
-        *output = CN_TYPE_QUALIFIER_ATOMIC;
+        *output = CN_AST_TYPE_QUALIFIER_ATOMIC;
         return 0;
     }
 
@@ -5093,10 +5437,10 @@ CNDEF Cn_Ast_Idx cn_ast_try_parse_type_specifier(Cn_Lexer *lexer, Cn_Ast_Idx out
     Cn_Ast_Node *node = cn_ast_node_get(output_idx);
     
     // Checking if token is primitive.
-    for (Cn_Type_Kind kind = 1; kind < CN_ARRAY_LENGTH(CN_TYPE_KINDS); kind++) {
-        if (cn_str_equals(lexer->token.str, CN_TYPE_KINDS[kind])) {
+    for (Cn_Ast_Type_Kind kind = 1; kind < CN_ARRAY_LENGTH(CN_AST_TYPE_KINDS); kind++) {
+        if (cn_str_equals(&lexer->token.str, &CN_AST_TYPE_KINDS[kind])) {
 
-            if (node->type_specifier.kind != CN_TYPE_NONE) {
+            if (node->type_specifier.kind != CN_AST_TYPE_NONE) {
                 cn_log(CN_ERROR, "Only single type specifier kind is allowed.");
                 cn_lexer_print_snippet_token(lexer);
                 goto error;
@@ -5118,48 +5462,48 @@ CNDEF Cn_Ast_Idx cn_ast_try_parse_type_specifier(Cn_Lexer *lexer, Cn_Ast_Idx out
     // Checking if token(s) is enum specifier.
 
     // Checking if token is type sign.
-    if (cn_str_equals(lexer->token.str, CN_SIGNED_STR)) {
-        if (node->type_specifier.sign != CN_TYPE_SIGN_NONE) {
+    if (cn_str_equals(&lexer->token.str, &CN_SIGNED_STR)) {
+        if (node->type_specifier.sign != CN_AST_TYPE_SIGN_NONE) {
             cn_log(CN_ERROR, "Duplicate type sign '%.*s' is not allowed in type specifier.", CN_UNPACK(CN_SIGNED_STR));
             cn_lexer_print_snippet_token(lexer);
             goto error;
         }
 
         cn_ast_next_token(lexer);
-        node->type_specifier.sign = CN_TYPE_SIGN_SIGNED;
+        node->type_specifier.sign = CN_AST_TYPE_SIGN_SIGNED;
         return 0;
     }
 
-    if (cn_str_equals(lexer->token.str, CN_UNSIGNED_STR)) {
-        if (node->type_specifier.sign != CN_TYPE_SIGN_NONE) {
+    if (cn_str_equals(&lexer->token.str, &CN_UNSIGNED_STR)) {
+        if (node->type_specifier.sign != CN_AST_TYPE_SIGN_NONE) {
             cn_log(CN_ERROR, "Duplicate type sign '%.*s' is not allowed in type specifier.", CN_UNPACK(CN_UNSIGNED_STR));
             cn_lexer_print_snippet_token(lexer);
             goto error;
         }
 
         cn_ast_next_token(lexer);
-        node->type_specifier.sign = CN_TYPE_SIGN_UNSIGNED;
+        node->type_specifier.sign = CN_AST_TYPE_SIGN_UNSIGNED;
         return 0;
     }
 
     // Checking if token is type width.
-    if (cn_str_equals(lexer->token.str, CN_SHORT_STR)) {
-        if (node->type_specifier.width != CN_TYPE_WIDTH_NONE) {
+    if (cn_str_equals(&lexer->token.str, &CN_SHORT_STR)) {
+        if (node->type_specifier.width != CN_AST_TYPE_WIDTH_NONE) {
             cn_log(CN_ERROR, "Duplicate type width '%.*s' is not allowed in type specifier.", CN_UNPACK(CN_SHORT_STR));
             cn_lexer_print_snippet_token(lexer);
             goto error;
         }
 
         cn_ast_next_token(lexer);
-        node->type_specifier.width = CN_TYPE_WIDTH_SHORT;
+        node->type_specifier.width = CN_AST_TYPE_WIDTH_SHORT;
         return 0;
     }
 
-    if (cn_str_equals(lexer->token.str, CN_LONG_STR)) {
-        if (node->type_specifier.width != CN_TYPE_WIDTH_NONE) {
-            if (node->type_specifier.width == CN_TYPE_WIDTH_LONG) {
+    if (cn_str_equals(&lexer->token.str, &CN_LONG_STR)) {
+        if (node->type_specifier.width != CN_AST_TYPE_WIDTH_NONE) {
+            if (node->type_specifier.width == CN_AST_TYPE_WIDTH_LONG) {
                 cn_ast_next_token(lexer);
-                node->type_specifier.width = CN_TYPE_WIDTH_LONG_LONG;
+                node->type_specifier.width = CN_AST_TYPE_WIDTH_LONG_LONG;
                 return 0;
             }
 
@@ -5169,7 +5513,7 @@ CNDEF Cn_Ast_Idx cn_ast_try_parse_type_specifier(Cn_Lexer *lexer, Cn_Ast_Idx out
         }
 
         cn_ast_next_token(lexer);
-        node->type_specifier.width = CN_TYPE_WIDTH_LONG;
+        node->type_specifier.width = CN_AST_TYPE_WIDTH_LONG;
         return 0;
     }
 
@@ -5226,17 +5570,17 @@ CNDEF Cn_Ast_Idx cn_ast_parse_type_name(Cn_Lexer *lexer) {
     Cn_Ast_Node *ts = cn_ast_node_get(node.declaration_specifiers.type_specifier_idx);
 
     // Implicit int case.
-    if (ts->type_specifier.kind == CN_TYPE_NONE) {
-        ts->type_specifier.kind = CN_TYPE_INT;
+    if (ts->type_specifier.kind == CN_AST_TYPE_NONE) {
+        ts->type_specifier.kind = CN_AST_TYPE_INT;
     }
 
-    if (ts->type_specifier.width != CN_TYPE_WIDTH_NONE && ts->type_specifier.kind != CN_TYPE_INT) {
+    if (ts->type_specifier.width != CN_AST_TYPE_WIDTH_NONE && ts->type_specifier.kind != CN_AST_TYPE_INT) {
         cn_log(CN_ERROR, "Specified type width on non 'int' type.");
         cn_lexer_print_snippet_token(lexer);
         goto error;
     }
 
-    if (ts->type_specifier.sign != CN_TYPE_SIGN_NONE && ts->type_specifier.kind != CN_TYPE_INT && ts->type_specifier.kind != CN_TYPE_CHAR) {
+    if (ts->type_specifier.sign != CN_AST_TYPE_SIGN_NONE && ts->type_specifier.kind != CN_AST_TYPE_INT && ts->type_specifier.kind != CN_AST_TYPE_CHAR) {
         cn_log(CN_ERROR, "Specified type sign on non 'int' or 'char' type.");
         cn_lexer_print_snippet_token(lexer);
         goto error;
@@ -5444,6 +5788,7 @@ CNDEF void cn_tu_free(Cn_Translation_Unit *tu) {
     cn_array_list_free(&tu->modification_list);
 }
 
+#endif
 
 
 #endif // CN_IMPLEMENTATION

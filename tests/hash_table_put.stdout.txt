@@ -1,60 +1,92 @@
 
 --------Hash Table--------
-EMPTY            | State: 0x00
-EMPTY            | State: 0x00
+EMPTY            |
+EMPTY            |
+EMPTY            |
 
 --------Hash Table--------
-Item: 0x47000000 | State: 0x01 | Key Size: 3 | Key -> foo
-Item: 0xf7ffffff | State: 0x01 | Key Size: 3 | Key -> bar
+item: 0xf7ffffff | state: 0x01, hash: 0x1a46391319343900, key: 0x03000000000000009880555555550000
+item: 0xbc0a0000 | state: 0x01, hash: 0x77d5d9fe1875b2dc, key: 0x03000000000000009480555555550000
+EMPTY            |
 
 --------Hash Table--------
-EMPTY            | State: 0x00
-Item: 0x00000000 | State: 0x01 | Key Size: 2 | Key -> az
-Item: 0x01000000 | State: 0x01 | Key Size: 2 | Key -> by
-Item: 0xf7ffffff | State: 0x01 | Key Size: 3 | Key -> bar
-Item: 0x02000000 | State: 0x01 | Key Size: 2 | Key -> cx
-Item: 0x03000000 | State: 0x01 | Key Size: 2 | Key -> dw
-Item: 0x47000000 | State: 0x01 | Key Size: 3 | Key -> foo
-Item: 0x04000000 | State: 0x01 | Key Size: 2 | Key -> ev
-Item: 0x05000000 | State: 0x01 | Key Size: 2 | Key -> fu
-Item: 0x06000000 | State: 0x01 | Key Size: 2 | Key -> gt
-Item: 0x07000000 | State: 0x01 | Key Size: 2 | Key -> hs
-Item: 0x08000000 | State: 0x01 | Key Size: 2 | Key -> ir
-Item: 0x09000000 | State: 0x01 | Key Size: 2 | Key -> jq
-EMPTY            | State: 0x00
-EMPTY            | State: 0x00
-EMPTY            | State: 0x00
+item: 0x07000000 | state: 0x01, hash: 0xac975eb50745ba08, key: 0x0200000000000000b180555555550000
+EMPTY            |
+EMPTY            |
+item: 0x06000000 | state: 0x01, hash: 0x56763fb507429508, key: 0x0200000000000000ae80555555550000
+item: 0x05000000 | state: 0x01, hash: 0x44c241b5074f9808, key: 0x0200000000000000ab80555555550000
+item: 0x00000000 | state: 0x01, hash: 0x02a645b5074c9c08, key: 0x02000000000000009c80555555550000
+item: 0xf7ffffff | state: 0x01, hash: 0x1a46391319343900, key: 0x03000000000000009880555555550000
+item: 0xbc0a0000 | state: 0x01, hash: 0x77d5d9fe1875b2dc, key: 0x03000000000000009480555555550000
+item: 0x02000000 | state: 0x01, hash: 0x7e074ab50746a208, key: 0x0200000000000000a280555555550000
+item: 0x04000000 | state: 0x01, hash: 0x425439b507408e08, key: 0x0200000000000000a880555555550000
+item: 0x08000000 | state: 0x01, hash: 0x22605cb50744b708, key: 0x0200000000000000b480555555550000
+item: 0x09000000 | state: 0x01, hash: 0x24ce64b50753c108, key: 0x0200000000000000b780555555550000
+EMPTY            |
+item: 0x03000000 | state: 0x01, hash: 0xcc8b3bb507419108, key: 0x0200000000000000a580555555550000
+item: 0x01000000 | state: 0x01, hash: 0xd4f84db5074ba608, key: 0x02000000000000009f80555555550000
 
 --------Hash Table--------
-Item: 0x08000000 | State: 0x01 | Key Size: 3 | Key -> phi
-Item: 0x00000000 | State: 0x01 | Key Size: 2 | Key -> az
-Item: 0x01000000 | State: 0x01 | Key Size: 2 | Key -> by
-Item: 0xf7ffffff | State: 0x01 | Key Size: 3 | Key -> bar
-Item: 0x02000000 | State: 0x01 | Key Size: 2 | Key -> cx
-Item: 0x03000000 | State: 0x01 | Key Size: 2 | Key -> dw
-Item: 0x47000000 | State: 0x01 | Key Size: 3 | Key -> foo
-Item: 0x04000000 | State: 0x01 | Key Size: 2 | Key -> ev
-Item: 0x05000000 | State: 0x01 | Key Size: 2 | Key -> fu
-Item: 0x06000000 | State: 0x01 | Key Size: 2 | Key -> gt
-Item: 0x07000000 | State: 0x01 | Key Size: 2 | Key -> hs
-Item: 0x08000000 | State: 0x01 | Key Size: 2 | Key -> ir
-Item: 0x09000000 | State: 0x01 | Key Size: 2 | Key -> jq
-Item: 0x15000000 | State: 0x01 | Key Size: 5 | Key -> alpha
-Item: 0x5a000000 | State: 0x01 | Key Size: 4 | Key -> beta
-Item: 0x0c000000 | State: 0x01 | Key Size: 5 | Key -> gamma
-Item: 0x4a000000 | State: 0x01 | Key Size: 5 | Key -> delta
-Item: 0xffffffff | State: 0x01 | Key Size: 7 | Key -> epsilon
-Item: 0xdaffffff | State: 0x01 | Key Size: 3 | Key -> eta
-Item: 0x17000000 | State: 0x01 | Key Size: 4 | Key -> iota
-Item: 0xd0ffffff | State: 0x01 | Key Size: 5 | Key -> theta
-Item: 0x36feffff | State: 0x01 | Key Size: 5 | Key -> kappa
-Item: 0x20000000 | State: 0x01 | Key Size: 6 | Key -> lambda
-Item: 0x01000000 | State: 0x01 | Key Size: 2 | Key -> mu
-Item: 0x0c000000 | State: 0x01 | Key Size: 2 | Key -> nu
-Item: 0x00000000 | State: 0x01 | Key Size: 2 | Key -> xi
-Item: 0x02000000 | State: 0x01 | Key Size: 4 | Key -> zeta
-Item: 0x00000000 | State: 0x01 | Key Size: 7 | Key -> omicron
-Item: 0x00000000 | State: 0x01 | Key Size: 2 | Key -> pi
-Item: 0xf0ffffff | State: 0x01 | Key Size: 3 | Key -> rho
-Item: 0x10000000 | State: 0x01 | Key Size: 5 | Key -> sigma
-Item: 0x08000000 | State: 0x01 | Key Size: 7 | Key -> upsilon
+item: 0x08000000 | state: 0x01, hash: 0x22605cb50744b708, key: 0x0200000000000000b480555555550000
+item: 0x09000000 | state: 0x01, hash: 0x24ce64b50753c108, key: 0x0200000000000000b780555555550000
+EMPTY            |
+item: 0xdaffffff | state: 0x01, hash: 0x273164f0182404c3, key: 0x03000000000000003580555555550000
+EMPTY            |
+EMPTY            |
+item: 0x00000000 | state: 0x01, hash: 0x1ca5db8dd39380b6, key: 0x07000000000000007380555555550000
+item: 0x00000000 | state: 0x01, hash: 0x325575b5073fd508, key: 0x02000000000000007b80555555550000
+EMPTY            |
+item: 0x01000000 | state: 0x01, hash: 0x773550b5074fa908, key: 0x02000000000000006a80555555550000
+EMPTY            |
+item: 0x01000000 | state: 0x01, hash: 0xd4f84db5074ba608, key: 0x02000000000000009f80555555550000
+item: 0x04000000 | state: 0x01, hash: 0x425439b507408e08, key: 0x0200000000000000a880555555550000
+item: 0x05000000 | state: 0x01, hash: 0x44c241b5074f9808, key: 0x0200000000000000ab80555555550000
+item: 0x15000000 | state: 0x01, hash: 0x2b20ed85bb25c68a, key: 0x05000000000000002e80555555550000
+item: 0x0c000000 | state: 0x01, hash: 0xcc6e58b5073fb308, key: 0x02000000000000006d80555555550000
+EMPTY            |
+EMPTY            |
+EMPTY            |
+EMPTY            |
+item: 0x00000000 | state: 0x01, hash: 0xeacf8db5073ff108, key: 0x02000000000000007080555555550000
+item: 0xf7ffffff | state: 0x01, hash: 0x1a46391319343900, key: 0x03000000000000009880555555550000
+item: 0xffffffff | state: 0x01, hash: 0x9d43603d0116d323, key: 0x07000000000000004580555555550000
+EMPTY            |
+EMPTY            |
+item: 0x08000000 | state: 0x01, hash: 0xe40f62561959b277, key: 0x03000000000000009080555555550000
+item: 0x02000000 | state: 0x01, hash: 0x7e074ab50746a208, key: 0x0200000000000000a280555555550000
+item: 0x5a000000 | state: 0x01, hash: 0xa72046959b612776, key: 0x04000000000000003480555555550000
+item: 0x4a000000 | state: 0x01, hash: 0xc1a013ec75660752, key: 0x05000000000000003f80555555550000
+EMPTY            |
+item: 0x17000000 | state: 0x01, hash: 0xfa1f1d7ec5ffb7fc, key: 0x04000000000000005880555555550000
+item: 0x07000000 | state: 0x01, hash: 0xac975eb50745ba08, key: 0x0200000000000000b180555555550000
+item: 0x0c000000 | state: 0x01, hash: 0x6aa96b1fbd769122, key: 0x05000000000000003980555555550000
+item: 0xd0ffffff | state: 0x01, hash: 0x1bdba15d72b6daea, key: 0x05000000000000005280555555550000
+EMPTY            |
+EMPTY            |
+EMPTY            |
+item: 0xbc0a0000 | state: 0x01, hash: 0x77d5d9fe1875b2dc, key: 0x03000000000000009480555555550000
+item: 0x08000000 | state: 0x01, hash: 0x8d46005db55c37d8, key: 0x07000000000000008880555555550000
+EMPTY            |
+EMPTY            |
+item: 0x20000000 | state: 0x01, hash: 0x4a3225f3aa4c6b82, key: 0x06000000000000006380555555550000
+item: 0xf0ffffff | state: 0x01, hash: 0x58d9196119a9158a, key: 0x03000000000000007e80555555550000
+item: 0x03000000 | state: 0x01, hash: 0xcc8b3bb507419108, key: 0x0200000000000000a580555555550000
+item: 0x00000000 | state: 0x01, hash: 0x02a645b5074c9c08, key: 0x02000000000000009c80555555550000
+EMPTY            |
+EMPTY            |
+EMPTY            |
+EMPTY            |
+EMPTY            |
+item: 0x36feffff | state: 0x01, hash: 0x88d7a7f6cecf02ec, key: 0x05000000000000005d80555555550000
+item: 0x06000000 | state: 0x01, hash: 0x56763fb507429508, key: 0x0200000000000000ae80555555550000
+EMPTY            |
+item: 0x02000000 | state: 0x01, hash: 0x9f81663761c23022, key: 0x04000000000000004d80555555550000
+EMPTY            |
+EMPTY            |
+EMPTY            |
+EMPTY            |
+EMPTY            |
+EMPTY            |
+EMPTY            |
+EMPTY            |
+item: 0x10000000 | state: 0x01, hash: 0x94a792304f2c02dc, key: 0x05000000000000008280555555550000
