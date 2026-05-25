@@ -518,56 +518,47 @@ typedef struct {
     int64_t item_size;
     Cn_Hash_Function *hash_func; 
     Cn_Equals_Function *equals_func;
+    float load_factor;
 } Cn_Hash_Set_Header;
 
+typedef enum {
+    CN_HASH_SET_SLOT_EMPTY,
+    CN_HASH_SET_SLOT_OCCUPIED,
+    CN_HASH_SET_SLOT_DELETED,
+} Cn_Hash_Set_Slot_State;
+
 typedef struct {
-    bool occupied;
+    Cn_Hash_Set_Slot_State state;
+    uint64_t hash;
 } Cn_Hash_Set_Slot;
 
 #define cn_hash_set_make(type, capacity, hash_func, equals_func)\
     (type *)cn__hash_set_make(sizeof(type), capacity, hash_func, equals_func) 
 
-#define cn_hash_set_count(ptr_set)\
-    cn__hash_set_count((void *)*ptr_set)
+#define cn_hash_set_header(ptr_set)\
+    ((Cn_Hash_Set_Header *)((uint8_t *)((*ptr_set) - 1) - sizeof(Cn_Hash_Set_Header)))
 
-#define cn_hash_set_capacity(ptr_set)\
-    cn__hash_set_capacity((void *)*ptr_set)
+#define cn_hash_set_put(ptr_set, item)\
+    (*((*ptr_set) - 1) = item, cn__hash_set_put(cn_hash_set_header(ptr_set), (void **)ptr_set))
 
-#define cn_hash_set_item_size(ptr_set)\
-    cn__hash_set_item_size((void *)*ptr_set)
+#define cn_hash_set_contains(ptr_set, item)\
+    (*((*ptr_set) - 1) = item, cn__hash_set_contains(cn_hash_set_header(ptr_set)))
 
-#define cn_hash_set_put(ptr_set, item_ptr)\
-    cn__hash_set_put((void **)(ptr_set), item_ptr)
-
-#define cn_hash_set_contains(ptr_set, item_ptr)\
-    cn__hash_set_contains((void *)(ptr_set), item_ptr)
-
-#define cn_hash_set_remove(ptr_set, item_ptr)\
-    cn__hash_set_remove((void **)(ptr_set), item_ptr) 
+#define cn_hash_set_remove(ptr_set, item)\
+    (*((*ptr_set) - 1) = item, cn__hash_set_remove(cn_hash_set_header(ptr_set)))
 
 #define cn_hash_set_free(ptr_set)\
-    cn__hash_set_free((void **)(ptr_set))
-
-#define cn_hash_set_header(ptr_set)\
-    ((Cn_Hash_Set_Header *)((uint8_t *)*ptr_set - sizeof(Cn_Hash_Set_Header)))
-
-CNDEF void cn_hash_set_print(void **set);
+    cn__hash_set_free(cn_hash_set_header(ptr_set))
 
 CNDEF void *cn__hash_set_make(int64_t item_size, int64_t capacity, Cn_Hash_Function *hash_func, Cn_Equals_Function *equals_func);
 
-CNDEF int64_t cn__hash_set_count(void *set);
+CNDEF void cn__hash_set_put(Cn_Hash_Set_Header *header, void **set);
 
-CNDEF int64_t cn__hash_set_capacity(void *set);
+CNDEF bool cn__hash_set_contains(Cn_Hash_Set_Header *header);
 
-CNDEF int64_t cn__hash_set_item_size(void *set);
+CNDEF void cn__hash_set_remove(Cn_Hash_Set_Header *header);
 
-CNDEF void cn__hash_set_put(void **set, void *item);
-
-CNDEF bool cn__hash_set_contains(void **set, void *item);
-
-CNDEF void cn__hash_set_remove(void **set, void *item);
-
-CNDEF void cn__hash_set_free(void **set);
+CNDEF void cn__hash_set_free(Cn_Hash_Set_Header *header);
 
 #ifdef CNOTES_CORE
 
@@ -2835,139 +2826,6 @@ CNDEF uint64_t cn_hash_mix(uint64_t a, uint64_t b) {
 
 // HASH TABLE SECTION
 
-// /**
-//  * Internal function.
-//  * RETURNS: Index of the corresponding key by calculating hash.
-//  * IMPORTANT: Doesn't perfom any slot checks.
-//  */
-// CNDEF int64_t cn__hash_table_hash_index_of(void **table, int64_t key_size, uint8_t *key) {
-//     Cn_Hash_Table_Header *header = cn_hash_table_header(table);
-//     Cn_String str = CN_STR(key_size, key);
-//     return header->hash_func(&str) % header->capacity;
-// }
-// 
-// /**
-//  * Internal function.
-//  * RETURNS: True if slot key equals given key.
-//  */
-// CNDEF bool cn__hash_table_key_equals(void **table, Cn_Hash_Table_Slot *slot, int64_t key_size, uint8_t *key) {
-//     Cn_Hash_Table_Header *header = cn_hash_table_header(table);
-//     
-//     if (slot->key_size == key_size) {
-//         Cn_String a, b;
-//         a = CN_STR(key_size, key);
-//         if (header->flags & CN_HASH_TABLE_NO_INTERNAL_KEYS) {
-//             b = CN_STR(key_size, slot->key);
-//         } else {
-//             b = CN_STR(key_size, header->keys + slot->key_idx);
-//         }
-//         return header->equals_func(&a, &b);
-//     }
-// 
-//     return false;
-// }
-// 
-// /**
-//  * Internal function.
-//  * Sets all occupied slots to depricated.
-//  */
-// CNDEF void cn__hash_table_depricate_slots(void **table) {
-//     int64_t cap = cn_hash_table_capacity(table);
-//     Cn_Hash_Table_Slot *slot = NULL;
-//     for (int64_t i = 0; i < cap; i++) {
-//         slot = cn__hash_table_get_slot(table, i);
-//         if (slot->state == CN_SLOT_OCCUPIED) {
-//             slot->state = CN_SLOT_DEPRICATED;
-//         }
-//     }
-// }
-// 
-// /**
-//  * Internal function.
-//  */
-// CNDEF void cn__hash_table_print_slot(void *item, int64_t item_size, uint8_t *keys, Cn_Hash_Table_Slot *slot, bool no_internal_keys) {
-//     
-//     // Print the state and key_size as hex.
-// 
-// }
-// 
-// /**
-//  * Internal function.
-//  * RECURSION: Recursivly readdresses slots if they are depricated.
-//  * RETURNS: True, if it succesfully readdressed a slot.
-//  */
-// CNDEF bool cn__hash_table_readdress(void **table, int64_t index) {
-//     Cn_Hash_Table_Header *header = cn_hash_table_header(table);
-//     Cn_Hash_Table_Slot *target_slot = cn__hash_table_get_slot(table, index);
-// 
-//     int64_t new_index; 
-//     if (header->flags & CN_HASH_TABLE_NO_INTERNAL_KEYS) {
-//         new_index = cn__hash_table_hash_index_of(table, target_slot->key_size, target_slot->key);
-//     } else {
-//         new_index = cn__hash_table_hash_index_of(table, target_slot->key_size, header->keys + target_slot->key_idx);
-//     }
-//     target_slot->state = CN_SLOT_EMPTY;
-// 
-//     Cn_Hash_Table_Slot *slot = NULL;
-//     for (int64_t i = 0; i < header->capacity; i++) {
-//         slot = cn__hash_table_get_slot(table, (new_index + i) % header->capacity);
-//         if (slot->state == CN_SLOT_EMPTY) {
-//             // Copy data to a new slot.
-//             slot->state = CN_SLOT_OCCUPIED;
-// 
-//             slot->key_size = target_slot->key_size;
-//             if (header->flags & CN_HASH_TABLE_NO_INTERNAL_KEYS) {
-//                 slot->key = target_slot->key;
-//             } else {
-//                 slot->key_idx = target_slot->key_idx;
-//             }
-// 
-//             memcpy((uint8_t *)*table + ((new_index + i) % header->capacity) * header->item_size, (uint8_t *)*table + index * header->item_size, header->item_size);
-// 
-//             return true;
-//         }
-//         else if (slot->state == CN_SLOT_DEPRICATED && cn__hash_table_readdress(table, (new_index + i) % header->capacity)) {
-// 
-//             // IMPORTANT: There is an additional is CN_SLOT_OCCUPIED check, because cn__hash_table_readdress can possbily readdress slot to the same index as it was before, therefore additional check is needed.
-//             if (slot->state != CN_SLOT_OCCUPIED) {
-//                 // Copy data to a new slot.
-//                 slot->state = CN_SLOT_OCCUPIED;
-// 
-//                 slot->key_size = target_slot->key_size;
-//                 if (header->flags & CN_HASH_TABLE_NO_INTERNAL_KEYS) {
-//                     slot->key = target_slot->key;
-//                 } else {
-//                     slot->key_idx = target_slot->key_idx;
-//                 }
-// 
-//                 memcpy((uint8_t *)*table + ((new_index + i) % header->capacity) * header->item_size, (uint8_t *)*table + index * header->item_size, header->item_size);
-// 
-//                 return true;
-//             }
-//         }
-//     }
-// 
-//     cn_log(CN_ERROR, "Couldn't find new free hash slot when readdressing.\n");
-//     return false;
-// }
-// 
-// CNDEF uint32_t cn_hashf(int64_t key_size, uint8_t *key) {
-//     CN_ASSERT(key != NULL);         // Do we need to assert this?
-//     CN_ASSERT(key_size > 0);
-// 
-//     if (key_size < 2) {
-//         return *(uint8_t *)(key);
-//     }
-//     
-//     uint32_t hash = 0;
-//     uint8_t *hash_ptr = (uint8_t *)&(hash);
-//     hash_ptr[0] = *((uint8_t *)(key) + 0);
-//     hash_ptr[1] = *((uint8_t *)(key) + 1);
-//     hash_ptr[2] = *((uint8_t *)(key) + key_size - 1);
-//     hash_ptr[3] = *((uint8_t *)(key) + key_size - 2);
-// 
-//     return hash;
-// }
 CNDEF Cn_Hash_Table_Slot *cn__hash_table_get_slot(Cn_Hash_Table_Header *header, int64_t idx) {
     return (Cn_Hash_Table_Slot *)( ((uint8_t *)(header + 1)) + (header->capacity * header->item_size) + (idx * (sizeof(Cn_Hash_Table_Slot) + header->key_size)));
 }
@@ -3012,10 +2870,6 @@ CNDEF void cn_hash_table_print(void **table) {
                 printf("%02x", *((uint8_t *)(&slot->hash) + i)); // Print each byte of the hash.
             }
 
-            printf(", key: 0x");
-            for (int64_t i = 0; i < header->key_size; i++) {
-                printf("%02x", *((uint8_t *)(slot + 1) + i)); // Print each byte of the key.
-            }
             printf("\n");
         } else {
             printf("EMPTY   %*s |\n", (int)header->item_size * 2, "");
@@ -3219,18 +3073,108 @@ CNDEF void cn__hash_table_free(void **table) {
 
 // HASH SET SECTION
 
-CNDEF void cn_hash_set_print(void **set) {
-    CN_TODO("Hash set print.");
+CNDEF Cn_Hash_Set_Slot *cn__hash_set_get_slot(Cn_Hash_Set_Header *header, int64_t idx) {
+    return (Cn_Hash_Set_Slot *)( ((uint8_t *)(header + 1) + header->item_size) + (header->capacity * header->item_size) + (idx * (sizeof(Cn_Hash_Set_Slot))));
+}
+
+CNDEF int64_t cn__hash_set_probe_insert(void *data, Cn_Hash_Set_Header *header, void *item, int64_t idx) {
+    Cn_Hash_Set_Slot *slot;
+    int64_t insertion_idx;
+    for (int64_t i = 0; i < header->capacity; i++) {
+        insertion_idx = (idx + i) % header->capacity;
+        slot = cn__hash_set_get_slot(header, insertion_idx);
+        if (slot->state != CN_HASH_SET_SLOT_OCCUPIED) {
+            memcpy((uint8_t *)data + insertion_idx * header->item_size, item, header->item_size);
+            return insertion_idx;
+        }
+    }
+    
+    cn_log(CN_ERROR, "No valid entry in the hash set.");
+    return -1;
+}
+
+CNDEF Cn_Hash_Set_Header *cn__hash_set_resize_to_fit(Cn_Hash_Set_Header *header, int64_t requiered_length) {
+
+    if (requiered_length > header->capacity * header->load_factor) {
+        // IMPORTANT: To understand where this calculation comes from check cn__array_list_resize_to_fit implementation.
+        // It uses same calculation that simplifies pow and log of base 2 caluclation to just using bit manipulation.
+        int64_t ratio = requiered_length / header->capacity;
+        if (ratio < 1) ratio = 1;
+        int highest_bit_pos = 63 - CN_COUNT_LEADING_ZEROS(ratio);
+        CN_ASSERT(highest_bit_pos >= 0);
+        int64_t capacity_multiplier = (int64_t)(1 << (highest_bit_pos + 1));
+
+         // Adding 1 to make next capacity odd.
+        Cn_Hash_Set_Header *h = (Cn_Hash_Set_Header *)CN_REALLOC(NULL, sizeof(Cn_Hash_Set_Header) + header->item_size + (header->item_size + sizeof(Cn_Hash_Set_Slot)) * (header->capacity * capacity_multiplier + 1));
+
+        if (h == NULL) {
+            cn_log(CN_ERROR, "Couldn't allocate more memory to fit new size of: %ld bytes, for the hash set.", sizeof(Cn_Hash_Set_Header) + header->item_size + (header->item_size + sizeof(Cn_Hash_Set_Slot)) * (header->capacity * capacity_multiplier + 1));
+            return NULL;
+        }
+
+        // Copying temp item.
+        memcpy(h + 1, header + 1, header->item_size);
+
+        h->capacity = header->capacity * capacity_multiplier + 1;
+        h->count = header->count;
+        h->item_size = header->item_size;
+        h->hash_func = header->hash_func;
+        h->equals_func = header->equals_func;
+        h->load_factor = header->load_factor;
+
+
+        // Free new slots to.
+        uint8_t *new_data = (uint8_t *)(h + 1) + header->item_size;
+
+        {
+            Cn_Hash_Set_Slot *slot;
+            for (int64_t i = 0; i < h->capacity; i++) {
+                slot = cn__hash_set_get_slot(h, i);
+                slot->state = CN_HASH_SET_SLOT_EMPTY;
+            }
+        }
+
+        // Readdressing into new hash set.
+        uint8_t *old_data = (uint8_t *)(header + 1) + header->item_size;
+
+        {
+            Cn_Hash_Set_Slot *old_slot, *new_slot;
+            int64_t idx;
+            for (int64_t i = 0; i < header->capacity; i++) {
+                old_slot = cn__hash_set_get_slot(header, i);
+
+                if (old_slot->state == CN_HASH_SET_SLOT_OCCUPIED) {
+                    idx = old_slot->hash % h->capacity;
+                    
+                    idx = cn__hash_set_probe_insert(new_data, h, old_data + i * header->item_size, idx);
+                    new_slot = cn__hash_set_get_slot(h, idx);
+                    new_slot->state = CN_HASH_SET_SLOT_OCCUPIED;
+                    new_slot->hash = old_slot->hash;
+
+                    header->count--;
+                }
+
+                if (header->count == 0) break;
+            }
+        }
+
+
+        CN_FREE(header);
+        
+        return h;
+    }
+
+    return header;
 }
 
 CNDEF void *cn__hash_set_make(int64_t item_size, int64_t capacity, Cn_Hash_Function *hash_func, Cn_Equals_Function *equals_func) {
     CN_ASSERT(item_size > 0);
     CN_ASSERT(capacity > 0);
 
-    Cn_Hash_Set_Header *header = (Cn_Hash_Set_Header *)CN_REALLOC(NULL, sizeof(Cn_Hash_Set_Header) + item_size * capacity);
+    Cn_Hash_Set_Header *header = (Cn_Hash_Set_Header *)CN_REALLOC(NULL, sizeof(Cn_Hash_Set_Header) + item_size + (item_size + sizeof(Cn_Hash_Set_Slot)) * (capacity + 1));
 
     if (header == NULL) {
-        cn_log(CN_ERROR, "Couldn't allocate more memory of size: %lld bytes, for the hash set.", sizeof(Cn_Hash_Set_Header) + item_size * capacity);
+        cn_log(CN_ERROR, "Couldn't allocate more memory of size: %lld bytes, for the hash set.", sizeof(Cn_Hash_Set_Header) + item_size + (item_size + sizeof(Cn_Hash_Set_Slot)) * (capacity + 1));
         return NULL;
     }
 
@@ -3239,36 +3183,94 @@ CNDEF void *cn__hash_set_make(int64_t item_size, int64_t capacity, Cn_Hash_Funct
     header->count       = 0;
     header->hash_func   = hash_func;
     header->equals_func = equals_func;
+    header->load_factor = 0.9f;
 
-    return header + 1;
+    Cn_Hash_Set_Slot *slot;
+    for (int64_t i = 0; i < header->capacity; i++) {
+        slot = cn__hash_set_get_slot(header, i);
+        slot->state = CN_HASH_SET_SLOT_EMPTY;
+    }
+
+    return (uint8_t *)(header + 1) + item_size;
 }
 
-CNDEF int64_t cn__hash_set_count(void *set) {
 
+CNDEF void cn__hash_set_put(Cn_Hash_Set_Header *header, void **set) {
+    header = cn__hash_set_resize_to_fit(header, header->count + 1);
+    *set = (uint8_t *)(header + 1) + header->item_size;
+
+    uint8_t *item = (uint8_t *)(header + 1);
+    uint8_t *data = item + header->item_size;
+
+    uint64_t hash = header->hash_func(item);
+    int64_t idx = hash % header->capacity;
+
+    Cn_Hash_Set_Slot *slot;
+    int64_t probe_idx;
+    for (int64_t i = 0; i < header->capacity; i++) {
+        probe_idx = (idx + i) % header->capacity;
+        slot = cn__hash_set_get_slot(header, probe_idx);
+        
+        if (slot->state != CN_HASH_SET_SLOT_OCCUPIED) {
+            memcpy(data + probe_idx * header->item_size, item, header->item_size);
+            slot->state = CN_HASH_SET_SLOT_OCCUPIED;
+            slot->hash = hash;
+            header->count++;
+            return;
+        } else if (slot->hash == hash && header->equals_func(item, data + probe_idx * header->item_size)) {
+            return;
+        }
+    }
 }
 
-CNDEF int64_t cn__hash_set_capacity(void *set) {
+CNDEF bool cn__hash_set_contains(Cn_Hash_Set_Header *header) {
+    uint8_t *item = (uint8_t *)(header + 1);
+    uint8_t *data = item + header->item_size;
 
+    uint64_t hash = header->hash_func(item);
+    int64_t idx = hash % header->capacity;
+
+    Cn_Hash_Set_Slot *slot;
+    int64_t probe_idx;
+    for (int64_t i = 0; i < header->capacity; i++) {
+        probe_idx = (idx + i) % header->capacity;
+        slot = cn__hash_set_get_slot(header, probe_idx);
+        
+        if (slot->state == CN_HASH_SET_SLOT_EMPTY) return false;
+
+        if (slot->state == CN_HASH_SET_SLOT_OCCUPIED && slot->hash == hash && header->equals_func(item, data + probe_idx * header->item_size)) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
-CNDEF int64_t cn__hash_set_item_size(void *set) {
+CNDEF void cn__hash_set_remove(Cn_Hash_Set_Header *header) {
+    uint8_t *item = (uint8_t *)(header + 1);
+    uint8_t *data = item + header->item_size;
 
+    uint64_t hash = header->hash_func(item);
+    int64_t idx = hash % header->capacity;
+
+    Cn_Hash_Set_Slot *slot;
+    int64_t probe_idx;
+    for (int64_t i = 0; i < header->capacity; i++) {
+        probe_idx = (idx + i) % header->capacity;
+        slot = cn__hash_set_get_slot(header, probe_idx);
+        
+        if (slot->state == CN_HASH_SET_SLOT_EMPTY) return;
+
+        if (slot->state == CN_HASH_SET_SLOT_OCCUPIED && slot->hash == hash && header->equals_func(item, data + probe_idx * header->item_size)) {
+            slot->state = CN_HASH_SET_SLOT_DELETED;
+            header->count--;
+            return;
+        }
+    }
 }
 
-CNDEF void cn__hash_set_put(void **set, void *item) {
-
-}
-
-CNDEF bool cn__hash_set_contains(void **set, void *item) {
-
-}
-
-CNDEF void cn__hash_set_remove(void **set, void *item) {
-
-}
-
-CNDEF void cn__hash_set_free(void **set) {
-
+CNDEF void cn__hash_set_free(Cn_Hash_Set_Header *header) {
+    CN_FREE(header);
 }
 
 #ifdef CNOTES_CORE
