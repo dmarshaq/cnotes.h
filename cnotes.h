@@ -3179,6 +3179,8 @@ CNDEF void *cn__hash_table_get(void **table, void *key) {
         probe_idx = (idx + i) % header->capacity;
         slot = cn__hash_table_get_slot(header, probe_idx);
 
+        if (slot->state == CN_HASH_TABLE_SLOT_EMPTY) return NULL;
+
         if (slot->state == CN_HASH_TABLE_SLOT_OCCUPIED && slot->hash == hash && header->equals_func(key, slot + 1)) {
             return (uint8_t *)*table + probe_idx * header->item_size;
         }
@@ -3188,7 +3190,25 @@ CNDEF void *cn__hash_table_get(void **table, void *key) {
 }
 
 CNDEF void cn__hash_table_remove(void **table, void *key) {
-    CN_TODO("Implement this.");
+    Cn_Hash_Table_Header *header = cn_hash_table_header(table);
+
+    uint64_t hash = header->hash_func(key);
+    int64_t idx = hash % header->capacity;
+
+    Cn_Hash_Table_Slot *slot;
+    int64_t probe_idx;
+    for (int64_t i = 0; i < header->capacity; i++) {
+        probe_idx = (idx + i) % header->capacity;
+        slot = cn__hash_table_get_slot(header, probe_idx);
+
+        if (slot->state == CN_HASH_TABLE_SLOT_EMPTY) return;
+
+        if (slot->state == CN_HASH_TABLE_SLOT_OCCUPIED && slot->hash == hash && header->equals_func(key, slot + 1)) {
+            slot->state = CN_HASH_TABLE_SLOT_DELETED;
+            return;
+        }
+    }
+
 }
 
 CNDEF void cn__hash_table_free(void **table) {
