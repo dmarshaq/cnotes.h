@@ -5,7 +5,7 @@
 #   define CNDEF
 #endif // CNDEF
 
-#ifndef CNOTES_ASSERT
+#ifndef CN_ASSERT
 #   include <assert.h>
 #   define CN_ASSERT assert
 #endif // CN_ASSERT
@@ -559,8 +559,6 @@ CNDEF bool cn__hash_set_contains(Cn_Hash_Set_Header *header);
 CNDEF void cn__hash_set_remove(Cn_Hash_Set_Header *header);
 
 CNDEF void cn__hash_set_free(Cn_Hash_Set_Header *header);
-
-#ifdef CNOTES_CORE
 
 // LEXER SECTION
 
@@ -2293,7 +2291,6 @@ typedef void (Cn_Message_Handler)(Cn_Message *message);
 
 extern Cn_Message_Handler *cn_message_handler;
 
-#endif
 
 #endif // CN_H_
        
@@ -3273,8 +3270,6 @@ CNDEF void cn__hash_set_free(Cn_Hash_Set_Header *header) {
     CN_FREE(header);
 }
 
-#ifdef CNOTES_CORE
-
 // LEXER SECTION
 const Cn_Literal_Token CN_LITERAL_TOKENS[] = {
     { CN_TOKEN_ELLIPSIS,            CN_STR_BUFFER("...") },
@@ -3833,12 +3828,12 @@ CNDEF Cn_String cn_ast_scope_stack_add_binding(Cn_String name, Cn_Ast_Binding_Ki
         binding_table = cn_ast_symbol_binding_table;
     }
 
-    Cn_Ast_Binding_Idx *ref = cn_hash_table_get(&binding_table, name.length, (uint8_t *)name.data);
+    Cn_Ast_Binding_Idx *ref = cn_hash_table_get(&binding_table, &name);
     if (ref == NULL) {
         name = cn__ast_scope_stack_save_string(name);
 
         cn_array_list_append(&cn_ast_binding_list, ((Cn_Ast_Binding) { .name = name, .kind = kind, .definition_idx = node_idx, .next_idx = CN_AST_NIL_BINDING_IDX, .scope_idx = cn_array_list_length(&cn_ast_scope_stack) - 1 }));
-        cn_hash_table_put(&binding_table, cn_array_list_length(&cn_ast_binding_list) - 1, name.length, (uint8_t *)name.data);
+        cn_hash_table_put(&binding_table, cn_array_list_length(&cn_ast_binding_list) - 1, &name);
 
         return name;
     }
@@ -3851,7 +3846,7 @@ CNDEF Cn_String cn_ast_scope_stack_add_binding(Cn_String name, Cn_Ast_Binding_Ki
 
     cn_array_list_append(&cn_ast_binding_list, ((Cn_Ast_Binding) { .name = existing_binding->name, .kind = kind, .definition_idx = node_idx, .next_idx = *ref, .scope_idx = cn_array_list_length(&cn_ast_scope_stack) - 1 }));
 
-    cn_hash_table_put(&binding_table, cn_array_list_length(&cn_ast_binding_list) - 1, name.length, (uint8_t *)name.data);
+    cn_hash_table_put(&binding_table, cn_array_list_length(&cn_ast_binding_list) - 1, &name);
 
     return existing_binding->name;
 }
@@ -3865,8 +3860,8 @@ CNDEF int cn_ast_init() {
     if (cn_ast_node_list == NULL)
         return -1;
 
-    cn_ast_tag_binding_table = cn_hash_table_make(Cn_Ast_Idx, CN_AST_TAG_BINDING_TABLE_INITIAL_CAP);
-    cn_ast_symbol_binding_table = cn_hash_table_make(Cn_Ast_Idx, CN_AST_SYMBOL_BINDING_TABLE_INITIAL_CAP);
+    cn_ast_tag_binding_table = cn_hash_table_make(Cn_String, Cn_Ast_Idx, CN_AST_TAG_BINDING_TABLE_INITIAL_CAP, (Cn_Hash_Function *)cn_str_hash, (Cn_Equals_Function *)cn_str_equals);
+    cn_ast_symbol_binding_table = cn_hash_table_make(Cn_String, Cn_Ast_Idx, CN_AST_SYMBOL_BINDING_TABLE_INITIAL_CAP,(Cn_Hash_Function *)cn_str_hash, (Cn_Equals_Function *)cn_str_equals);
     cn_ast_saved_strings_data_arena = cn_chained_arena_make(CN_AST_SAVED_STRINGS_DATA_ARENA_BLOCK_CAP);
     cn_ast_saved_strings_list = cn_array_list_make(Cn_String, CN_AST_SAVED_STRINGS_LIST_INITIAL_CAP);
     cn_ast_scope_stack = cn_array_list_make(Cn_Ast_Scope, CN_AST_SCOPE_STACK_INITIAL_CAP);
@@ -5809,8 +5804,6 @@ CNDEF void cn_tu_free(Cn_Translation_Unit *tu) {
     CN_FREE(tu->content.data);
     cn_array_list_free(&tu->modification_list);
 }
-
-#endif
 
 
 #endif // CN_IMPLEMENTATION

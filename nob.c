@@ -536,16 +536,16 @@ int cn_command(int *argc, char ***argv) {
     }
 
     // Library pre-processing.
-    // cn_ast_init();
+    cn_ast_init();
 
-    // Cn_Translation_Unit tu = cn_tu_make("main.i");
-    // 
-    // if (cn_tu_process(&tu) == -1) {
-    //     cn_tu_free(&tu);
-    //     return 1;
-    // }
+    Cn_Translation_Unit tu = cn_tu_make("main.i");
+    
+    if (cn_tu_process(&tu) == -1) {
+        cn_tu_free(&tu);
+        return 1;
+    }
 
-    // cn_tu_free(&tu);
+    cn_tu_free(&tu);
     
     // Compiling main executable.
     nob_cc(&cmd);
