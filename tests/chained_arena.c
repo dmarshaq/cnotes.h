@@ -1,7 +1,8 @@
 #include "../cnotes.h"
+Cn_Chained_Arena arena = {0};
 
 int main(void) {
-    Cn_Chained_Arena arena = cn_chained_arena_make(64);
+    arena = cn_chained_arena_make(64);
 
     int *ptr, *v1, *v2, *v3, *v4, *v5, *v6;
 

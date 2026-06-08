@@ -1,9 +1,13 @@
-#include <stdbool.h>
+typedef struct vec2f Vec2f;
 
-int func(int a) {
-    bool BOL = true;
 
-    if (BOL) {
-        a = 1 + 2;
-    }
+Vec2f *v1;
+
+struct vec2f { 
+    float x, y; 
+} a;
+
+
+int main() {
+    return 0;
 }

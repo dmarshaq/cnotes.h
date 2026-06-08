@@ -362,6 +362,20 @@ void *cn_chained_arena_alloc(Cn_Chained_Arena *arena, uint64_t size);
 void cn_chained_arena_dealloc(Cn_Chained_Arena *arena, uint64_t size);
 
 /**
+ * Given chained arena and pointer allocated by it, it will compute index 
+ * of the allocation block it was allocated in, and byte offset from the beginning 
+ * of the allocation block to the allocated memory.
+ *
+ * RETURNS: Index of the allocation block, -1 if pointer supplied doesn't point to the allocated memory.
+ * OUTPUTS: Byte offset to the allocated memory from beginning of the allocation block.
+ *
+ * NOTE: This function will properly return if supplied pointer points to the memory held by the arena.
+ * Even if address was not supplied correctly, but it happens to point to the allocated memory, 
+ * this function will properly return.
+ */
+int64_t cn_chained_arena_allocation_info(Cn_Chained_Arena *arena, void *allocation_ptr, uint64_t *offset);
+
+/**
  * Completely frees all memory occupied by the arena.
  */
 void cn_chained_arena_free(Cn_Chained_Arena *arena);
@@ -539,7 +553,7 @@ typedef struct {
     ((Cn_Hash_Set_Header *)((uint8_t *)((*ptr_set) - 1) - sizeof(Cn_Hash_Set_Header)))
 
 #define cn_hash_set_put(ptr_set, item)\
-    (*((*ptr_set) - 1) = item, cn__hash_set_put(cn_hash_set_header(ptr_set), (void **)ptr_set))
+    (*((*ptr_set) - 1) = item, cn__hash_set_put(cn_hash_set_header(ptr_set), (void **)ptr_set), *((*ptr_set) - 1))
 
 #define cn_hash_set_contains(ptr_set, item)\
     (*((*ptr_set) - 1) = item, cn__hash_set_contains(cn_hash_set_header(ptr_set)))
@@ -682,7 +696,6 @@ typedef enum : uint8_t {
     CN_STRUCT,
     CN_ENUM,
     CN_UNION,
-    CN_TYPEDEF,
     CN_UNKNOWN,
 } Cn_Type_Kind;
 
@@ -696,7 +709,7 @@ typedef struct {
 
 typedef struct {
     Cn_Type *type;
-    Cn_String name;
+    // Cn_String name;
 } Cn_Type_Function_Param;
 
 typedef struct {
@@ -705,7 +718,7 @@ typedef struct {
     int64_t params_length;
     Cn_Type_Function_Param *params;
 
-    Cn_String definition_file;
+    // Cn_String definition_file;
 } Cn_Type_Function;
 
 typedef struct {
@@ -715,9 +728,10 @@ typedef struct {
 } Cn_Type_Struct_Member;
 
 typedef struct {
+    Cn_String tag;
+    bool is_complete;
     int64_t members_length;
     Cn_Type_Struct_Member *members;
-    Cn_String tag;
 } Cn_Type_Struct;
 
 typedef struct {
@@ -736,12 +750,7 @@ typedef struct {
     Cn_Type_Enum_Member *members;
 } Cn_Type_Enum;
 
-typedef struct {
-    Cn_Type *typedef_of;
-} Cn_Type_Typedef;
-
-struct type_info {
-    Cn_String name;
+struct cn_type {
     int64_t size;
     int64_t align;
     
@@ -753,15 +762,23 @@ struct type_info {
         Cn_Type_Struct    t_struct;
         Cn_Type_Array     t_array;
         Cn_Type_Enum      t_enum;
-        Cn_Type_Typedef   t_typedef;
     };
 };
 
+/**
+ * Checks if "type1" equals "type2".
+ * RETURNS: True if types are identical.
+ */
+CNDEF bool cn_type_equals(const Cn_Type *type1, const Cn_Type *type2);
+
+/**
+ * RETURNS: Hash of specified type.
+ */
+CNDEF uint64_t cn_type_hash(const Cn_Type *type);
+
+CNDEF void cn_type_print(FILE *f, const Cn_Type *type);
+
 // AST SECTION
-
-// TODO: REFACTOR THIS MACRO.
-#define FLAG_ORDINAL(flag) (__builtin_ctz(flag))
-
 
 typedef uint32_t Cn_Ast_Idx;
 
@@ -770,6 +787,7 @@ typedef uint32_t Cn_Ast_Idx;
 typedef struct {
     Cn_Ast_Idx last_idx;
     Cn_Ast_Idx idx;
+    int64_t length;
 } Cn_Ast_Linked_List;
 
 typedef enum : uint8_t {
@@ -831,8 +849,7 @@ typedef enum : uint8_t {
     CN_AST_TYPE_VOID    = 6,
 
     CN_AST_TYPE_TYPEDEF,
-    CN_AST_TYPE_STRUCT,
-    CN_AST_TYPE_ENUM,
+    CN_AST_TYPE_STRUCT_OR_UNION,
     CN_AST_TYPE_UNION,
 } Cn_Ast_Type_Kind;
 
@@ -1118,8 +1135,13 @@ typedef enum cn_ast_node_kind : uint8_t {
     CN_AST_NODE_DECLARATION_SPECIFIERS,
     CN_AST_NODE_TYPE_SPECIFIER,
     CN_AST_NODE_TYPE_NAME,
+    CN_AST_NODE_SPECIFIER_QUALIFIER,
     CN_AST_NODE_PARAMETER_TYPE_LIST,
     CN_AST_NODE_PARAMETER_DECLARATION,
+    CN_AST_NODE_STRUCT_SPECIFIER,
+    CN_AST_NODE_UNION_SPECIFIER,
+    CN_AST_NODE_MEMBER_DECLARATION,
+    CN_AST_NODE_MEMBER_DECLARATOR,
 } Cn_Ast_Node_Kind;
 
 typedef struct {
@@ -1157,6 +1179,21 @@ typedef struct {
     Cn_Ast_Idx statement_idx;
     Cn_Ast_Idx else_statement_idx;
 } Cn_Ast_Node_Selection_Statement;
+
+typedef enum {
+    CN_AST_JUMP_GOTO,
+    CN_AST_JUMP_CONTINUE,
+    CN_AST_JUMP_BREAK,
+    CN_AST_JUMP_RETURN,
+} Cn_Ast_Jump_Kind;
+
+typedef struct {
+    Cn_Ast_Jump_Kind kind;
+    union {
+        Cn_String identifier;
+        Cn_Ast_Idx expression_idx;
+    };
+} Cn_Ast_Node_Jump_Statement;
 
 typedef struct {
     Cn_Ast_Idx expression_idx;
@@ -1266,13 +1303,21 @@ typedef struct {
     Cn_Ast_Type_Kind  kind;
     Cn_Ast_Type_Width width;
     Cn_Ast_Type_Sign  sign;
+    union {
+        Cn_String typedef_name;
+        Cn_Ast_Idx struct_or_union_idx;
+    };
 } Cn_Ast_Node_Type_Specifier;
+
+typedef struct {
+    Cn_Ast_Idx         specifier_qualifier_idx;
+    Cn_Ast_Idx         abstract_declarator_idx;
+} Cn_Ast_Node_Type_Name;
 
 typedef struct {
     Cn_Qualifier_Flags qualifiers;
     Cn_Ast_Idx         type_specifier_idx;
-    Cn_Ast_Idx         abstract_declarator_idx;
-} Cn_Ast_Node_Type_Name;
+} Cn_Ast_Node_Specifier_Qualifier;
 
 typedef struct {
     Cn_Ast_Linked_List parameter_declaration_list;
@@ -1283,6 +1328,26 @@ typedef struct {
     Cn_Ast_Idx declaration_specifiers_idx;
     Cn_Ast_Idx declarator_idx;
 } Cn_Ast_Node_Parameter_Declaration;
+
+typedef struct {
+    Cn_String tag;
+    Cn_Ast_Linked_List member_declaration_list;
+} Cn_Ast_Node_Struct_Specifier;
+
+typedef struct {
+    Cn_String tag;
+    Cn_Ast_Linked_List member_declaration_list;
+} Cn_Ast_Node_Union_Specifier;
+
+typedef struct {
+    Cn_Ast_Idx specifier_qualifier_idx;
+    Cn_Ast_Linked_List member_declarator_list;
+} Cn_Ast_Node_Member_Declaration;
+
+typedef struct {
+    Cn_Ast_Idx declarator_idx;
+    Cn_Ast_Idx bitfield_expression_idx;
+} Cn_Ast_Node_Member_Declarator;
 
 
 typedef struct cn_ast_node {
@@ -1302,7 +1367,7 @@ typedef struct cn_ast_node {
         Cn_Ast_Node_Compound_Statement          compound_statement;
         Cn_Ast_Node_Selection_Statement         selection_statement;
         // Cn_Ast_Node_Iteration_Statement      iteration_statement;
-        // Cn_Ast_Node_Jump_Statement           jump_statement;
+        Cn_Ast_Node_Jump_Statement              jump_statement;
         // Cn_Ast_Node_Labeled_Statement        labeled_statement;
         Cn_Ast_Node_Expression_Statement        expression_statement;
         Cn_Ast_Node_Binary_Expression           binary_expression;
@@ -1324,8 +1389,13 @@ typedef struct cn_ast_node {
         Cn_Ast_Node_Declaration_Specifiers      declaration_specifiers;
         Cn_Ast_Node_Type_Specifier              type_specifier;
         Cn_Ast_Node_Type_Name                   type_name;
+        Cn_Ast_Node_Specifier_Qualifier         specifier_qualifier;
         Cn_Ast_Node_Parameter_Type_List         parameter_type_list;
         Cn_Ast_Node_Parameter_Declaration       parameter_declaration;
+        Cn_Ast_Node_Struct_Specifier            struct_specifier;
+        Cn_Ast_Node_Union_Specifier             union_specifier;
+        Cn_Ast_Node_Member_Declaration          member_declaration;
+        Cn_Ast_Node_Member_Declarator           member_declarator;
     };
 } Cn_Ast_Node;
 
@@ -1341,6 +1411,46 @@ extern Cn_Ast_Node *cn_ast_node_list;
 #ifndef CN_AST_NODE_LIST_INITIAL_CAP
 #   define CN_AST_NODE_LIST_INITIAL_CAP 32
 #endif // CN_AST_NODE_LIST_INITIAL_CAP
+
+/**
+ * Type arena used, to store type structs.
+ * So that pointers to types never change.
+ */
+extern Cn_Chained_Arena cn_ast_type_arena;
+
+#ifndef CN_AST_TYPE_ARENA_BLOCK_CAP
+#   define CN_AST_TYPE_ARENA_BLOCK_CAP (sizeof(Cn_Type) * 64)
+#endif // CN_AST_TYPE_ARENA_BLOCK_CAP
+
+extern Cn_Type **cn_ast_type_ptr_set;
+
+#ifndef CN_AST_TYPE_PTR_SET_INITIAL_CAP
+#   define CN_AST_TYPE_PTR_SET_INITIAL_CAP 32
+#endif // CN_AST_TYPE_PTR_SET_INITIAL_CAP
+
+/**
+ * This arena is used to store various type children.
+ * For example: struct members, function parameters, etc.
+ * Since each type has its own array of members, 
+ * which doesn't overlap, all of them can be stored in the single arena.
+ */
+extern Cn_Chained_Arena cn_ast_type_children_arena;
+
+#ifndef CN_AST_TYPE_CHILDREN_ARENA_BLOCK_CAP
+#   define CN_AST_TYPE_CHILDREN_ARENA_BLOCK_CAP 4096
+#endif // CN_AST_TYPE_CHILDREN_ARENA_BLOCK_CAP
+
+/**
+ * Wrapper around cn_type_equals, to be used in a set that holds pointers to the types.
+ * That is made so actual type data stays in the same memory addressees.
+ */
+CNDEF bool cn_ast_type_ptr_equals(const Cn_Type **type1_ptr, const Cn_Type **type2_ptr);
+
+/**
+ * Wrapper around cn_type_hash, to be used in a set that holds pointers to the types.
+ * That is made so actual type data stays in the same memory addressees.
+ */
+CNDEF uint64_t cn_ast_type_ptr_hash(const Cn_Type **type_ptr);
 
 typedef uint32_t Cn_Ast_Binding_Idx;
 
@@ -1362,14 +1472,6 @@ typedef struct {
                                         // Depends on the kind of the binding.
     
     Cn_Type *type;                      // Resolved type of the binding.
-
-    Cn_Ast_Idx definition_idx;          // Idx of ast node which contains 
-                                        // information about definition of the binding.
-                                        // Different binding kinds will reference different definitions.
-
-    int64_t declarator_oridnal;         // Which declarator inside declaration does this binding relate to.
-                                        // starting with 0 as first declarator. For example
-                                        // Value of 1 would relate to declarator b, in following declaration: int a[10], **b;
 
     Cn_Ast_Binding_Idx next_idx;        // Each binding can "shadow" previous binding,
                                         // therefore if such case appears most recent binding
@@ -1417,22 +1519,24 @@ extern Cn_Chained_Arena cn_ast_saved_strings_data_arena;
 #   define CN_AST_SAVED_STRINGS_DATA_ARENA_BLOCK_CAP 4096
 #endif // CN_AST_SAVED_STRINGS_DATA_ARENA_BLOCK_CAP
 
-/**
- * Saved strings list is used to store every scoped string reference.
- * By storing struct Cn_String which contains both pointer to the string
- * and it's length.
- */
-extern Cn_String *cn_ast_saved_strings_list;
-
-#ifndef CN_AST_SAVED_STRINGS_LIST_INITIAL_CAP
-#   define CN_AST_SAVED_STRINGS_LIST_INITIAL_CAP 64
-#endif // CN_AST_SAVED_STRINGS_LIST_INITIAL_CAP
+// REDUNDANT?
+//
+// /**
+//  * Saved strings list is used to store every scoped string reference.
+//  * By storing struct Cn_String which contains both pointer to the string
+//  * and it's length.
+//  */
+// extern Cn_String *cn_ast_saved_strings_list;
+// 
+// #ifndef CN_AST_SAVED_STRINGS_LIST_INITIAL_CAP
+// #   define CN_AST_SAVED_STRINGS_LIST_INITIAL_CAP 64
+// #endif // CN_AST_SAVED_STRINGS_LIST_INITIAL_CAP
 
 /**
  * This struct simply contains information that each scope will have.
  */
 typedef struct {
-    int64_t saved_strings_idx;
+    int64_t saved_strings_length;
     int64_t binding_idx;
 } Cn_Ast_Scope;
 
@@ -1442,8 +1546,19 @@ extern Cn_Ast_Scope *cn_ast_scope_stack;
 #   define CN_AST_SCOPE_STACK_INITIAL_CAP 64
 #endif // CN_AST_SCOPE_STACK_INITIAL_CAP
 
+/**
+ * Returns scope that sits at the top of the scope stack.
+ */
+CNDEF Cn_Ast_Scope *cn_ast_scope_stack_peek();
+
+/**
+ * Pushes new scope to the top of the stack.
+ */
 CNDEF void cn_ast_scope_stack_push();
 
+/**
+ * Pops scope from the top of the stack.
+ */
 CNDEF void cn_ast_scope_stack_pop();
 
 /**
@@ -1451,7 +1566,7 @@ CNDEF void cn_ast_scope_stack_pop();
  * 
  * RETURNS: Empty string if error occured, valid saved name if binding was added.
  */
-CNDEF Cn_String cn_ast_scope_stack_add_binding(Cn_String name, Cn_Ast_Binding_Kind kind, Cn_Ast_Idx node_idx);
+CNDEF Cn_String cn_ast_scope_stack_add_binding(Cn_String name, Cn_Ast_Binding_Kind kind, Cn_Type *type);
 
 /**
  * Inits ast functionality, called once before parsing begins.
@@ -1623,7 +1738,12 @@ CNDEF Cn_Ast_Idx cn_ast_parse_iteration_statement(Cn_Lexer *lexer);
  * Parses code starting of with lexer current token as jump_statement
  *
  *  jump_statement
- *          : TODO: Jump statement
+ *          : ( 
+ *              'goto' identifier
+ *              | 'continue'
+ *              | 'break'
+ *              | 'return' expression?
+ *          ) ';'
  *          ;
  *
  */
@@ -2114,7 +2234,8 @@ CNDEF int cn_ast_try_parse_qualifier(Cn_Lexer *lexer, Cn_Qualifier_Flags *output
  *          | '_Bool'
  *          | '_Complex'
  *          | atomic_type_specifier
- *          | struct_or_union_specifier
+ *          | struct_specifier
+ *          | union_specifier
  *          | enum_specifier
  *          | typedef
  *          ;
@@ -2125,10 +2246,19 @@ CNDEF Cn_Ast_Idx cn_ast_try_parse_type_specifier(Cn_Lexer *lexer, Cn_Ast_Idx out
  * Parses code starting of with lexer current token as type name.
  *
  *  type_name
- *          : (qualifier | type_specifier)+ abstract_declarator
+ *          : specifier_qualifier abstract_declarator
  *          ;
  */
 CNDEF Cn_Ast_Idx cn_ast_parse_type_name(Cn_Lexer *lexer);
+
+/**
+ * Parses code starting of with lexer current token as specifier qualifier.
+ *
+ *  specifier_qualifier
+ *          : (qualifier | type_specifier)+
+ *          ;
+ */
+CNDEF Cn_Ast_Idx cn_ast_parse_specifier_qualifier(Cn_Lexer *lexer);
 
 /**
  * Parses code starting of with lexer current token as parameter type list.
@@ -2152,6 +2282,56 @@ CNDEF Cn_Ast_Idx cn_ast_parse_parameter_type_list(Cn_Lexer *lexer);
  *          ;
  */
 CNDEF Cn_Ast_Idx cn_ast_parse_parameter_declaration(Cn_Lexer *lexer);
+
+/**
+ * Parses code starting of with lexer current token as struct or union specifier.
+ *
+ *  struct_specifier
+ *          : 'struct' 
+ *          ( identifier? '{' member_declaration* '}' ) 
+ *          | identifier
+ *          ;
+ *
+ *  union_specifier
+ *          : 'union' 
+ *          ( identifier? '{' member_declaration* '}' ) 
+ *          | identifier
+ *          ;
+ */
+CNDEF Cn_Ast_Idx cn_ast_parse_struct_or_union_specifier(Cn_Lexer *lexer);
+
+/**
+ * Parses code starting of with lexer current token as member declaration.
+ *
+ *  member_declaration
+ *          : specifier_qualifier member_declarator_list ';'
+ *          ;
+ */
+CNDEF Cn_Ast_Idx cn_ast_parse_member_declaration(Cn_Lexer *lexer);
+
+/**
+ * Parses code starting of with lexer current token as member declarator list.
+ *
+ *  member_declarator_list
+ *          : member_declarator (',' member_declarator)*
+ *          ;
+ *
+ * RETURNS: 0 on success, -1 if error occured.
+ */
+CNDEF int cn_ast_parse_member_declarator_list(Cn_Lexer *lexer, Cn_Ast_Linked_List *member_declarator_list);
+
+/**
+ * Parses code starting of with lexer current token as member declarator.
+ *
+ *  member_declarator
+ *          : declarator
+ *          | declarator? ':' expression
+ *          ;
+ *
+ */
+CNDEF Cn_Ast_Idx cn_ast_parse_member_declarator(Cn_Lexer *lexer);
+
+
 
 /**
  * IMPORTANT: Attributes of C23 in theory have similar ideas to what this library is trying to implement.
@@ -2203,6 +2383,13 @@ CNDEF Cn_Ast_Idx cn_ast_parse_parameter_declaration(Cn_Lexer *lexer);
  *          ;
  */
 CNDEF Cn_Ast_Idx cn_ast_parse_attribute_specifier_sequence(Cn_Lexer *lexer);
+
+/**
+ * Converts ast nodes to type.
+ * If type already exists returns pointer to it, 
+ * if not creates new type(s) and returns pointer to it.
+ */
+CNDEF Cn_Type *cn_ast_to_type(Cn_Qualifier_Flags flags, Cn_Ast_Idx type_specifier_idx, Cn_Ast_Idx declarator_idx);
 
 
 // PRE-PROCESSING SECTION
@@ -2643,6 +2830,7 @@ Cn_Chained_Arena cn_chained_arena_make(uint64_t block_capacity) {
     Cn_Chained_Arena_Block_Header *header = (Cn_Chained_Arena_Block_Header *)CN_REALLOC(NULL, sizeof(Cn_Chained_Arena_Block_Header) + block_capacity);
 
     header->prev = NULL;
+    header->allocated = 0;
     
     return (Cn_Chained_Arena) {
         .block_capacity = block_capacity,
@@ -2660,6 +2848,8 @@ void *cn_chained_arena_alloc(Cn_Chained_Arena *arena, uint64_t size) {
         header = (Cn_Chained_Arena_Block_Header *)CN_REALLOC(NULL, sizeof(Cn_Chained_Arena_Block_Header) + arena->block_capacity);
 
         header->prev = arena->block;
+        header->allocated = 0;
+        
         arena->block = header + 1;
     }
 
@@ -2687,6 +2877,38 @@ void cn_chained_arena_dealloc(Cn_Chained_Arena *arena, uint64_t size) {
         header->allocated -= decrease;
         size -= decrease;
     }
+}
+
+int64_t cn_chained_arena_allocation_info(Cn_Chained_Arena *arena, void *allocation_ptr, uint64_t *offset) {
+    Cn_Chained_Arena_Block_Header *header;
+    uint8_t *ptr = allocation_ptr;
+    Cn_Chained_Arena a = *arena;
+
+    while (true) {
+        header = CN_CHAINED_ARENA_BLOCK_HEADER(&a);
+        
+        if (ptr >= (uint8_t *)a.block && ptr < ((uint8_t *)a.block + header->allocated)) {
+            *offset = ptr - (uint8_t *)a.block;
+            break;
+        }
+
+        if (header->prev == NULL) {
+            // No block was found that contains address supplied by the user.
+            return -1;
+        }
+        
+        a.block = header->prev;
+    }
+
+    // Count number of blocks before found allocation block (it's index from the start).
+    int64_t idx = 0;
+    while (header->prev != NULL) {
+        idx++;
+        a.block = header->prev;
+        header = CN_CHAINED_ARENA_BLOCK_HEADER(&a);
+    }
+
+    return idx;
 }
 
 void cn_chained_arena_free(Cn_Chained_Arena *arena) {
@@ -3215,9 +3437,13 @@ CNDEF void cn__hash_set_put(Cn_Hash_Set_Header *header, void **set) {
             header->count++;
             return;
         } else if (slot->hash == hash && header->equals_func(item, data + probe_idx * header->item_size)) {
+            // Memcpy here to the item, slot so put can use it as return value if item already exists.
+            memcpy(item, data + probe_idx * header->item_size, header->item_size);
             return;
         }
     }
+
+    cn_log(CN_ERROR, "Couldn't find free slot for the item in hash set.");
 }
 
 CNDEF bool cn__hash_set_contains(Cn_Hash_Set_Header *header) {
@@ -3662,6 +3888,185 @@ CNDEF void cn_lexer_print_snippet(Cn_Lexer *lexer, uint64_t index, int64_t lengt
     fputs("\033[0m\n\n", stderr);
 }
 
+// TYPE SECTION
+
+CNDEF bool cn_type_equals(const Cn_Type *a, const Cn_Type *b) {
+    if (a == b) return true;
+
+    if (a->kind != b->kind) return false;
+     
+    switch (a->kind) {
+        case CN_INTEGER:
+            if (a->size != b->size && a->align != b->align) return false;
+
+            if (a->t_integer.is_signed != b->t_integer.is_signed) return false;
+            break;
+        case CN_POINTER:
+            if (a->size != b->size && a->align != b->align) return false;
+
+            if (a->t_pointer.ptr_to != b->t_pointer.ptr_to) return false;
+            break;
+        case CN_FUNCTION:
+            if (a->t_function.return_type != b->t_function.return_type) return false;
+            if (a->t_function.params_length != b->t_function.params_length) return false;
+            for (int64_t i = 0; i < a->t_function.params_length; i++) {
+                if (a->t_function.params[i].type != b->t_function.params[i].type) return false;
+            }
+            break;
+        case CN_ARRAY:
+            if (a->size != b->size && a->align != b->align) return false;
+
+            if (a->t_array.element_type != b->t_array.element_type) return false;
+            if (a->t_array.length != b->t_array.length) return false;
+            break;
+        case CN_STRUCT:
+            return cn_str_equals(&a->t_struct.tag, &b->t_struct.tag);
+            break;
+        case CN_ENUM:
+            break;
+        case CN_UNION:
+            break;
+        default:
+            break;
+    }
+
+    return true;
+}
+
+CNDEF uint64_t cn_type_hash(const Cn_Type *type) {
+    uint64_t hash = cn_hash_u64(type->kind);
+
+    switch (type->kind) {
+        case CN_INTEGER:
+            hash = cn_hash_mix(hash, cn_hash_u64(type->size));
+            hash = cn_hash_mix(hash, cn_hash_u64(type->align));
+            hash = cn_hash_mix(hash, cn_hash_u64(type->t_integer.is_signed));
+            break;
+        case CN_POINTER:
+            hash = cn_hash_mix(hash, cn_hash_u64(type->size));
+            hash = cn_hash_mix(hash, cn_hash_u64(type->align));
+            hash = cn_hash_mix(hash, cn_hash_ptr(type->t_pointer.ptr_to));
+            break;
+        case CN_FUNCTION:
+            hash = cn_hash_mix(hash, cn_hash_ptr(type->t_function.return_type));
+            hash = cn_hash_mix(hash, cn_hash_u64(type->t_function.params_length));
+            for (int64_t i = 0; i < type->t_function.params_length; i++) {
+                hash = cn_hash_mix(hash, cn_hash_ptr(type->t_function.params[i].type));
+            }
+            break;
+        case CN_ARRAY:
+            hash = cn_hash_mix(hash, cn_hash_u64(type->size));
+            hash = cn_hash_mix(hash, cn_hash_u64(type->align));
+            hash = cn_hash_mix(hash, cn_hash_ptr(type->t_array.element_type));
+            hash = cn_hash_mix(hash, cn_hash_u64(type->t_array.length));
+            break;
+        case CN_STRUCT:
+            // Struct is nominal type.
+            hash = cn_hash_mix(hash, cn_str_hash(&type->t_struct.tag));
+            break;
+        case CN_ENUM:
+            break;
+        case CN_UNION:
+            break;
+        default:
+            break;
+    }
+
+    return hash;
+}
+
+CNDEF void cn_type_print(FILE *f, const Cn_Type *t) {
+    if (!t) { fputs("<null>", f); return; }
+    
+    switch (t->kind) {
+        case CN_VOID:    fputs("void", f); return;
+        case CN_BOOL:    fputs("_Bool", f); return;
+        case CN_UNKNOWN: fputs("<unknown>", f); return;
+        
+        case CN_INTEGER:
+            if (!t->t_integer.is_signed) fputs("unsigned ", f);
+            switch (t->size) {
+                case 1: fputs("char", f); break;
+                case 2: fputs("short", f); break;
+                case 4: fputs("int", f); break;
+                case 8: fputs("long long", f); break;
+                default: fprintf(f, "int%lld_t", (long long)(t->size * 8)); break;
+            }
+            return;
+        
+        case CN_FLOAT:
+            switch (t->size) {
+                case 4:  fputs("float", f); break;
+                case 8:  fputs("double", f); break;
+                case 16: fputs("long double", f); break;
+                default: fprintf(f, "float%lld", (long long)(t->size * 8)); break;
+            }
+            return;
+        
+        case CN_POINTER:
+            cn_type_print(f, t->t_pointer.ptr_to);
+            fputc('*', f);
+            return;
+        
+        case CN_ARRAY:
+            cn_type_print(f, t->t_array.element_type);
+            if (t->t_array.length >= 0)
+                fprintf(f, "[%lld]", (long long)t->t_array.length);
+            else
+                fputs("[]", f);
+            return;
+        
+        case CN_FUNCTION:
+            cn_type_print(f, t->t_function.return_type);
+            fputc('(', f);
+            if (t->t_function.params_length == 0) {
+                fputs("void", f);
+            } else {
+                for (int64_t i = 0; i < t->t_function.params_length; i++) {
+                    if (i > 0) fputs(", ", f);
+                    cn_type_print(f, t->t_function.params[i].type);
+                }
+            }
+            fputc(')', f);
+            return;
+        
+        case CN_STRUCT: {
+            fputs("struct ", f);
+            
+            // Print the tag if there is one; otherwise mark anonymous
+            if (t->t_struct.tag.length > 0) {
+                fprintf(f, "%.*s", (int)t->t_struct.tag.length, t->t_struct.tag.data);
+            } else {
+                fputs("<anonymous>", f);
+            }
+            
+            // If incomplete (forward-declared only), stop here — there's no body to print
+            if (!t->t_struct.is_complete) {
+                return;
+            }
+            
+            // Print the body
+            fputs(" { ", f);
+            for (int64_t i = 0; i < t->t_struct.members_length; i++) {
+                const Cn_Type_Struct_Member *m = &t->t_struct.members[i];
+                
+                // Print member type
+                cn_type_print(f, m->type);
+                
+                fputs("; ", f);
+            }
+            fputc('}', f);
+            return;
+        }
+        
+        case CN_UNION:
+            return;
+        
+        case CN_ENUM:
+            return;
+
+    }
+}
 
 // AST SECTION
 
@@ -3789,38 +4194,81 @@ next_token:
 
 Cn_Ast_Node *cn_ast_node_list = NULL;
 
+Cn_Chained_Arena cn_ast_type_arena = {0};
+
+Cn_Type **cn_ast_type_ptr_set = NULL;
+
+Cn_Chained_Arena cn_ast_type_children_arena = {0};
+
+CNDEF bool cn_ast_type_ptr_equals(const Cn_Type **type1_ptr, const Cn_Type **type2_ptr) {
+    return cn_type_equals(*type1_ptr, *type2_ptr);
+}
+
+CNDEF uint64_t cn_ast_type_ptr_hash(const Cn_Type **type_ptr) {
+    return cn_type_hash(*type_ptr);
+}
+
 Cn_Ast_Binding *cn_ast_binding_list = NULL;
+
 Cn_Ast_Binding_Idx *cn_ast_tag_binding_table = NULL;
+
 Cn_Ast_Binding_Idx *cn_ast_symbol_binding_table = NULL;
+
 Cn_Chained_Arena cn_ast_saved_strings_data_arena = {0};
-Cn_String *cn_ast_saved_strings_list = NULL;
+
+// Cn_String *cn_ast_saved_strings_list = NULL;
+
 Cn_Ast_Scope *cn_ast_scope_stack = NULL;
 
+CNDEF Cn_Ast_Scope *cn_ast_scope_stack_peek() {
+    if (cn_array_list_length(&cn_ast_scope_stack) == 0) return NULL;
+
+    return cn_ast_scope_stack + (cn_array_list_length(&cn_ast_scope_stack) - 1);
+}
+
 CNDEF void cn_ast_scope_stack_push() {
-    cn_array_list_append(&cn_ast_scope_stack, ((Cn_Ast_Scope) { .saved_strings_idx = cn_array_list_length(&cn_ast_saved_strings_list), .binding_idx = cn_array_list_length(&cn_ast_binding_list) } ));
+    cn_array_list_append(&cn_ast_scope_stack, ((Cn_Ast_Scope) { 
+                // .saved_strings_idx = cn_array_list_length(&cn_ast_saved_strings_list), 
+                .saved_strings_length = 0,
+                .binding_idx = cn_array_list_length(&cn_ast_binding_list),
+                } ));
 }
 
 CNDEF void cn_ast_scope_stack_pop() {
     CN_ASSERT(cn_array_list_length(&cn_ast_scope_stack) > 0);
 
-    // cn_array_list_pop_multiple(&cn_ast_saved_strings_list, cn_array_list_length(&cn_ast_saved_strings_list) - cn_ast_scope_stack[cn_array_list_length(&cn_ast_scope_stack) - 1].saved_strings_idx);
-    // cn_chained_arena_dealloc(&cn_ast_saved_strings_data_arena, cn_ast_scope_stack[cn_array_list_length(&cn_ast_scope_stack) - 1].saved_strings_length);
-    // cn_array_list_pop(&cn_ast_scope_stack);
+    Cn_Ast_Scope *scope = cn_ast_scope_stack_peek();
+    for (int i = scope->binding_idx; i < cn_array_list_length(&cn_ast_binding_list); i++) {
+        // Resolve each binding, properly dispose each binding.
+        if (cn_ast_binding_list[i].kind == CN_BINDING_TAG) {
+            cn_hash_table_put(&cn_ast_tag_binding_table, cn_ast_binding_list[i].next_idx, &cn_ast_binding_list[i].name);
+        } else {
+            cn_hash_table_put(&cn_ast_symbol_binding_table, cn_ast_binding_list[i].next_idx, &cn_ast_binding_list[i].name);
+        }
+    }
+    cn_array_list_pop_multiple(&cn_ast_binding_list, cn_array_list_length(&cn_ast_binding_list) - scope->binding_idx);
+
+    cn_chained_arena_dealloc(&cn_ast_saved_strings_data_arena, scope->saved_strings_length);
+    cn_array_list_pop(&cn_ast_scope_stack);
 }
 
 CNDEF Cn_String cn__ast_scope_stack_save_string(Cn_String str) {
+    Cn_Ast_Scope *scope = cn_ast_scope_stack_peek();
+
     void *data = cn_chained_arena_alloc(&cn_ast_saved_strings_data_arena, str.length);
     cn_str_copy_to(str, data);
     str.data = data;
 
-    cn_array_list_append(&cn_ast_saved_strings_list, str);
+    scope->saved_strings_length += str.length;
+
+    // cn_array_list_append(&cn_ast_saved_strings_list, str);
 
     return str;
 }
 
-CNDEF Cn_String cn_ast_scope_stack_add_binding(Cn_String name, Cn_Ast_Binding_Kind kind, Cn_Ast_Idx node_idx) {
+CNDEF Cn_String cn_ast_scope_stack_add_binding(Cn_String name, Cn_Ast_Binding_Kind kind, Cn_Type *type) {
     CN_ASSERT(cn_array_list_length(&cn_ast_scope_stack) > 0);
-
+    
     Cn_Ast_Binding_Idx *binding_table;
     if (kind == CN_BINDING_TAG) {
         binding_table = cn_ast_tag_binding_table;
@@ -3832,7 +4280,7 @@ CNDEF Cn_String cn_ast_scope_stack_add_binding(Cn_String name, Cn_Ast_Binding_Ki
     if (ref == NULL) {
         name = cn__ast_scope_stack_save_string(name);
 
-        cn_array_list_append(&cn_ast_binding_list, ((Cn_Ast_Binding) { .name = name, .kind = kind, .definition_idx = node_idx, .next_idx = CN_AST_NIL_BINDING_IDX, .scope_idx = cn_array_list_length(&cn_ast_scope_stack) - 1 }));
+        cn_array_list_append(&cn_ast_binding_list, ((Cn_Ast_Binding) { .name = name, .kind = kind, .type = type, .next_idx = CN_AST_NIL_BINDING_IDX, .scope_idx = cn_array_list_length(&cn_ast_scope_stack) - 1 }));
         cn_hash_table_put(&binding_table, cn_array_list_length(&cn_ast_binding_list) - 1, &name);
 
         return name;
@@ -3844,7 +4292,7 @@ CNDEF Cn_String cn_ast_scope_stack_add_binding(Cn_String name, Cn_Ast_Binding_Ki
         CN_TODO("Handle redeclarations and redefinitions.");
     }
 
-    cn_array_list_append(&cn_ast_binding_list, ((Cn_Ast_Binding) { .name = existing_binding->name, .kind = kind, .definition_idx = node_idx, .next_idx = *ref, .scope_idx = cn_array_list_length(&cn_ast_scope_stack) - 1 }));
+    cn_array_list_append(&cn_ast_binding_list, ((Cn_Ast_Binding) { .name = existing_binding->name, .kind = kind, .type = type, .next_idx = *ref, .scope_idx = cn_array_list_length(&cn_ast_scope_stack) - 1 }));
 
     cn_hash_table_put(&binding_table, cn_array_list_length(&cn_ast_binding_list) - 1, &name);
 
@@ -3860,10 +4308,22 @@ CNDEF int cn_ast_init() {
     if (cn_ast_node_list == NULL)
         return -1;
 
+    cn_ast_type_arena = cn_chained_arena_make(CN_AST_TYPE_ARENA_BLOCK_CAP);
+
+    cn_ast_type_ptr_set = cn_hash_set_make(Cn_Type *, CN_AST_TYPE_PTR_SET_INITIAL_CAP, (Cn_Hash_Function *)cn_ast_type_ptr_hash, (Cn_Equals_Function *)cn_ast_type_ptr_equals);
+
+    cn_ast_type_children_arena = cn_chained_arena_make(CN_AST_TYPE_CHILDREN_ARENA_BLOCK_CAP);
+
+    cn_ast_binding_list = cn_array_list_make(Cn_Ast_Binding, CN_AST_BINDING_LIST_INITIAL_CAP);
+
     cn_ast_tag_binding_table = cn_hash_table_make(Cn_String, Cn_Ast_Idx, CN_AST_TAG_BINDING_TABLE_INITIAL_CAP, (Cn_Hash_Function *)cn_str_hash, (Cn_Equals_Function *)cn_str_equals);
+
     cn_ast_symbol_binding_table = cn_hash_table_make(Cn_String, Cn_Ast_Idx, CN_AST_SYMBOL_BINDING_TABLE_INITIAL_CAP,(Cn_Hash_Function *)cn_str_hash, (Cn_Equals_Function *)cn_str_equals);
+
     cn_ast_saved_strings_data_arena = cn_chained_arena_make(CN_AST_SAVED_STRINGS_DATA_ARENA_BLOCK_CAP);
-    cn_ast_saved_strings_list = cn_array_list_make(Cn_String, CN_AST_SAVED_STRINGS_LIST_INITIAL_CAP);
+
+    // cn_ast_saved_strings_list = cn_array_list_make(Cn_String, CN_AST_SAVED_STRINGS_LIST_INITIAL_CAP);
+
     cn_ast_scope_stack = cn_array_list_make(Cn_Ast_Scope, CN_AST_SCOPE_STACK_INITIAL_CAP);
 
     return 0;
@@ -3882,6 +4342,7 @@ CNDEF void cn_ast_linked_list_add(Cn_Ast_Linked_List *list, Cn_Ast_Idx next_idx)
         cn_ast_node_get(list->last_idx)->next_idx = next_idx;
         list->last_idx = next_idx;
     }
+    list->length++;
 }
 
 #define CN__ENUM_PRINT_CASE(enum_name)\
@@ -3923,8 +4384,13 @@ CNDEF void cn__ast_print_kind(Cn_Ast_Node_Kind kind) {
         CN__ENUM_PRINT_CASE(CN_AST_NODE_DECLARATION_SPECIFIERS);
         CN__ENUM_PRINT_CASE(CN_AST_NODE_TYPE_SPECIFIER);
         CN__ENUM_PRINT_CASE(CN_AST_NODE_TYPE_NAME);
+        CN__ENUM_PRINT_CASE(CN_AST_NODE_SPECIFIER_QUALIFIER);
         CN__ENUM_PRINT_CASE(CN_AST_NODE_PARAMETER_TYPE_LIST);
         CN__ENUM_PRINT_CASE(CN_AST_NODE_PARAMETER_DECLARATION);
+        CN__ENUM_PRINT_CASE(CN_AST_NODE_STRUCT_SPECIFIER);
+        CN__ENUM_PRINT_CASE(CN_AST_NODE_UNION_SPECIFIER);
+        CN__ENUM_PRINT_CASE(CN_AST_NODE_MEMBER_DECLARATION);
+        CN__ENUM_PRINT_CASE(CN_AST_NODE_MEMBER_DECLARATOR);
 
         CN__ENUM_PRINT_CASE(CN_AST_NODE_UNKNOWN);
         default: 
@@ -3933,7 +4399,7 @@ CNDEF void cn__ast_print_kind(Cn_Ast_Node_Kind kind) {
     }
 }
 
-const char *cn_ast_print_prefixes[32] = {0};
+const char *cn_ast_print_prefixes[64] = {0};
 
 const char *CN_AST_PRINT_EMPTY_TAB = "    ";
 const char *CN_AST_PRINT_FLAT_TAB  = "│   ";
@@ -4042,6 +4508,28 @@ CNDEF void cn_ast_print(Cn_Ast_Node *node, int depth) {
 
                 break;
             }
+        case CN_AST_NODE_JUMP_STATEMENT:
+            {
+                printf(" kind: ");
+                switch(node->jump_statement.kind) {
+                    case CN_AST_JUMP_GOTO:
+                        printf("goto ");
+                        printf("identifier: %.*s\n", CN_UNPACK(node->jump_statement.identifier));
+                        break;
+                    case CN_AST_JUMP_CONTINUE:
+                        printf("continue\n");
+                        break;
+                    case CN_AST_JUMP_BREAK:
+                        printf("break\n");
+                        break;
+                    case CN_AST_JUMP_RETURN:
+                        printf("return\n");
+                        ADD_IDX(node->jump_statement.expression_idx);
+                        break;
+                }
+                
+            }
+            break;
         case CN_AST_NODE_EXPRESSION_STATEMENT:
             {
                 printf("\n");
@@ -4313,14 +4801,32 @@ CNDEF void cn_ast_print(Cn_Ast_Node *node, int depth) {
 
                 if (node->type_specifier.kind < CN_ARRAY_LENGTH(CN_AST_TYPE_KINDS)) {
                     printf(" '%.*s'", CN_UNPACK(CN_AST_TYPE_KINDS[node->type_specifier.kind]));
+                } else {
+                    switch (node->type_specifier.kind) {
+                        case CN_AST_TYPE_TYPEDEF:
+                            printf(" typedef: '%.*s'", CN_UNPACK(node->type_specifier.typedef_name));
+                            break;
+                        case CN_AST_TYPE_STRUCT_OR_UNION:
+                            ADD_IDX(node->type_specifier.struct_or_union_idx);
+                            break;
+                        default:
+                            break;
+                    }
                 }
                 printf("\n");
                 break;
             }
         case CN_AST_NODE_TYPE_NAME:
             {
+                printf("\n");
+                ADD_IDX(node->type_name.specifier_qualifier_idx);
+                ADD_IDX(node->type_name.abstract_declarator_idx);
+                break;
+            }
+        case CN_AST_NODE_SPECIFIER_QUALIFIER:
+            {
                 for (int i = 0; i < 4; i++) {
-                    switch (node->type_name.qualifiers & (1 << i)) {
+                    switch (node->specifier_qualifier.qualifiers & (1 << i)) {
                         case CN_AST_TYPE_QUALIFIER_CONST:
                             printf(" '%.*s'", CN_UNPACK(CN_CONST_STR));
                             break;
@@ -4337,8 +4843,7 @@ CNDEF void cn_ast_print(Cn_Ast_Node *node, int depth) {
                 }
                 printf("\n");
 
-                ADD_IDX(node->type_name.type_specifier_idx);
-                ADD_IDX(node->type_name.abstract_declarator_idx);
+                ADD_IDX(node->specifier_qualifier.type_specifier_idx);
                 break;
             }
         case CN_AST_NODE_PARAMETER_TYPE_LIST:
@@ -4354,8 +4859,48 @@ CNDEF void cn_ast_print(Cn_Ast_Node *node, int depth) {
                 printf("\n");
                 ADD_IDX(node->parameter_declaration.declaration_specifiers_idx);
                 ADD_IDX(node->parameter_declaration.declarator_idx);
+                break;
+            }
+        case CN_AST_NODE_STRUCT_SPECIFIER:
+            {
+                if (!cn_str_empty(node->struct_specifier.tag)) {
+                    printf(" tag: '%.*s'\n", CN_UNPACK(node->struct_specifier.tag));
+                } else {
+                    printf("\n");
+                }
+
+                ADD_LIST(&node->struct_specifier.member_declaration_list);
+                break;
+            }
+        case CN_AST_NODE_UNION_SPECIFIER:
+            {
+                if (!cn_str_empty(node->union_specifier.tag)) {
+                    printf(" tag: '%.*s'\n", CN_UNPACK(node->union_specifier.tag));
+                } else {
+                    printf("\n");
+                }
+
+                ADD_LIST(&node->union_specifier.member_declaration_list);
+                break;
+            }
+        case CN_AST_NODE_MEMBER_DECLARATION:
+            {
+                printf("\n");
+                ADD_IDX(node->member_declaration.specifier_qualifier_idx);
+                ADD_LIST(&node->member_declaration.member_declarator_list);
+                break;
+            }
+        case CN_AST_NODE_MEMBER_DECLARATOR:
+            {
+                ADD_IDX(node->member_declarator.declarator_idx);
+                ADD_IDX(node->member_declarator.bitfield_expression_idx);
+                printf("\n");
+                break;
             }
         default:
+            {
+                printf("\n");
+            }
             break;
     }
 
@@ -4462,15 +5007,9 @@ CNDEF Cn_Ast_Idx cn_ast_parse_function_definition_or_declaration(Cn_Lexer *lexer
     if (declaration_specifiers_idx == CN_AST_NIL_IDX) goto error;
     
     // Deciding whether node is function definiton or declaration.
-    // Simple case, empty declaration.
-    if (cn_lexer_expect(lexer, CN_TOKEN_SEMICOLON)) {
-        cn_ast_next_token(lexer);
-        node.kind = CN_AST_NODE_DECLARATION;
-        node.declaration.declaration_specifiers_idx = declaration_specifiers_idx;
-        return cn_ast_node_list_append(node);
-    }
-    
-    // Then there MUST be declarator, which will be either part of init_declarator_list or just be by itself.
+    // There MUST be declarator, 
+    // which will be either part of init_declarator_list or just be by itself.
+    // It might be completely abstract, meaning no tokens are part of it.
     Cn_Lexer before_declarator = *lexer;
     child_idx = cn_ast_parse_declarator(lexer);
     if (child_idx == CN_AST_NIL_IDX) goto error;
@@ -4481,6 +5020,59 @@ CNDEF Cn_Ast_Idx cn_ast_parse_function_definition_or_declaration(Cn_Lexer *lexer
         node.function_definition.declaration_specifiers_idx = declaration_specifiers_idx;
 
         node.function_definition.declarator_idx = child_idx;
+
+        // Adding function type here.
+        {
+            Cn_Ast_Node *decl_spec = cn_ast_node_get(node.function_definition.declaration_specifiers_idx);
+            Cn_Type *type = cn_ast_to_type(decl_spec->declaration_specifiers.qualifiers, decl_spec->declaration_specifiers.type_specifier_idx, node.function_definition.declarator_idx);
+
+            // Extracting function name and verifying that declarator is a function.
+            // By checking whether function declarator points to the identifier 
+            // in the end of the declarator chain.
+            Cn_String name;
+            Cn_Ast_Node *decl = cn_ast_node_get(node.function_definition.declarator_idx);
+
+            if (decl->kind == CN_AST_NODE_ABSTRACT_DECLARATOR) {
+                cn_log(CN_ERROR, "Cannot have abstract declarator in function definition.");
+                cn_lexer_print_snippet_token(lexer);
+                goto error;
+            }
+
+            Cn_Ast_Node *dd = cn_ast_node_get(decl->declarator.direct_declarator_idx);
+            Cn_Ast_Node *dd_child;
+
+            while(true) {
+                switch (dd->direct_declarator.kind) {
+                    case CN_DD_FUNCTION:
+                        dd_child = cn_ast_node_get(dd->direct_declarator.dd_function.direct_declarator_idx);
+                        if (dd_child->direct_declarator.kind == CN_DD_IDENTIFIER) {
+                            name = dd_child->direct_declarator.identifier;
+                            break;
+                        }
+
+                        dd = dd_child;
+                        continue;
+
+                    case CN_DD_ARRAY:
+                        dd = cn_ast_node_get(dd->direct_declarator.dd_array.direct_declarator_idx);
+                        continue;
+
+                    case CN_DD_GROUPED:
+                        dd = cn_ast_node_get(cn_ast_node_get(dd->direct_declarator.declarator_idx)->declarator.direct_declarator_idx);
+                        continue;
+
+                    case CN_DD_IDENTIFIER:
+                        cn_log(CN_ERROR, "Invalid declarator in function definition.");
+                        cn_lexer_print_snippet_token(lexer);
+                        goto error;
+                }
+
+                break;
+            }
+
+            cn_ast_scope_stack_add_binding(name, CN_BINDING_FUCNTION, type);
+        }
+
 
         child_idx = cn_ast_parse_compound_statement(lexer);
         if (child_idx == CN_AST_NIL_IDX) goto error;
@@ -4504,6 +5096,53 @@ CNDEF Cn_Ast_Idx cn_ast_parse_function_definition_or_declaration(Cn_Lexer *lexer
             goto error;
         }
         cn_ast_next_token(lexer);
+        
+        // Adding types that are used by declarators.
+        {
+            Cn_Ast_Node *decl_spec = cn_ast_node_get(node.declaration.declaration_specifiers_idx);
+            Cn_Ast_Node *init_decl_list = cn_ast_node_get(node.declaration.init_declarator_list_idx);
+            Cn_Ast_Node *decl, *dd;
+            Cn_Type *type;
+            Cn_String name;
+            Cn_Ast_Binding_Kind binding_kind = decl_spec->declaration_specifiers.storage_specifiers & CN_STORAGE_SPECIFIER_TYPEDEF ? CN_BINDING_TYPEDEF : CN_BINDING_VARIABLE;
+            
+            // Iterating over declarators.
+            cn_ast_linked_list_foreach(init_decl, &init_decl_list->init_declarator_list.init_declarator_list) {
+                type = cn_ast_to_type(decl_spec->declaration_specifiers.qualifiers, decl_spec->declaration_specifiers.type_specifier_idx, init_decl->init_declarator.declarator_idx);
+                
+                // Adding declarator to variable bidning, if it is not abstract.
+                decl = cn_ast_node_get(init_decl->init_declarator.declarator_idx);
+                if (decl->kind != CN_AST_NODE_ABSTRACT_DECLARATOR) {
+                    // Iterating over to get identifier in declarator.
+                    dd = cn_ast_node_get(decl->declarator.direct_declarator_idx);
+                    while(true) {
+                        switch (dd->direct_declarator.kind) {
+                            case CN_DD_FUNCTION:
+                                dd = cn_ast_node_get(dd->direct_declarator.dd_function.direct_declarator_idx);
+                                continue;
+
+                            case CN_DD_ARRAY:
+                                dd = cn_ast_node_get(dd->direct_declarator.dd_array.direct_declarator_idx);
+                                continue;
+
+                            case CN_DD_GROUPED:
+                                dd = cn_ast_node_get(cn_ast_node_get(dd->direct_declarator.declarator_idx)->declarator.direct_declarator_idx);
+                                continue;
+
+                            case CN_DD_IDENTIFIER:
+                                name = dd->direct_declarator.identifier;
+                                break;
+                        }
+
+                        break;
+                    }
+                    
+                    // Adding binding here.
+                    cn_ast_scope_stack_add_binding(name, binding_kind, type);
+                }
+
+            }
+        }
     }
 
     return cn_ast_node_list_append(node);
@@ -4530,6 +5169,9 @@ CNDEF bool cn_ast_starts_declaration(Cn_Lexer *lexer) {
 }
 
 CNDEF bool cn_ast_starts_type(Cn_Lexer *lexer) {
+    Cn_Ast_Binding_Idx *ref = cn_hash_table_get(&cn_ast_symbol_binding_table, &lexer->token.str);
+    if (ref != NULL && cn_ast_binding_list[*ref].kind == CN_BINDING_TYPEDEF) return true;
+
     return 
             cn_str_equals(&lexer->token.str, &CN_CONST_STR) ||
             cn_str_equals(&lexer->token.str, &CN_RESTRICT_STR) ||
@@ -4553,7 +5195,6 @@ CNDEF bool cn_ast_starts_type(Cn_Lexer *lexer) {
             cn_str_equals(&lexer->token.str, &CN_ENUM_STR) ||
             cn_str_equals(&lexer->token.str, &CN_UNION_STR)
 
-            // TODO: Replace it with proper typedef check. cn_hash_table_get(&cn_ast_typedef_definition_table, lexer->token.str.length, (uint8_t *)lexer->token.str.data) != NULL
             ;
 }
 
@@ -4595,9 +5236,13 @@ CNDEF Cn_Ast_Idx cn_ast_parse_compound_statement(Cn_Lexer *lexer) {
     }
     cn_ast_next_token(lexer);
 
+    // Stepping into scope.
+    cn_ast_scope_stack_push();
+
     while (true) {
         if (cn_lexer_expect(lexer, CN_TOKEN_CURLY_CLOSE)) {
             cn_ast_next_token(lexer);
+            cn_ast_scope_stack_pop();
             return cn_ast_node_list_append(node);
         }
 
@@ -4701,8 +5346,38 @@ CNDEF Cn_Ast_Idx cn_ast_parse_jump_statement(Cn_Lexer *lexer) {
 
     Cn_Ast_Idx child_idx;
 
+    if (cn_str_equals(&lexer->token.str, &CN_GOTO_STR)) {
+        cn_ast_next_token(lexer);
+        node.jump_statement.kind = CN_AST_JUMP_GOTO;
+
+        node.jump_statement.identifier = cn_ast_parse_identifier(lexer);
+        
+    } else if (cn_str_equals(&lexer->token.str, &CN_CONTINUE_STR)) {
+        cn_ast_next_token(lexer);
+        node.jump_statement.kind = CN_AST_JUMP_CONTINUE;
+    } else if (cn_str_equals(&lexer->token.str, &CN_BREAK_STR)) {
+        cn_ast_next_token(lexer);
+        node.jump_statement.kind = CN_AST_JUMP_BREAK;
+    } else if (cn_str_equals(&lexer->token.str, &CN_RETURN_STR)) {
+        cn_ast_next_token(lexer);
+        node.jump_statement.kind = CN_AST_JUMP_RETURN;
+        
+        if (!cn_lexer_expect(lexer, CN_TOKEN_SEMICOLON)) {
+            node.jump_statement.expression_idx = cn_ast_parse_expression(lexer, 0, 0);
+        }
+    } else {
+        cn_log(CN_ERROR, "Not a jump statement.");
+        cn_lexer_print_snippet_token(lexer);
+        goto error;
+    }
     
-    
+    if (!cn_lexer_expect(lexer, CN_TOKEN_SEMICOLON)) {
+        cn_log(CN_ERROR, "Expected ';' at the end of jump statement.");
+        cn_lexer_print_snippet_token(lexer);
+        goto error;
+    }
+    cn_lexer_next_token(lexer);
+
     return cn_ast_node_list_append(node);
 
 error:
@@ -5469,11 +6144,30 @@ CNDEF Cn_Ast_Idx cn_ast_try_parse_type_specifier(Cn_Lexer *lexer, Cn_Ast_Idx out
         }
     }
 
-    // INCOMPLETE:
     // Checking if token is typedef.
+    {   
+        Cn_Ast_Binding_Idx *ref = cn_hash_table_get(&cn_ast_symbol_binding_table, &lexer->token.str);
+        if (ref != NULL && cn_ast_binding_list[*ref].kind == CN_BINDING_TYPEDEF) {
+            // TODO: String saving.
+            node->type_specifier.typedef_name = lexer->token.str;
+
+            node->type_specifier.kind = CN_AST_TYPE_TYPEDEF;
+            cn_ast_next_token(lexer);
+
+            return 0;
+        }
+    }
     
-    // INCOMPLETE:
-    // Checking if token(s) is struct or union.
+    // Checking if token is struct or union.
+    if (cn_str_equals(&lexer->token.str, &CN_STRUCT_STR) || cn_str_equals(&lexer->token.str, &CN_UNION_STR)) {
+        Cn_Ast_Idx struct_or_union_idx = cn_ast_parse_struct_or_union_specifier(lexer);
+        if (struct_or_union_idx == CN_AST_NIL_IDX) goto error;
+        node->type_specifier.struct_or_union_idx = struct_or_union_idx;
+        
+        node->type_specifier.kind = CN_AST_TYPE_STRUCT_OR_UNION;
+
+        return 0;
+    }
 
     // INCOMPLETE:
     // Checking if token(s) is enum specifier.
@@ -5551,13 +6245,39 @@ CNDEF Cn_Ast_Idx cn_ast_parse_type_name(Cn_Lexer *lexer) {
 
     Cn_Ast_Node node = { .kind = CN_AST_NODE_TYPE_NAME };
 
-    // Copypasta from declaration specifiers.
-    node.type_name.type_specifier_idx = cn_ast_node_list_append((Cn_Ast_Node) { .kind = CN_AST_NODE_TYPE_SPECIFIER });
+    Cn_Ast_Idx specifier_qualifier_idx = cn_ast_parse_specifier_qualifier(lexer);
+    if (specifier_qualifier_idx == CN_AST_NIL_IDX) goto error;
+    node.type_name.specifier_qualifier_idx = specifier_qualifier_idx;
+    
+    Cn_Ast_Idx abstract_declarator_idx = cn_ast_parse_declarator(lexer);
+    if (abstract_declarator_idx == CN_AST_NIL_IDX) goto error;
+    
+    if (cn_ast_node_get(abstract_declarator_idx)->kind != CN_AST_NODE_ABSTRACT_DECLARATOR) {
+        cn_log(CN_ERROR, "Only abstract declarator is allowed in type name.");
+        cn_lexer_print_snippet_token(lexer);
+        goto error;
+    }
+
+    node.type_name.abstract_declarator_idx = abstract_declarator_idx;
+
+    return cn_ast_node_list_append(node);
+
+error:
+    *lexer = original_state;
+    return CN_AST_NIL_IDX;
+}
+
+CNDEF Cn_Ast_Idx cn_ast_parse_specifier_qualifier(Cn_Lexer *lexer) {
+    Cn_Lexer original_state = *lexer;
+
+    Cn_Ast_Node node = { .kind = CN_AST_NODE_SPECIFIER_QUALIFIER };
+
+    node.specifier_qualifier.type_specifier_idx = cn_ast_node_list_append((Cn_Ast_Node) { .kind = CN_AST_NODE_TYPE_SPECIFIER });
 
     bool at_least_one = false;
     int ok;
     while (true) {
-        ok = cn_ast_try_parse_qualifier(lexer, &node.type_name.qualifiers);
+        ok = cn_ast_try_parse_qualifier(lexer, &node.specifier_qualifier.qualifiers);
         if (ok == 0) {
             at_least_one = true;
             continue;
@@ -5565,7 +6285,7 @@ CNDEF Cn_Ast_Idx cn_ast_parse_type_name(Cn_Lexer *lexer) {
         if (ok == 2)
             goto error;
     
-        ok = cn_ast_try_parse_type_specifier(lexer, node.type_name.type_specifier_idx);
+        ok = cn_ast_try_parse_type_specifier(lexer, node.specifier_qualifier.type_specifier_idx);
         if (ok == 0) {
             at_least_one = true;
             continue;
@@ -5584,7 +6304,7 @@ CNDEF Cn_Ast_Idx cn_ast_parse_type_name(Cn_Lexer *lexer) {
     }
 
     // Validation of type specifier.
-    Cn_Ast_Node *ts = cn_ast_node_get(node.declaration_specifiers.type_specifier_idx);
+    Cn_Ast_Node *ts = cn_ast_node_get(node.specifier_qualifier.type_specifier_idx);
 
     // Implicit int case.
     if (ts->type_specifier.kind == CN_AST_TYPE_NONE) {
@@ -5602,18 +6322,6 @@ CNDEF Cn_Ast_Idx cn_ast_parse_type_name(Cn_Lexer *lexer) {
         cn_lexer_print_snippet_token(lexer);
         goto error;
     }
-    
-    Cn_Ast_Idx abstract_declarator_idx = cn_ast_parse_declarator(lexer);
-    if (abstract_declarator_idx == CN_AST_NIL_IDX) goto error;
-    
-    if (cn_ast_node_get(abstract_declarator_idx)->kind != CN_AST_NODE_ABSTRACT_DECLARATOR) {
-        cn_log(CN_ERROR, "Only abstract declarator is allowed in type name.");
-        cn_lexer_print_snippet_token(lexer);
-        goto error;
-    }
-
-    node.type_name.abstract_declarator_idx = abstract_declarator_idx;
-
     return cn_ast_node_list_append(node);
 
 error:
@@ -5672,9 +6380,362 @@ error:
     return CN_AST_NIL_IDX;
 }
 
+CNDEF Cn_Ast_Idx cn_ast_parse_struct_or_union_specifier(Cn_Lexer *lexer) {
+    Cn_Lexer original_state = *lexer;
+
+    Cn_Ast_Node node = {0};
+
+    if (cn_str_equals(&lexer->token.str, &CN_STRUCT_STR)) {
+        node.kind = CN_AST_NODE_STRUCT_SPECIFIER;
+    } else if (cn_str_equals(&lexer->token.str, &CN_UNION_STR)) {
+        node.kind = CN_AST_NODE_UNION_SPECIFIER;
+    } else {
+        cn_log(CN_ERROR, "Not a struct or union specifier.");
+        cn_lexer_print_snippet_token(lexer);
+        goto error;
+    }
+
+    cn_ast_next_token(lexer);
+    
+    // Parse tag identifier.
+    if (!cn_lexer_expect(lexer, CN_TOKEN_CURLY_OPEN)) {
+        Cn_String tag = cn_ast_parse_identifier(lexer);
+        node.kind == CN_AST_NODE_STRUCT_SPECIFIER ? (node.struct_specifier.tag = tag) : (node.union_specifier.tag = tag);
+    }
+
+    // Parsing struct or union body.
+    if (cn_lexer_expect(lexer, CN_TOKEN_CURLY_OPEN)) {
+        cn_ast_next_token(lexer);
+
+        Cn_Ast_Linked_List member_declaration_list = {0};
+        Cn_Ast_Idx member_declaration_idx;
+        while (!cn_lexer_expect(lexer, CN_TOKEN_CURLY_CLOSE)) {
+            member_declaration_idx = cn_ast_parse_member_declaration(lexer);
+            if (member_declaration_idx == CN_AST_NIL_IDX) goto error;
+            cn_ast_linked_list_add(&member_declaration_list, member_declaration_idx);
+        }
+        cn_ast_next_token(lexer);
+
+        node.kind == CN_AST_NODE_STRUCT_SPECIFIER ? (node.struct_specifier.member_declaration_list = member_declaration_list) : (node.union_specifier.member_declaration_list = member_declaration_list);
+    }
+
+
+    return cn_ast_node_list_append(node);
+
+error:
+    *lexer = original_state;
+    return CN_AST_NIL_IDX;
+}
+
+CNDEF Cn_Ast_Idx cn_ast_parse_member_declaration(Cn_Lexer *lexer) {
+    Cn_Lexer original_state = *lexer;
+
+    Cn_Ast_Node node = { .kind = CN_AST_NODE_MEMBER_DECLARATION };
+
+    Cn_Ast_Idx specifier_qualifier_idx = cn_ast_parse_specifier_qualifier(lexer);
+    if (specifier_qualifier_idx == CN_AST_NIL_IDX) goto error;
+    node.member_declaration.specifier_qualifier_idx = specifier_qualifier_idx;
+
+    if (cn_ast_parse_member_declarator_list(lexer, &node.member_declaration.member_declarator_list) != 0) 
+        goto error;
+
+    if (!cn_lexer_expect(lexer, CN_TOKEN_SEMICOLON)) {
+        cn_log(CN_ERROR, "Expected ';' at the end of member declaration.");
+        cn_lexer_print_snippet_token(lexer);
+    }
+    cn_ast_next_token(lexer);
+
+    return cn_ast_node_list_append(node);
+
+error:
+    *lexer = original_state;
+    return CN_AST_NIL_IDX;
+}
+
+CNDEF int cn_ast_parse_member_declarator_list(Cn_Lexer *lexer, Cn_Ast_Linked_List *member_declarator_list) {
+    Cn_Lexer original_state = *lexer;
+
+    while (true) {
+        Cn_Ast_Idx member_declarator_idx = cn_ast_parse_member_declarator(lexer);
+        if (member_declarator_idx == CN_AST_NIL_IDX) goto error;
+        cn_ast_linked_list_add(member_declarator_list, member_declarator_idx);
+
+        if (!cn_lexer_expect(lexer, CN_TOKEN_COMMA)) break;
+        cn_ast_next_token(lexer);
+    }
+    
+    return 0;
+
+error:
+    *lexer = original_state;
+    return -1;
+}
+
+CNDEF Cn_Ast_Idx cn_ast_parse_member_declarator(Cn_Lexer *lexer) {
+    Cn_Lexer original_state = *lexer;
+
+    Cn_Ast_Node node = { .kind = CN_AST_NODE_MEMBER_DECLARATOR };
+
+    if (!cn_lexer_expect(lexer, CN_TOKEN_COLON)) {
+        Cn_Ast_Idx declarator_idx = cn_ast_parse_declarator(lexer);
+        if (declarator_idx == CN_AST_NIL_IDX) goto error;
+        node.member_declarator.declarator_idx = declarator_idx;
+    }
+
+    if (cn_lexer_expect(lexer, CN_TOKEN_COLON)) {
+        cn_ast_next_token(lexer);
+
+        Cn_Ast_Idx expression_idx = cn_ast_parse_expression(lexer, 0, CN_NO_COMMA_OPERATOR);
+        if (expression_idx == CN_AST_NIL_IDX) goto error;
+        node.member_declarator.bitfield_expression_idx = expression_idx;
+    }
+
+    return cn_ast_node_list_append(node);
+
+error:
+    *lexer = original_state;
+    return CN_AST_NIL_IDX;
+}
+
 CNDEF Cn_Ast_Idx cn_ast_parse_attribute_specifier_sequence(Cn_Lexer *lexer) {
     CN_TODO("AST attribute specifier sequence.");
 }
+
+CNDEF Cn_Type *cn__ast_add_type_if_not(Cn_Type *type) {
+    if (!cn_hash_set_contains(&cn_ast_type_ptr_set, type)) {
+        // Arena allocate memory for type.
+        Cn_Type *result = cn_chained_arena_alloc(&cn_ast_type_arena, sizeof(Cn_Type));
+        *result = *type;
+
+        cn_hash_set_put(&cn_ast_type_ptr_set, result);
+        return result;
+    } else {
+        // Acts as a get, since type is already in there, 
+        // the put will return actual item stored in the hash set.
+        return cn_hash_set_put(&cn_ast_type_ptr_set, type);
+    }
+}
+
+CNDEF Cn_Type *cn_ast_to_type(Cn_Qualifier_Flags flags, Cn_Ast_Idx type_specifier_idx, Cn_Ast_Idx declarator_idx) {
+    Cn_Type type = {0};
+
+    Cn_Ast_Node *ts   = cn_ast_node_get(type_specifier_idx);
+    Cn_Type *result;
+    switch (ts->type_specifier.kind) {
+        case CN_AST_TYPE_INT:
+            type.kind = CN_INTEGER;
+
+            type.t_integer.is_signed = ts->type_specifier.sign != CN_AST_TYPE_SIGN_UNSIGNED;
+            
+            switch (ts->type_specifier.width) {
+                case CN_AST_TYPE_WIDTH_NONE:
+                    type.size = sizeof(int);
+                    break;
+                case CN_AST_TYPE_WIDTH_SHORT:
+                    type.size = sizeof(short);
+                    break;
+                case CN_AST_TYPE_WIDTH_LONG:
+                    type.size = sizeof(long);
+                    break;
+                case CN_AST_TYPE_WIDTH_LONG_LONG:
+                    type.size = sizeof(long long);
+                    break;
+            }
+
+            type.align = type.size;
+
+            result = cn__ast_add_type_if_not(&type);
+            break;
+        case CN_AST_TYPE_CHAR:
+            type.kind = CN_INTEGER;
+
+            type.t_integer.is_signed = ts->type_specifier.sign != CN_AST_TYPE_SIGN_UNSIGNED;
+
+            type.size = sizeof(char);
+            type.align = type.size;
+
+            result = cn__ast_add_type_if_not(&type);
+            break;
+        case CN_AST_TYPE_FLOAT:
+            type.kind = CN_FLOAT;
+
+            type.size = sizeof(float);
+            type.align = type.size;
+
+            result = cn__ast_add_type_if_not(&type);
+            break;
+        case CN_AST_TYPE_DOUBLE:
+            type.kind = CN_FLOAT;
+
+            type.size = sizeof(double);
+            type.align = type.size;
+
+            result = cn__ast_add_type_if_not(&type);
+            break;
+        case CN_AST_TYPE_BOOL:
+            type.kind = CN_BOOL;
+
+            type.size = sizeof(bool);
+            type.align = type.size;
+
+            result = cn__ast_add_type_if_not(&type);
+            break;
+        case CN_AST_TYPE_VOID:
+            type.kind = CN_VOID;
+
+            type.size = sizeof(void);
+            type.align = type.size;
+
+            result = cn__ast_add_type_if_not(&type);
+            break;
+        case CN_AST_TYPE_STRUCT_OR_UNION:
+            Cn_Ast_Node *struct_or_union = cn_ast_node_get(ts->type_specifier.struct_or_union_idx);
+            if (struct_or_union->kind == CN_AST_NODE_STRUCT_SPECIFIER) {
+                type.kind = CN_STRUCT;
+                type.t_struct.tag = struct_or_union->struct_specifier.tag;
+                type.t_struct.is_complete = false;
+                
+                // First adding struct as incomplete type.
+                result = cn__ast_add_type_if_not(&type);
+
+                // If declarations present, construct full struct type.
+                // But if struct was already defined, error.
+                if (struct_or_union->struct_specifier.member_declaration_list.length > 0) {
+                    if (result->t_struct.is_complete) {
+                        cn_log(CN_ERROR, "Struct '%.*s' is already defined, this tool doesn't support multiple struct definitions with the same name.", CN_UNPACK(result->t_struct.tag));
+                        return NULL;
+                    }
+
+                    
+                    // Determining members length.
+                    result->t_struct.members_length = 0;
+                    cn_ast_linked_list_foreach(m, &struct_or_union->struct_specifier.member_declaration_list) {
+                       result->t_struct.members_length += m->member_declaration.member_declarator_list.length;
+                    }
+
+                    result->t_struct.members = cn_chained_arena_alloc(&cn_ast_type_children_arena, result->t_struct.members_length * sizeof(Cn_Type_Struct_Member));
+
+                    // Converting members.
+                    Cn_Ast_Node *spec;
+                    Cn_Type *member_type;
+                    int i = 0;
+                    cn_ast_linked_list_foreach(m, &struct_or_union->struct_specifier.member_declaration_list) {
+                        spec = cn_ast_node_get(m->member_declaration.specifier_qualifier_idx);
+                        cn_ast_linked_list_foreach(d, &m->member_declaration.member_declarator_list) {
+                            member_type = cn_ast_to_type(spec->specifier_qualifier.qualifiers, spec->specifier_qualifier.type_specifier_idx, d->member_declarator.declarator_idx);
+                            result->t_struct.members[i] = (Cn_Type_Struct_Member) {
+                                .type = member_type,
+                            };
+                            i++;
+                        }
+                    }
+
+                    result->t_struct.is_complete = true;
+                }
+
+            } else {
+                CN_TODO("Union to type conversion.");
+            }
+            break;
+        case CN_AST_TYPE_UNION:
+            CN_TODO("Union to type conversion.");
+            break;
+        case CN_AST_TYPE_TYPEDEF:
+            Cn_Ast_Binding_Idx *ref = cn_hash_table_get(&cn_ast_symbol_binding_table, &ts->type_specifier.typedef_name);
+            result = cn_ast_binding_list[*ref].type;
+            break;
+        case CN_AST_TYPE_NONE:
+            return NULL;
+        default:
+            break;
+    }
+    
+    // Declarator traversal.
+    {
+        Cn_Ast_Node *decl = cn_ast_node_get(declarator_idx);
+
+        while (true) {
+            // Pointer traversal.
+            {
+                Cn_Ast_Idx pointer_idx = decl->declarator.pointer_idx;
+                Cn_Ast_Node *ptr;
+                while (pointer_idx != CN_AST_NIL_IDX) {
+                    ptr = cn_ast_node_get(pointer_idx);
+
+                    type = (Cn_Type) { .kind = CN_POINTER };
+                    type.size = sizeof(void *);
+                    type.align = type.size;
+                    type.t_pointer.ptr_to = result;
+                    result = cn__ast_add_type_if_not(&type);
+
+                    pointer_idx = ptr->pointer.pointer_idx;
+                }
+            }
+
+            // Direct Declarator traversal.
+            Cn_Ast_Idx direct_declarator_idx = decl->declarator.direct_declarator_idx;
+            Cn_Ast_Node *dd;
+
+
+            while (direct_declarator_idx != CN_AST_NIL_IDX) {
+                dd = cn_ast_node_get(direct_declarator_idx);
+
+                if (dd->direct_declarator.kind == CN_DD_IDENTIFIER) 
+                    break;
+
+                if (dd->direct_declarator.kind == CN_DD_GROUPED) {
+                    decl = cn_ast_node_get(dd->direct_declarator.declarator_idx);
+                    break;
+                }
+
+                switch (dd->direct_declarator.kind) {
+                    case CN_DD_ARRAY:
+                        direct_declarator_idx = dd->direct_declarator.dd_array.direct_declarator_idx;
+                        break;
+                    case CN_DD_FUNCTION:
+                        direct_declarator_idx = dd->direct_declarator.dd_function.direct_declarator_idx;
+                        
+                        type = (Cn_Type) { .kind = CN_FUNCTION };
+                        type.size = 0;
+                        type.align = 0;
+                        type.t_function.return_type = result;
+                        
+                        Cn_Ast_Node *params_list = cn_ast_node_get(dd->direct_declarator.dd_function.parameter_type_list_idx);
+
+                        type.t_function.params_length = params_list->parameter_type_list.parameter_declaration_list.length;
+                        
+                        if (type.t_function.params_length > 0) {
+                            type.t_function.params = cn_chained_arena_alloc(&cn_ast_type_children_arena, sizeof(Cn_Type_Function_Param) * type.t_function.params_length);
+                        
+                            Cn_Ast_Node *decl_spec;
+                            Cn_Type *param_type;
+                            int64_t i = 0;
+                            cn_ast_linked_list_foreach(p, &params_list->parameter_type_list.parameter_declaration_list) {
+                                decl_spec = cn_ast_node_get(p->parameter_declaration.declaration_specifiers_idx);
+                                param_type = cn_ast_to_type(decl_spec->declaration_specifiers.qualifiers, decl_spec->declaration_specifiers.type_specifier_idx, p->parameter_declaration.declarator_idx);
+
+                                type.t_function.params[i] = (Cn_Type_Function_Param) {              
+                                    .type = param_type,
+                                };
+                                i++;
+                            }
+                        }
+
+                        result = cn__ast_add_type_if_not(&type);
+                        break;
+                    default:
+                        break;
+                }
+            }
+
+            if (direct_declarator_idx == CN_AST_NIL_IDX || dd->direct_declarator.kind == CN_DD_IDENTIFIER) 
+                break;
+        }
+    }
+    
+    return result;
+}
+
 
 
 // PRE-PROCESSING SECTION
@@ -5787,15 +6848,54 @@ CNDEF int cn_tu_process(Cn_Translation_Unit *tu) {
     cn_lexer_init(&lexer, tu->content);
     cn_ast_next_token(&lexer);
 
-
-
     Cn_Ast_Idx idx = cn_ast_parse_translation_unit(&lexer);
 
     if (idx == CN_AST_NIL_IDX) {
         return -1;
     }
 
+    cn_log(CN_INFO, "Parsed main.i:");
     cn_ast_print(cn_ast_node_get(idx), 0);
+    fputc('\n', stderr);
+
+    // Printing type set.
+    cn_log(CN_INFO, "Type set main.i:" CN_ANSI_BLUE);
+    for (int i = 0; i < cn_hash_set_header(&cn_ast_type_ptr_set)->capacity; i++) {
+        if (cn__hash_set_get_slot(cn_hash_set_header(&cn_ast_type_ptr_set), i)->state == CN_HASH_SET_SLOT_OCCUPIED) {
+            cn_type_print(stderr, cn_ast_type_ptr_set[i]);
+            fputc('\n', stderr);
+        }
+    }
+    fprintf(stderr, CN_ANSI_RESET"\n");
+
+    // Printing binding tables.
+    cn_log(CN_INFO, "Symbol bindings main.i:" CN_ANSI_BRIGHT_YELLOW);
+    for (int i = 0; i < cn_array_list_length(&cn_ast_binding_list); i++) {
+        switch (cn_ast_binding_list[i].kind) {
+            case CN_BINDING_VARIABLE:
+                fputs("VARIABLE    ", stderr);
+                break;
+            case CN_BINDING_FUCNTION:
+                fputs("FUNCTION    ", stderr);
+                break;
+            case CN_BINDING_TYPEDEF:
+                fputs("TYPEDEF     ", stderr);
+                break;
+            case CN_BINDING_ENUM_CONSTANT:
+                fputs("ENUM CONST  ", stderr);
+                break;
+            default:
+                break;
+        }
+
+        fprintf(stderr, "%.*s -> ", CN_UNPACK(cn_ast_binding_list[i].name));
+        cn_type_print(stderr, cn_ast_binding_list[i].type);
+        fputc('\n', stderr);
+    }
+    fprintf(stderr, CN_ANSI_RESET"\n");
+
+    // cn_log(CN_INFO, "Tag bindings main.i:" CN_ANSI_YELLOW);
+    // fprintf(stderr, CN_ANSI_RESET"\n");
 
     return 0;
 }
