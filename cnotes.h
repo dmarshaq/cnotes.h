@@ -190,7 +190,13 @@ CNDEF Cn_String cn_str_substring(Cn_String str, int64_t start, int64_t end);
  * Linearly searches for the first occurnse of "search" in "str" from the LEFT, by comparing them through "cn_str_equals()" function.
  * RETURNS: Index of first character of the occurns, otherwise, returns -1.
  */
-CNDEF int64_t cn_str_find(Cn_String str, Cn_String search);
+CNDEF int64_t cn_str_find_left(Cn_String str, Cn_String search);
+
+/**
+ * Linearly searches for the first occurnse of "search" in "str" from the RIGHT, by comparing them through "cn_str_equals()" function.
+ * RETURNS: Index of first character of the occurns, otherwise, returns -1.
+ */
+CNDEF int64_t cn_str_find_right(Cn_String str, Cn_String search);
 
 /**
  * Linearly searches for the first occurnse of char "symbol" in "str" from the LEFT, by comparing each char in "str".
@@ -308,6 +314,74 @@ CNDEF bool cn_str_equals(const Cn_String *str1, const Cn_String *str2);
  */
 CNDEF uint64_t cn_str_hash(const Cn_String *str);
 
+// STRING BUILDER SECTION
+typedef struct {
+    int64_t capacity;
+    int64_t length;
+    char *data;
+} Cn_String_Builder;
+
+#define CN_SB_STACK_STORAGE_CAP 32
+
+/**
+ * This macro allocated new Cn_String_Builder on the stack if capacity is small enough,
+ * otherwise allocates it on the heap.
+ *
+ * IMPORTANT: String builder lifetime thus depends on the life time of stack allocated string.
+ * If greater life time needed make sure to heap allocate string builder,
+ * or make sure it is resized to be heap allocated.
+ */
+#define CN_SB_MAKE(cap) ((cap) <= CN_SB_STACK_STORAGE_CAP ? ((Cn_String_Builder) { CN_SB_STACK_STORAGE_CAP, 0, (char *)(char[CN_SB_STACK_STORAGE_CAP]){}}) : cn__sb_make(cap))
+
+/**
+ * Constructs new string builder with specified initial capacity.
+ * Heap allocates the string builder.
+ *
+ * IMPORTANT: Expects initial_capacity > CN_SB_STACK_STORAGE_CAP.
+ */
+CNDEF Cn_String_Builder cn__sb_make(int64_t initial_capacity);
+
+/**
+ * Free's heap memory occupied by string builder, 
+ * only if capacity > CN_SB_STACK_STORAGE_CAP.
+ */
+CNDEF void cn_sb_free(Cn_String_Builder *sb);
+
+/**
+ * Clears all contents of string builder, by setting it's length to 0.
+ * Doesn't allocate or free any memory.
+ */
+CNDEF void cn_sb_clear(Cn_String_Builder *sb);
+
+/**
+ * Appends char to the specified string builder.
+ */
+CNDEF void cn_sb_append_char(Cn_String_Builder *sb, char c);
+
+/**
+ * Appends string to the specified string builder.
+ */
+CNDEF void cn_sb_append_str(Cn_String_Builder *sb, Cn_String str);
+
+/**
+ * Formats string and appends output to the specified string builder.
+ */
+CNDEF void cn_sb_append_format(Cn_String_Builder *sb, char *format, ...);
+
+/**
+ * Reverses contents of the specified string builder.
+ */
+CNDEF void cn_sb_reverse(Cn_String_Builder *sb);
+
+/**
+ * Converts string builder back to str, that points to the memory used by string builder.
+ * 
+ * IMPORTANT: If string builder is freed memory occupied by the string might be invalid.
+ *
+ * After getting string it's contents can be copied elsewhere to prevent such invalidation.
+ */
+CNDEF Cn_String cn_sb_to_str(Cn_String_Builder *sb);
+
 // CHAINED ARENA SECTION
 
 /**
@@ -334,7 +408,7 @@ typedef struct {
     void *block;
 } Cn_Chained_Arena;
 
-#define CN_CHAINED_ARENA_BLOCK_HEADER(arena) (Cn_Chained_Arena_Block_Header *)((uint8_t *)(arena)->block - sizeof(Cn_Chained_Arena_Block_Header))
+#define CN_CHAINED_ARENA_BLOCK_HEADER(block) ((Cn_Chained_Arena_Block_Header *)((uint8_t *)(block) - sizeof(Cn_Chained_Arena_Block_Header)))
 
 typedef struct {
     void *prev;
@@ -374,6 +448,10 @@ void cn_chained_arena_dealloc(Cn_Chained_Arena *arena, uint64_t size);
  * this function will properly return.
  */
 int64_t cn_chained_arena_allocation_info(Cn_Chained_Arena *arena, void *allocation_ptr, uint64_t *offset);
+
+#define cn_ast_chained_arena_foreach_in_block(type, it, block) for (type *it = (type *)(block); (uint8_t *)it <= (uint8_t *)(block) + CN_CHAINED_ARENA_BLOCK_HEADER(block)->allocated - sizeof(type); it++)
+
+
 
 /**
  * Completely frees all memory occupied by the arena.
@@ -681,8 +759,31 @@ CNDEF void cn_lexer_print_snippet(Cn_Lexer *lexer, uint64_t index, int64_t lengt
 
 CNDEF void cn_lexer_print_snippet_token(Cn_Lexer *lexer);
 
-// TYPE SECTION
+typedef struct {
+    char *file;
+    int64_t line;
+    int64_t column;
+    int64_t bol;
+    int64_t length;
+} Cn_Source_Loc;
 
+/**
+ * Prints source code snippet message.
+ *  
+ * file.c:46:8
+ *  45 |         
+ *  46 | typedef struct vec2f {
+ *     |         ^~~~~~
+ *  47 |    float x;
+ */
+CNDEF void cn_print_snippet(FILE *file, Cn_String source, Cn_Source_Loc *loc);
+
+/**
+ * Returns source location of the current lexer token.
+ */
+CNDEF Cn_Source_Loc cn_lexer_loc(Cn_Lexer *lexer);
+
+// TYPE SECTION
 typedef struct cn_type Cn_Type;
 
 typedef enum : uint8_t {
@@ -698,6 +799,9 @@ typedef enum : uint8_t {
     CN_UNION,
     CN_UNKNOWN,
 } Cn_Type_Kind;
+
+#define CN_INVALID_SIZE    -1
+#define CN_INVALID_ALIGN   -1
 
 typedef struct {
     bool is_signed;
@@ -729,7 +833,7 @@ typedef struct {
 
 typedef struct {
     Cn_String tag;
-    bool is_complete;
+    
     int64_t members_length;
     Cn_Type_Struct_Member *members;
 } Cn_Type_Struct;
@@ -751,9 +855,10 @@ typedef struct {
 } Cn_Type_Enum;
 
 struct cn_type {
+    bool is_complete;
     int64_t size;
     int64_t align;
-    
+
     Cn_Type_Kind kind;
     union {
         Cn_Type_Integer   t_integer;
@@ -775,6 +880,15 @@ CNDEF bool cn_type_equals(const Cn_Type *type1, const Cn_Type *type2);
  * RETURNS: Hash of specified type.
  */
 CNDEF uint64_t cn_type_hash(const Cn_Type *type);
+
+/**
+ * Converts type to string and copies contents to the buffer.
+ * 
+ * IMPORTANT: Buffer should be big enough to hold string, otherwise it will be cutoff short.
+ *
+ * RETURNS: Resulting string.
+ */
+CNDEF Cn_String cn_type_stringify(Cn_String buffer, const Cn_Type *type);
 
 CNDEF void cn_type_print(FILE *f, const Cn_Type *type);
 
@@ -850,7 +964,6 @@ typedef enum : uint8_t {
 
     CN_AST_TYPE_TYPEDEF,
     CN_AST_TYPE_STRUCT_OR_UNION,
-    CN_AST_TYPE_UNION,
 } Cn_Ast_Type_Kind;
 
 static const Cn_String CN_AST_TYPE_KINDS[] = {
@@ -1512,6 +1625,9 @@ extern Cn_Ast_Binding_Idx *cn_ast_symbol_binding_table;
  * since chained arena gurantees that memory once allocated is not moved.
  * Deallocation mechanism is used in the arena to "pop" string data once
  * it is out of scope.
+ *
+ * Used for binding names:
+ * Functions, Variables, Typedefs, Enums.
  */
 extern Cn_Chained_Arena cn_ast_saved_strings_data_arena;
 
@@ -1519,18 +1635,21 @@ extern Cn_Chained_Arena cn_ast_saved_strings_data_arena;
 #   define CN_AST_SAVED_STRINGS_DATA_ARENA_BLOCK_CAP 4096
 #endif // CN_AST_SAVED_STRINGS_DATA_ARENA_BLOCK_CAP
 
-// REDUNDANT?
-//
-// /**
-//  * Saved strings list is used to store every scoped string reference.
-//  * By storing struct Cn_String which contains both pointer to the string
-//  * and it's length.
-//  */
-// extern Cn_String *cn_ast_saved_strings_list;
-// 
-// #ifndef CN_AST_SAVED_STRINGS_LIST_INITIAL_CAP
-// #   define CN_AST_SAVED_STRINGS_LIST_INITIAL_CAP 64
-// #endif // CN_AST_SAVED_STRINGS_LIST_INITIAL_CAP
+/**
+ * Permanent strings arena is used to store strings data that lives 
+ * globally outside of source. Pointers to the data remain the same 
+ * throughout the execution. since chained arena gurantees that memory 
+ * once allocated is not moved.
+ *
+ * Used for type names, persistent names:
+ * Struct members, Tags, Parameters:
+ */
+extern Cn_Chained_Arena cn_ast_permanent_strings_arena;
+
+// #ifndef CN_AST_SAVED_STRINGS_DATA_ARENA_BLOCK_CAP
+// #   define CN_AST_SAVED_STRINGS_DATA_ARENA_BLOCK_CAP 4096
+// #endif // CN_AST_SAVED_STRINGS_DATA_ARENA_BLOCK_CAP
+
 
 /**
  * This struct simply contains information that each scope will have.
@@ -1545,6 +1664,8 @@ extern Cn_Ast_Scope *cn_ast_scope_stack;
 #ifndef CN_AST_SCOPE_STACK_INITIAL_CAP
 #   define CN_AST_SCOPE_STACK_INITIAL_CAP 64
 #endif // CN_AST_SCOPE_STACK_INITIAL_CAP
+
+#define CN_AST_SCOPE_STACK_CURRENT_IDX (cn_array_list_length(&cn_ast_scope_stack) - 1)
 
 /**
  * Returns scope that sits at the top of the scope stack.
@@ -1562,11 +1683,40 @@ CNDEF void cn_ast_scope_stack_push();
 CNDEF void cn_ast_scope_stack_pop();
 
 /**
- * Adds new binding to the current scope.
- * 
+ * Adds new symbol binding to the current scope.
+ * If same binding already exists handles redefinition of the binding.
+ * Handles: Variables, Typedefs, Functions, Enum Constants.
+ *
  * RETURNS: Empty string if error occured, valid saved name if binding was added.
+ *
+ * TODO: Replace string return on Cn_Ast_Binding * return.
  */
-CNDEF Cn_String cn_ast_scope_stack_add_binding(Cn_String name, Cn_Ast_Binding_Kind kind, Cn_Type *type);
+CNDEF Cn_String cn_ast_symbol_binding_add(Cn_String name, Cn_Ast_Binding_Kind kind, Cn_Type *type);
+
+/**
+ * Declares new tag binding to the current scope. 
+ *
+ * If same binding already exists handles redeclaration.
+ *  -   If binding exists and complete from any scope, including current scope, 
+ *      it will return that binding from that scope.
+ *  -   If binding exists but not completed in different scope, 
+ *      it will declare new binding in current scope.
+ *  -   If binding exists but not completed in current scope, 
+ *      it will reference that declaration.
+ *  -   If binding doesn't exist it will declare new binding in current scope.
+ *
+ * RETURNS: NULL if error occured, binding on success.
+ */
+CNDEF Cn_Ast_Binding_Idx cn_ast_tag_binding_declare(Cn_String tag, Cn_Type_Kind kind);
+
+/**
+ * Given tag returns it's most recent binding.
+ *
+ * RETURNS: Pointer to binding, NULL if tag is not binded.
+ */
+CNDEF Cn_Ast_Binding_Idx cn_ast_tag_binding_get(Cn_String tag);
+
+extern Cn_String cn_ast_source;
 
 /**
  * Inits ast functionality, called once before parsing begins.
@@ -2427,9 +2577,9 @@ typedef struct {
 #endif // CN_TU_MODIFICATION_LIST_INITIAL_CAP
 
 typedef struct {
-    int64_t          version;
-    char *           path;
-    Cn_String        content;
+    int64_t version;
+    char *path;
+    Cn_String content;
     Cn_Modification *modification_list;
 } Cn_Translation_Unit;
 
@@ -2533,13 +2683,27 @@ CNDEF Cn_String cn_str_substring(Cn_String str, int64_t start, int64_t end) {
     return CN_STR(end - start, str.data + start);
 }
 
-CNDEF int64_t cn_str_find(Cn_String str, Cn_String search) {
+CNDEF int64_t cn_str_find_left(Cn_String str, Cn_String search) {
     Cn_String substr;
     for (int64_t i = 0; i + search.length <= str.length; i++) {
         if (str.data[i] == search.data[0]) {
             substr = cn_str_substring(str, i, i + search.length);
             if (cn_str_equals(&substr, &search)) {
                 return i;
+            }
+        }
+    }
+    
+    return -1;
+}
+
+CNDEF int64_t cn_str_find_right(Cn_String str, Cn_String search) {
+    Cn_String substr;
+    for (int64_t i = str.length - 1; i - search.length + 1 > -1; i--) {
+        if (str.data[i] == search.data[search.length - 1]) {
+            substr = cn_str_substring(str, i - search.length + 1, i + 1);
+            if (cn_str_equals(&substr, &search)) {
+                return i - search.length + 1;
             }
         }
     }
@@ -2823,6 +2987,129 @@ CNDEF uint64_t cn_str_hash(const Cn_String *str) {
     return cn_hash_bytes(str->data, str->length);
 }
 
+// STRING BUILDER SECTION
+CNDEF Cn_String_Builder cn__sb_make(int64_t initial_capacity) {
+    CN_ASSERT(initial_capacity > CN_SB_STACK_STORAGE_CAP);
+    
+    char *data = CN_REALLOC(NULL, initial_capacity);
+
+    if (data == NULL){
+        cn_log(CN_ERROR, "Couldn't allocate memory of size: %lld bytes, for the string builder.", initial_capacity);
+        return (Cn_String_Builder) {0};
+    }
+
+    return (Cn_String_Builder) {
+        .capacity = initial_capacity,
+        .length = 0,
+        .data = data,
+    };
+}
+
+CNDEF void cn_sb_free(Cn_String_Builder *sb) {
+    if (sb->capacity > CN_SB_STACK_STORAGE_CAP) {
+        CN_FREE(sb->data);
+    }
+
+    sb->length = 0;
+    sb->capacity = 0;
+    sb->data = NULL;
+}
+
+CNDEF void cn_sb_clear(Cn_String_Builder *sb) {
+    sb->length = 0;
+}
+
+CNDEF void cn_sb_append_char(Cn_String_Builder *sb, char c) {
+    if (sb->length + 1 > sb->capacity) {
+        if (sb->capacity > CN_SB_STACK_STORAGE_CAP) {
+            sb->data = CN_REALLOC(sb->data, sb->capacity * 2);
+        } else {
+            char *old = sb->data;
+            sb->data = CN_REALLOC(NULL, sb->capacity * 2);
+            memcpy(sb->data, old, sb->length);
+        }
+
+        sb->capacity *= 2;
+    }
+
+    sb->data[sb->length] = c;
+    sb->length++;
+}
+
+CNDEF void cn_sb_append_str(Cn_String_Builder *sb, Cn_String str) {
+    if (sb->length + str.length > sb->capacity) {
+        // IMPORTANT: To understand where this calculation comes from check cn__array_list_resize_to_fit implementation.
+        // It uses same calculation that simplifies pow and log of base 2 caluclation to just using bit manipulation.
+        int64_t ratio = (sb->length + str.length) / sb->capacity;
+        if (ratio < 1) ratio = 1;
+        int highest_bit_pos = 63 - CN_COUNT_LEADING_ZEROS(ratio);
+        CN_ASSERT(highest_bit_pos >= 0);
+        int64_t capacity_multiplier = (int64_t)(1 << (highest_bit_pos + 1));
+
+        if (sb->capacity > CN_SB_STACK_STORAGE_CAP) {
+            sb->data = CN_REALLOC(sb->data, sb->capacity * capacity_multiplier);
+        } else {
+            char *old = sb->data;
+            sb->data = CN_REALLOC(NULL, sb->capacity * capacity_multiplier);
+            memcpy(sb->data, old, sb->length);
+        }
+
+        sb->capacity *= capacity_multiplier;
+    }
+
+    memcpy(sb->data + sb->length, str.data, str.length);
+    sb->length += str.length;
+}
+
+CNDEF void cn_sb_append_format(Cn_String_Builder *sb, char *format, ...) {
+    va_list args;
+    va_start(args, format);
+    int length = vsnprintf(NULL, 0, format, args);
+    va_end(args);
+
+    if (length < 0) return;
+
+    if (sb->length + length + 1 > sb->capacity) {
+        // IMPORTANT: To understand where this calculation comes from check cn__array_list_resize_to_fit implementation.
+        // It uses same calculation that simplifies pow and log of base 2 caluclation to just using bit manipulation.
+        int64_t ratio = (sb->length + length + 1) / sb->capacity;
+        if (ratio < 1) ratio = 1;
+        int highest_bit_pos = 63 - CN_COUNT_LEADING_ZEROS(ratio);
+        CN_ASSERT(highest_bit_pos >= 0);
+        int64_t capacity_multiplier = (int64_t)(1 << (highest_bit_pos + 1));
+
+        if (sb->capacity > CN_SB_STACK_STORAGE_CAP) {
+            sb->data = CN_REALLOC(sb->data, sb->capacity * capacity_multiplier);
+        } else {
+            char *old = sb->data;
+            sb->data = CN_REALLOC(NULL, sb->capacity * capacity_multiplier);
+            memcpy(sb->data, old, sb->length);
+        }
+
+        sb->capacity *= capacity_multiplier;
+    }
+
+    va_start(args, format);
+    vsnprintf(sb->data + sb->length, length + 1, format, args);
+    va_end(args);
+
+    sb->length += length;
+}
+
+CNDEF void cn_sb_reverse(Cn_String_Builder *sb) {
+    char temp;
+    for (int64_t i = 0; i < sb->length / 2; i++) {
+        temp = sb->data[i];
+        sb->data[i] = sb->data[sb->length - 1 - i];
+        sb->data[sb->length - 1 - i] = temp;
+    }
+}
+
+CNDEF Cn_String cn_sb_to_str(Cn_String_Builder *sb) {
+    return CN_STR(sb->length, sb->data);
+}
+
+
 // CHAINED ARENA SECTION
 Cn_Chained_Arena cn_chained_arena_make(uint64_t block_capacity) {
     CN_ASSERT(block_capacity > 0);
@@ -2842,7 +3129,7 @@ void *cn_chained_arena_alloc(Cn_Chained_Arena *arena, uint64_t size) {
     CN_ASSERT(size > 0);
     CN_ASSERT(size <= arena->block_capacity);
 
-    Cn_Chained_Arena_Block_Header *header = CN_CHAINED_ARENA_BLOCK_HEADER(arena);
+    Cn_Chained_Arena_Block_Header *header = CN_CHAINED_ARENA_BLOCK_HEADER(arena->block);
 
     if ((header->allocated + size) > arena->block_capacity) {
         header = (Cn_Chained_Arena_Block_Header *)CN_REALLOC(NULL, sizeof(Cn_Chained_Arena_Block_Header) + arena->block_capacity);
@@ -2858,7 +3145,7 @@ void *cn_chained_arena_alloc(Cn_Chained_Arena *arena, uint64_t size) {
 }
 
 void cn_chained_arena_dealloc(Cn_Chained_Arena *arena, uint64_t size) {
-    Cn_Chained_Arena_Block_Header *header = CN_CHAINED_ARENA_BLOCK_HEADER(arena);
+    Cn_Chained_Arena_Block_Header *header = CN_CHAINED_ARENA_BLOCK_HEADER(arena->block);
     uint64_t decrease;
 
     while (size > 0) {
@@ -2871,7 +3158,7 @@ void cn_chained_arena_dealloc(Cn_Chained_Arena *arena, uint64_t size) {
             CN_FREE(header);
         }
 
-        header = CN_CHAINED_ARENA_BLOCK_HEADER(arena);
+        header = CN_CHAINED_ARENA_BLOCK_HEADER(arena->block);
 
         decrease = size > header->allocated ? header->allocated : size;
         header->allocated -= decrease;
@@ -2885,7 +3172,7 @@ int64_t cn_chained_arena_allocation_info(Cn_Chained_Arena *arena, void *allocati
     Cn_Chained_Arena a = *arena;
 
     while (true) {
-        header = CN_CHAINED_ARENA_BLOCK_HEADER(&a);
+        header = CN_CHAINED_ARENA_BLOCK_HEADER(a.block);
         
         if (ptr >= (uint8_t *)a.block && ptr < ((uint8_t *)a.block + header->allocated)) {
             *offset = ptr - (uint8_t *)a.block;
@@ -2905,14 +3192,14 @@ int64_t cn_chained_arena_allocation_info(Cn_Chained_Arena *arena, void *allocati
     while (header->prev != NULL) {
         idx++;
         a.block = header->prev;
-        header = CN_CHAINED_ARENA_BLOCK_HEADER(&a);
+        header = CN_CHAINED_ARENA_BLOCK_HEADER(a.block);
     }
 
     return idx;
 }
 
 void cn_chained_arena_free(Cn_Chained_Arena *arena) {
-    Cn_Chained_Arena_Block_Header *header = CN_CHAINED_ARENA_BLOCK_HEADER(arena);
+    Cn_Chained_Arena_Block_Header *header = CN_CHAINED_ARENA_BLOCK_HEADER(arena->block);
 
     while (header->prev != NULL) {
         arena->block = header->prev;
@@ -3888,22 +4175,63 @@ CNDEF void cn_lexer_print_snippet(Cn_Lexer *lexer, uint64_t index, int64_t lengt
     fputs("\033[0m\n\n", stderr);
 }
 
-// TYPE SECTION
+CNDEF void cn_print_snippet(FILE *file, Cn_String source, Cn_Source_Loc *loc) {
+    // Printing location info.
+    fprintf(file, "%s:%ld:%ld\n", loc->file, loc->line, loc->column);
+    
+    // Printing previous line.
+    if (loc->line > 1) {
+        Cn_String left = cn_str_substring(source, 0, loc->bol - strlen(CN_LINE_END));
+        int64_t left_bol = cn_str_find_right(left, CN_CSTR(CN_LINE_END)) + strlen(CN_LINE_END);
 
+        left = cn_str_eat_chars(left, left_bol);
+        fprintf(file, "%4lu | %.*s"CN_LINE_END, loc->line - 1, CN_UNPACK(left));
+    }
+    
+    // Printing current line.
+    Cn_String line = cn_str_eat_chars(source, loc->bol);
+    int64_t end = cn_str_find_left(line, CN_CSTR(CN_LINE_END));
+    if (end == -1) end = source.length - loc->bol;
+    
+    line = cn_str_substring(line, 0, end);
+
+    int64_t underline_offset = loc->column - 1;
+    fprintf(file, "%4lu | %.*s", loc->line, CN_UNPACK(cn_str_substring(line, 0, underline_offset)));
+    fprintf(file, "\033[31m%.*s\033[0m", CN_UNPACK(cn_str_substring(line, underline_offset, underline_offset + loc->length)));
+    fprintf(file, "%.*s\n", CN_UNPACK(cn_str_substring(line, underline_offset + loc->length, line.length)));
+    fprintf(file, "     | %*s\033[31m^", (int)underline_offset, "");
+
+    for(int64_t i = 1; i < loc->length; i++)
+        fputc('~', file);
+
+    fputs("\033[0m\n", file);
+}
+
+CNDEF Cn_Source_Loc cn_lexer_loc(Cn_Lexer *lexer) {
+    return (Cn_Source_Loc)  {
+        .file = "",                     // TODO: Add file info here.
+        .line = lexer->token.line_num,
+        .column = lexer->cursor - lexer->token.str.length - lexer->bol + 1,
+        .bol = lexer->bol,
+        .length = lexer->token.str.length,
+    };
+}
+
+
+
+// TYPE SECTION
 CNDEF bool cn_type_equals(const Cn_Type *a, const Cn_Type *b) {
     if (a == b) return true;
 
     if (a->kind != b->kind) return false;
+    if (a->is_complete != b->is_complete) return false;
+    if (a->size != b->size && a->align != b->align) return false;
      
     switch (a->kind) {
         case CN_INTEGER:
-            if (a->size != b->size && a->align != b->align) return false;
-
             if (a->t_integer.is_signed != b->t_integer.is_signed) return false;
             break;
         case CN_POINTER:
-            if (a->size != b->size && a->align != b->align) return false;
-
             if (a->t_pointer.ptr_to != b->t_pointer.ptr_to) return false;
             break;
         case CN_FUNCTION:
@@ -3914,13 +4242,16 @@ CNDEF bool cn_type_equals(const Cn_Type *a, const Cn_Type *b) {
             }
             break;
         case CN_ARRAY:
-            if (a->size != b->size && a->align != b->align) return false;
-
             if (a->t_array.element_type != b->t_array.element_type) return false;
             if (a->t_array.length != b->t_array.length) return false;
             break;
         case CN_STRUCT:
-            return cn_str_equals(&a->t_struct.tag, &b->t_struct.tag);
+            if (!cn_str_equals(&a->t_struct.tag, &b->t_struct.tag)) return false;
+            if (a->t_struct.members_length != b->t_struct.members_length) return false;
+            for (int64_t i = 0; i < a->t_struct.members_length; i++) {
+                // TODO: Compare by member names.
+                if (a->t_struct.members[i].type != b->t_struct.members[i].type) return false;
+            }
             break;
         case CN_ENUM:
             break;
@@ -3935,16 +4266,15 @@ CNDEF bool cn_type_equals(const Cn_Type *a, const Cn_Type *b) {
 
 CNDEF uint64_t cn_type_hash(const Cn_Type *type) {
     uint64_t hash = cn_hash_u64(type->kind);
+    hash = cn_hash_mix(hash, cn_hash_u64(type->is_complete));
+    hash = cn_hash_mix(hash, cn_hash_u64(type->size));
+    hash = cn_hash_mix(hash, cn_hash_u64(type->align));
 
     switch (type->kind) {
         case CN_INTEGER:
-            hash = cn_hash_mix(hash, cn_hash_u64(type->size));
-            hash = cn_hash_mix(hash, cn_hash_u64(type->align));
             hash = cn_hash_mix(hash, cn_hash_u64(type->t_integer.is_signed));
             break;
         case CN_POINTER:
-            hash = cn_hash_mix(hash, cn_hash_u64(type->size));
-            hash = cn_hash_mix(hash, cn_hash_u64(type->align));
             hash = cn_hash_mix(hash, cn_hash_ptr(type->t_pointer.ptr_to));
             break;
         case CN_FUNCTION:
@@ -3955,14 +4285,15 @@ CNDEF uint64_t cn_type_hash(const Cn_Type *type) {
             }
             break;
         case CN_ARRAY:
-            hash = cn_hash_mix(hash, cn_hash_u64(type->size));
-            hash = cn_hash_mix(hash, cn_hash_u64(type->align));
             hash = cn_hash_mix(hash, cn_hash_ptr(type->t_array.element_type));
             hash = cn_hash_mix(hash, cn_hash_u64(type->t_array.length));
             break;
         case CN_STRUCT:
-            // Struct is nominal type.
             hash = cn_hash_mix(hash, cn_str_hash(&type->t_struct.tag));
+            hash = cn_hash_mix(hash, cn_hash_u64(type->t_struct.members_length));
+            for (int64_t i = 0; i < type->t_struct.members_length; i++) {
+                hash = cn_hash_mix(hash, cn_hash_ptr(type->t_struct.members[i].type));
+            }
             break;
         case CN_ENUM:
             break;
@@ -3975,97 +4306,148 @@ CNDEF uint64_t cn_type_hash(const Cn_Type *type) {
     return hash;
 }
 
-CNDEF void cn_type_print(FILE *f, const Cn_Type *t) {
-    if (!t) { fputs("<null>", f); return; }
+CNDEF void cn__type_stringify(const Cn_Type *type, Cn_String_Builder *left, Cn_String_Builder *right) {
+    switch (type->kind) {
+        case CN_VOID:    cn_sb_append_str(left, CN_CSTR("void"));      return;
+        case CN_BOOL:    cn_sb_append_str(left, CN_CSTR("_Bool"));     return;
+        case CN_UNKNOWN: cn_sb_append_str(left, CN_CSTR("<unknown>")); return;
+
+        case CN_INTEGER: {
+            if (!type->t_integer.is_signed) cn_sb_append_str(left, CN_CSTR("unsigned "));
+            switch (type->size) {
+                case 1:  cn_sb_append_str(left, CN_CSTR("char"));      return;
+                case 2:  cn_sb_append_str(left, CN_CSTR("short"));     return;
     
-    switch (t->kind) {
-        case CN_VOID:    fputs("void", f); return;
-        case CN_BOOL:    fputs("_Bool", f); return;
-        case CN_UNKNOWN: fputs("<unknown>", f); return;
-        
-        case CN_INTEGER:
-            if (!t->t_integer.is_signed) fputs("unsigned ", f);
-            switch (t->size) {
-                case 1: fputs("char", f); break;
-                case 2: fputs("short", f); break;
-                case 4: fputs("int", f); break;
-                case 8: fputs("long long", f); break;
-                default: fprintf(f, "int%lld_t", (long long)(t->size * 8)); break;
+                case 4:  cn_sb_append_str(left, CN_CSTR("int"));       return;
+                case 8:  cn_sb_append_str(left, CN_CSTR("long long")); return;
+                default: cn_sb_append_format(left, "int%lld_t", type->size * 8); return;
             }
-            return;
-        
-        case CN_FLOAT:
-            switch (t->size) {
-                case 4:  fputs("float", f); break;
-                case 8:  fputs("double", f); break;
-                case 16: fputs("long double", f); break;
-                default: fprintf(f, "float%lld", (long long)(t->size * 8)); break;
+        }
+
+        case CN_FLOAT: {
+            switch (type->size) {
+                case 4:  cn_sb_append_str(left, CN_CSTR("float"));       return;
+                case 8:  cn_sb_append_str(left, CN_CSTR("double"));      return;
+                case 16: cn_sb_append_str(left, CN_CSTR("long double")); return;
+                default: cn_sb_append_format(left, "float%lld", type->size * 8); return;
             }
-            return;
-        
-        case CN_POINTER:
-            cn_type_print(f, t->t_pointer.ptr_to);
-            fputc('*', f);
-            return;
-        
-        case CN_ARRAY:
-            cn_type_print(f, t->t_array.element_type);
-            if (t->t_array.length >= 0)
-                fprintf(f, "[%lld]", (long long)t->t_array.length);
-            else
-                fputs("[]", f);
-            return;
-        
-        case CN_FUNCTION:
-            cn_type_print(f, t->t_function.return_type);
-            fputc('(', f);
-            if (t->t_function.params_length == 0) {
-                fputs("void", f);
-            } else {
-                for (int64_t i = 0; i < t->t_function.params_length; i++) {
-                    if (i > 0) fputs(", ", f);
-                    cn_type_print(f, t->t_function.params[i].type);
-                }
-            }
-            fputc(')', f);
-            return;
-        
+        }
+
         case CN_STRUCT: {
-            fputs("struct ", f);
-            
-            // Print the tag if there is one; otherwise mark anonymous
-            if (t->t_struct.tag.length > 0) {
-                fprintf(f, "%.*s", (int)t->t_struct.tag.length, t->t_struct.tag.data);
-            } else {
-                fputs("<anonymous>", f);
-            }
-            
-            // If incomplete (forward-declared only), stop here — there's no body to print
-            if (!t->t_struct.is_complete) {
-                return;
-            }
-            
-            // Print the body
-            fputs(" { ", f);
-            for (int64_t i = 0; i < t->t_struct.members_length; i++) {
-                const Cn_Type_Struct_Member *m = &t->t_struct.members[i];
-                
-                // Print member type
-                cn_type_print(f, m->type);
-                
-                fputs("; ", f);
-            }
-            fputc('}', f);
+            cn_sb_append_str(left, CN_CSTR("struct "));
+            if (type->t_struct.tag.length > 0)
+                cn_sb_append_str(left, type->t_struct.tag);
+            else
+                cn_sb_append_str(left, CN_CSTR("<anonymous>"));
             return;
         }
-        
-        case CN_UNION:
-            return;
-        
-        case CN_ENUM:
-            return;
 
+        case CN_UNION: {
+            cn_sb_append_str(left, CN_CSTR("union "));
+            CN_TODO("union stringify.");
+            return;
+        }
+
+        case CN_ENUM: {
+            cn_sb_append_str(left, CN_CSTR("enum "));
+            CN_TODO("enum stringify.");
+            return;
+        }
+
+        case CN_POINTER: {
+            Cn_Type *inner = type->t_pointer.ptr_to;
+            bool needs_parens = inner->kind == CN_ARRAY
+                             || inner->kind == CN_FUNCTION;
+        
+            if (needs_parens) {
+                Cn_String_Builder inner_right = CN_SB_MAKE(32);
+        
+                cn__type_stringify(inner, left, &inner_right);
+        
+                cn_sb_append_str(left,  CN_CSTR("(*"));
+                cn_sb_append_char(right, ')');
+                cn_sb_append_str(right, cn_sb_to_str(&inner_right));
+        
+                cn_sb_free(&inner_right);
+            } else {
+                cn__type_stringify(inner, left, right);
+                cn_sb_append_char(left, '*');
+            }
+            return;
+        }
+
+        case CN_ARRAY: {
+            cn__type_stringify(type->t_array.element_type, left, right);
+            if (type->t_array.length >= 0)
+                cn_sb_append_format(right, "[%lld]", type->t_array.length);
+            else
+                cn_sb_append_str(right, CN_CSTR("[]"));
+            return;
+        }
+
+        case CN_FUNCTION: {
+            cn__type_stringify(type->t_function.return_type, left, right);
+
+            cn_sb_append_char(right, '(');
+            if (type->t_function.params_length == 0) {
+                cn_sb_append_str(right, CN_CSTR("void"));
+            } else {
+                for (int64_t i = 0; i < type->t_function.params_length; i++) {
+                    if (i > 0) cn_sb_append_str(right, CN_CSTR(", "));
+
+                    Cn_String_Builder param_left  = CN_SB_MAKE(32);
+                    Cn_String_Builder param_right = CN_SB_MAKE(32);
+
+                    cn__type_stringify(type->t_function.params[i].type, &param_left, &param_right);
+
+                    cn_sb_append_str(right, cn_sb_to_str(&param_left));
+                    cn_sb_append_str(right, cn_sb_to_str(&param_right));
+
+                    cn_sb_free(&param_left);
+                    cn_sb_free(&param_right);
+                }
+            }
+            cn_sb_append_char(right, ')');
+            return;
+        }
     }
+}
+
+CNDEF Cn_String cn_type_stringify(Cn_String buffer, const Cn_Type *type) {
+    Cn_String_Builder left  = CN_SB_MAKE(CN_SB_STACK_STORAGE_CAP);
+    Cn_String_Builder right = CN_SB_MAKE(CN_SB_STACK_STORAGE_CAP);
+
+    cn__type_stringify(type, &left, &right);
+
+    int64_t total = left.length + right.length;
+    if (total > buffer.length) {
+        cn_log(CN_ERROR, "cn_type_stringify: buffer too small, needed %lld got %lld", total, buffer.length);
+        cn_sb_free(&left);
+        cn_sb_free(&right);
+        return CN_STR(NULL, 0);
+    }
+
+    memcpy(buffer.data, left.data, left.length);
+    memcpy(buffer.data + left.length,  right.data, right.length);
+
+    cn_sb_free(&left);
+    cn_sb_free(&right);
+
+    return CN_STR(total, buffer.data);
+}
+
+
+CNDEF void cn_type_print(FILE *f, const Cn_Type *t) {
+    if (t == NULL) { fputs("<null>", f); return; }
+
+    char buf[256];
+    Cn_String str = cn_type_stringify(CN_STR(sizeof(buf), buf), t);
+    if (str.data == NULL) {
+        fputs("<stringify failed>", f);
+        return;
+    }
+
+    fprintf(f, "%.*s", CN_UNPACK(str));
 }
 
 // AST SECTION
@@ -4177,6 +4559,11 @@ next_token:
             goto next_token; // Skips token if current is in the blacklist.
         }
     }
+
+    if (!cn_lexer_expect(lexer, CN_TOKEN_SEMICOLON)) {
+        Cn_Source_Loc loc = cn_lexer_loc(lexer);
+        cn_print_snippet(stderr, cn_ast_source, &loc);
+    }
 }
 
 CNDEF Cn_Token cn_ast_peek(Cn_Lexer lexer) {
@@ -4252,6 +4639,10 @@ CNDEF void cn_ast_scope_stack_pop() {
     cn_array_list_pop(&cn_ast_scope_stack);
 }
 
+/**
+ * Saves string respective to the current scope.
+ * Once scope is popped the string data is lost.
+ */
 CNDEF Cn_String cn__ast_scope_stack_save_string(Cn_String str) {
     Cn_Ast_Scope *scope = cn_ast_scope_stack_peek();
 
@@ -4266,22 +4657,23 @@ CNDEF Cn_String cn__ast_scope_stack_save_string(Cn_String str) {
     return str;
 }
 
-CNDEF Cn_String cn_ast_scope_stack_add_binding(Cn_String name, Cn_Ast_Binding_Kind kind, Cn_Type *type) {
+CNDEF Cn_String cn_ast_symbol_binding_add(Cn_String name, Cn_Ast_Binding_Kind kind, Cn_Type *type) {
     CN_ASSERT(cn_array_list_length(&cn_ast_scope_stack) > 0);
+    CN_ASSERT(kind != CN_BINDING_TAG);
     
-    Cn_Ast_Binding_Idx *binding_table;
-    if (kind == CN_BINDING_TAG) {
-        binding_table = cn_ast_tag_binding_table;
-    } else {
-        binding_table = cn_ast_symbol_binding_table;
-    }
 
-    Cn_Ast_Binding_Idx *ref = cn_hash_table_get(&binding_table, &name);
+    Cn_Ast_Binding_Idx *ref = cn_hash_table_get(&cn_ast_symbol_binding_table, &name);
     if (ref == NULL) {
         name = cn__ast_scope_stack_save_string(name);
 
-        cn_array_list_append(&cn_ast_binding_list, ((Cn_Ast_Binding) { .name = name, .kind = kind, .type = type, .next_idx = CN_AST_NIL_BINDING_IDX, .scope_idx = cn_array_list_length(&cn_ast_scope_stack) - 1 }));
-        cn_hash_table_put(&binding_table, cn_array_list_length(&cn_ast_binding_list) - 1, &name);
+        cn_array_list_append(&cn_ast_binding_list, ((Cn_Ast_Binding) { 
+                    .name = name, 
+                    .kind = kind, 
+                    .type = type, 
+                    .next_idx = CN_AST_NIL_BINDING_IDX, 
+                    .scope_idx = cn_array_list_length(&cn_ast_scope_stack) - 1 
+                    }));
+        cn_hash_table_put(&cn_ast_symbol_binding_table, cn_array_list_length(&cn_ast_binding_list) - 1, &name);
 
         return name;
     }
@@ -4289,24 +4681,108 @@ CNDEF Cn_String cn_ast_scope_stack_add_binding(Cn_String name, Cn_Ast_Binding_Ki
     Cn_Ast_Binding *existing_binding = cn_ast_binding_list + *ref;
 
     if (existing_binding->scope_idx == cn_array_list_length(&cn_ast_scope_stack) - 1) {
-        CN_TODO("Handle redeclarations and redefinitions.");
+        CN_TODO("Handle symbol redeclarations and redefinitions.");
     }
 
     cn_array_list_append(&cn_ast_binding_list, ((Cn_Ast_Binding) { .name = existing_binding->name, .kind = kind, .type = type, .next_idx = *ref, .scope_idx = cn_array_list_length(&cn_ast_scope_stack) - 1 }));
 
-    cn_hash_table_put(&binding_table, cn_array_list_length(&cn_ast_binding_list) - 1, &name);
+    cn_hash_table_put(&cn_ast_symbol_binding_table, cn_array_list_length(&cn_ast_binding_list) - 1, &name);
 
     return existing_binding->name;
 }
+
+CNDEF Cn_Ast_Binding_Idx cn_ast_tag_binding_declare(Cn_String tag, Cn_Type_Kind kind) {
+    CN_ASSERT(cn_array_list_length(&cn_ast_scope_stack) > 0);
+    CN_ASSERT(kind == CN_STRUCT || kind == CN_UNION || kind == CN_ENUM);
+
+    Cn_Ast_Binding_Idx *ref = cn_hash_table_get(&cn_ast_tag_binding_table, &tag);
+
+    // No previous declaration case.
+    if (ref == NULL) {
+        // Saving string.
+        tag = cn__ast_scope_stack_save_string(tag);
+
+        // Making type. 
+        Cn_Type *type = cn_chained_arena_alloc(&cn_ast_type_arena, sizeof(Cn_Type));
+        *type = (Cn_Type) { .kind = kind, .is_complete = false };
+        switch (kind) {
+            case CN_STRUCT:
+                type->t_struct.tag = tag;
+                break;
+            case CN_UNION:
+                CN_TODO("Union binding.");
+                break;
+            case CN_ENUM:
+                CN_TODO("Enum binding.");
+                break;
+            default:
+                break;
+        }
+
+        // Appending to the binding list.
+        cn_array_list_append(&cn_ast_binding_list, ((Cn_Ast_Binding) { 
+                    .name = tag, 
+                    .kind = CN_BINDING_TAG, 
+                    .type = type, 
+                    .next_idx = CN_AST_NIL_BINDING_IDX, 
+                    .scope_idx = cn_array_list_length(&cn_ast_scope_stack) - 1 
+                    }));
+
+        // Finally, putting it into the table, and returning.
+        cn_hash_table_put(&cn_ast_tag_binding_table, cn_array_list_length(&cn_ast_binding_list) - 1, &tag);
+        
+        return cn_array_list_length(&cn_ast_binding_list) - 1;
+    }
+
+    Cn_Ast_Binding *binding = cn_ast_binding_list + *ref;
+    if (binding->type->kind != kind) {
+        cn_log(CN_ERROR, "Tag '%.*s' is already declared under different type. This tool deosn't support that in any form.");
+        return CN_AST_NIL_BINDING_IDX;
+    }
+
+    if (binding->type->is_complete || binding->scope_idx == CN_AST_SCOPE_STACK_CURRENT_IDX) return *ref;
+    
+    // Making type. 
+    Cn_Type *type = cn_chained_arena_alloc(&cn_ast_type_arena, sizeof(Cn_Type));
+    *type = (Cn_Type) { .kind = kind, .is_complete = false };
+    switch (kind) {
+        case CN_STRUCT:
+            type->t_struct.tag = tag;
+            break;
+        case CN_UNION:
+            CN_TODO("Union binding.");
+            break;
+        case CN_ENUM:
+            CN_TODO("Enum binding.");
+            break;
+        default:
+            break;
+    }
+
+    cn_array_list_append(&cn_ast_binding_list, ((Cn_Ast_Binding) { 
+                .name = binding->name, 
+                .kind = CN_BINDING_TAG, 
+                .type = type, 
+                .next_idx = *ref, 
+                .scope_idx = cn_array_list_length(&cn_ast_scope_stack) - 1 
+                }));
+
+    cn_hash_table_put(&cn_ast_tag_binding_table, cn_array_list_length(&cn_ast_binding_list) - 1, &tag);
+
+    return cn_array_list_length(&cn_ast_binding_list) - 1;
+}
+
+Cn_String cn_ast_source = (Cn_String) {0};
 
 CNDEF int cn_ast_init() {
     cn_ast_node_list = cn_array_list_make(Cn_Ast_Node, CN_AST_NODE_LIST_INITIAL_CAP);
 
     // Inserting first element as NIL.
-    Cn_Ast_Node nil = {0};
-    cn_array_list_append(&cn_ast_node_list, nil);
-    if (cn_ast_node_list == NULL)
-        return -1;
+    {
+        Cn_Ast_Node nil = {0};
+        cn_array_list_append(&cn_ast_node_list, nil);
+        if (cn_ast_node_list == NULL) return -1;
+    }
 
     cn_ast_type_arena = cn_chained_arena_make(CN_AST_TYPE_ARENA_BLOCK_CAP);
 
@@ -4315,6 +4791,13 @@ CNDEF int cn_ast_init() {
     cn_ast_type_children_arena = cn_chained_arena_make(CN_AST_TYPE_CHILDREN_ARENA_BLOCK_CAP);
 
     cn_ast_binding_list = cn_array_list_make(Cn_Ast_Binding, CN_AST_BINDING_LIST_INITIAL_CAP);
+    
+    // Inserting first element as NIL.
+    {
+        Cn_Ast_Binding nil = {0};
+        cn_array_list_append(&cn_ast_binding_list, nil);
+        if (cn_ast_node_list == NULL) return -1;
+    }
 
     cn_ast_tag_binding_table = cn_hash_table_make(Cn_String, Cn_Ast_Idx, CN_AST_TAG_BINDING_TABLE_INITIAL_CAP, (Cn_Hash_Function *)cn_str_hash, (Cn_Equals_Function *)cn_str_equals);
 
@@ -5070,7 +5553,7 @@ CNDEF Cn_Ast_Idx cn_ast_parse_function_definition_or_declaration(Cn_Lexer *lexer
                 break;
             }
 
-            cn_ast_scope_stack_add_binding(name, CN_BINDING_FUCNTION, type);
+            cn_ast_symbol_binding_add(name, CN_BINDING_FUCNTION, type);
         }
 
 
@@ -5138,7 +5621,7 @@ CNDEF Cn_Ast_Idx cn_ast_parse_function_definition_or_declaration(Cn_Lexer *lexer
                     }
                     
                     // Adding binding here.
-                    cn_ast_scope_stack_add_binding(name, binding_kind, type);
+                    cn_ast_symbol_binding_add(name, binding_kind, type);
                 }
 
             }
@@ -6160,11 +6643,15 @@ CNDEF Cn_Ast_Idx cn_ast_try_parse_type_specifier(Cn_Lexer *lexer, Cn_Ast_Idx out
     
     // Checking if token is struct or union.
     if (cn_str_equals(&lexer->token.str, &CN_STRUCT_STR) || cn_str_equals(&lexer->token.str, &CN_UNION_STR)) {
+        node->type_specifier.kind = CN_AST_TYPE_STRUCT_OR_UNION;
+
         Cn_Ast_Idx struct_or_union_idx = cn_ast_parse_struct_or_union_specifier(lexer);
+        // Getting node again because array list that stores nodes might 
+        // have been resized, invalidating previous pointer.
+        node = cn_ast_node_get(output_idx);
+
         if (struct_or_union_idx == CN_AST_NIL_IDX) goto error;
         node->type_specifier.struct_or_union_idx = struct_or_union_idx;
-        
-        node->type_specifier.kind = CN_AST_TYPE_STRUCT_OR_UNION;
 
         return 0;
     }
@@ -6516,6 +7003,7 @@ CNDEF Cn_Type *cn__ast_add_type_if_not(Cn_Type *type) {
     }
 }
 
+
 CNDEF Cn_Type *cn_ast_to_type(Cn_Qualifier_Flags flags, Cn_Ast_Idx type_specifier_idx, Cn_Ast_Idx declarator_idx) {
     Cn_Type type = {0};
 
@@ -6524,9 +7012,8 @@ CNDEF Cn_Type *cn_ast_to_type(Cn_Qualifier_Flags flags, Cn_Ast_Idx type_specifie
     switch (ts->type_specifier.kind) {
         case CN_AST_TYPE_INT:
             type.kind = CN_INTEGER;
+            type.is_complete = true;
 
-            type.t_integer.is_signed = ts->type_specifier.sign != CN_AST_TYPE_SIGN_UNSIGNED;
-            
             switch (ts->type_specifier.width) {
                 case CN_AST_TYPE_WIDTH_NONE:
                     type.size = sizeof(int);
@@ -6541,24 +7028,25 @@ CNDEF Cn_Type *cn_ast_to_type(Cn_Qualifier_Flags flags, Cn_Ast_Idx type_specifie
                     type.size = sizeof(long long);
                     break;
             }
-
             type.align = type.size;
+
+            type.t_integer.is_signed = ts->type_specifier.sign != CN_AST_TYPE_SIGN_UNSIGNED;
 
             result = cn__ast_add_type_if_not(&type);
             break;
         case CN_AST_TYPE_CHAR:
             type.kind = CN_INTEGER;
-
-            type.t_integer.is_signed = ts->type_specifier.sign != CN_AST_TYPE_SIGN_UNSIGNED;
-
+            type.is_complete = true;
             type.size = sizeof(char);
             type.align = type.size;
+
+            type.t_integer.is_signed = ts->type_specifier.sign != CN_AST_TYPE_SIGN_UNSIGNED;
 
             result = cn__ast_add_type_if_not(&type);
             break;
         case CN_AST_TYPE_FLOAT:
             type.kind = CN_FLOAT;
-
+            type.is_complete = true;
             type.size = sizeof(float);
             type.align = type.size;
 
@@ -6566,7 +7054,7 @@ CNDEF Cn_Type *cn_ast_to_type(Cn_Qualifier_Flags flags, Cn_Ast_Idx type_specifie
             break;
         case CN_AST_TYPE_DOUBLE:
             type.kind = CN_FLOAT;
-
+            type.is_complete = true;
             type.size = sizeof(double);
             type.align = type.size;
 
@@ -6574,80 +7062,110 @@ CNDEF Cn_Type *cn_ast_to_type(Cn_Qualifier_Flags flags, Cn_Ast_Idx type_specifie
             break;
         case CN_AST_TYPE_BOOL:
             type.kind = CN_BOOL;
-
-            type.size = sizeof(bool);
+            type.is_complete = true;
+            type.size = sizeof(_Bool);
             type.align = type.size;
 
             result = cn__ast_add_type_if_not(&type);
             break;
         case CN_AST_TYPE_VOID:
             type.kind = CN_VOID;
-
-            type.size = sizeof(void);
-            type.align = type.size;
+            type.is_complete = false;
+            type.size = 1;              // Not 0 to make void * arithmetic behaving like char *.
+            type.align = 1;
 
             result = cn__ast_add_type_if_not(&type);
             break;
         case CN_AST_TYPE_STRUCT_OR_UNION:
+            // Tagged types, are handled a little bit different from purely structural types.
+            // Tags are used to reference types, references to such types is not stored 
+            // in type set. Instead tag bindings are used.
+            // And those types data still is stored in the same arena as every other type.
+            // Tagged types are unique not just by name, but by both name and scope.
+            // Since one tag with the same name can shadow tagged type from 
+            // outer scope with the same name.
+            // C also allows stucts and unions to be declared but not defined.
+            // Such is possible because incomplete types are allowed.
+            // Types are completed once definition is found in the same scope 
+            // with the same tag.
             Cn_Ast_Node *struct_or_union = cn_ast_node_get(ts->type_specifier.struct_or_union_idx);
             if (struct_or_union->kind == CN_AST_NODE_STRUCT_SPECIFIER) {
-                type.kind = CN_STRUCT;
-                type.t_struct.tag = struct_or_union->struct_specifier.tag;
-                type.t_struct.is_complete = false;
-                
-                // First adding struct as incomplete type.
-                result = cn__ast_add_type_if_not(&type);
+                Cn_Ast_Binding_Idx binding_idx = cn_ast_tag_binding_declare(struct_or_union->struct_specifier.tag, CN_STRUCT);
 
-                // If declarations present, construct full struct type.
-                // But if struct was already defined, error.
+                if (binding_idx == CN_AST_NIL_BINDING_IDX) return NULL;
+
+                Cn_Ast_Binding *binding = cn_ast_binding_list + binding_idx;
+
                 if (struct_or_union->struct_specifier.member_declaration_list.length > 0) {
-                    if (result->t_struct.is_complete) {
-                        cn_log(CN_ERROR, "Struct '%.*s' is already defined, this tool doesn't support multiple struct definitions with the same name.", CN_UNPACK(result->t_struct.tag));
+                    // Checking if it is redifinition.
+                    if (binding->type->is_complete && binding->scope_idx == CN_AST_SCOPE_STACK_CURRENT_IDX) {
+                        cn_log(CN_ERROR, "Redefinition of 'struct %.*s' is not allowed within the same scope.");
                         return NULL;
                     }
 
-                    
-                    // Determining members length.
-                    result->t_struct.members_length = 0;
+                    // Defining struct below.
+                    // Making sure to set is complete at the end.
+                    // First determining members length.
+                    binding->type->t_struct.members_length = 0;
                     cn_ast_linked_list_foreach(m, &struct_or_union->struct_specifier.member_declaration_list) {
-                       result->t_struct.members_length += m->member_declaration.member_declarator_list.length;
+                       binding->type->t_struct.members_length += m->member_declaration.member_declarator_list.length;
                     }
 
-                    result->t_struct.members = cn_chained_arena_alloc(&cn_ast_type_children_arena, result->t_struct.members_length * sizeof(Cn_Type_Struct_Member));
+                    binding->type->t_struct.members = cn_chained_arena_alloc(&cn_ast_type_children_arena, binding->type->t_struct.members_length * sizeof(Cn_Type_Struct_Member));
 
-                    // Converting members.
+                    // Converting members, and figuring out sizes for the struct at the same time.
                     Cn_Ast_Node *spec;
                     Cn_Type *member_type;
                     int i = 0;
+
+                    int64_t offset = 0, max_align = 0;
                     cn_ast_linked_list_foreach(m, &struct_or_union->struct_specifier.member_declaration_list) {
                         spec = cn_ast_node_get(m->member_declaration.specifier_qualifier_idx);
                         cn_ast_linked_list_foreach(d, &m->member_declaration.member_declarator_list) {
+                            // Getting member type.
                             member_type = cn_ast_to_type(spec->specifier_qualifier.qualifiers, spec->specifier_qualifier.type_specifier_idx, d->member_declarator.declarator_idx);
-                            result->t_struct.members[i] = (Cn_Type_Struct_Member) {
-                                .type = member_type,
-                            };
+
+                            if (!member_type->is_complete) {    
+                                cn_log(CN_ERROR, "Cannot have incomplete member type in struct definition.");
+                                // TODO: Add location in code of where the error is.
+                                return NULL;
+                            }
+                            
+                            // Adding member to struct type.
+                            binding->type->t_struct.members[i] = (Cn_Type_Struct_Member) { .type = member_type, };
+                            
+                            // Setting offset to be next alligned offset and comparing with max align.
+                            CN_ASSERT(member_type->align != 0);
+                            offset = (offset + member_type->align - 1) / member_type->align * member_type->align;
+                            binding->type->t_struct.members[i].offset = offset;
+                            offset += member_type->size;
+
+                            if (max_align < member_type->align) {
+                                max_align = member_type->align;
+                            }
+
+                            // IMPORTANT: Incrementing to next member idx.
                             i++;
                         }
                     }
 
-                    result->t_struct.is_complete = true;
+                    binding->type->is_complete = true;
+                    binding->type->size = offset;
+                    binding->type->align = max_align;
                 }
 
+                result = binding->type;
             } else {
                 CN_TODO("Union to type conversion.");
             }
-            break;
-        case CN_AST_TYPE_UNION:
-            CN_TODO("Union to type conversion.");
             break;
         case CN_AST_TYPE_TYPEDEF:
             Cn_Ast_Binding_Idx *ref = cn_hash_table_get(&cn_ast_symbol_binding_table, &ts->type_specifier.typedef_name);
             result = cn_ast_binding_list[*ref].type;
             break;
         case CN_AST_TYPE_NONE:
-            return NULL;
         default:
-            break;
+            return NULL;
     }
     
     // Declarator traversal.
@@ -6663,8 +7181,10 @@ CNDEF Cn_Type *cn_ast_to_type(Cn_Qualifier_Flags flags, Cn_Ast_Idx type_specifie
                     ptr = cn_ast_node_get(pointer_idx);
 
                     type = (Cn_Type) { .kind = CN_POINTER };
+                    type.is_complete = true;
                     type.size = sizeof(void *);
                     type.align = type.size;
+
                     type.t_pointer.ptr_to = result;
                     result = cn__ast_add_type_if_not(&type);
 
@@ -6691,11 +7211,13 @@ CNDEF Cn_Type *cn_ast_to_type(Cn_Qualifier_Flags flags, Cn_Ast_Idx type_specifie
                 switch (dd->direct_declarator.kind) {
                     case CN_DD_ARRAY:
                         direct_declarator_idx = dd->direct_declarator.dd_array.direct_declarator_idx;
+                        CN_TODO("Array to type.");
                         break;
                     case CN_DD_FUNCTION:
                         direct_declarator_idx = dd->direct_declarator.dd_function.direct_declarator_idx;
                         
                         type = (Cn_Type) { .kind = CN_FUNCTION };
+                        type.is_complete = false;
                         type.size = 0;
                         type.align = 0;
                         type.t_function.return_type = result;
@@ -6829,6 +7351,9 @@ CNDEF int cn_tu_process(Cn_Translation_Unit *tu) {
     tu->content.length = size;
     tu->content.data = buffer;
 
+    // Setting ast source.
+    cn_ast_source = tu->content;
+
     cn_log(CN_INFO, "Received main.i:\n" CN_ANSI_BRIGHT_BLACK "%.*s" CN_ANSI_RESET, CN_UNPACK(tu->content));
 
     // Setting up lexer.
@@ -6858,19 +7383,34 @@ CNDEF int cn_tu_process(Cn_Translation_Unit *tu) {
     cn_ast_print(cn_ast_node_get(idx), 0);
     fputc('\n', stderr);
 
-    // Printing type set.
-    cn_log(CN_INFO, "Type set main.i:" CN_ANSI_BLUE);
-    for (int i = 0; i < cn_hash_set_header(&cn_ast_type_ptr_set)->capacity; i++) {
-        if (cn__hash_set_get_slot(cn_hash_set_header(&cn_ast_type_ptr_set), i)->state == CN_HASH_SET_SLOT_OCCUPIED) {
-            cn_type_print(stderr, cn_ast_type_ptr_set[i]);
+    // Printing type universe.
+    cn_log(CN_INFO, "Type universe main.i:" CN_ANSI_BLUE);
+    
+    void *block = cn_ast_type_arena.block;
+    Cn_Chained_Arena_Block_Header *h;
+    while(true) {
+        cn_ast_chained_arena_foreach_in_block(Cn_Type, type, cn_ast_type_arena.block) {
+            cn_type_print(stderr, type);
             fputc('\n', stderr);
         }
+
+        h = CN_CHAINED_ARENA_BLOCK_HEADER(block);
+        if (h->prev == NULL) break;
+
+        block = h->prev;
     }
+
+    
+    // for (int i = 0; i < cn_hash_set_header(&cn_ast_type_ptr_set)->capacity; i++) {
+    //     if (cn__hash_set_get_slot(cn_hash_set_header(&cn_ast_type_ptr_set), i)->state == CN_HASH_SET_SLOT_OCCUPIED) {
+    //     }
+    // }
     fprintf(stderr, CN_ANSI_RESET"\n");
 
-    // Printing binding tables.
-    cn_log(CN_INFO, "Symbol bindings main.i:" CN_ANSI_BRIGHT_YELLOW);
-    for (int i = 0; i < cn_array_list_length(&cn_ast_binding_list); i++) {
+    // Printing bindings.
+    // First binding is NIL, so skip index 0.
+    cn_log(CN_INFO, "Bindings main.i:" CN_ANSI_BRIGHT_YELLOW);
+    for (int i = 1; i < cn_array_list_length(&cn_ast_binding_list); i++) {
         switch (cn_ast_binding_list[i].kind) {
             case CN_BINDING_VARIABLE:
                 fputs("VARIABLE    ", stderr);
@@ -6884,6 +7424,9 @@ CNDEF int cn_tu_process(Cn_Translation_Unit *tu) {
             case CN_BINDING_ENUM_CONSTANT:
                 fputs("ENUM CONST  ", stderr);
                 break;
+            case CN_BINDING_TAG:
+                fputs("TAG         ", stderr);
+                break;
             default:
                 break;
         }
@@ -6893,9 +7436,6 @@ CNDEF int cn_tu_process(Cn_Translation_Unit *tu) {
         fputc('\n', stderr);
     }
     fprintf(stderr, CN_ANSI_RESET"\n");
-
-    // cn_log(CN_INFO, "Tag bindings main.i:" CN_ANSI_YELLOW);
-    // fprintf(stderr, CN_ANSI_RESET"\n");
 
     return 0;
 }
