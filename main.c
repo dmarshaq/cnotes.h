@@ -1,31 +1,20 @@
-int a;
+long int a;
+long long b;
+long c;
+long long int d;
+
 typedef struct vec2f {
-    float x;
-    float y;
+    float x, y;
 } Vec2f;
 
-// // Primitives
-// _Bool                   b;
-// char                    c;
-// unsigned char           d;
-// short                   e;
-// unsigned short          f;
-// int                     g;
-// unsigned int            h;
-// long long               i;
-// unsigned long long      j;
-// float                   k;
-// double                  l;
-// // Pointers
-// int                    *n;
-// int                   **o;
-// void                   *p;
-// 
-// // Functions
-// void                    v(void);
-// int                     w(int, char *);
-// void                   *x(int, unsigned long long);
-// 
+Vec2f vec_a;
+
+struct vec2f vec_b;
+
+int main(void) {
+    a + 5;
+}
+
 // // // Function pointers
 // void                  (*y)(void);
 // int                  (*z)(int, char *);
@@ -343,4 +332,4 @@ typedef struct vec2f {
 // 
 //     return 0;
 // }
-
+// 

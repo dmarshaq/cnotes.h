@@ -1,7 +1,7 @@
 #include "../cnotes.h"
 int main(void) {
     // Stack-backed.
-    Cn_String_Builder sb = CN_SB_MAKE(16);
+    Cn_String_Builder sb = cn_sb_make(16);
     CN_ASSERT(sb.capacity == CN_SB_STACK_STORAGE_CAP);
     CN_ASSERT(sb.length == 0);
 
@@ -44,21 +44,21 @@ int main(void) {
     CN_ASSERT(sb.data == NULL);
 
     // Heap-backed from the start.
-    Cn_String_Builder sb2 = CN_SB_MAKE(64);
+    Cn_String_Builder sb2 = cn_sb_make(64);
     CN_ASSERT(sb2.capacity == 64);
     CN_ASSERT(sb2.length == 0);
     CN_ASSERT(sb2.capacity > CN_SB_STACK_STORAGE_CAP);
     cn_sb_free(&sb2);
 
     // Append format
-    Cn_String_Builder sb3 = CN_SB_MAKE(16);
+    Cn_String_Builder sb3 = cn_sb_make(16);
     cn_sb_append_format(&sb3, "int [%lld]", (int64_t)30);
     CN_ASSERT(sb3.length == 8);
     CN_ASSERT(memcmp(sb3.data, "int [30]", 8) == 0);
     cn_sb_free(&sb3);
 
     // Reverse.
-    Cn_String_Builder sb4 = CN_SB_MAKE(16);
+    Cn_String_Builder sb4 = cn_sb_make(16);
     cn_sb_append_str(&sb4, CN_CSTR("**tni"));
     cn_sb_reverse(&sb4);
     CN_ASSERT(sb4.length == 5);
