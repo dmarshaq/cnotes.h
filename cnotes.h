@@ -676,6 +676,11 @@ typedef struct {
  */
 CNDEF Cn_String cn_source_loc_to_str(Cn_String source, Cn_Source_Loc *loc);
 
+/**
+ * RETURNS: Signed distance from source location a to source location b.
+ */
+CNDEF int64_t cn_source_loc_dist(Cn_Source_Loc *a, Cn_Source_Loc *b);
+
 typedef enum {
     CN_DC_ZERO,
     CN_DC_DUPLICATE_TYPE_SPECIFIER,
@@ -976,6 +981,8 @@ extern const Cn_Type CN_TYPE_INT;
 extern const Cn_Type CN_TYPE_FLOAT;
 
 extern const Cn_Type CN_TYPE_PTRDIFF;
+
+extern const Cn_Type CN_TYPE_SIZE;
 
 /**
  * Checks if "type1" equals "type2".
@@ -3969,6 +3976,10 @@ CNDEF Cn_String cn_source_loc_to_str(Cn_String source, Cn_Source_Loc *loc) {
     };
 }
 
+CNDEF int64_t cn_source_loc_dist(Cn_Source_Loc *a, Cn_Source_Loc *b) {
+    return b->bol - a->bol + b->column - a->column;
+}
+
 const Cn_String CN_DIAGNOSTIC_CODES[CN__DC_COUNT] = {
     [CN_DC_DUPLICATE_TYPE_SPECIFIER]        = CN_STR_BUFFER("Duplicate type specifier"),
     [CN_DC_EXPECTED_TOKEN]                  = CN_STR_BUFFER("Expected token"),
@@ -4745,6 +4756,14 @@ const Cn_Type CN_TYPE_PTRDIFF = {
     .align = sizeof(ptrdiff_t), 
     .kind = CN_INTEGER,
     .t_integer.is_signed = true,
+};
+
+const Cn_Type CN_TYPE_SIZE = {
+    .is_complete = true,
+    .size  = sizeof(size_t),
+    .align = sizeof(size_t),
+    .kind  = CN_INTEGER,
+    .t_integer.is_signed = false,   // size_t is unsigned.
 };
 
 CNDEF bool cn_type_equals(const Cn_Type *a, const Cn_Type *b) {
@@ -6505,17 +6524,21 @@ CNDEF Cn_Ast_Idx cn_ast_parse_expression_statement(Cn_Lexer *lexer) {
     node.expression_statement.expression_idx = expression_idx;
 
     if (!cn_lexer_expect(lexer, CN_TOKEN_SEMICOLON)) {
-        // cn_log(CN_ERROR, "Expected ';' at the end of expression statement.");
-        // cn_lexer_print_snippet_token(lexer);
         cn_diagnostic(CN_DIAGNOSTIC_ERROR, &cn_lexer_token(lexer).loc, CN_DC_EXPECTED_TOKEN, "Expected ';' at the end of expression statement.");
         goto error;
     }
+    node.loc.length = cn_source_loc_dist(&node.loc, &cn_lexer_token(lexer).loc);
 
     cn_ast_next_token(lexer);
 
     // Type checking parsed expression.
     Cn_Type *type = cn_ast_expression_typecheck(node.expression_statement.expression_idx);
     if (type == NULL) goto error;
+
+    // TEMPORARY: Printing resulting type of an expression
+    Cn_String typename = CN_STR_BUFFER_EMPTY(128);
+    cn_type_stringify(typename, type);
+    cn_diagnostic(CN_DIAGNOSTIC_INFO, &node.loc, CN_DC_ZERO, "%.*s", CN_UNPACK(typename));
 
     return cn_ast_node_list_append(node);
 
@@ -8454,7 +8477,103 @@ CNDEF Cn_Type *cn__ast_cast_expression_typecheck(Cn_Ast_Node *node) {
     return target;
 }
 
+CNDEF Cn_Type *cn__ast_sizeof_expression_typecheck(Cn_Ast_Node *node) {
+    CN_ASSERT(node->kind == CN_AST_NODE_SIZEOF_EXPRESSION);
 
+    Cn_Ast_Node *child = cn_ast_node_get(node->sizeof_expression.child_idx);
+
+    Cn_Type *operand;
+    if (child->kind == CN_AST_NODE_TYPE_NAME) {
+        // Case: sizeof typename.
+        Cn_Ast_Node *spec_qual = cn_ast_node_get(child->type_name.specifier_qualifier_idx);
+        operand = cn_ast_to_type(
+            spec_qual->specifier_qualifier.qualifiers,
+            spec_qual->specifier_qualifier.type_specifier_idx,
+            child->type_name.abstract_declarator_idx);
+    } else {
+        // Case: sizeof expr, operand is not evaluated; only its type is needed.
+        operand = cn_ast_expression_typecheck(node->sizeof_expression.child_idx);
+    }
+
+    if (operand == NULL) return NULL;
+
+    if (operand->kind == CN_FUNCTION) {
+        cn_diagnostic(CN_DIAGNOSTIC_ERROR, &node->loc, CN_DC_ILLEGAL_TYPE, "Cannot take 'sizeof' of a function type.");
+        return NULL;
+    }
+
+    if (operand->kind == CN_VOID) {
+        cn_diagnostic(CN_DIAGNOSTIC_ERROR, &node->loc, CN_DC_ILLEGAL_TYPE, "Cannot take 'sizeof' of a void type.");
+        return NULL;
+    }
+
+    if (!operand->is_complete) {
+        cn_diagnostic(CN_DIAGNOSTIC_ERROR, &node->loc, CN_DC_INCOMPLETE_TYPE, "Cannot take 'sizeof' of an incomplete type.");
+        return NULL;
+    }
+
+    return cn__ast_add_type_if_not((Cn_Type *)&CN_TYPE_SIZE);
+}
+
+CNDEF Cn_Type *cn__ast_ternary_expression_typecheck(Cn_Ast_Node *node) {
+    CN_ASSERT(node->kind == CN_AST_NODE_TERNARY_EXPRESSION);
+
+    Cn_Type *cond = cn_ast_expression_typecheck(node->ternary_expression.condition_expression_idx);
+    if (cond == NULL) return NULL;
+
+    // Condition must be scalar.
+    if (!cn_type_is_scalar(cond)) {
+        cn_diagnostic(CN_DIAGNOSTIC_ERROR, &node->loc, CN_DC_ILLEGAL_TYPE, "Condition of '?:' must be of scalar type.");
+        return NULL;
+    }
+
+    Cn_Type *a = cn_ast_expression_typecheck(node->ternary_expression.true_expression_idx);
+    if (a == NULL) return NULL;
+
+    Cn_Type *b = cn_ast_expression_typecheck(node->ternary_expression.false_expression_idx);
+    if (b == NULL) return NULL;
+
+    // Both arithmetic.
+    if (cn_type_is_arithmetic(a) && cn_type_is_arithmetic(b)) {
+        return cn__ast_usual_arithmetic_conversion(a, b);
+    }
+
+    // Both void.
+    if (a->kind == CN_VOID && b->kind == CN_VOID) {
+        return a;
+    }
+
+    // Same struct type interned or tagged types share identity.
+    if (a->kind == CN_STRUCT && b->kind == CN_STRUCT && a == b) {
+        return a;
+    }
+
+    // Pointer combinations.
+    {
+        Cn_Ast_Idx ia = node->ternary_expression.true_expression_idx;
+        Cn_Ast_Idx ib = node->ternary_expression.false_expression_idx;
+
+        // pointer  ?:  null pointer constant  ->  the pointer type.
+        if (a->kind == CN_POINTER && cn__ast_is_null_pointer_constant(ib)) return a;
+        if (b->kind == CN_POINTER && cn__ast_is_null_pointer_constant(ia)) return b;
+
+        if (a->kind == CN_POINTER && b->kind == CN_POINTER) {
+            // If either side points to void, the result is pointer-to-void.
+            if (a->t_pointer.ptr_to->kind == CN_VOID) return a;
+            if (b->t_pointer.ptr_to->kind == CN_VOID) return b;
+            // Compatible pointed-to types -> that pointer type.
+            if (cn_type_is_compatible(a->t_pointer.ptr_to, b->t_pointer.ptr_to)) return a;
+        }
+    }
+
+    // No common type int vs pointer or mismatched structs.
+    {
+        Cn_String a_str = cn_type_stringify(CN_STR_BUFFER_EMPTY(128), a);
+        Cn_String b_str = cn_type_stringify(CN_STR_BUFFER_EMPTY(128), b);
+        cn_diagnostic(CN_DIAGNOSTIC_ERROR, &node->loc, CN_DC_ILLEGAL_TYPE, "Incompatible operand types in '?:' expression, %.*s and %.*s.", CN_UNPACK(a_str), CN_UNPACK(b_str));
+    }
+    return NULL;
+}
 
 CNDEF Cn_Type *cn__ast_assignment_expression_typecheck(Cn_Ast_Node *node) {
     CN_ASSERT(node->kind == CN_AST_NODE_ASSIGNMENT_EXPRESSION);
@@ -8528,6 +8647,40 @@ CNDEF Cn_Type *cn__ast_assignment_expression_typecheck(Cn_Ast_Node *node) {
     }
 }
 
+CNDEF Cn_Type *cn__ast_postfix_expression_typecheck(Cn_Ast_Node *node) {
+    CN_ASSERT(node->kind == CN_AST_NODE_POSTFIX_EXPRESSION);
+
+    Cn_Ast_Idx operand_idx = node->postfix_expression.expression_idx;
+    Cn_Type *operand = cn_ast_expression_typecheck(operand_idx);
+    if (operand == NULL) return NULL;
+
+    switch (node->postfix_expression.operator_kind) {
+        // x++ / x-- : modifiable lvalue of scalar type; result is the operand's type.
+        case CN_POSTFIX_OP_INCREMENT:
+        case CN_POSTFIX_OP_DECREMENT: 
+            {
+                if (!cn__ast_is_lvalue(operand_idx)) {
+                    cn_diagnostic(CN_DIAGNOSTIC_ERROR, &node->loc, CN_DC_ILLEGAL_TYPE,
+                            "Operand of postfix '++'/'--' is not an lvalue.");
+                    return NULL;
+                }
+                if (!cn_type_is_scalar(operand)) {
+                    cn_diagnostic(CN_DIAGNOSTIC_ERROR, &node->loc, CN_DC_ILLEGAL_TYPE,
+                            "Operand of postfix '++'/'--' must be of scalar type.");
+                    return NULL;
+                }
+                // TODO: Reject const-qualified lvalues once qualifiers are tracked.
+                return operand;
+            }
+
+        default: 
+            {
+                cn_diagnostic(CN_DIAGNOSTIC_ERROR, &node->loc, CN_DC_EXPECTED_TOKEN, "Expected postfix operator.");
+                return NULL;
+            }
+    }
+}
+
 CNDEF Cn_Type *cn_ast_expression_typecheck(Cn_Ast_Idx expression_idx) {
     Cn_Ast_Node *node = cn_ast_node_get(expression_idx);
 
@@ -8566,11 +8719,13 @@ CNDEF Cn_Type *cn_ast_expression_typecheck(Cn_Ast_Idx expression_idx) {
             }
         case CN_AST_NODE_SIZEOF_EXPRESSION:
             {
+                result = cn__ast_sizeof_expression_typecheck(node);
                 node->sizeof_expression.type = result;
                 break;
             }
         case CN_AST_NODE_TERNARY_EXPRESSION:
-            {
+            {   
+                result = cn__ast_ternary_expression_typecheck(node);
                 node->ternary_expression.type = result;
                 break;
             }
@@ -8582,6 +8737,7 @@ CNDEF Cn_Type *cn_ast_expression_typecheck(Cn_Ast_Idx expression_idx) {
             }
         case CN_AST_NODE_POSTFIX_EXPRESSION:
             {
+                result = cn__ast_postfix_expression_typecheck(node);
                 node->postfix_expression.type = result;
                 break;
             }
@@ -8636,13 +8792,12 @@ CNDEF Cn_Type *cn_ast_expression_typecheck(Cn_Ast_Idx expression_idx) {
     }
     
     // TEMPORARY: outputing typechecked result.
-    if (result != NULL) {
-        Cn_String typename = CN_STR_BUFFER_EMPTY(128);
-        cn_type_stringify(typename, result);
-        cn_diagnostic(CN_DIAGNOSTIC_INFO, &node->loc, CN_DC_ZERO, "%.*s", CN_UNPACK(typename));
-    }
+    // if (result != NULL) {
+    //     Cn_String typename = CN_STR_BUFFER_EMPTY(128);
+    //     cn_type_stringify(typename, result);
+    //     cn_diagnostic(CN_DIAGNOSTIC_INFO, &node->loc, CN_DC_ZERO, "%.*s", CN_UNPACK(typename));
+    // }
     
-
     return result;
 }
 

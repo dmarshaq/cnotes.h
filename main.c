@@ -1,23 +1,21 @@
 // ============================================================================
-// cnotes typecheck checkpoint test
+// cnotes typecheck — FULL expression test
 //
-// Exercises every expression-typecheck case implemented so far:
-//   - binary: + - * / % << >> < <= > >= == != & ^ | && || , and []
-//   - member access: . and ->   (incl. nested and through pointers)
-//   - function calls: fixed-arity, variadic, nested, casts-as-args, void return
-//   - casts: arithmetic, pointer<->integer, cast-to-void
-//   - unary: + - ! ~ * &  and prefix ++ --
-//   - assignment: simple = and compound (+= -= <<= ...), null pointer constant
+// Every expression-typecheck case is now implemented; this exercises all of
+// them, including the three that were just finished (postfix ++/--, sizeof,
+// ternary ?:), plus deep nested combinations and an extensive error section.
 //
-// NOT yet implemented (deliberately left out of the active section):
-//   sizeof, ternary ?:, postfix ++/--
+// Build:  gcc -E -o typecheck_full_test.i typecheck_full_test.c
+//         then feed the .i to the tool.
 //
-// Build:  gcc -E -o checkpoint_test.i checkpoint_test.c
-//         then feed checkpoint_test.i to the tool.
+// ACTIVE statements should all typecheck cleanly. Two trailing blocks are
+// commented out:
+//   * "DEPENDS ON OPTIONAL PATCHES" — pass only if the matching patch is in.
+//   * "EXPECTED ERRORS"             — uncomment one at a time to see diagnostics.
 //
-// Every ACTIVE statement should typecheck cleanly (the typechecker prints the
-// resulting type as an info diagnostic). The trailing block lists statements
-// that SHOULD error — uncomment them one at a time to verify diagnostics.
+// Type-printing note: your stringifier has no typedef names, so it prints
+// `long`/`long long`/`ptrdiff_t` as "long long" and `size_t` as
+// "unsigned long long". Annotations below use the conceptual C name.
 // ============================================================================
 
 struct Vec { int x; int y; };
@@ -37,109 +35,259 @@ struct Vec  *make_vec(int x, int y);
 void         noop(int x);
 
 int main(void) {
-    int       i  = 0;
-    unsigned  u  = 0x10;
-    char      c  = 0;
-    float     f  = 1.5f;
-    double    d  = 2.0;
-    int      *p  = 0;
+    int       i = 0, j = 0;
+    unsigned  u = 0x10;
+    char      c = 0;
+    short     sh = 0;
+    long      lng = 0;
+    double    d = 2.0;
+    float     f = 1.5f;
+    _Bool     bl = 0;
+
+    int      *p  = 0, *q = 0;
     int     **pp = 0;
+    char     *cp = 0;
     void     *vp = 0;
 
     struct Vec     v;
-    struct Entity  ent;
+    struct Entity  ent, ent2;
     struct Entity *ep = 0;
 
-    // --- arithmetic + usual arithmetic conversions / promotion ---
-    i + u * 2;             // unsigned int
-    c * c + i;             // int     (char operands promote to int)
-    f + i * 2;             // float
-    d * f - i;             // double
-    (char)u + 1;           // int     (char + int -> int by rank)
+    // ------------------------------------------------------------------
+    // Primary expressions
+    // ------------------------------------------------------------------
+    i;                     // int
+    0x2A;                  // int
+    3.5f;                  // float
 
-    // --- bitwise / shift ---
-    u & 0xF | i << 2;      // unsigned int
-    ~c & 0xFF;             // int
-    u >> c;                // unsigned int
+    // ------------------------------------------------------------------
+    // Arithmetic + usual arithmetic conversions / promotion
+    // ------------------------------------------------------------------
+    i + j;                 // int
+    i + u;                 // unsigned int
+    i + sh;                // int     (short -> int by rank)
+    i + lng;               // long
+    u + lng;               // long    (long wider than unsigned int)
+    c * c;                 // int     (char operands promote to int)
+    sh * sh;               // int     (short operands promote to int)
+    f + i;                 // float
+    f + d;                 // double
+    d / 2;                 // double
 
-    // --- relational / equality / logical ---
-    i < u && f > 0;        // int
-    p == 0 || i;           // int     (pointer vs null constant)
+    // ------------------------------------------------------------------
+    // Bitwise / shift
+    // ------------------------------------------------------------------
+    u & 0xF;               // unsigned int
+    i | j;                 // int
+    sh ^ sh;               // int     (promotes to int)
+    i << 2;                // int
+    u >> 1;                // unsigned int
+    c << 4;                // int     (left promotes to int)
+    u % 3;                 // unsigned int
+
+    // ------------------------------------------------------------------
+    // Relational / equality / logical
+    // ------------------------------------------------------------------
+    i < j;                 // int
+    u <= 5;                // int
+    f > 0;                 // int
+    p == q;                // int
+    p != 0;                // int
+    i && j;                // int
+    p || i;                // int
     !p;                    // int
-    ep != 0;               // int
+    !bl;                   // int     (_Bool is scalar)
 
-    // --- comma (type of the right operand) ---
+    // ------------------------------------------------------------------
+    // Comma (type of right operand)
+    // ------------------------------------------------------------------
     i, f;                  // float
-    f, i + 1;              // int
+    (i, j, d);             // double
 
-    // --- pointer arithmetic + subscript + deref ---
+    // ------------------------------------------------------------------
+    // Pointer arithmetic / subscript / deref / address-of
+    // ------------------------------------------------------------------
     p + 5;                 // int *
-    (p + 5) - p;           // ptrdiff_t
-    *(p + 3);              // int
-    p[2] + 1;              // int
+    5 + p;                 // int *
+    p - 2;                 // int *
+    p - q;                 // ptrdiff_t
+    *p;                    // int
+    *(p + i);              // int
+    p[i];                  // int
+    pp[0];                 // int *
     pp[0][1];              // int
-    p += 2;                // int *   (compound assign: pointer += int)
-
-    // --- address-of / deref / multi-level ---
     &i;                    // int *
-    *&i;                   // int
+    &*p;                   // int *
+    &p;                    // int **
     **pp;                  // int
-    *p + i;                // int
+    cp + 1;                // char *
+    &ent;                  // struct Entity *
+    &ent.id;               // int *   (address of a member)
 
-    // --- struct member access (nested + through pointers) ---
-    ent.id + 1;            // int
-    ent.health * 2;        // float
-    ent.pos.x + ent.pos.y; // int
+    // ------------------------------------------------------------------
+    // Struct member access (nested + through pointers)
+    // ------------------------------------------------------------------
+    ent.id;                // int
+    ent.health;            // float
+    ent.pos;               // struct Vec
+    ent.pos.x;             // int
+    ent.vel->y;            // int
+    *ent.tag;              // int
     ep->id;                // int
-    ep->pos.x;             // int
+    ep->pos.y;             // int
     (*ep).health;          // float
-    ep->vel->y;            // int
-    *ep->tag;              // int     (-> binds tighter than unary *)
+    ep->vel->x;            // int
     v.x + v.y;             // int
 
-    // --- function calls ---
-    add(i, 2);             // int
-    add(i, 2) + add(3, 4); // int
-    scale(f, i) + 1.0f;    // float
-    sum(3, i, u, c);       // int     (variadic: trailing args unchecked)
+    // ------------------------------------------------------------------
+    // Function calls (fixed, variadic, nested, casts-as-args, void)
+    // ------------------------------------------------------------------
+    add(i, j);             // int
+    scale(f, i);           // float
+    sum(2, i, j);          // int     (variadic: trailing args unchecked)
+    sum(0);                // int     (variadic: just the fixed arg)
     make_vec(1, 2);        // struct Vec *
     make_vec(1, 2)->x;     // int
-    add((int)f, (int)d);   // int
     noop(i);               // void
+    add(add(1, 2), 3);     // int     (nested)
+    add((int)f, (short)i); // int     (casts as arguments)
 
-    // --- casts ---
-    (double)i + f;         // double
-    (int)f * 2;            // int
-    (int)p + 1;            // int     (pointer -> integer)
-    (void)u;               // void
+    // ------------------------------------------------------------------
+    // Casts
+    // ------------------------------------------------------------------
+    (float)i;              // float
+    (int)f;                // int
+    (double)i;             // double
+    (char)u;               // char
+    (unsigned)i;           // unsigned int
+    (int)p;                // int          (pointer -> integer)
+    (int *)i;              // int *        (integer -> pointer)
+    (void *)p;             // void *
+    (struct Vec *)vp;      // struct Vec * (pointer -> pointer)
+    (void)i;               // void
 
-    // --- assignment (simple + compound) ---
+    // ------------------------------------------------------------------
+    // Unary
+    // ------------------------------------------------------------------
+    -i;                    // int
+    +f;                    // float
+    ~i;                    // int
+    ~c;                    // int     (promotes)
+    !i;                    // int
+    ++i;                   // int
+    --p;                   // int *
+
+    // ------------------------------------------------------------------
+    // Postfix
+    // ------------------------------------------------------------------
+    i++;                   // int
+    i--;                   // int
+    p++;                   // int *
+    f--;                   // float
+    ent.id++;              // int
+    p[0]++;                // int
+    (*p)++;                // int
+    ep->id--;              // int
+
+    // ------------------------------------------------------------------
+    // sizeof (type-name and expression forms)
+    // ------------------------------------------------------------------
+    sizeof(int);           // size_t
+    sizeof i;              // size_t
+    sizeof(struct Entity); // size_t
+    sizeof(int *);         // size_t
+    sizeof ent;            // size_t
+    sizeof ep;             // size_t
+    sizeof(i + j);         // size_t
+    sizeof p[0];           // size_t
+    sizeof(i ? f : d);     // size_t  (sizeof of a ternary)
+
+    // ------------------------------------------------------------------
+    // Ternary ?:
+    // ------------------------------------------------------------------
+    i ? j : 0;             // int
+    i ? f : j;             // float   (usual arithmetic conversions)
+    i ? d : f;             // double
+    i ? p : q;             // int *
+    i ? p : 0;             // int *   (pointer / null constant)
+    i ? 0 : p;             // int *
+    i ? p : vp;            // void *  (one side is void*)
+    i ? vp : p;            // void *
+    p ? i : j;             // int     (condition may be a pointer)
+    bl ? i : j;            // int     (condition may be _Bool)
+    i ? ent : ent2;        // struct Entity
+    i ? (j + 1) : (f * 2); // float
+
+    // ------------------------------------------------------------------
+    // Assignment (simple + compound)
+    // ------------------------------------------------------------------
+    i = j;                 // int
     i = u + 2;             // int
+    u = i;                 // unsigned int
     f += i;                // float
+    i -= 1;                // int
+    i *= 2;                // int
+    f /= 2;                // float
+    i %= 3;                // int
+    i <<= 2;               // int
+    u >>= 1;               // unsigned int
+    i &= 0xF;              // int
+    i |= 1;                // int
+    i ^= 1;                // int
     p = &i;                // int *
-    p = 0;                 // int *   (null pointer constant)
-    *p = i + 1;            // int
+    p = q;                 // int *
+    p += 2;                // int *
+    p -= 1;                // int *
+    *p = i;                // int
     ent.id = 5;            // int
     ep->health = f;        // float
-    u <<= 2;               // unsigned int
-    ep->tag = &i;          // int *
+    pp = &p;               // int **
 
-    // --- big nested combinations ---
-    (ent.health + (float)ep->id) * scale(f, i);     // float
-    *(p + (i & 3)) + ~c;                             // int
-    add(i, ep->pos.x) + p[0x2] - (*ep).id;           // int
-    (i < u) && (p != 0) && (ep->health > 0.0f);      // int
+    // ------------------------------------------------------------------
+    // Big nested combinations
+    // ------------------------------------------------------------------
+    (ent.health + (float)ep->id) * scale(f, i);            // float
+    *(p + (i & 3)) + ~c;                                   // int
+    add(i, ep->pos.x) + p[0x1] - (*ep).id;               // int
+    (i < u) && (p != 0) && (ep->health > 0.0f);            // int
+    i ? add(p[0], *q) : (int)(f + d);                      // int
+    ep ? ep->vel : (struct Vec *)0;                        // struct Vec *
+    sizeof(i ? p : q) + (unsigned)(p - q);                 // size_t
+    (i++ , p[0] , ep->health) > 0.0f;                      // int
+    !(i < j) == (u >= 1);                                  // int
 
-    // ========================================================================
-    // Expected ERRORS — uncomment individually to verify diagnostics
-    // ========================================================================
-    // *vp;                // dereference of void*
-    // i.x;                // member access on non-struct
-    // add(i);             // too few arguments (non-variadic)
-    // ~f;                 // '~' requires integer
-    // p + f;              // pointer + non-integer
-    // (struct Vec)i;      // cast to non-scalar type
-    // 5 = i;              // assignment to non-lvalue
-    // &5;                 // address-of non-lvalue
-    // i = ep;             // struct* not assignable to int
+    // ============================================================
+    // DEPENDS ON OPTIONAL PATCHES — uncomment if the patch is in.
+    //   If these error, it's the patch missing, not the typechecker.
+    // ============================================================
+    p  = 0;          // null-pointer-constant in assignment path
+    vp = p;          // void* interop in cn_type_is_assignable
+    p  = vp;         // void* interop in cn_type_is_assignable
+
+    // ============================================================
+    // EXPECTED ERRORS — uncomment individually to verify diagnostics.
+    // ============================================================
+    // *vp;             // dereference of void*
+    // i.x;             // member access on non-struct
+    // ep.id;           // '.' on a pointer (should be '->')
+    // ent->id;         // '->' on a non-pointer (should be '.')
+    // add(i);          // too few arguments
+    // add(i, j, 1);    // too many arguments (non-variadic)
+    // ~f;              // '~' requires integer
+    // f % 2;           // '%' requires integer
+    // i << f;          // shift requires integer operands
+    // p + f;           // pointer + non-integer
+    // p * 2;           // '*' on a pointer
+    // p + q;           // pointer + pointer
+    // (struct Vec)i;   // cast to non-scalar type
+    // (float)p;        // cast between float and pointer
+    // 5 = i;           // assignment to non-lvalue
+    // (i + 1) = j;     // assignment to non-lvalue (binary result)
+    // &5;              // address-of non-lvalue
+    // ++5;             // prefix ++ on non-lvalue
+    // i = ep;          // struct* not assignable to int
+    // i ? j : p;       // int (non-constant) vs pointer in ?:
+    // ent ? i : j;     // ?: condition not scalar
+    // sizeof(void);    // sizeof of incomplete type
+    // sizeof add;      // sizeof of function type
 }
