@@ -1,6 +1,7 @@
 #ifndef CN_H_
 #define CN_H_
 
+#include <stddef.h>
 #ifndef CNDEF
 #   define CNDEF
 #endif // CNDEF
@@ -211,12 +212,12 @@ CNDEF int64_t cn_str_find_char_left(Cn_String str, char symbol);
 CNDEF int64_t cn_str_find_char_right(Cn_String str, char symbol);
 
 /**
- * Finds index of the first non whitespace occurns from the left.
+ * Finds index of the first non-whitespace occurns from the left.
  */
 CNDEF int64_t cn_str_find_non_whitespace_left(Cn_String str);
 
 /**
- * Finds index of the first non whitespace occurns from the right.
+ * Finds index of the first non-whitespace occurns from the right.
  */
 CNDEF int64_t cn_str_find_non_whitespace_right(Cn_String str);
 
@@ -689,6 +690,7 @@ typedef enum {
     CN_DC_REDEFINITION,
     CN_DC_INCOMPLETE_TYPE,
     CN_DC_INVALID_SYMBOL,
+    CN_DC_ILLEGAL_TYPE,
     CN__DC_COUNT,
 } Cn_Diagnostic_Code;
 
@@ -920,6 +922,7 @@ typedef struct {
     int64_t params_length;
     Cn_Type_Function_Param *params;
 
+    bool is_variadic;
     // Cn_String definition_file;
 } Cn_Type_Function;
 
@@ -972,6 +975,8 @@ extern const Cn_Type CN_TYPE_INT;
 
 extern const Cn_Type CN_TYPE_FLOAT;
 
+extern const Cn_Type CN_TYPE_PTRDIFF;
+
 /**
  * Checks if "type1" equals "type2".
  * RETURNS: True if types are identical.
@@ -1013,6 +1018,19 @@ CNDEF bool cn_type_is_assignable(const Cn_Type *to, const Cn_Type *from);
  * RETURNS: True if types are stucturally compatible.
  */
 CNDEF bool cn_type_is_compatible(const Cn_Type *a, const Cn_Type *b);
+
+/**
+ * RETURNS: Type that has a greater arithmetic rank between two types a and b.
+ *
+ * EXPECTS: a and b to be arithmetic types.
+ */
+CNDEF Cn_Type *cn_type_greatest_arithmetic_rank(const Cn_Type *a, const Cn_Type *b);
+
+/**
+ * RETURNS: True if type is arithmetic, pointer or bool.
+ */
+CNDEF bool cn_type_is_scalar(Cn_Type *type);
+
 
 // AST SECTION
 typedef uint32_t Cn_Ast_Idx;
@@ -3964,6 +3982,7 @@ const Cn_String CN_DIAGNOSTIC_CODES[CN__DC_COUNT] = {
     [CN_DC_REDEFINITION]                    = CN_STR_BUFFER("Redefinition"),
     [CN_DC_INCOMPLETE_TYPE]                 = CN_STR_BUFFER("Incomplete type"),
     [CN_DC_INVALID_SYMBOL]                  = CN_STR_BUFFER("Invalid symbol"),
+    [CN_DC_ILLEGAL_TYPE]                    = CN_STR_BUFFER("Illegal type"),
 };
 
 Cn_Diagnostic_Level cn_min_diagnostic_level = CN_DIAGNOSTIC_INFO;
@@ -4720,6 +4739,14 @@ const Cn_Type CN_TYPE_FLOAT = {
     .kind = CN_FLOAT,
 };
 
+const Cn_Type CN_TYPE_PTRDIFF = { 
+    .is_complete = true,
+    .size = sizeof(ptrdiff_t), 
+    .align = sizeof(ptrdiff_t), 
+    .kind = CN_INTEGER,
+    .t_integer.is_signed = true,
+};
+
 CNDEF bool cn_type_equals(const Cn_Type *a, const Cn_Type *b) {
     if (a == b) return true;
 
@@ -4962,6 +4989,10 @@ CNDEF bool cn_type_is_assignable(const Cn_Type *to, const Cn_Type *from) {
     // If to is pointer.
     if (to->kind == CN_POINTER && from->kind == CN_POINTER) {
         // TODO: Pointer qualifiers check.
+
+        // Void pointers can be assigned in either direction without explicit casting.
+        if (to->t_pointer.ptr_to->kind == CN_VOID || from->t_pointer.ptr_to->kind == CN_VOID) return true;
+
         return cn_type_is_compatible(to->t_pointer.ptr_to, from->t_pointer.ptr_to);
     }
 
@@ -4970,6 +5001,28 @@ CNDEF bool cn_type_is_assignable(const Cn_Type *to, const Cn_Type *from) {
 
 CNDEF bool cn_type_is_compatible(const Cn_Type *a, const Cn_Type *b) {
     return a == b;
+}
+
+CNDEF Cn_Type *cn_type_greatest_arithmetic_rank(const Cn_Type *a, const Cn_Type *b) {
+    // Float cases:
+    if (a->kind == CN_FLOAT && (b->kind == CN_INTEGER || a->size >= b->size)) {
+        return (Cn_Type *)a;
+    }
+    if (b->kind == CN_FLOAT && (a->kind == CN_INTEGER || b->size >= a->size)) {
+        return (Cn_Type *)b;
+    }
+
+    // Int uneven ranks:
+    if (a->size != b->size) {
+        return (Cn_Type *)(a->size > b->size ? a : b);
+    }
+
+    // Int even rank:
+    return (Cn_Type *)(!a->t_integer.is_signed ? a : b);
+}
+
+CNDEF bool cn_type_is_scalar(Cn_Type *type) {
+    return cn_type_is_arithmetic(type) || type->kind == CN_POINTER || type->kind == CN_BOOL;
 }
 
 // AST SECTION
@@ -6004,6 +6057,38 @@ error:
     return CN_AST_NIL_IDX;
 }
 
+/**
+ * Following function traverses declarator nodes to get declarator identifier.
+ *
+ * RETURNS: Empty string if declarator is abstract, otherwise identifier string.
+ */
+CNDEF Cn_String cn__ast_declarator_identifier(Cn_Ast_Idx declarator_idx) {
+    CN_ASSERT(declarator_idx != CN_AST_NIL_IDX);
+
+    Cn_Ast_Node *decl = cn_ast_node_get(declarator_idx);
+    if (decl->kind == CN_AST_NODE_ABSTRACT_DECLARATOR) return (Cn_String) {0};
+
+    Cn_Ast_Node *dd = cn_ast_node_get(decl->declarator.direct_declarator_idx);
+    while (true) {
+        switch (dd->direct_declarator.kind) {
+            case CN_DD_IDENTIFIER:
+                return dd->direct_declarator.identifier;
+            case CN_DD_GROUPED:
+                dd = cn_ast_node_get(cn_ast_node_get(dd->direct_declarator.declarator_idx)->declarator.direct_declarator_idx);
+                continue;
+            case CN_DD_ARRAY:
+                dd = cn_ast_node_get(dd->direct_declarator.dd_array.direct_declarator_idx);
+                continue;
+            case CN_DD_FUNCTION:
+                dd = cn_ast_node_get(dd->direct_declarator.dd_function.direct_declarator_idx);
+                continue;
+        }
+        break;
+    }
+
+    return (Cn_String) {0};
+}
+
 CNDEF Cn_Ast_Idx cn_ast_parse_function_definition_or_declaration(Cn_Lexer *lexer) {
     Cn_Lexer original_state = *lexer;
 
@@ -6113,46 +6198,19 @@ CNDEF Cn_Ast_Idx cn_ast_parse_function_definition_or_declaration(Cn_Lexer *lexer
         {
             Cn_Ast_Node *decl_spec = cn_ast_node_get(node.declaration.declaration_specifiers_idx);
             Cn_Ast_Node *init_decl_list = cn_ast_node_get(node.declaration.init_declarator_list_idx);
-            Cn_Ast_Node *decl, *dd;
-            Cn_Type *type;
-            Cn_String name;
             Cn_Ast_Binding_Kind binding_kind = decl_spec->declaration_specifiers.storage_specifiers & CN_STORAGE_SPECIFIER_TYPEDEF ? CN_BINDING_TYPEDEF : CN_BINDING_VARIABLE;
             
             // Iterating over declarators.
+            Cn_Type *type;
+            Cn_String name;
             cn_ast_linked_list_foreach(init_decl, &init_decl_list->init_declarator_list.init_declarator_list) {
                 type = cn_ast_to_type(decl_spec->declaration_specifiers.qualifiers, decl_spec->declaration_specifiers.type_specifier_idx, init_decl->init_declarator.declarator_idx);
                 
-                // Adding declarator to variable bidning, if it is not abstract.
-                decl = cn_ast_node_get(init_decl->init_declarator.declarator_idx);
-                if (decl->kind != CN_AST_NODE_ABSTRACT_DECLARATOR) {
-                    // Iterating over to get identifier in declarator.
-                    dd = cn_ast_node_get(decl->declarator.direct_declarator_idx);
-                    while(true) {
-                        switch (dd->direct_declarator.kind) {
-                            case CN_DD_FUNCTION:
-                                dd = cn_ast_node_get(dd->direct_declarator.dd_function.direct_declarator_idx);
-                                continue;
-
-                            case CN_DD_ARRAY:
-                                dd = cn_ast_node_get(dd->direct_declarator.dd_array.direct_declarator_idx);
-                                continue;
-
-                            case CN_DD_GROUPED:
-                                dd = cn_ast_node_get(cn_ast_node_get(dd->direct_declarator.declarator_idx)->declarator.direct_declarator_idx);
-                                continue;
-
-                            case CN_DD_IDENTIFIER:
-                                name = dd->direct_declarator.identifier;
-                                break;
-                        }
-
-                        break;
-                    }
-                    
-                    // Adding binding here.
+                // Adding declarator to variable or typedef bidning, if it is not abstract.
+                name = cn__ast_declarator_identifier(init_decl->init_declarator.declarator_idx);
+                if (!cn_str_empty(name)) {
                     cn_ast_symbol_binding_add(name, binding_kind, type);
                 }
-
             }
         }
     }
@@ -6459,11 +6517,6 @@ CNDEF Cn_Ast_Idx cn_ast_parse_expression_statement(Cn_Lexer *lexer) {
     Cn_Type *type = cn_ast_expression_typecheck(node.expression_statement.expression_idx);
     if (type == NULL) goto error;
 
-    // TEMPORARY: outputing typechecked result.
-    Cn_String typename = CN_STR_BUFFER_EMPTY(128);
-    cn_type_stringify(typename, type);
-    cn_diagnostic(CN_DIAGNOSTIC_INFO, &node.loc, CN_DC_ZERO, "%.*s", CN_UNPACK(typename));
-    
     return cn_ast_node_list_append(node);
 
 error:
@@ -6553,6 +6606,20 @@ CNDEF Cn_Ast_Idx cn_ast_parse_expression_increasing_precedence(Cn_Lexer *lexer, 
 
             return cn_ast_node_list_append(node); 
         } 
+
+        // Access operator cases.
+        if (cn_lexer_expect(lexer, CN_TOKEN_ARROW) || cn_lexer_expect(lexer, CN_TOKEN_DOT)) {
+            Cn_Ast_Node node = { .kind = CN_AST_NODE_ACCESS_EXPRESSION, .loc = cn_lexer_token(lexer).loc };
+            cn_ast_next_token(lexer);
+            
+            node.access_expression.expression_idx = left_idx;
+
+            node.access_expression.pointer = op_kind == CN_BINARY_OP_ARROW;
+
+            node.access_expression.member_identifier = cn_ast_parse_identifier(lexer);
+            if (cn_str_empty(node.access_expression.member_identifier)) goto error;
+            return cn_ast_node_list_append(node); 
+        }
 
         // Array subscript case.
         Cn_Ast_Node node = { .kind = CN_AST_NODE_BINARY_EXPRESSION, .loc = cn_lexer_token(lexer).loc };
@@ -7129,13 +7196,11 @@ CNDEF Cn_Ast_Idx cn_ast_parse_declaration_specifiers(Cn_Lexer *lexer) {
     }
 
     if (ts->type_specifier.width != CN_AST_TYPE_WIDTH_NONE && ts->type_specifier.kind != CN_AST_TYPE_INT) {
-        // cn_log(CN_ERROR, "Specified type width on non 'int' type.");
         cn_diagnostic(CN_DIAGNOSTIC_ERROR, &node.loc, CN_DC_INVALID_TYPE_SPECIFIER, "Specified type width on non 'int' type.");
         goto error;
     }
 
     if (ts->type_specifier.sign != CN_AST_TYPE_SIGN_NONE && ts->type_specifier.kind != CN_AST_TYPE_INT && ts->type_specifier.kind != CN_AST_TYPE_CHAR) {
-        // cn_log(CN_ERROR, "Specified type sign on non 'int' or 'char' type.");
         cn_diagnostic(CN_DIAGNOSTIC_ERROR, &node.loc, CN_DC_INVALID_TYPE_SPECIFIER, "Specified type sign on non 'int' or 'char' type.");
         goto error;
     }
@@ -7446,15 +7511,11 @@ CNDEF Cn_Ast_Idx cn_ast_parse_specifier_qualifier(Cn_Lexer *lexer) {
     }
 
     if (ts->type_specifier.width != CN_AST_TYPE_WIDTH_NONE && ts->type_specifier.kind != CN_AST_TYPE_INT) {
-        // cn_log(CN_ERROR, "Specified type width on non 'int' type.");
-        // cn_lexer_print_snippet_token(lexer);
         cn_diagnostic(CN_DIAGNOSTIC_ERROR, &cn_lexer_token(lexer).loc, CN_DC_INVALID_TYPE_SPECIFIER, "Specified type width on non 'int' type.");
         goto error;
     }
 
     if (ts->type_specifier.sign != CN_AST_TYPE_SIGN_NONE && ts->type_specifier.kind != CN_AST_TYPE_INT && ts->type_specifier.kind != CN_AST_TYPE_CHAR) {
-        // cn_log(CN_ERROR, "Specified type sign on non 'int' or 'char' type.");
-        // cn_lexer_print_snippet_token(lexer);
         cn_diagnostic(CN_DIAGNOSTIC_ERROR, &cn_lexer_token(lexer).loc, CN_DC_INVALID_TYPE_SPECIFIER, "Specified type sign on non 'int' or 'char' type.");
         goto error;
     }
@@ -7775,8 +7836,6 @@ CNDEF Cn_Type *cn_ast_to_type(Cn_Qualifier_Flags flags, Cn_Ast_Idx type_specifie
                 if (struct_or_union->struct_specifier.member_declaration_list.length > 0) {
                     // Checking if it is redifinition.
                     if (binding->type->is_complete && binding->scope_idx == CN_AST_SCOPE_STACK_CURRENT_IDX) {
-                        // cn_log(CN_ERROR, "Redefinition of 'struct %.*s' is not allowed within the same scope.", CN_UNPACK(struct_or_union->struct_specifier.tag));
-                        // cn_print_snippet(stderr, cn__ast_data->source, NULL, &struct_or_union->loc, NULL);
                         cn_diagnostic(CN_DIAGNOSTIC_ERROR, &struct_or_union->loc, CN_DC_REDEFINITION, "Redefinition of 'struct %.*s' is not allowed within the same scope.", CN_UNPACK(struct_or_union->struct_specifier.tag));
 
                         return NULL;
@@ -7804,15 +7863,16 @@ CNDEF Cn_Type *cn_ast_to_type(Cn_Qualifier_Flags flags, Cn_Ast_Idx type_specifie
                             // Getting member type.
                             member_type = cn_ast_to_type(spec->specifier_qualifier.qualifiers, spec->specifier_qualifier.type_specifier_idx, d->member_declarator.declarator_idx);
                             if (!member_type->is_complete) {    
-                                // cn_log(CN_ERROR, "Cannot have incomplete member type in struct definition.");
-                                // cn_print_snippet(stderr, cn__ast_data->source, NULL, &d->loc, NULL);
                                 cn_diagnostic(CN_DIAGNOSTIC_ERROR, &d->loc, CN_DC_INCOMPLETE_TYPE, "Cannot have incomplete member type in struct definition.");
 
                                 return NULL;
                             }
                             
                             // Adding member to struct type.
-                            binding->type->t_struct.members[i] = (Cn_Type_Struct_Member) { .type = member_type, };
+                            binding->type->t_struct.members[i] = (Cn_Type_Struct_Member) { 
+                                .type = member_type, 
+                                .name = cn__ast_declarator_identifier(d->member_declarator.declarator_idx),
+                            };
                             
                             // Setting offset to be next alligned offset and comparing with max align.
                             CN_ASSERT(member_type->align != 0);
@@ -7845,6 +7905,7 @@ CNDEF Cn_Type *cn_ast_to_type(Cn_Qualifier_Flags flags, Cn_Ast_Idx type_specifie
             break;
         case CN_AST_TYPE_NONE:
         default:
+            cn_diagnostic(CN_DIAGNOSTIC_ERROR, &ts->loc, CN_DC_INVALID_TYPE_SPECIFIER, "Unknown or invalid type specifier.");
             return NULL;
     }
     
@@ -7876,7 +7937,6 @@ CNDEF Cn_Type *cn_ast_to_type(Cn_Qualifier_Flags flags, Cn_Ast_Idx type_specifie
             Cn_Ast_Idx direct_declarator_idx = decl->declarator.direct_declarator_idx;
             Cn_Ast_Node *dd;
 
-
             while (direct_declarator_idx != CN_AST_NIL_IDX) {
                 dd = cn_ast_node_get(direct_declarator_idx);
 
@@ -7903,7 +7963,11 @@ CNDEF Cn_Type *cn_ast_to_type(Cn_Qualifier_Flags flags, Cn_Ast_Idx type_specifie
                         type.t_function.return_type = result;
                         
                         Cn_Ast_Node *params_list = cn_ast_node_get(dd->direct_declarator.dd_function.parameter_type_list_idx);
+                        
+                        // Is true if function declarator contains variadic args.
+                        type.t_function.is_variadic = params_list->parameter_type_list.variadic_args;
 
+                        // Iterating over parameters, converting them to types.
                         type.t_function.params_length = params_list->parameter_type_list.parameter_declaration_list.length;
                         
                         if (type.t_function.params_length > 0) {
@@ -7938,6 +8002,532 @@ CNDEF Cn_Type *cn_ast_to_type(Cn_Qualifier_Flags flags, Cn_Ast_Idx type_specifie
     return result;
 }
 
+CNDEF Cn_Type *cn__ast_integer_promote(Cn_Type *type) {
+    // Integer types of rank lower than int (and _Bool) promote to int.
+    if (type->kind == CN_BOOL) {
+        return cn__ast_add_type_if_not((Cn_Type *)&CN_TYPE_INT);
+    }
+    if (type->kind == CN_INTEGER && type->size < (int64_t)sizeof(int)) {
+        return cn__ast_add_type_if_not((Cn_Type *)&CN_TYPE_INT);
+    }
+    return type;
+}
+
+CNDEF Cn_Type *cn__ast_usual_arithmetic_conversion(Cn_Type *a, Cn_Type *b) {
+    // Promote each operand, then pick the greater rank.
+    a = cn__ast_integer_promote(a);
+    b = cn__ast_integer_promote(b);
+    return cn_type_greatest_arithmetic_rank(a, b);
+}
+
+CNDEF void cn__ast_illegal_binary(Cn_Ast_Node *node, Cn_Type *left, Cn_Type *right, const char *op_desc) {
+    Cn_String left_str  = cn_type_stringify(CN_STR_BUFFER_EMPTY(128), left);
+    Cn_String right_str = cn_type_stringify(CN_STR_BUFFER_EMPTY(128), right);
+    cn_diagnostic(CN_DIAGNOSTIC_ERROR, &node->loc, CN_DC_ILLEGAL_TYPE, "Illegal %s between %.*s and %.*s types.", op_desc, CN_UNPACK(left_str), CN_UNPACK(right_str));
+}
+
+CNDEF bool cn__ast_is_null_pointer_constant(Cn_Ast_Idx expression_idx) {
+    Cn_Ast_Node *node = cn_ast_node_get(expression_idx);
+
+    if (node->kind == CN_AST_NODE_PRIMARY_EXPRESSION && node->primary_expression.token.type == CN_TOKEN_INTEGER_VALUE) {
+        // TODO: Replace cn_str_parse_int with a proper parsing constant expression evaluation.
+        Cn_String s = cn_source_loc_to_str(cn__ast_data->source, &node->primary_expression.token.loc);
+        return cn_str_parse_int(s) == 0;
+    }
+
+    return false;
+}
+
+CNDEF bool cn__ast_is_lvalue(Cn_Ast_Idx expression_idx) {
+    Cn_Ast_Node *node = cn_ast_node_get(expression_idx);
+
+    switch (node->kind) {
+        case CN_AST_NODE_PRIMARY_EXPRESSION:
+            // Only identifiers denote objects; integer/float/string literals don't.
+            return node->primary_expression.token.type == CN_TOKEN_IDENTIFIER;
+
+        case CN_AST_NODE_UNARY_EXPRESSION:
+            // *p is an lvalue; -x, !x, &x, etc. are not.
+            return node->unary_expression.operator_kind == CN_UNARY_OP_DEREF;
+
+        case CN_AST_NODE_ACCESS_EXPRESSION:
+            // p->m is always an lvalue; s.m is an lvalue iff s is one.
+            // TODO: Check if parent is an lvalue.
+            return true;
+
+        case CN_AST_NODE_BINARY_EXPRESSION:
+            // a[b] is an lvalue; no other binary result is.
+            return node->binary_expression.operator_kind == CN_BINARY_OP_ARRAY_SUB;
+
+        default:
+            return false;
+    }
+}
+
+CNDEF Cn_Type *cn__ast_binary_expression_typecheck(Cn_Ast_Node *node) {
+    CN_ASSERT(node->kind == CN_AST_NODE_BINARY_EXPRESSION);
+
+    Cn_Type *left = cn_ast_expression_typecheck(node->binary_expression.left_expression_idx);
+    if (left == NULL) return NULL;
+
+    Cn_Type *right = cn_ast_expression_typecheck(node->binary_expression.right_expression_idx);
+    if (right == NULL) return NULL;
+
+    switch (node->binary_expression.operator_kind) {
+        case CN_BINARY_OP_ADDITION: 
+            {
+                if (cn_type_is_arithmetic(left) && cn_type_is_arithmetic(right)) {
+                    return cn_type_greatest_arithmetic_rank(left, right);
+                }
+                if (left->kind == CN_POINTER || right->kind == CN_POINTER) {
+                    Cn_Type *ptr_type   = left->kind == CN_POINTER ? left  : right;
+                    Cn_Type *other_type = left->kind == CN_POINTER ? right : left;
+                    if (other_type->kind != CN_INTEGER) {
+                        cn__ast_illegal_binary(node, left, right, "pointer addition");
+                        return NULL;
+                    }
+                    return ptr_type;
+                }
+                cn__ast_illegal_binary(node, left, right, "addition");
+                return NULL;
+            }
+
+        case CN_BINARY_OP_SUBTRACTION: 
+            {
+                if (cn_type_is_arithmetic(left) && cn_type_is_arithmetic(right)) {
+                    return cn_type_greatest_arithmetic_rank(left, right);
+                }
+                if (left->kind == CN_POINTER || right->kind == CN_POINTER) {
+                    Cn_Type *ptr_type   = left->kind == CN_POINTER ? left  : right;
+                    Cn_Type *other_type = left->kind == CN_POINTER ? right : left;
+                    if (other_type->kind != CN_INTEGER) {
+                        if (other_type->kind == CN_POINTER) {
+                            return cn__ast_add_type_if_not((Cn_Type *)&CN_TYPE_PTRDIFF);
+                        }
+                        cn__ast_illegal_binary(node, left, right, "pointer subtraction");
+                        return NULL;
+                    }
+                    return ptr_type;
+                }
+                cn__ast_illegal_binary(node, left, right, "subtraction");
+                return NULL;
+            }
+
+        case CN_BINARY_OP_ARRAY_SUB: 
+            {
+                if (left->kind != CN_POINTER) {
+                    cn__ast_illegal_binary(node, left, right, "array subscript (left operand must be a pointer)");
+                    return NULL;
+                }
+                if (right->kind != CN_INTEGER) {
+                    cn__ast_illegal_binary(node, left, right, "array subscript (subscript must be an integer)");
+                    return NULL;
+                }
+
+                return left->t_pointer.ptr_to;
+            }
+
+        // Arithmetic, usual arithmetic conversions.
+        case CN_BINARY_OP_MULTIPLICATION:
+        case CN_BINARY_OP_DIVISION: 
+            {
+                if (cn_type_is_arithmetic(left) && cn_type_is_arithmetic(right)) {
+                    return cn__ast_usual_arithmetic_conversion(left, right);
+                }
+                cn__ast_illegal_binary(node, left, right,
+                        node->binary_expression.operator_kind == CN_BINARY_OP_MULTIPLICATION
+                        ? "multiplication" : "division");
+                return NULL;
+            }
+
+        // Integer-only, usual arithmetic conversions.
+        case CN_BINARY_OP_MODULO:
+        case CN_BINARY_OP_BIT_AND:
+        case CN_BINARY_OP_BIT_XOR:
+        case CN_BINARY_OP_BIT_OR: 
+            {
+                if (left->kind == CN_INTEGER && right->kind == CN_INTEGER) {
+                    return cn__ast_usual_arithmetic_conversion(left, right);
+                }
+                cn__ast_illegal_binary(node, left, right, "integer operation");
+                return NULL;
+            }
+
+        // Shifts: each operand promoted independently; result is the promoted LEFT
+        // operand. The right operand does NOT participate in the result type.
+        case CN_BINARY_OP_LSHIFT:
+        case CN_BINARY_OP_RSHIFT: 
+            {
+                if (left->kind == CN_INTEGER && right->kind == CN_INTEGER) {
+                    return cn__ast_integer_promote(left);
+                }
+                cn__ast_illegal_binary(node, left, right, "shift");
+                return NULL;
+            }
+
+        // Relational: arithmetic vs arithmetic, or pointer vs pointer. Result is int.
+        case CN_BINARY_OP_LESS:
+        case CN_BINARY_OP_LESS_EQ:
+        case CN_BINARY_OP_GREATER:
+        case CN_BINARY_OP_GREATER_EQ: 
+            {
+                bool ok = (cn_type_is_arithmetic(left) && cn_type_is_arithmetic(right))
+                    || (left->kind == CN_POINTER && right->kind == CN_POINTER);
+                if (!ok) {
+                    cn__ast_illegal_binary(node, left, right, "relational comparison");
+                    return NULL;
+                }
+                return cn__ast_add_type_if_not((Cn_Type *)&CN_TYPE_INT);
+            }
+
+        // Equality: as relational, plus pointer vs integer (null constant). Result int.
+        case CN_BINARY_OP_EQ:
+        case CN_BINARY_OP_NOT_EQ: 
+            {
+                bool ok = (cn_type_is_arithmetic(left) && cn_type_is_arithmetic(right))
+                    || (left->kind == CN_POINTER && right->kind == CN_POINTER)
+                    || (left->kind == CN_POINTER && right->kind == CN_INTEGER)
+                    || (left->kind == CN_INTEGER && right->kind == CN_POINTER);
+                if (!ok) {
+                    cn__ast_illegal_binary(node, left, right, "equality comparison");
+                    return NULL;
+                }
+                return cn__ast_add_type_if_not((Cn_Type *)&CN_TYPE_INT);
+            }
+
+        // Logical: scalar operands, no arithmetic conversions, result is int.
+        case CN_BINARY_OP_AND:
+        case CN_BINARY_OP_OR: {
+            if (cn_type_is_scalar(left) && cn_type_is_scalar(right)) {
+                return cn__ast_add_type_if_not((Cn_Type *)&CN_TYPE_INT);
+            }
+            cn__ast_illegal_binary(node, left, right, "logical operation");
+            return NULL;
+        }
+
+        // Comma: result is the type of the right operand.
+        case CN_BINARY_OP_COMMA:
+            return right;
+
+        default: {
+            cn_diagnostic(CN_DIAGNOSTIC_ERROR, &node->loc, CN_DC_EXPECTED_TOKEN, "Expected binary operator.");
+            return NULL;
+        }
+    }
+}
+
+CNDEF Cn_Type *cn__ast_access_expression_typecheck(Cn_Ast_Node *node) {
+    CN_ASSERT(node->kind == CN_AST_NODE_ACCESS_EXPRESSION);
+
+    Cn_Type *base = cn_ast_expression_typecheck(node->access_expression.expression_idx);
+    if (base == NULL) return NULL;
+
+    Cn_Type *struct_type;
+    if (node->access_expression.pointer) {
+        // '->' : operand must be a pointer to a struct/union.
+        if (base->kind != CN_POINTER) {
+            cn_diagnostic(CN_DIAGNOSTIC_ERROR, &node->loc, CN_DC_ILLEGAL_TYPE, "'->' requires a pointer operand.");
+            return NULL;
+        }
+        struct_type = base->t_pointer.ptr_to;
+    } else {
+        // '.' : operand must be a struct/union directly.
+        struct_type = base;
+    }
+
+    // TODO: Allow CN_UNION once union types are implemented.
+    if (struct_type->kind != CN_STRUCT) {
+        cn_diagnostic(CN_DIAGNOSTIC_ERROR, &node->loc, CN_DC_ILLEGAL_TYPE, "Member access on non-struct type.");
+        return NULL;
+    }
+
+    if (!struct_type->is_complete) {
+        cn_diagnostic(CN_DIAGNOSTIC_ERROR, &node->loc, CN_DC_INCOMPLETE_TYPE, "Cannot access member of incomplete type.");
+        return NULL;
+    }
+
+    for (int64_t i = 0; i < struct_type->t_struct.members_length; i++) {
+        if (cn_str_equals(&struct_type->t_struct.members[i].name, &node->access_expression.member_identifier)) {
+            return struct_type->t_struct.members[i].type;
+        }
+    }
+
+    cn_diagnostic(CN_DIAGNOSTIC_ERROR, &node->loc, CN_DC_INVALID_SYMBOL, "No member named '%.*s' in struct.", CN_UNPACK(node->access_expression.member_identifier));
+    return NULL;
+}
+
+CNDEF Cn_Type *cn__ast_function_expression_typecheck(Cn_Ast_Node *node) {
+    CN_ASSERT(node->kind == CN_AST_NODE_FUNCTION_EXPRESSION);
+
+    Cn_Type *callee = cn_ast_expression_typecheck(node->function_expression.expression_idx);
+    if (callee == NULL) return NULL;
+
+    // A function itself or a pointer to function may be called. Getting function type itself.
+    Cn_Type *fn = callee;
+    if (fn->kind == CN_POINTER) fn = fn->t_pointer.ptr_to;
+
+    if (fn->kind != CN_FUNCTION) {
+        cn_diagnostic(CN_DIAGNOSTIC_ERROR, &node->loc, CN_DC_ILLEGAL_TYPE, "Called object is not a function or function pointer.");
+        return NULL;
+    }
+
+    // Argument count must match parameter count.
+    // NOTE: variadics aren't tracked in Cn_Type_Function yet, so this is exact-match only.
+    int64_t arg_count = node->function_expression.argument_list.length;
+    if (fn->t_function.is_variadic) {
+        if (arg_count < fn->t_function.params_length) {
+            cn_diagnostic(CN_DIAGNOSTIC_ERROR, &node->loc, CN_DC_ILLEGAL_TYPE, "Variadic function expects at least %lld argument(s) but %lld were provided.", fn->t_function.params_length, arg_count);
+            return NULL;
+        }
+    } else if (arg_count != fn->t_function.params_length) {
+        cn_diagnostic(CN_DIAGNOSTIC_ERROR, &node->loc, CN_DC_ILLEGAL_TYPE, "Function expects %lld argument(s) but %lld were provided.", fn->t_function.params_length, arg_count);
+        return NULL;
+    }
+
+    // Each argument must be assignable to its corresponding parameter type.
+    // NOTE: Not using linked list foreach cause we need to supply idx's to typechecking function.
+    Cn_Ast_Idx arg_idx = node->function_expression.argument_list.idx;
+    int64_t i = 0;
+    while (arg_idx != CN_AST_NIL_IDX) {
+        Cn_Type *arg_type = cn_ast_expression_typecheck(arg_idx);
+        if (arg_type == NULL) return NULL;
+
+        // If parameter is not part of variadic list, typechecking with function param type, otherwise ignoring.
+        if (i < fn->t_function.params_length) {
+            Cn_Type *param_type = fn->t_function.params[i].type;
+
+            if (!cn_type_is_assignable(param_type, arg_type)) {
+                // Additionally to checking type assignable checking edge case of NULL pointer assignment to pointer type, example int *a = 0
+                if (!(param_type->kind == CN_POINTER && cn__ast_is_null_pointer_constant(arg_idx))) {
+                        Cn_String a_str = cn_type_stringify(CN_STR_BUFFER_EMPTY(128), arg_type);
+                        Cn_String p_str = cn_type_stringify(CN_STR_BUFFER_EMPTY(128), param_type);
+                        cn_diagnostic(CN_DIAGNOSTIC_ERROR, &node->loc, CN_DC_ILLEGAL_TYPE, "Argument %lld of type %.*s is not assignable to parameter type %.*s.", i + 1, CN_UNPACK(a_str), CN_UNPACK(p_str));
+                        return NULL;
+                }
+            }
+        }
+
+        arg_idx = cn_ast_node_get(arg_idx)->next_idx;
+        i++;
+    }
+
+    return fn->t_function.return_type;
+}
+
+CNDEF Cn_Type *cn__ast_unary_expression_typecheck(Cn_Ast_Node *node) {
+    CN_ASSERT(node->kind == CN_AST_NODE_UNARY_EXPRESSION);
+
+    Cn_Ast_Idx operand_idx = node->unary_expression.expression_idx;
+    Cn_Type *operand = cn_ast_expression_typecheck(operand_idx);
+    if (operand == NULL) return NULL;
+
+    switch (node->unary_expression.operator_kind) {
+        // ++x / --x : modifiable lvalue of scalar type; result is the operand's type.
+        case CN_UNARY_OP_INCREMENT:
+        case CN_UNARY_OP_DECREMENT: 
+            {
+                if (!cn__ast_is_lvalue(operand_idx)) 
+                {
+                    cn_diagnostic(CN_DIAGNOSTIC_ERROR, &node->loc, CN_DC_ILLEGAL_TYPE, "Operand of '++'/'--' is not an lvalue.");
+                    return NULL;
+                }
+                if (!cn_type_is_scalar(operand)) 
+                {
+                    cn_diagnostic(CN_DIAGNOSTIC_ERROR, &node->loc, CN_DC_ILLEGAL_TYPE, "Operand of '++'/'--' must be of scalar type.");
+                    return NULL;
+                }
+                // TODO: reject const-qualified lvalues once qualifiers are tracked.
+                return operand;
+            }
+
+        // +x / -x : arithmetic operand; result is integer-promoted.
+        case CN_UNARY_OP_POSITIVE:
+        case CN_UNARY_OP_NEGATIVE: 
+            {
+                if (!cn_type_is_arithmetic(operand)) {
+                    cn_diagnostic(CN_DIAGNOSTIC_ERROR, &node->loc, CN_DC_ILLEGAL_TYPE, "Operand of unary '+'/'-' must be of arithmetic type.");
+                    return NULL;
+                }
+                return cn__ast_integer_promote(operand);
+            }
+
+        // ~x : integer operand; result is integer-promoted.
+        case CN_UNARY_OP_BIT_NOT: 
+            {
+                if (operand->kind != CN_INTEGER) {
+                    cn_diagnostic(CN_DIAGNOSTIC_ERROR, &node->loc, CN_DC_ILLEGAL_TYPE, "Operand of '~' must be of integer type.");
+                    return NULL;
+                }
+                return cn__ast_integer_promote(operand);
+            }
+
+        // !x : scalar operand; result is always int.
+        case CN_UNARY_OP_NOT: 
+            {
+                if (!cn_type_is_scalar(operand)) {
+                    cn_diagnostic(CN_DIAGNOSTIC_ERROR, &node->loc, CN_DC_ILLEGAL_TYPE, "Operand of '!' must be of scalar type.");
+                    return NULL;
+                }
+                return cn__ast_add_type_if_not((Cn_Type *)&CN_TYPE_INT);
+            }
+
+        // *x : pointer operand; result is the pointed-to type (an lvalue).
+        case CN_UNARY_OP_DEREF: 
+            {
+                if (operand->kind != CN_POINTER) {
+                    cn_diagnostic(CN_DIAGNOSTIC_ERROR, &node->loc, CN_DC_ILLEGAL_TYPE, "Cannot dereference a non-pointer type.");
+                    return NULL;
+                }
+
+                if (operand->t_pointer.ptr_to->kind == CN_VOID) {
+                    cn_diagnostic(CN_DIAGNOSTIC_ERROR, &node->loc, CN_DC_ILLEGAL_TYPE, "Cannot dereference a void * type.");
+                    return NULL;
+                }
+
+                return operand->t_pointer.ptr_to;
+            }
+
+        // &x : operand must be an lvalue; result is pointer-to-operand-type.
+        case CN_UNARY_OP_ADDROF: 
+            {
+                if (!cn__ast_is_lvalue(operand_idx)) {
+                    cn_diagnostic(CN_DIAGNOSTIC_ERROR, &node->loc, CN_DC_ILLEGAL_TYPE, "Cannot take the address of a non-lvalue.");
+                    return NULL;
+                }
+                Cn_Type ptr = {
+                    .kind = CN_POINTER,
+                    .is_complete = true,
+                    .size = sizeof(void *),
+                    .align = sizeof(void *),
+                    .t_pointer.ptr_to = operand,
+                };
+                return cn__ast_add_type_if_not(&ptr);
+            }
+
+        default: 
+            {
+                cn_diagnostic(CN_DIAGNOSTIC_ERROR, &node->loc, CN_DC_EXPECTED_TOKEN, "Expected unary operator.");
+                return NULL;
+            }
+    }
+}
+
+CNDEF Cn_Type *cn__ast_cast_expression_typecheck(Cn_Ast_Node *node) {
+    CN_ASSERT(node->kind == CN_AST_NODE_CAST_EXPRESSION);
+
+    // Resolve the target type from the typename.
+    Cn_Ast_Node *type_name = cn_ast_node_get(node->cast_expression.type_name_idx);
+    Cn_Ast_Node *spec_qual = cn_ast_node_get(type_name->type_name.specifier_qualifier_idx);
+    Cn_Type *target = cn_ast_to_type(spec_qual->specifier_qualifier.qualifiers, spec_qual->specifier_qualifier.type_specifier_idx, type_name->type_name.abstract_declarator_idx);
+    if (target == NULL) return NULL;
+
+    Cn_Type *operand = cn_ast_expression_typecheck(node->cast_expression.expression_idx);
+    if (operand == NULL) return NULL;
+
+    // Cast to void: always allowed, value is discarded.
+    if (target->kind == CN_VOID) {
+        return target;
+    }
+
+    // Target must be scalar.
+    if (!cn_type_is_scalar(target)) {
+        Cn_String t_str = cn_type_stringify(CN_STR_BUFFER_EMPTY(128), target);
+        cn_diagnostic(CN_DIAGNOSTIC_ERROR, &node->loc, CN_DC_ILLEGAL_TYPE, "Cannot cast to non-scalar type %.*s.", CN_UNPACK(t_str));
+        return NULL;
+    }
+
+    // Operand must be scalar.
+    if (!cn_type_is_scalar(operand)) {
+        Cn_String o_str = cn_type_stringify(CN_STR_BUFFER_EMPTY(128), operand);
+        cn_diagnostic(CN_DIAGNOSTIC_ERROR, &node->loc, CN_DC_ILLEGAL_TYPE, "Cannot cast from non-scalar type %.*s.", CN_UNPACK(o_str));
+        return NULL;
+    }
+
+    // Floating types can't be cast to or from pointers.
+    if ((target->kind == CN_POINTER && operand->kind == CN_FLOAT) || (target->kind == CN_FLOAT && operand->kind == CN_POINTER)) {
+        Cn_String t_str = cn_type_stringify(CN_STR_BUFFER_EMPTY(128), target);
+        Cn_String o_str = cn_type_stringify(CN_STR_BUFFER_EMPTY(128), operand);
+        cn_diagnostic(CN_DIAGNOSTIC_ERROR, &node->loc, CN_DC_ILLEGAL_TYPE, "Cannot cast between floating type and pointer %.*s to %.*s.", CN_UNPACK(o_str), CN_UNPACK(t_str));
+        return NULL;
+    }
+
+    return target;
+}
+
+
+
+CNDEF Cn_Type *cn__ast_assignment_expression_typecheck(Cn_Ast_Node *node) {
+    CN_ASSERT(node->kind == CN_AST_NODE_ASSIGNMENT_EXPRESSION);
+
+    Cn_Type *left = cn_ast_expression_typecheck(node->assignment_expression.left_expression_idx);
+    if (left == NULL) return NULL;
+
+    Cn_Type *right = cn_ast_expression_typecheck(node->assignment_expression.right_expression_idx);
+    if (right == NULL) return NULL;
+
+    // Left must be a modifiable lvalue for every assignment form.
+    if (!cn__ast_is_lvalue(node->assignment_expression.left_expression_idx)) {
+        cn_diagnostic(CN_DIAGNOSTIC_ERROR, &node->loc, CN_DC_ILLEGAL_TYPE, "Left operand of assignment is not an lvalue.");
+        return NULL;
+    }
+    // TODO: Reject const-qualified / array / function lvalues once qualifiers are tracked.
+
+    switch (node->assignment_expression.operator_kind) {
+        // Simple assignment: right must be assignable to left, with NULL constant to pointer case handled too.
+        case CN_ASSIGNMENT_OP_ASSIGN: 
+            {
+                if (!cn_type_is_assignable(left, right)) {
+
+                    if (!(left->kind == CN_POINTER && cn__ast_is_null_pointer_constant(node->assignment_expression.right_expression_idx))) {
+                        Cn_String left_str  = cn_type_stringify(CN_STR_BUFFER_EMPTY(128), left);
+                        Cn_String right_str = cn_type_stringify(CN_STR_BUFFER_EMPTY(128), right);
+                        cn_diagnostic(CN_DIAGNOSTIC_ERROR, &node->loc, CN_DC_ILLEGAL_TYPE, "Cannot assign %.*s to %.*s.", CN_UNPACK(right_str), CN_UNPACK(left_str));
+                        return NULL;
+                    }
+                }
+                return left;
+            }
+
+        // '+=' / '-=' : arithmetic both sides, OR pointer-left with integer-right.
+        case CN_ASSIGNMENT_OP_PLUS:
+        case CN_ASSIGNMENT_OP_MINUS: 
+            {
+                if (cn_type_is_arithmetic(left) && cn_type_is_arithmetic(right)) return left;
+                if (left->kind == CN_POINTER && right->kind == CN_INTEGER)       return left;
+                cn__ast_illegal_binary(node, left, right, node->assignment_expression.operator_kind == CN_ASSIGNMENT_OP_PLUS ? "'+=' assignment" : "'-=' assignment");
+                return NULL;
+            }
+
+        // '*=' / '/=' : arithmetic both sides.
+        case CN_ASSIGNMENT_OP_MULTIPLY:
+        case CN_ASSIGNMENT_OP_DIVIDE: 
+            {
+                if (cn_type_is_arithmetic(left) && cn_type_is_arithmetic(right)) return left;
+                cn__ast_illegal_binary(node, left, right, "arithmetic assignment");
+                return NULL;
+            }
+
+        // '%=' '<<=' '>>=' '&=' '^=' '|=' : integer both sides.
+        case CN_ASSIGNMENT_OP_MODULO:
+        case CN_ASSIGNMENT_OP_LSHIFT:
+        case CN_ASSIGNMENT_OP_RSHIFT:
+        case CN_ASSIGNMENT_OP_BIT_AND:
+        case CN_ASSIGNMENT_OP_BIT_XOR:
+        case CN_ASSIGNMENT_OP_BIT_OR: 
+            {
+                if (left->kind == CN_INTEGER && right->kind == CN_INTEGER) return left;
+                cn__ast_illegal_binary(node, left, right, "integer assignment");
+                return NULL;
+            }
+
+        default: 
+            {
+                cn_diagnostic(CN_DIAGNOSTIC_ERROR, &node->loc, CN_DC_EXPECTED_TOKEN, "Expected assignment operator.");
+                return NULL;
+            }
+    }
+}
+
 CNDEF Cn_Type *cn_ast_expression_typecheck(Cn_Ast_Idx expression_idx) {
     Cn_Ast_Node *node = cn_ast_node_get(expression_idx);
 
@@ -7946,38 +8536,31 @@ CNDEF Cn_Type *cn_ast_expression_typecheck(Cn_Ast_Idx expression_idx) {
     switch(node->kind) {
         case CN_AST_NODE_BINARY_EXPRESSION: 
             {
-                switch (node->binary_expression.operator_kind) {
-                    case CN_BINARY_OP_ADDITION:
-                        {   
-                            
-                            break;
-                        }
-                    default:
-                        {
-                            cn_diagnostic(CN_DIAGNOSTIC_ERROR, &node->loc, CN_DC_EXPECTED_TOKEN, "Expected binary operator.");
-                            return NULL;
-                        }
-                }
+                result = cn__ast_binary_expression_typecheck(node);
                 node->binary_expression.type = result;
                 break;
             }
         case CN_AST_NODE_ACCESS_EXPRESSION:
             {
+                result = cn__ast_access_expression_typecheck(node);
                 node->access_expression.type = result;
                 break;
             }
         case CN_AST_NODE_FUNCTION_EXPRESSION:
             {
+                result = cn__ast_function_expression_typecheck(node);
                 node->function_expression.type = result;
                 break;
             }
         case CN_AST_NODE_UNARY_EXPRESSION:
             {
+                result = cn__ast_unary_expression_typecheck(node);
                 node->unary_expression.type = result;
                 break;
             }
         case CN_AST_NODE_CAST_EXPRESSION:
             {
+                result = cn__ast_cast_expression_typecheck(node);
                 node->cast_expression.type = result;
                 break;
             }
@@ -7993,6 +8576,7 @@ CNDEF Cn_Type *cn_ast_expression_typecheck(Cn_Ast_Idx expression_idx) {
             }
         case CN_AST_NODE_ASSIGNMENT_EXPRESSION:
             {
+                result = cn__ast_assignment_expression_typecheck(node);
                 node->assignment_expression.type = result;
                 break;
             }
@@ -8050,6 +8634,14 @@ CNDEF Cn_Type *cn_ast_expression_typecheck(Cn_Ast_Idx expression_idx) {
             cn_diagnostic(CN_DIAGNOSTIC_ERROR, &node->loc, CN_DC_EXPECTED_EXPRESSION, "Expected expression to typecheck.");
             break;
     }
+    
+    // TEMPORARY: outputing typechecked result.
+    if (result != NULL) {
+        Cn_String typename = CN_STR_BUFFER_EMPTY(128);
+        cn_type_stringify(typename, result);
+        cn_diagnostic(CN_DIAGNOSTIC_INFO, &node->loc, CN_DC_ZERO, "%.*s", CN_UNPACK(typename));
+    }
+    
 
     return result;
 }
