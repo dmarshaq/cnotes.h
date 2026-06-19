@@ -541,12 +541,14 @@ int cn_command(int *argc, char ***argv) {
 
     Cn_Translation_Unit tu = cn_tu_make("main.i");
     
-    if (cn_tu_process(&tu) == -1) {
+    if (cn_tu_process(&tu, 0) == -1) {
         cn_tu_free(&tu);
         return 1;
     }
 
     cn_tu_free(&tu);
+
+    return 1;
     
     // Compiling main executable.
     nob_cc(&cmd);

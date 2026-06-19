@@ -66,7 +66,7 @@ int main(void) {
 
     cn_chained_arena_dealloc(&arena, 9999);
 
-    Cn_Chained_Arena_Block_Header *header = CN_CHAINED_ARENA_BLOCK_HEADER(&arena);
+    Cn_Chained_Arena_Block_Header *header = CN_CHAINED_ARENA_BLOCK_HEADER(arena.block);
     CN_ASSERT(header->prev == NULL && header->allocated == 0);
 
     cn_chained_arena_free(&arena);

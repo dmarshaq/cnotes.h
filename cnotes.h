@@ -2763,6 +2763,13 @@ typedef struct {
     Cn_Ast_Data ast_data;
 } Cn_Translation_Unit;
 
+typedef enum : uint8_t {
+    CN_PRINT_SOURCE   = 0x01,
+    CN_PRINT_TOKENS   = 0x02,
+    CN_PRINT_AST      = 0x04,
+    CN_PRINT_TYPES    = 0x08,
+    CN_PRINT_BINDINGS = 0x10,
+} Cn_Flags;
 
 /**
  * RETURNS: Cn_Translation_Unit struct that represent classic C translation unit in which all lexing, parsing, infering, modification occurs.
@@ -2792,7 +2799,7 @@ CNDEF void cn_tu_free(Cn_Translation_Unit *tu);
  * if cn_message_handler is not NULL.
  * RETURNS: 0 if processing is successful. -1 if error occured.
  */
-CNDEF int cn_tu_process(Cn_Translation_Unit *tu); 
+CNDEF int cn_tu_process(Cn_Translation_Unit *tu, Cn_Flags flags); 
 
 
 typedef struct {
@@ -3503,7 +3510,7 @@ CNDEF uint64_t cn_hash_ptr(void *ptr) {
 CNDEF uint64_t cn_hash_bytes(void *data, int64_t length) {
     uint8_t *p = (uint8_t *)data;
     uint64_t h = 0xcbf29ce484222325ULL;
-    for (size_t i = 0; i < length; i++) {
+    for (int64_t i = 0; i < length; i++) {
         h ^= p[i];
         h *= 0x100000001b3ULL;
     }
@@ -4021,10 +4028,11 @@ CNDEF bool cn__find_next_line(Cn_String source, int64_t *bol, int64_t *eol) {
 /**
  * Given current bol, eol and source, it will find previous bol 
  * with it's eol and overwrite supplied value of bol and eol.
+ *
  * RETURNS: True if successfuly found previous bol, false otherwise.
  */
 CNDEF bool cn__find_prev_line(Cn_String source, int64_t *bol, int64_t *eol) {
-    if (*bol - strlen(CN_LINE_END) < 0) return false;
+    if ((*bol - (int64_t)strlen(CN_LINE_END)) < 0) return false;
 
     source = cn_str_get_chars(source, *bol - strlen(CN_LINE_END));
 
@@ -4623,7 +4631,7 @@ number_lexer_fail:
         }
        
         Cn_String symbol = cn_source_loc_to_str(cn__ast_data->source, &token.loc);
-        for (int i = 0; i < CN_ARRAY_LENGTH(CN_KEYWORD_TOKENS); i++) {
+        for (int i = 0; i < (int)CN_ARRAY_LENGTH(CN_KEYWORD_TOKENS); i++) {
             if (cn_str_equals(&CN_KEYWORD_TOKENS[i].literal, &symbol)) {
                 token.type = CN_KEYWORD_TOKENS[i].type;
                 break;
@@ -5073,7 +5081,7 @@ const Cn_Binary_Operator CN_BINARY_OPERATORS[] = {
 };
 
 CNDEF Cn_Binary_Operator_Kind cn_ast_is_binary_operator(Cn_Lexer *lexer) {
-    for (int i = 0; i < CN_ARRAY_LENGTH(CN_BINARY_OPERATORS); i++) {
+    for (int i = 0; i < (int)CN_ARRAY_LENGTH(CN_BINARY_OPERATORS); i++) {
         if (cn_lexer_token(lexer).type == CN_BINARY_OPERATORS[i].token_identifier) {
             return i;
         }
@@ -5094,7 +5102,7 @@ const Cn_Unary_Operator CN_UNARY_OPERATORS[] = {
 };
 
 CNDEF Cn_Unary_Operator_Kind cn_ast_is_unary_operator(Cn_Lexer *lexer) {
-    for (int i = 0; i < CN_ARRAY_LENGTH(CN_UNARY_OPERATORS); i++) {
+    for (int i = 0; i < (int)CN_ARRAY_LENGTH(CN_UNARY_OPERATORS); i++) {
         if (cn_lexer_token(lexer).type == CN_UNARY_OPERATORS[i].token_identifier) {
             return i;
         }
@@ -5118,7 +5126,7 @@ const Cn_Assignment_Operator CN_ASSIGNMENT_OPERATORS[] = {
 };
 
 CNDEF Cn_Assignment_Operator_Kind cn_ast_is_assignment_operator(Cn_Lexer *lexer) {
-    for (int i = 0; i < CN_ARRAY_LENGTH(CN_ASSIGNMENT_OPERATORS); i++) {
+    for (int i = 0; i < (int)CN_ARRAY_LENGTH(CN_ASSIGNMENT_OPERATORS); i++) {
         if (cn_lexer_token(lexer).type == CN_ASSIGNMENT_OPERATORS[i].token_identifier) {
             return i;
         }
@@ -5133,7 +5141,7 @@ const Cn_Postfix_Operator CN_POSTFIX_OPERATORS[] = {
 };
 
 CNDEF Cn_Postfix_Operator_Kind cn_ast_is_postfix_operator(Cn_Lexer *lexer) {
-    for (int i = 0; i < CN_ARRAY_LENGTH(CN_POSTFIX_OPERATORS); i++) {
+    for (int i = 0; i < (int)CN_ARRAY_LENGTH(CN_POSTFIX_OPERATORS); i++) {
         if (cn_lexer_token(lexer).type == CN_POSTFIX_OPERATORS[i].token_identifier) {
             return i;
         }
@@ -5344,9 +5352,9 @@ CNDEF void cn_ast_print(Cn_Ast_Node *node, int depth) {
     Cn_Ast_Idx idxs[4] = {0};
     bool is_list[4]    = {0};
 
-#define ADD_IDX(idx) do { if (idx != CN_AST_NIL_IDX) { CN_ASSERT(next < CN_ARRAY_LENGTH(idxs)); idxs[next++] = idx; } } while(0)
+#define ADD_IDX(idx) do { if (idx != CN_AST_NIL_IDX) { CN_ASSERT(next < (int)CN_ARRAY_LENGTH(idxs)); idxs[next++] = idx; } } while(0)
 
-#define ADD_LIST(list) do { CN_ASSERT(next < CN_ARRAY_LENGTH(idxs)); idxs[next] = (list)->idx; is_list[next++] = true; } while(0)
+#define ADD_LIST(list) do { CN_ASSERT(next < (int)CN_ARRAY_LENGTH(idxs)); idxs[next] = (list)->idx; is_list[next++] = true; } while(0)
     
     // Printing info about specific nodes.
     switch(node->kind) {
@@ -6246,6 +6254,7 @@ error:
 }
 
 CNDEF Cn_Ast_Idx cn_ast_parse_asm_definition(Cn_Lexer *lexer) {
+    CN_UNUSED(lexer);
     CN_TODO("AST asm definition.");
 }
 
@@ -6427,9 +6436,12 @@ CNDEF Cn_Ast_Idx cn_ast_parse_iteration_statement(Cn_Lexer *lexer) {
     Cn_Ast_Idx child_idx;
 
     
+    CN_UNUSED(child_idx);
+    // Unused label.
+    goto error;
     
     return cn_ast_node_list_append(node);
-
+    
 error:
     *lexer = original_state;
     return CN_AST_NIL_IDX;
@@ -6439,8 +6451,6 @@ CNDEF Cn_Ast_Idx cn_ast_parse_jump_statement(Cn_Lexer *lexer) {
     Cn_Lexer original_state = *lexer;
 
     Cn_Ast_Node node = { .kind = CN_AST_NODE_JUMP_STATEMENT, .loc = cn_lexer_token(lexer).loc };
-
-    Cn_Ast_Idx child_idx;
 
     switch (cn_lexer_token(lexer).type) {
         case CN_TOKEN_GOTO: 
@@ -6470,13 +6480,12 @@ CNDEF Cn_Ast_Idx cn_ast_parse_jump_statement(Cn_Lexer *lexer) {
 
                 if (!cn_lexer_expect(lexer, CN_TOKEN_SEMICOLON)) {
                     node.jump_statement.expression_idx = cn_ast_parse_expression(lexer, 0, 0);
+                    if (node.jump_statement.expression_idx == CN_AST_NIL_IDX) goto error;
                 }
                 break;
             }
         default:
             {
-                // cn_log(CN_ERROR, "Not a jump statement.");
-                // cn_lexer_print_snippet_token(lexer);
                 cn_diagnostic(CN_DIAGNOSTIC_ERROR, &cn_lexer_token(lexer).loc, CN_DC_UNEXPECTED_TOKEN, "Not a jump statement.");
                 goto error;
             }
@@ -6504,7 +6513,9 @@ CNDEF Cn_Ast_Idx cn_ast_parse_labeled_statement(Cn_Lexer *lexer) {
 
     Cn_Ast_Idx child_idx;
 
-    
+    CN_UNUSED(child_idx);
+    // Unused label.
+    goto error;
     
     return cn_ast_node_list_append(node);
 
@@ -7329,7 +7340,6 @@ CNDEF int cn_ast_try_parse_qualifier(Cn_Lexer *lexer, Cn_Qualifier_Flags *output
             return 1;
     }
 
-error:
     *lexer = original_state;
     return 2;
 }
@@ -7746,6 +7756,7 @@ error:
 }
 
 CNDEF Cn_Ast_Idx cn_ast_parse_attribute_specifier_sequence(Cn_Lexer *lexer) {
+    CN_UNUSED(lexer);
     CN_TODO("AST attribute specifier sequence.");
 }
 
@@ -7755,8 +7766,7 @@ CNDEF Cn_Type *cn__ast_add_type_if_not(Cn_Type *type) {
         Cn_Type *result = cn_chained_arena_alloc(&cn__ast_data->type_arena, sizeof(Cn_Type));
         *result = *type;
 
-        cn_hash_set_put(&cn__ast_data->type_ptr_set, result);
-        return result;
+        return cn_hash_set_put(&cn__ast_data->type_ptr_set, result);
     } else {
         // Acts as a get, since type is already in there, 
         // the put will return actual item stored in the hash set.
@@ -7765,6 +7775,9 @@ CNDEF Cn_Type *cn__ast_add_type_if_not(Cn_Type *type) {
 }
 
 CNDEF Cn_Type *cn_ast_to_type(Cn_Qualifier_Flags flags, Cn_Ast_Idx type_specifier_idx, Cn_Ast_Idx declarator_idx) {
+    // TODO: Add qualifier flags to types.
+    CN_UNUSED(flags);
+
     Cn_Type type = {0};
 
     Cn_Ast_Node *ts   = cn_ast_node_get(type_specifier_idx);
@@ -8880,7 +8893,7 @@ CNDEF Cn_Translation_Unit cn_tu_make(char *intermidiate_path) {
 }
 
 
-CNDEF int cn_tu_process(Cn_Translation_Unit *tu) {
+CNDEF int cn_tu_process(Cn_Translation_Unit *tu, Cn_Flags flags) {
     // Check if there any modifications.
     // Process them if there are.
     // Start size with previous content length.
@@ -8928,21 +8941,25 @@ CNDEF int cn_tu_process(Cn_Translation_Unit *tu) {
 
     cn__ast_data->source = tu->content;
 
-    cn_log(CN_INFO, "Received main.i:\n" CN_ANSI_BRIGHT_BLACK "%.*s" CN_ANSI_RESET, CN_UNPACK(tu->content));
+    // Printing source.
+    if (flags & CN_PRINT_SOURCE) {
+        cn_log(CN_INFO, "Received main.i:\n" CN_ANSI_BRIGHT_BLACK "%.*s" CN_ANSI_RESET, CN_UNPACK(tu->content));
+    }
 
     // Setting up lexer.
     Cn_Lexer lexer = {0};
 
-    // Logging tokens.
-    cn_lexer_init(&lexer, tu->content);
-
-    cn_log(CN_INFO, "Tokenized main.i:" CN_ANSI_CYAN);
-    do {
-        cn_lexer_next_token(&lexer);
-        Cn_String str = cn_source_loc_to_str(cn__ast_data->source, &cn_lexer_token(&lexer).loc);
-        fprintf(stderr, "TOKEN:     %.*s\n", CN_UNPACK(str));
-    } while (cn_lexer_token(&lexer).type != CN_TOKEN_EOF);
-    fprintf(stderr, CN_ANSI_RESET"\n");
+    // Printing tokens.
+    if (flags & CN_PRINT_TOKENS) {
+        cn_lexer_init(&lexer, tu->content);
+        cn_log(CN_INFO, "Tokenized main.i:" CN_ANSI_CYAN);
+        do {
+            cn_lexer_next_token(&lexer);
+            Cn_String str = cn_source_loc_to_str(cn__ast_data->source, &cn_lexer_token(&lexer).loc);
+            fprintf(stderr, "TOKEN:     %.*s\n", CN_UNPACK(str));
+        } while (cn_lexer_token(&lexer).type != CN_TOKEN_EOF);
+        fprintf(stderr, CN_ANSI_RESET"\n");
+    }
     
     // Building AST.
     cn_lexer_init(&lexer, tu->content);
@@ -8954,60 +8971,64 @@ CNDEF int cn_tu_process(Cn_Translation_Unit *tu) {
         return -1;
     }
 
-    // TODO: Add flags to control printing and other things.
-
     // Printing AST.
-    // cn_log(CN_INFO, "Parsed main.i:");
-    // cn_ast_print(cn_ast_node_get(idx), 0);
-    // fputc('\n', stderr);
+    if (flags & CN_PRINT_AST) {
+        cn_log(CN_INFO, "Parsed main.i:");
+        cn_ast_print(cn_ast_node_get(idx), 0);
+        fputc('\n', stderr);
+    }
 
     // Printing type universe.
-    // cn_log(CN_INFO, "Type universe main.i:" CN_ANSI_BLUE);
-    // 
-    // void *block = cn__ast_data->type_arena.block;
-    // Cn_Chained_Arena_Block_Header *h;
-    // while(true) {
-    //     cn_ast_chained_arena_foreach_in_block(Cn_Type, type, cn__ast_data->type_arena.block) {
-    //         cn_type_print(type);
-    //         fputc('\n', stderr);
-    //     }
+    if (flags & CN_PRINT_TYPES) {
+        cn_log(CN_INFO, "Type universe main.i:" CN_ANSI_BLUE);
 
-    //     h = CN_CHAINED_ARENA_BLOCK_HEADER(block);
-    //     if (h->prev == NULL) break;
+        void *block = cn__ast_data->type_arena.block;
+        Cn_Chained_Arena_Block_Header *h;
+        while(true) {
+            cn_ast_chained_arena_foreach_in_block(Cn_Type, type, cn__ast_data->type_arena.block) {
+                cn_type_print(type);
+                fputc('\n', stderr);
+            }
 
-    //     block = h->prev;
-    // }
-    // fprintf(stderr, CN_ANSI_RESET"\n");
+            h = CN_CHAINED_ARENA_BLOCK_HEADER(block);
+            if (h->prev == NULL) break;
+
+            block = h->prev;
+        }
+        fprintf(stderr, CN_ANSI_RESET"\n");
+    }
 
     // Printing bindings.
-    // First binding is NIL, so skip index 0.
-    // cn_log(CN_INFO, "Bindings main.i:" CN_ANSI_BRIGHT_YELLOW);
-    // for (int i = 1; i < cn_array_list_length(&cn__ast_data->binding_list); i++) {
-    //     switch (cn__ast_data->binding_list[i].kind) {
-    //         case CN_BINDING_VARIABLE:
-    //             fputs("VARIABLE    ", stderr);
-    //             break;
-    //         case CN_BINDING_FUCNTION:
-    //             fputs("FUNCTION    ", stderr);
-    //             break;
-    //         case CN_BINDING_TYPEDEF:
-    //             fputs("TYPEDEF     ", stderr);
-    //             break;
-    //         case CN_BINDING_ENUM_CONSTANT:
-    //             fputs("ENUM CONST  ", stderr);
-    //             break;
-    //         case CN_BINDING_TAG:
-    //             fputs("TAG         ", stderr);
-    //             break;
-    //         default:
-    //             break;
-    //     }
+    if (flags & CN_PRINT_BINDINGS) {
+        // First binding is NIL, so skip index 0.
+        cn_log(CN_INFO, "Bindings main.i:" CN_ANSI_BRIGHT_YELLOW);
+        for (int i = 1; i < cn_array_list_length(&cn__ast_data->binding_list); i++) {
+            switch (cn__ast_data->binding_list[i].kind) {
+                case CN_BINDING_VARIABLE:
+                    fputs("VARIABLE    ", stderr);
+                    break;
+                case CN_BINDING_FUCNTION:
+                    fputs("FUNCTION    ", stderr);
+                    break;
+                case CN_BINDING_TYPEDEF:
+                    fputs("TYPEDEF     ", stderr);
+                    break;
+                case CN_BINDING_ENUM_CONSTANT:
+                    fputs("ENUM CONST  ", stderr);
+                    break;
+                case CN_BINDING_TAG:
+                    fputs("TAG         ", stderr);
+                    break;
+                default:
+                    break;
+            }
 
-    //     fprintf(stderr, "%.*s -> ", CN_UNPACK(cn__ast_data->binding_list[i].name));
-    //     cn_type_print(cn__ast_data->binding_list[i].type);
-    //     fputc('\n', stderr);
-    // }
-    // fprintf(stderr, CN_ANSI_RESET"\n");
+            fprintf(stderr, "%.*s -> ", CN_UNPACK(cn__ast_data->binding_list[i].name));
+            cn_type_print(cn__ast_data->binding_list[i].type);
+            fputc('\n', stderr);
+        }
+        fprintf(stderr, CN_ANSI_RESET"\n");
+    }
 
     return 0;
 }

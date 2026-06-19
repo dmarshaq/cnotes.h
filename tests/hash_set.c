@@ -3,7 +3,7 @@
 
 void hash_set_put(Cn_String **set, const char *value) {
     Cn_String str = CN_CSTR(value);
-    cn_hash_set_put(set, str);
+    (void)cn_hash_set_put(set, str);
 }
 
 bool hash_set_contains(Cn_String **set, const char *value) {
