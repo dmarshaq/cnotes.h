@@ -1,5 +1,6 @@
-int main() {
-    char *str;
+#define SIZE 8
 
-    str = "aboba";
+int array[];
+
+int main() {
 }

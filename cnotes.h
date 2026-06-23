@@ -696,6 +696,7 @@ typedef enum {
     CN_DC_INCOMPLETE_TYPE,
     CN_DC_INVALID_SYMBOL,
     CN_DC_ILLEGAL_TYPE,
+    CN_DC_INVALID_CONSTANT_EXPRESSION,
     CN__DC_COUNT,
 } Cn_Diagnostic_Code;
 
@@ -1013,6 +1014,7 @@ CNDEF Cn_Type cn_type_make_qualified(Cn_Type_Qualified_Flags flags, const Cn_Typ
 
 /**
  * Checks if "type1" equals "type2".
+ *
  * RETURNS: True if types are identical.
  */
 CNDEF bool cn_type_equals(const Cn_Type *type1, const Cn_Type *type2);
@@ -1084,6 +1086,8 @@ typedef struct {
     Cn_Type *type;
     void *data;
 } Cn_Any;
+
+#define CN_TYPE_SCALAR_MAX_SIZE 16
 
 /**
  * Reads contents of supplied any, interprets it as integer.
@@ -1174,10 +1178,10 @@ typedef struct {
 } Cn_Ast_Linked_List;
 
 typedef enum : uint8_t {
-    CN_AST_TYPE_QUALIFIER_CONST           = 0x01,
-    CN_AST_TYPE_QUALIFIER_RESTRICT        = 0x02,
-    CN_AST_TYPE_QUALIFIER_VOLATILE        = 0x04,
-    CN_AST_TYPE_QUALIFIER_ATOMIC          = 0x08,
+    CN_AST_TYPE_QUALIFIER_CONST       = 0x01,
+    CN_AST_TYPE_QUALIFIER_RESTRICT    = 0x02,
+    CN_AST_TYPE_QUALIFIER_VOLATILE    = 0x04,
+    CN_AST_TYPE_QUALIFIER_ATOMIC      = 0x08,
 } Cn_Qualifier_Flags;
 
 typedef enum : uint8_t {
@@ -2766,48 +2770,6 @@ CNDEF Cn_Ast_Idx cn_ast_parse_member_declarator(Cn_Lexer *lexer);
 
 
 /**
- * IMPORTANT: Attributes of C23 in theory have similar ideas to what this library is trying to implement.
- * And this library could in theory use [[]] syntax for attributes. The problem is that this syntax might not scale really well.
- * And regardless of whether this library adapts it, various code analysis tools will still view attributes as just transparent sequence of tokens.
- * Yelling at anything more complex, even if it bases of recognized C syntax.
- * This happens because this library is planned to be more complex than plain attachment of attributes.
- *
- * For example potential generic implementation using this library that adapts C attribute syntax might look like this:
- *
- * typedef int T;
- * [[cn::generic(T: int, char, void *)]] T my_function(T my_var) {
- *      T var = my_var;
- *      return var;
- * }
- *
- * Other example:
- *
- * typedef void * T;
- * T my_function([[cn::generic]] T my_var) {
- *      T var = my_var;
- *      return var;
- * }
- *
- * The problem is that this might not be intuitive, and contains garbage syntax to satisfy code analysis tools.
- * So it doesn't really make sense to try to look like "C standard like" extension, if other tools won't understand it anyway.
- * Alternative is just modern, cleaner syntax, for example:
- * 
- * @Generic(T: int, char, void *) T my_function(T my_var) {
- *      T var = my_var;
- *      return var;
- * }
- *
- * Or even this, depending on generic implementation:
- *
- * T my_function(@Generic T my_var) {
- *      T var = my_var;
- *      return var;
- * }
- *
- * Such intuitive syntax also means that power over [[...]] is fully left to the C compilers,
- * so none of the future changes are likely to cause collisions or problems with the library.
- * 
- *
  * Parses code starting of with lexer current token as attribute specifier sequence.
  *
  * attribute_specifier_sequence
@@ -2830,6 +2792,8 @@ CNDEF Cn_Type *cn_ast_to_type(Cn_Qualifier_Flags flags, Cn_Ast_Idx type_specifie
  * by traversing ast nodes from bottom down,
  * and assigning appropriate type to every node.
  *
+ * EXPECTS: Expression idx != 0.
+ *
  * RETURNS: NULL if error occured, resulting type of an expression on success.
  */
 CNDEF Cn_Type *cn_ast_expression_typecheck(Cn_Ast_Idx expression_idx);
@@ -2837,12 +2801,14 @@ CNDEF Cn_Type *cn_ast_expression_typecheck(Cn_Ast_Idx expression_idx);
 /**
  * Gets resulting type of an expression.
  *
+ * EXPECTS: Expression idx != 0.
+ *
  * RETURNS: NULL if expression wasn't typechecked, valid type on success.
  */
 CNDEF Cn_Type *cn_ast_expression_get_type(Cn_Ast_Idx expression_idx);
 
 /**
- * Parses a C integer literal: decimal, octal, 0x-hex, optional u/U/l/L suffix. 
+ * Parses a integer literal: decimal, octal, 0x-hex, optional u/U/l/L suffix. 
  * into its magnitude. No leading sign: unary minus is its own AST node.
  *
  * RETURNS: True on success, false on error.
@@ -2850,7 +2816,7 @@ CNDEF Cn_Type *cn_ast_expression_get_type(Cn_Ast_Idx expression_idx);
 CNDEF bool cn_parse_int_literal(Cn_String literal, uint64_t *out);
 
 /**
- * Parses a C float literal: mantissa + optional exponent + optional f/F/l/L suffix. 
+ * Parses a float literal: mantissa + optional exponent + optional f/F/l/L suffix. 
  * Rounding is not bit exact. 
  *
  * NOTE: Hex floats are not handled will output NIL.
@@ -2865,7 +2831,7 @@ CNDEF bool cn_parse_float_literal(Cn_String literal, double *out);
  * NOTE: Size of the buffer can be determined 
  * from the resulting type of an expression.
  *
- * EXPECTS: Expression to be typechecked.
+ * EXPECTS: Expression idx != 0 and expression to be typechecked.
  *
  * RETURNS: NIL if expression wasn't typechecked or if expression 
  * cannot be evaluated at compile time, valid any struct on success.
@@ -4152,6 +4118,7 @@ const Cn_String CN_DIAGNOSTIC_CODES[CN__DC_COUNT] = {
     [CN_DC_INCOMPLETE_TYPE]                 = CN_STR_BUFFER("Incomplete type"),
     [CN_DC_INVALID_SYMBOL]                  = CN_STR_BUFFER("Invalid symbol"),
     [CN_DC_ILLEGAL_TYPE]                    = CN_STR_BUFFER("Illegal type"),
+    [CN_DC_INVALID_CONSTANT_EXPRESSION]     = CN_STR_BUFFER("Invalid constant expression"),
 };
 
 Cn_Diagnostic_Level cn_min_diagnostic_level = CN_DIAGNOSTIC_INFO;
@@ -5425,6 +5392,8 @@ CNDEF Cn_Any cn_any_write_float(Cn_Any any, double value) {
 }
 
 CNDEF bool cn_any_is_zero(Cn_Any any) {
+    if (cn_any_is_empty(any)) return false;
+
     Cn_Type *type = cn_type_unqualified(any.type);
     
     if (type->kind == CN_FLOAT) return cn_any_read_float(any) == 0.0;
@@ -5511,8 +5480,8 @@ const Cn_Binary_Operator CN_BINARY_OPERATORS[] = {
     { CN_BINARY_OP_MODULO,          CN_TOKEN_PERCENT,           12  },
     { CN_BINARY_OP_ADDITION,        CN_TOKEN_PLUS,              11  },
     { CN_BINARY_OP_SUBTRACTION,     CN_TOKEN_MINUS,             11  },
-    { CN_BINARY_OP_LSHIFT,          CN_TOKEN_RSHIFT,            10  },
-    { CN_BINARY_OP_RSHIFT,          CN_TOKEN_LSHIFT,            10  },
+    { CN_BINARY_OP_LSHIFT,          CN_TOKEN_LSHIFT,            10  },
+    { CN_BINARY_OP_RSHIFT,          CN_TOKEN_RSHIFT,            10  },
     { CN_BINARY_OP_LESS,            CN_TOKEN_LESS,              9   },
     { CN_BINARY_OP_LESS_EQ,         CN_TOKEN_LESS_EQ,           9   },
     { CN_BINARY_OP_GREATER,         CN_TOKEN_GREATER,           9   },
@@ -7468,8 +7437,6 @@ CNDEF Cn_Ast_Idx cn_ast_parse_pointer(Cn_Lexer *lexer) {
     Cn_Ast_Node node = { .kind = CN_AST_NODE_POINTER, .loc = cn_lexer_token(lexer).loc };
     
     if (!cn_lexer_expect(lexer, CN_TOKEN_ASTERISK)) {
-        // cn_log(CN_ERROR, "Expected '*' here when parsing pointer.");
-        // cn_lexer_print_snippet_token(lexer);
         cn_diagnostic(CN_DIAGNOSTIC_ERROR, &cn_lexer_token(lexer).loc, CN_DC_EXPECTED_TOKEN, "Expected '*' when parsing pointer.");
         goto error;
     }
@@ -7554,25 +7521,31 @@ CNDEF Cn_Ast_Idx cn_ast_parse_direct_declarator(Cn_Lexer *lexer, bool *is_abstra
     // Postfix cases.
     // direct_declarator '[' expression? ']' case.
     if (cn_lexer_expect(lexer, CN_TOKEN_SQR_BRACES_OPEN)) {
-        cn_ast_next_token(lexer);
 
-        node = (Cn_Ast_Node) { .kind = CN_AST_NODE_DIRECT_DECLARATOR };
+        node = (Cn_Ast_Node) { .kind = CN_AST_NODE_DIRECT_DECLARATOR, .loc = cn_lexer_token(lexer).loc };
         node.direct_declarator.kind = CN_DD_ARRAY;
+
+        cn_ast_next_token(lexer);
 
         if (!cn_lexer_expect(lexer, CN_TOKEN_SQR_BRACES_CLOSE)) {
             Cn_Ast_Idx expression_idx = cn_ast_parse_expression(lexer, -1, CN_NO_COMMA_OPERATOR);
             if (expression_idx == CN_AST_NIL_IDX) goto error;
             node.direct_declarator.dd_array.expression_idx = expression_idx;
+
+            // Type checking expression.
+            Cn_Type *type = cn_ast_expression_typecheck(expression_idx);
+            if (type == NULL) goto error;
         }
-        
+
         if (!cn_lexer_expect(lexer, CN_TOKEN_SQR_BRACES_CLOSE)) {
-            // cn_log(CN_ERROR, "Expected ']' when parsing direct declarator.");
-            // cn_lexer_print_snippet_token(lexer);
             cn_diagnostic(CN_DIAGNOSTIC_ERROR, &cn_lexer_token(lexer).loc, CN_DC_EXPECTED_TOKEN, "Expected ']' when parsing direct declarator.");
             goto error;
         }
 
         cn_ast_next_token(lexer);
+
+        // Extending source loc to highlight whole array '[...]' declarator.
+        node.loc.length = cn_source_loc_dist(&node.loc, &cn_lexer_token(lexer).loc);
 
         node.direct_declarator.dd_array.direct_declarator_idx = direct_declarator_idx;
 
@@ -7580,10 +7553,11 @@ CNDEF Cn_Ast_Idx cn_ast_parse_direct_declarator(Cn_Lexer *lexer, bool *is_abstra
     }
     // direct_declarator '(' ('void' | parameter_type_list)? ')' case.
     else if (cn_lexer_expect(lexer, CN_TOKEN_PARAN_OPEN)) {
-        cn_ast_next_token(lexer);
 
-        node = (Cn_Ast_Node) { .kind = CN_AST_NODE_DIRECT_DECLARATOR };
+        node = (Cn_Ast_Node) { .kind = CN_AST_NODE_DIRECT_DECLARATOR, .loc = cn_lexer_token(lexer).loc};
         node.direct_declarator.kind = CN_DD_FUNCTION;
+
+        cn_ast_next_token(lexer);
 
         if (!cn_lexer_expect(lexer, CN_TOKEN_PARAN_CLOSE)) {
             // If not '(' 'void' ')' case.
@@ -7597,13 +7571,14 @@ CNDEF Cn_Ast_Idx cn_ast_parse_direct_declarator(Cn_Lexer *lexer, bool *is_abstra
         }
 
         if (!cn_lexer_expect(lexer, CN_TOKEN_PARAN_CLOSE)) {
-            // cn_log(CN_ERROR, "Expected ')' when parsing direct declarator.");
-            // cn_lexer_print_snippet_token(lexer);
             cn_diagnostic(CN_DIAGNOSTIC_ERROR, &cn_lexer_token(lexer).loc, CN_DC_EXPECTED_TOKEN, "Expected ')' when parsing direct declarator.");
             goto error;
         }
-
+        
         cn_ast_next_token(lexer);
+
+        // Extending source loc to highlight whole function '(...)' declarator.
+        node.loc.length = cn_source_loc_dist(&node.loc, &cn_lexer_token(lexer).loc);
 
         node.direct_declarator.dd_function.direct_declarator_idx = direct_declarator_idx;
 
@@ -8446,7 +8421,45 @@ CNDEF Cn_Type *cn_ast_to_type(Cn_Qualifier_Flags flags, Cn_Ast_Idx type_specifie
                 switch (dd->direct_declarator.kind) {
                     case CN_DD_ARRAY:
                         direct_declarator_idx = dd->direct_declarator.dd_array.direct_declarator_idx;
-                        CN_TODO("Array to type.");
+
+                        type = (Cn_Type) { .kind = CN_ARRAY };
+
+                        // Allow only complete types.
+                        if (!(result->flags & CN_TYPE_COMPLETE)) {
+                            cn_diagnostic(CN_DIAGNOSTIC_ERROR, &dd->loc, CN_DC_INCOMPLETE_TYPE, "Incomplete type not allowed in array declarator.");
+                            return NULL;
+                        }
+
+                        type.t_array.element_type = result;
+                        
+                        // Evaluate constant expression, diagnose if unable to get array size.
+                        // TODO: Handle VLA.
+                        uint8_t buffer[CN_TYPE_SCALAR_MAX_SIZE];
+                        Cn_Any any = cn_ast_expression_evaluate(dd->direct_declarator.dd_array.expression_idx, buffer);
+
+                        if (cn_any_is_empty(any)) {
+                            cn_diagnostic(CN_DIAGNOSTIC_ERROR, &dd->loc, CN_DC_INVALID_CONSTANT_EXPRESSION, "Invalid constant expression in array declarator.");
+                            return NULL;
+                        }
+
+                        if (any.type->kind != CN_INTEGER) {
+                            cn_diagnostic(CN_DIAGNOSTIC_ERROR, &dd->loc, CN_DC_INVALID_CONSTANT_EXPRESSION, "Non integer result from constant expression in array declarator.");
+                            return NULL;
+                        }
+
+                        int64_t length = cn_any_read_int(any);
+
+                        if (length == 0) {
+                            cn_diagnostic(CN_DIAGNOSTIC_ERROR, &dd->loc, CN_DC_INVALID_CONSTANT_EXPRESSION, "0 length array resulting from constant expression in array declarator.");
+                            return NULL;
+                        }
+
+                        type.t_array.length = length;
+                        type.size = length * result->size;
+                        type.align = result->align;
+
+                        result = cn__ast_add_type_if_not(&type);
+
                         break;
                     case CN_DD_FUNCTION:
                         direct_declarator_idx = dd->direct_declarator.dd_function.direct_declarator_idx;
@@ -9218,6 +9231,7 @@ CNDEF Cn_Type *cn__ast_postfix_expression_typecheck(Cn_Ast_Node *node) {
 }
 
 CNDEF Cn_Type *cn_ast_expression_typecheck(Cn_Ast_Idx expression_idx) {
+    CN_ASSERT(expression_idx != CN_AST_NIL_IDX);
     Cn_Ast_Node *node = cn_ast_node_get(expression_idx);
 
     Cn_Type *result = NULL;
@@ -9342,6 +9356,7 @@ CNDEF Cn_Type *cn_ast_expression_typecheck(Cn_Ast_Idx expression_idx) {
 }
 
 CNDEF Cn_Type *cn_ast_expression_get_type(Cn_Ast_Idx expression_idx) {
+    CN_ASSERT(expression_idx != CN_AST_NIL_IDX);
     Cn_Ast_Node *node = cn_ast_node_get(expression_idx);
 
     switch(node->kind) {
@@ -9488,7 +9503,247 @@ CNDEF bool cn_parse_float_literal(Cn_String str, double *out) {
 }
 
 CNDEF Cn_Any cn__ast_binary_expression_evaluate(Cn_Ast_Node *node, void *buffer) {
-    CN_TODO("binary expression evaluate.");
+    Cn_Type *rtype = node->binary_expression.type;
+    if (rtype == NULL) return (Cn_Any) {0};
+ 
+    Cn_Binary_Operator_Kind op = node->binary_expression.operator_kind;
+    Cn_Ast_Idx left_idx  = node->binary_expression.left_expression_idx;
+    Cn_Ast_Idx right_idx = node->binary_expression.right_expression_idx;
+ 
+    Cn_Any result = { 
+        .type = rtype, 
+        .data = buffer 
+    };
+ 
+    uint8_t lbuf[CN_TYPE_SCALAR_MAX_SIZE];
+    uint8_t rbuf[CN_TYPE_SCALAR_MAX_SIZE];
+ 
+    switch (op) {
+        // a , b  ->  value of b. Side effects of a are irrelevant to the value.
+        case CN_BINARY_OP_COMMA:
+            return cn_ast_expression_evaluate(right_idx, buffer);
+ 
+        // This never resolve to a compile time scalar.
+        case CN_BINARY_OP_ARRAY_SUB:
+            return (Cn_Any) {0};
+ 
+        // Short circuit logical ops: foldable even if one side is unknown, as
+        // long as the known side already determines the outcome.
+        case CN_BINARY_OP_AND: 
+            {
+                Cn_Any l = cn_ast_expression_evaluate(left_idx, lbuf);
+                bool lv = !cn_any_is_zero(l);
+                if (!cn_any_is_empty(l) && lv) { 
+                    cn_any_write_int(result, 0); 
+                    return result; 
+                }
+
+                Cn_Any r = cn_ast_expression_evaluate(right_idx, rbuf);
+                bool rv = !cn_any_is_zero(r);
+                if (!cn_any_is_empty(l) && !cn_any_is_empty(r)) {
+                    cn_any_write_int(result, (lv && rv) ? 1 : 0);
+                    return result;
+                }
+
+                if (!cn_any_is_empty(r) && rv) { 
+                    cn_any_write_int(result, 0); 
+                    return result; 
+                }
+
+                return (Cn_Any) {0};
+            }
+        case CN_BINARY_OP_OR: 
+            {
+                Cn_Any l = cn_ast_expression_evaluate(left_idx, lbuf);
+                bool lv = !cn_any_is_zero(l);
+                if (!cn_any_is_empty(l) && lv) { 
+                    cn_any_write_int(result, 1); 
+                    return result; 
+                }
+
+                Cn_Any r = cn_ast_expression_evaluate(right_idx, rbuf);
+                bool rv = !cn_any_is_zero(r);
+                if (!cn_any_is_empty(l) && !cn_any_is_empty(r)) {
+                    cn_any_write_int(result, (lv || rv) ? 1 : 0);
+                    return result;
+                }
+
+                if (!cn_any_is_empty(r) && rv) { 
+                    cn_any_write_int(result, 1); 
+                    return result; 
+                }
+
+                return (Cn_Any) {0};
+            }
+ 
+        default:
+            break;
+    }
+ 
+    // Everything below needs both operands.
+    Cn_Any l = cn_ast_expression_evaluate(left_idx, lbuf);
+    if (cn_any_is_empty(l)) return (Cn_Any) {0};
+
+    Cn_Any r = cn_ast_expression_evaluate(right_idx, rbuf);
+    if (cn_any_is_empty(r)) return (Cn_Any) {0};
+ 
+    Cn_Type *lt = cn_type_unqualified(l.type);
+    Cn_Type *rt = cn_type_unqualified(r.type);
+ 
+    // Pointer arithmetic or pointer differences have no known address.
+    if (lt->kind == CN_POINTER || rt->kind == CN_POINTER) return (Cn_Any) {0};
+ 
+    bool float_operands = (lt->kind == CN_FLOAT) || (rt->kind == CN_FLOAT);
+ 
+    // Relational and equality operators -> int.
+    switch (op) {
+        case CN_BINARY_OP_LESS:
+        case CN_BINARY_OP_LESS_EQ:
+        case CN_BINARY_OP_GREATER:
+        case CN_BINARY_OP_GREATER_EQ:
+        case CN_BINARY_OP_EQ:
+        case CN_BINARY_OP_NOT_EQ: 
+            {
+                bool res = false;
+                if (float_operands) {
+                    double a = cn_any_as_double(l), b = cn_any_as_double(r);
+                    switch (op) {
+                        case CN_BINARY_OP_LESS:       res = a <  b; break;
+                        case CN_BINARY_OP_LESS_EQ:    res = a <= b; break;
+                        case CN_BINARY_OP_GREATER:    res = a >  b; break;
+                        case CN_BINARY_OP_GREATER_EQ: res = a >= b; break;
+                        case CN_BINARY_OP_EQ:         res = a == b; break;
+                        default:                      res = a != b; break;
+                    }
+                } else {
+                    int64_t a = cn_any_read_int(l), b = cn_any_read_int(r);
+
+                    Cn_Type *common = cn__ast_usual_arithmetic_conversion(lt, rt);
+                    // Case: unsigned.
+                    if ((common->kind == CN_INTEGER) && !common->t_integer.is_signed) {
+                        uint64_t ua = (uint64_t)a, ub = (uint64_t)b;
+                        switch (op) {
+                            case CN_BINARY_OP_LESS:       res = ua <  ub; break;
+                            case CN_BINARY_OP_LESS_EQ:    res = ua <= ub; break;
+                            case CN_BINARY_OP_GREATER:    res = ua >  ub; break;
+                            case CN_BINARY_OP_GREATER_EQ: res = ua >= ub; break;
+                            case CN_BINARY_OP_EQ:         res = ua == ub; break;
+                            default:                      res = ua != ub; break;
+                        }
+                    } 
+                    // Case: signed.
+                    else {
+                        switch (op) {
+                            case CN_BINARY_OP_LESS:       res = a <  b; break;
+                            case CN_BINARY_OP_LESS_EQ:    res = a <= b; break;
+                            case CN_BINARY_OP_GREATER:    res = a >  b; break;
+                            case CN_BINARY_OP_GREATER_EQ: res = a >= b; break;
+                            case CN_BINARY_OP_EQ:         res = a == b; break;
+                            default:                      res = a != b; break;
+                        }
+                    }
+                }
+                cn_any_write_int(result, res ? 1 : 0);
+                return result;
+            }
+        default:
+            break;
+    }
+ 
+    // Strip qualifiers on return type.
+    Cn_Type *urtype = cn_type_unqualified(rtype);
+ 
+    // Floating arithmetic.
+    if (urtype->kind == CN_FLOAT) {
+        double a = cn_any_as_double(l), b = cn_any_as_double(r);
+        double res = 0.0;
+        switch (op) {
+            case CN_BINARY_OP_ADDITION:       res = a + b; break;
+            case CN_BINARY_OP_SUBTRACTION:    res = a - b; break;
+            case CN_BINARY_OP_MULTIPLICATION: res = a * b; break;
+            case CN_BINARY_OP_DIVISION:       res = a / b; break; // Inf or NaN are valid doubles.
+            default: return (Cn_Any) {0};
+        }
+        cn_any_write_float(result, res);
+        return result;
+    }
+ 
+    // Integer arithmetic or bitwise. Computed in 64 bits; the store truncates to
+    // the result width. Unsigned casts keep the evaluator from undefined behavior.
+    if (urtype->kind == CN_INTEGER) {
+        bool is_signed = urtype->t_integer.is_signed;
+        int64_t a = cn_any_read_int(l), b = cn_any_read_int(r);
+        int64_t res = 0;
+        switch (op) {
+            case CN_BINARY_OP_ADDITION:       
+                res = (int64_t)((uint64_t)a + (uint64_t)b); 
+                break;
+
+            case CN_BINARY_OP_SUBTRACTION:    
+                res = (int64_t)((uint64_t)a - (uint64_t)b); 
+                break;
+
+            case CN_BINARY_OP_MULTIPLICATION: 
+                res = (int64_t)((uint64_t)a * (uint64_t)b); 
+                break;
+ 
+            case CN_BINARY_OP_DIVISION:
+                {
+                    if (b == 0) {
+                        cn_diagnostic(CN_DIAGNOSTIC_ERROR, &node->loc, CN_DC_INVALID_CONSTANT_EXPRESSION, "Integer division '/' by 0.");
+                        return (Cn_Any) {0};
+                    }
+                    if (is_signed) res = (a == INT64_MIN && b == -1) ? INT64_MIN : (a / b);
+                    else           res = (int64_t)((uint64_t)a / (uint64_t)b);
+                    break;
+                }
+ 
+            case CN_BINARY_OP_MODULO:
+                {
+                    if (b == 0) {
+                        cn_diagnostic(CN_DIAGNOSTIC_ERROR, &node->loc, CN_DC_INVALID_CONSTANT_EXPRESSION, "Integer modulo '\%' by 0.");
+                        return (Cn_Any) {0};
+                    }
+                    if (is_signed) res = (a == INT64_MIN && b == -1) ? 0 : (a % b);
+                    else           res = (int64_t)((uint64_t)a % (uint64_t)b);
+                    break;
+                }
+ 
+            case CN_BINARY_OP_BIT_AND: 
+                res = a & b; 
+                break;
+
+            case CN_BINARY_OP_BIT_OR:  
+                res = a | b; 
+                break;
+
+            case CN_BINARY_OP_BIT_XOR: 
+                res = a ^ b; 
+                break;
+ 
+            case CN_BINARY_OP_LSHIFT:
+            case CN_BINARY_OP_RSHIFT: 
+                {
+                    int64_t width = urtype->size * 8;
+
+                    if (b < 0 || b >= width) return (Cn_Any) {0}; // Undefined behavior shift, not evaluatable.
+
+                    if (op == CN_BINARY_OP_LSHIFT)
+                        res = (int64_t)((uint64_t)a << (uint64_t)b);
+                    else
+                        res = is_signed ? (a >> b) : (int64_t)((uint64_t)a >> (uint64_t)b);
+                    break;
+                }
+ 
+            default:
+                return (Cn_Any) {0};
+        }
+
+        cn_any_write_int(result, res);
+        return result;
+    }
+ 
+    return (Cn_Any) {0};
 }
 
 CNDEF Cn_Any cn__ast_access_expression_evaluate(Cn_Ast_Node *node, void *buffer) {
@@ -9540,15 +9795,27 @@ CNDEF Cn_Any cn__ast_primary_expression_evaluate(Cn_Ast_Node *node, void *buffer
     switch (node->primary_expression.token.type) {
         case CN_TOKEN_INTEGER_VALUE:
             {
+                uint64_t value;
+                if (!cn_parse_int_literal(cn_source_loc_to_str(cn__ast_data->source, &node->loc), &value)) {
+                    cn_diagnostic(CN_DIAGNOSTIC_ERROR, &node->loc, CN_DC_INVALID_CONSTANT_EXPRESSION, "Invalid integer literal in primary expression.");
+                    return (Cn_Any) {0};
+                }
+                any = cn_any_write_int(any, (int64_t)value);
                 break;
             }
         case CN_TOKEN_FLOAT_VALUE:
             {
+                double value;
+                if (!cn_parse_float_literal(cn_source_loc_to_str(cn__ast_data->source, &node->loc), &value)) {
+                    cn_diagnostic(CN_DIAGNOSTIC_ERROR, &node->loc, CN_DC_INVALID_CONSTANT_EXPRESSION, "Invalid float literal in primary expression.");
+                    return (Cn_Any) {0};
+                }
+                any = cn_any_write_float(any, value);
                 break;
             }
         case CN_TOKEN_STRING:
             {
-                break;
+                return (Cn_Any) {0};
             }
         case CN_TOKEN_IDENTIFIER:
             {   
@@ -9565,6 +9832,7 @@ CNDEF Cn_Any cn__ast_primary_expression_evaluate(Cn_Ast_Node *node, void *buffer
 }
 
 CNDEF Cn_Any cn_ast_expression_evaluate(Cn_Ast_Idx expression_idx, void *buffer) {
+    CN_ASSERT(expression_idx != CN_AST_NIL_IDX);
     Cn_Ast_Node *node = cn_ast_node_get(expression_idx);
 
     switch(node->kind) {
