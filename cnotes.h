@@ -995,15 +995,10 @@ struct cn_type {
 };
 
 extern const Cn_Type CN_TYPE_INT;
-
 extern const Cn_Type CN_TYPE_FLOAT;
-
 extern const Cn_Type CN_TYPE_CHAR;
-
 extern const Cn_Type CN_TYPE_VOID;
-
 extern const Cn_Type CN_TYPE_PTRDIFF;
-
 extern const Cn_Type CN_TYPE_SIZE;
 
 /**
@@ -1084,6 +1079,85 @@ CNDEF Cn_Type *cn_type_greatest_arithmetic_rank(const Cn_Type *a, const Cn_Type 
  * RETURNS: True if type is arithmetic, pointer or bool.
  */
 CNDEF bool cn_type_is_scalar(Cn_Type *type);
+
+typedef struct {
+    Cn_Type *type;
+    void *data;
+} Cn_Any;
+
+/**
+ * Reads contents of supplied any, interprets it as integer.
+ *
+ * RETURNS: Integer value of any.
+ */
+CNDEF int64_t cn_any_read_int(Cn_Any any);
+
+/**
+ * Reads contents of supplied any, interprets it as floating point.
+ *
+ * RETURNS: Floating point value of any.
+ */
+CNDEF double cn_any_read_float(Cn_Any any);
+
+/**
+ * Writes value to contents of any, uses any's type to 
+ * properly size the integer.
+ *
+ * RETURNS: Resulting any.
+ */
+CNDEF Cn_Any cn_any_write_int(Cn_Any any, int64_t value);
+
+/**
+ * Writes value to contents of any, uses any's type to 
+ * properly size the floating point.
+ *
+ * RETURNS: Resulting any.
+ */
+CNDEF Cn_Any cn_any_write_float(Cn_Any any, double value);
+
+/**
+ * RETURNS: True if any is 0.
+ */
+CNDEF bool cn_any_is_zero(Cn_Any any);
+
+/**
+ * Converts any to double, including any scalar,
+ * interpreting any other data as raw integer.
+ *
+ * NOTE: If supplied any is not a scalar type, 
+ * it will still try to read it as raw int and convert to a double.
+ *
+ * RETURNS: Resulting double value.
+ */
+CNDEF double cn_any_as_double(Cn_Any any);
+
+/**
+ * Safe double to int64 used by casts. 
+ * Rejects NaN and out of range values whose
+ * conversion would be undefined.
+ *
+ * RETURNS: True on success, false on failure.
+ */
+CNDEF bool cn_double_to_int64(double d, int64_t *out);
+
+/**
+ * Converts an already evaluated scalar value to target type, 
+ * can be used by casts. NIL when target or source isn't a
+ * foldable scalar, or when a float to int conversion would be out of range.
+ *
+ * NOTE: Uses supplied buffer to store output.
+ *
+ * RETURNS: Any of the new converted value on success, NIL on failure.
+ */
+CNDEF Cn_Any cn_any_convert(Cn_Any src, Cn_Type *target, void *buffer);
+
+/**
+ * Checks whether the any value is empty,
+ * meaning it's data and type are both NULL.
+ *
+ * RETURNS: True if any is empty and false otherwise.
+ */
+CNDEF bool cn_any_is_empty(Cn_Any any);
 
 
 // AST SECTION
@@ -2767,6 +2841,36 @@ CNDEF Cn_Type *cn_ast_expression_typecheck(Cn_Ast_Idx expression_idx);
  */
 CNDEF Cn_Type *cn_ast_expression_get_type(Cn_Ast_Idx expression_idx);
 
+/**
+ * Parses a C integer literal: decimal, octal, 0x-hex, optional u/U/l/L suffix. 
+ * into its magnitude. No leading sign: unary minus is its own AST node.
+ *
+ * RETURNS: True on success, false on error.
+ */
+CNDEF bool cn_parse_int_literal(Cn_String literal, uint64_t *out);
+
+/**
+ * Parses a C float literal: mantissa + optional exponent + optional f/F/l/L suffix. 
+ * Rounding is not bit exact. 
+ *
+ * NOTE: Hex floats are not handled will output NIL.
+ *
+ * RETURNS: True on success, false on error.
+ */
+CNDEF bool cn_parse_float_literal(Cn_String literal, double *out);
+
+/**
+ * Evaluates an expression, uses supplied buffer to store data.
+ *
+ * NOTE: Size of the buffer can be determined 
+ * from the resulting type of an expression.
+ *
+ * EXPECTS: Expression to be typechecked.
+ *
+ * RETURNS: NIL if expression wasn't typechecked or if expression 
+ * cannot be evaluated at compile time, valid any struct on success.
+ */
+CNDEF Cn_Any cn_ast_expression_evaluate(Cn_Ast_Idx expression_idx, void *buffer);
 
 // PRE-PROCESSING SECTION
 typedef enum {
@@ -5199,6 +5303,201 @@ CNDEF Cn_Type *cn_type_greatest_arithmetic_rank(const Cn_Type *a, const Cn_Type 
 CNDEF bool cn_type_is_scalar(Cn_Type *type) {
     return cn_type_is_arithmetic(type) || type->kind == CN_POINTER || type->kind == CN_BOOL;
 }
+
+CNDEF int64_t cn_any_read_int(Cn_Any any) {
+    Cn_Type *type = cn_type_unqualified(any.type);
+    int64_t size = type->size;
+    bool is_signed = (type->kind == CN_INTEGER) && type->t_integer.is_signed;
+ 
+    switch (size) {
+        case 1:
+            if (is_signed) { 
+                int8_t x; 
+                memcpy(&x, any.data, 1); 
+                return x; 
+            } else { 
+                uint8_t x; 
+                memcpy(&x, any.data, 1); 
+                return x; 
+            }
+        case 2:
+            if (is_signed) { 
+                int16_t x; 
+                memcpy(&x, any.data, 2); 
+                return x; 
+            } else { 
+                uint16_t x; 
+                memcpy(&x, any.data, 2); 
+                return x; 
+            }
+        case 4:
+            if (is_signed) { 
+                int32_t x; 
+                memcpy(&x, any.data, 4); 
+                return x; 
+            } else { 
+                uint32_t x; 
+                memcpy(&x, any.data, 4); 
+                return x; 
+            }
+        case 8:
+            if (is_signed) { 
+                int64_t x; 
+                memcpy(&x, any.data, 8); 
+                return x; 
+            } else { 
+                uint64_t x; 
+                memcpy(&x, any.data, 8); 
+                return x; 
+            }
+        default:
+            { 
+                int64_t x = 0; 
+                memcpy(&x, any.data, (size_t)size); 
+                return x; 
+            }
+    }
+}
+
+CNDEF double cn_any_read_float(Cn_Any any) {
+    Cn_Type *type = cn_type_unqualified(any.type);
+
+    if (type->size == (int64_t)sizeof(float)) {
+        float x; 
+        memcpy(&x, any.data, sizeof(float)); 
+        return (double)x;
+    }
+
+    double x; 
+    memcpy(&x, any.data, sizeof(double)); 
+    return x;
+}
+
+CNDEF Cn_Any cn_any_write_int(Cn_Any any, int64_t value) {
+    Cn_Type *type = cn_type_unqualified(any.type);
+
+    int64_t size = type->size;
+    switch (size) {
+        case 1: 
+            { 
+                int8_t x = (int8_t)value;  
+                memcpy(any.data, &x, 1); 
+                break; 
+            }
+        case 2: 
+            { 
+                int16_t x = (int16_t)value; 
+                memcpy(any.data, &x, 2); 
+                break; 
+            }
+        case 4: 
+            { 
+                int32_t x = (int32_t)value; 
+                memcpy(any.data, &x, 4); 
+                break; 
+            }
+        case 8: 
+            { 
+                memcpy(any.data, &value, 8); 
+                break; 
+            }
+        default: 
+            { 
+                memcpy(any.data, &value, (size_t)size); 
+                break; 
+            }
+    }
+    
+    return any;
+}
+
+CNDEF Cn_Any cn_any_write_float(Cn_Any any, double value) {
+    Cn_Type *type = cn_type_unqualified(any.type);
+
+    if (type->size == (int64_t)sizeof(float)) {
+        float x = (float)value; 
+        memcpy(any.data, &x, sizeof(float));
+    } else {
+        memcpy(any.data, &value, sizeof(double));
+    }
+
+    return any;
+}
+
+CNDEF bool cn_any_is_zero(Cn_Any any) {
+    Cn_Type *type = cn_type_unqualified(any.type);
+    
+    if (type->kind == CN_FLOAT) return cn_any_read_float(any) == 0.0;
+
+    return cn_any_read_int(any) == 0;
+}
+
+CNDEF double cn_any_as_double(Cn_Any any) {
+    Cn_Type *type = cn_type_unqualified(any.type);
+    if (type->kind == CN_FLOAT) return cn_any_read_float(any);
+ 
+    int64_t raw = cn_any_read_int(any);
+    if (type->kind == CN_INTEGER && !type->t_integer.is_signed) {
+        return (double)(uint64_t)raw;
+    }
+    return (double)raw;
+}
+
+CNDEF bool cn_double_to_int64(double d, int64_t *out) {
+    if (d != d) return false;                       // NaN.
+    if (d >=  9223372036854775808.0) return false;  // >= 2^63.
+    if (d <  -9223372036854775808.0) return false;  // <  -2^63.
+    *out = (int64_t)d;
+    return true;
+}
+
+CNDEF Cn_Any cn_any_convert(Cn_Any src, Cn_Type *target, void *buffer) {
+    if (src.type == NULL || target == NULL) return (Cn_Any) {0};
+ 
+    Cn_Type *target_t = cn_type_unqualified(target);
+    Cn_Type *src_t    = cn_type_unqualified(src.type);
+ 
+    if (!cn_type_is_scalar(target_t)) return (Cn_Any) {0};
+    if (target_t->kind == CN_POINTER) return (Cn_Any) {0};
+
+    if (!cn_type_is_scalar(src_t)) return (Cn_Any) {0};
+    if (src_t->kind == CN_POINTER) return (Cn_Any) {0};
+ 
+    Cn_Any result = { 
+        .type = target, 
+        .data = buffer 
+    };
+ 
+    // Bool case: 0 is 0, non zero is 1.
+    if (target_t->kind == CN_BOOL) {
+        cn_any_write_int(result, cn_any_is_zero(src) ? 0 : 1);
+    } 
+    // Float case: any value converted to double, and written to result.
+    else if (target_t->kind == CN_FLOAT) {
+        cn_any_write_float(result, cn_any_as_double(src));
+    } 
+    // Integer case:
+    else {
+        if (src_t->kind == CN_FLOAT) {
+            int64_t v;
+            // Tries to convert double to int64, 
+            // if out of range conversion return NIL.
+            if (!cn_double_to_int64(cn_any_read_float(src), &v)) return (Cn_Any) {0};
+            cn_any_write_int(result, v);
+        } else {
+            // Simple int to int, reading and writing will 
+            // automatically convert width and signess based on types.
+            cn_any_write_int(result, cn_any_read_int(src));
+        }
+    }
+ 
+    return result;
+}
+
+CNDEF bool cn_any_is_empty(Cn_Any any) {
+    return any.type == NULL && any.data == NULL;
+}
+
 
 // AST SECTION
 
@@ -9070,6 +9369,251 @@ CNDEF Cn_Type *cn_ast_expression_get_type(Cn_Ast_Idx expression_idx) {
             cn_diagnostic(CN_DIAGNOSTIC_ERROR, &node->loc, CN_DC_EXPECTED_EXPRESSION, "Expected expression to get it's resulting type.");
             return NULL;
     }
+}
+
+CNDEF bool cn_parse_int_literal(Cn_String str, uint64_t *out) {
+    if (str.length <= 0) return false;
+
+    int64_t i = 0;
+    int base = 10;
+    bool any_digit = false;
+
+    if (str.length >= 2 && str.data[0] == '0' && (str.data[1] == 'x' || str.data[1] == 'X')) {
+        base = 16;
+        i = 2;
+    } else if (str.data[0] == '0') {
+        base = 8;
+        i = 1;
+        any_digit = true;   // The leading 0 is itself a valid digit.
+    }
+
+    uint64_t value = 0;
+    for (; i < str.length; i++) {
+        char c = str.data[i];
+        int d;
+
+        if (c >= '0' && c <= '9') 
+            d = c - '0';
+        else if (c >= 'a' && c <= 'f') 
+            d = 10 + (c - 'a');
+        else if (c >= 'A' && c <= 'F') 
+            d = 10 + (c - 'A');
+        else 
+            break;
+
+        if (d >= base) return false;    // For example if digits 8, 9 inside an octal literal.
+
+        value = value * (uint64_t)base + (uint64_t)d;
+        any_digit = true;
+    }
+
+    // Gather remaining integer suffix.
+    for (; i < str.length; i++) {
+        char c = str.data[i];
+        if (c != 'u' && c != 'U' && c != 'l' && c != 'L') return false;
+    }
+
+    // If there were no digits encountered return false.
+    if (!any_digit) return false;
+
+    *out = value;
+    return true;
+}
+
+CNDEF bool cn_parse_float_literal(Cn_String str, double *out) {
+    if (str.length <= 0) return false;
+ 
+    int64_t i = 0;
+    double result = 0.0;
+    bool any_digit = false;
+ 
+    while (i < str.length && str.data[i] >= '0' && str.data[i] <= '9') {
+        result = result * 10.0 + (str.data[i] - '0');
+        any_digit = true;
+        i++;
+    }
+ 
+    if (i < str.length && str.data[i] == '.') {
+        i++;
+        double scale = 0.1;
+        while (i < str.length && str.data[i] >= '0' && str.data[i] <= '9') {
+            result += (str.data[i] - '0') * scale;
+            scale *= 0.1;
+            any_digit = true;
+            i++;
+        }
+    }
+ 
+    // If there were no digits encountered return false.
+    if (!any_digit) return false;
+ 
+    if (i < str.length && (str.data[i] == 'e' || str.data[i] == 'E')) {
+        i++;
+
+        int exp_sign = 1;
+        if (i < str.length && (str.data[i] == '+' || str.data[i] == '-')) {
+            if (str.data[i] == '-') exp_sign = -1;
+            i++;
+        }
+
+        bool any_exp_digit = false;
+        int exp = 0;
+        while (i < str.length && str.data[i] >= '0' && str.data[i] <= '9') {
+            exp = exp * 10 + (str.data[i] - '0');
+            any_exp_digit = true;
+            i++;
+        }
+        
+        // If there were no exp digits encountered return false.
+        if (!any_exp_digit) return false;
+ 
+        double factor = 1.0;
+        for (int e = 0; e < exp; e++) 
+            factor *= 10.0;
+
+        if (exp_sign < 0) 
+            result /= factor;
+        else 
+            result *= factor;
+    }
+ 
+    // Gather remaining float suffix.
+    for (; i < str.length; i++) {
+        char c = str.data[i];
+        if (c != 'f' && c != 'F' && c != 'l' && c != 'L') return false;
+    }
+ 
+    *out = result;
+    return true;
+}
+
+CNDEF Cn_Any cn__ast_binary_expression_evaluate(Cn_Ast_Node *node, void *buffer) {
+    CN_TODO("binary expression evaluate.");
+}
+
+CNDEF Cn_Any cn__ast_access_expression_evaluate(Cn_Ast_Node *node, void *buffer) {
+    CN_UNUSED(node);
+    CN_UNUSED(buffer);
+    return (Cn_Any) {0};
+}
+
+CNDEF Cn_Any cn__ast_function_expression_evaluate(Cn_Ast_Node *node, void *buffer) {
+    // Cannot really evaluate runtime function during compile time.
+    CN_UNUSED(node);
+    CN_UNUSED(buffer);
+    return (Cn_Any) {0};
+}
+
+CNDEF Cn_Any cn__ast_unary_expression_evaluate(Cn_Ast_Node *node, void *buffer) {
+    CN_TODO("unary expression evaluate.");
+}
+
+CNDEF Cn_Any cn__ast_cast_expression_evaluate(Cn_Ast_Node *node, void *buffer) {
+    CN_TODO("cast expression evaluate.");
+}
+
+CNDEF Cn_Any cn__ast_sizeof_expression_evaluate(Cn_Ast_Node *node, void *buffer) {
+    CN_TODO("sizeof expression evaluate.");
+}
+
+CNDEF Cn_Any cn__ast_ternary_expression_evaluate(Cn_Ast_Node *node, void *buffer) {
+    CN_TODO("ternary expression evaluate.");
+}
+
+CNDEF Cn_Any cn__ast_assignment_expression_evaluate(Cn_Ast_Node *node, void *buffer){
+    CN_UNUSED(node);
+    CN_UNUSED(buffer);
+    return (Cn_Any) {0};
+}
+
+CNDEF Cn_Any cn__ast_postfix_expression_evaluate(Cn_Ast_Node *node, void *buffer) {
+    CN_UNUSED(node);
+    CN_UNUSED(buffer);
+    return (Cn_Any) {0};
+}
+
+CNDEF Cn_Any cn__ast_primary_expression_evaluate(Cn_Ast_Node *node, void *buffer) {
+    Cn_Any any = {0};
+    any.data = buffer;
+    any.type = node->primary_expression.type;
+
+    switch (node->primary_expression.token.type) {
+        case CN_TOKEN_INTEGER_VALUE:
+            {
+                break;
+            }
+        case CN_TOKEN_FLOAT_VALUE:
+            {
+                break;
+            }
+        case CN_TOKEN_STRING:
+            {
+                break;
+            }
+        case CN_TOKEN_IDENTIFIER:
+            {   
+                return (Cn_Any) {0};
+            }
+        default:
+            {
+                cn_diagnostic(CN_DIAGNOSTIC_ERROR, &node->primary_expression.token.loc, CN_DC_EXPECTED_TOKEN, "Expected identifier, float, integer, or string literal in primary expression.");
+                return (Cn_Any) {0};
+            }
+    }
+
+    return any;
+}
+
+CNDEF Cn_Any cn_ast_expression_evaluate(Cn_Ast_Idx expression_idx, void *buffer) {
+    Cn_Ast_Node *node = cn_ast_node_get(expression_idx);
+
+    switch(node->kind) {
+        case CN_AST_NODE_BINARY_EXPRESSION: 
+            {   
+                return cn__ast_binary_expression_evaluate(node, buffer);
+            }
+        case CN_AST_NODE_ACCESS_EXPRESSION:
+            {
+                return cn__ast_access_expression_evaluate(node, buffer);
+            }
+        case CN_AST_NODE_FUNCTION_EXPRESSION:
+            {
+                return cn__ast_function_expression_evaluate(node, buffer);
+            }
+        case CN_AST_NODE_UNARY_EXPRESSION:
+            {
+                return cn__ast_unary_expression_evaluate(node, buffer);
+            }
+        case CN_AST_NODE_CAST_EXPRESSION:
+            {
+                return cn__ast_cast_expression_evaluate(node, buffer);
+            }
+        case CN_AST_NODE_SIZEOF_EXPRESSION:
+            {
+                return cn__ast_sizeof_expression_evaluate(node, buffer);
+            }
+        case CN_AST_NODE_TERNARY_EXPRESSION:
+            {   
+                return cn__ast_ternary_expression_evaluate(node, buffer);
+            }
+        case CN_AST_NODE_ASSIGNMENT_EXPRESSION:
+            {
+                return cn__ast_assignment_expression_evaluate(node, buffer);
+            }
+        case CN_AST_NODE_POSTFIX_EXPRESSION:
+            {
+                return cn__ast_postfix_expression_evaluate(node, buffer);
+            }
+        case CN_AST_NODE_PRIMARY_EXPRESSION:
+            {   
+                return cn__ast_primary_expression_evaluate(node, buffer);
+            }
+        default:
+            cn_diagnostic(CN_DIAGNOSTIC_ERROR, &node->loc, CN_DC_EXPECTED_EXPRESSION, "Expected expression to evaluate.");
+            break;
+    }
+    
+    return (Cn_Any) {0};
 }
 
 
