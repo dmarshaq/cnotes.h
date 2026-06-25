@@ -1,6 +1,6 @@
-#define SIZE 8
-
-int array[];
+#include <stdio.h>
 
 int main() {
+    printf("Hello world!\n");
+    return 0;
 }
