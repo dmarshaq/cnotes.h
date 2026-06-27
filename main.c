@@ -1,8 +1,21 @@
-#include <stdio.h>
+int foo() {
+    struct my_struct {
+        int x, y;
+    };
+
+    struct my_struct s;
+
+    return s.x;
+}
 
 int main() {
-    int a;
-    int a;
-    printf("Hello world!\n");
+    struct my_struct {
+        float x, y;
+    };
+
+    struct my_struct s;
+
     return 0;
 }
+
+

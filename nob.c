@@ -514,6 +514,21 @@ int lib_command(int *argc, char ***argv) {
     return 0;
 }
 
+int msg_handler(Cn_Message_Kind kind, void *message) {
+    switch (kind) {
+        case CN_MESSAGE_PARSED_FUNCTION_DEFINITION:
+            {   
+                Cn_Message_Parsed_Function_Definition *m = message;
+                cn_ast_print(cn_ast_node_get(m->node_idx), 0);
+                return 1;
+            }
+        default: 
+            return 0;
+    }
+
+    return 0;
+}
+
 int cn_command(int *argc, char ***argv) {
     int    argc_ = 0;
     char **argv_ = NULL;
@@ -536,19 +551,15 @@ int cn_command(int *argc, char ***argv) {
     }
 
     // Library pre-processing.
-    Cn_Ast_Data data;
-    cn_ast_init(&data);
-
+    cn_message_handler = msg_handler;
     Cn_Translation_Unit tu = cn_tu_make("main.i");
     
-    if (cn_tu_process(&tu, CN_PRINT_TYPES | CN_PRINT_BINDINGS | CN_PRINT_AST) == -1) {
+    if (cn_tu_process(&tu, 0) == -1) {
         cn_tu_free(&tu);
         return 1;
     }
 
     cn_tu_free(&tu);
-
-    return 1;
     
     // Compiling main executable.
     nob_cc(&cmd);

@@ -1,6 +1,7 @@
 #ifndef CN_H_
 #define CN_H_
 
+#include <setjmp.h>
 #include <stddef.h>
 #ifndef CNDEF
 #   define CNDEF
@@ -424,7 +425,7 @@ typedef struct {
 /**
  * Initializes arena by allocating first block and setting all pointers.
  */
-Cn_Chained_Arena cn_chained_arena_make(uint64_t block_capacity);
+CNDEF Cn_Chained_Arena cn_chained_arena_make(uint64_t block_capacity);
 
 /**
  * Allocates specified memory size from the arena.
@@ -433,13 +434,13 @@ Cn_Chained_Arena cn_chained_arena_make(uint64_t block_capacity);
  *
  * IMPORTANT: It will be invalid once arena is freed.
  */
-void *cn_chained_arena_alloc(Cn_Chained_Arena *arena, uint64_t size);
+CNDEF void *cn_chained_arena_alloc(Cn_Chained_Arena *arena, uint64_t size);
 
 /**
  * Dellocates specified memory size from the front of the arena.
  * If specified size completely deallocates whole block, it is freed.
  */
-void cn_chained_arena_dealloc(Cn_Chained_Arena *arena, uint64_t size);
+CNDEF void cn_chained_arena_dealloc(Cn_Chained_Arena *arena, uint64_t size);
 
 /**
  * Given chained arena and pointer allocated by it, it will compute index 
@@ -453,16 +454,22 @@ void cn_chained_arena_dealloc(Cn_Chained_Arena *arena, uint64_t size);
  * Even if address was not supplied correctly, but it happens to point to the allocated memory, 
  * this function will properly return.
  */
-int64_t cn_chained_arena_allocation_info(Cn_Chained_Arena *arena, void *allocation_ptr, uint64_t *offset);
+CNDEF int64_t cn_chained_arena_allocation_info(Cn_Chained_Arena *arena, void *allocation_ptr, uint64_t *offset);
+
+/**
+ * Given chained arena computes total allocated size by the arena.
+ *
+ * RETURNS: Total allocated size.
+ */
+CNDEF uint64_t cn_chained_arena_allocated(Cn_Chained_Arena *arena);
 
 #define cn_ast_chained_arena_foreach_in_block(type, it, block) for (type *it = (type *)(block); (uint8_t *)it <= (uint8_t *)(block) + CN_CHAINED_ARENA_BLOCK_HEADER(block)->allocated - sizeof(type); it++)
-
 
 
 /**
  * Completely frees all memory occupied by the arena.
  */
-void cn_chained_arena_free(Cn_Chained_Arena *arena);
+CNDEF void cn_chained_arena_free(Cn_Chained_Arena *arena);
 
 // ARRAY LIST SECTION
 typedef struct {
@@ -1546,12 +1553,12 @@ typedef struct {
 } Cn_Ast_Node_Compound_Statement;
 
 typedef enum {
-    CN_SELECTION_IF,
-    CN_SELECTION_SWITCH,
-} Cn_Selection_Kind;
+    CN_AST_SELECTION_IF,
+    CN_AST_SELECTION_SWITCH,
+} Cn_Ast_Selection_Kind;
 
 typedef struct {
-    Cn_Selection_Kind kind;
+    Cn_Ast_Selection_Kind kind;
     Cn_Ast_Idx condition_expression_idx;
     Cn_Ast_Idx statement_idx;
     Cn_Ast_Idx else_statement_idx;
@@ -1638,11 +1645,11 @@ typedef enum {
     CN_AST_PRIMARY_INTEGER,
     CN_AST_PRIMARY_FLOAT,
     CN_AST_PRIMARY_STRING,
-} Cn_Ast_Node_Primary_Expression_Kind;
+} Cn_Ast_Primary_Expression_Kind;
 
 typedef struct {
     Cn_Type *type;
-    Cn_Ast_Node_Primary_Expression_Kind kind;
+    Cn_Ast_Primary_Expression_Kind kind;
     Cn_String value;
 } Cn_Ast_Node_Primary_Expression;
 
@@ -1672,20 +1679,20 @@ typedef struct {
 } Cn_Ast_Node_Pointer;
 
 typedef enum {
-    CN_DD_IDENTIFIER,
-    CN_DD_GROUPED,
-    CN_DD_ARRAY,
-    CN_DD_FUNCTION,
-} Cn_Direct_Declarator_Kind;
+    CN_AST_DIRECT_DECLARATOR_IDENTIFIER,
+    CN_AST_DIRECT_DECLARATOR_GROUPED,
+    CN_AST_DIRECT_DECLARATOR_ARRAY,
+    CN_AST_DIRECT_DECLARATOR_FUNCTION,
+} Cn_Ast_Direct_Declarator_Kind;
 
 typedef struct {
-    Cn_Direct_Declarator_Kind kind;
+    Cn_Ast_Direct_Declarator_Kind kind;
 
     union {
         Cn_String identifier;
         Cn_Ast_Idx declarator_idx;
-        struct { Cn_Ast_Idx direct_declarator_idx; Cn_Ast_Idx expression_idx; } dd_array;
-        struct { Cn_Ast_Idx direct_declarator_idx; Cn_Ast_Idx parameter_type_list_idx; } dd_function;
+        struct { Cn_Ast_Idx direct_declarator_idx; Cn_Ast_Idx expression_idx; } array;
+        struct { Cn_Ast_Idx direct_declarator_idx; Cn_Ast_Idx parameter_type_list_idx; } function;
     };
 } Cn_Ast_Node_Direct_Declarator;
 
@@ -1698,7 +1705,7 @@ typedef struct {
 } Cn_Ast_Node_Declaration_Specifiers;
 
 typedef struct {
-    Cn_Ast_Idx child_idx; // Either expression or type_name.
+    Cn_Ast_Idx expression_or_type_name_idx; // Either expression or type_name.
 } Cn_Ast_Node_Gnu_Typeof_Specifier;
 
 typedef struct {
@@ -1713,8 +1720,8 @@ typedef struct {
 } Cn_Ast_Node_Type_Specifier;
 
 typedef struct {
-    Cn_Ast_Idx         specifier_qualifier_idx;
-    Cn_Ast_Idx         abstract_declarator_idx;
+    Cn_Ast_Idx specifier_qualifier_idx;
+    Cn_Ast_Idx abstract_declarator_idx;
 } Cn_Ast_Node_Type_Name;
 
 typedef struct {
@@ -1762,7 +1769,7 @@ typedef struct {
 } Cn_Ast_Node_Gnu_Attribute;
 
 typedef struct {
-    Cn_String label;
+    Cn_String literal;
 } Cn_Ast_Node_Gnu_Asm_Label;
 
 typedef struct cn_ast_node {
@@ -1932,6 +1939,22 @@ typedef struct {
 typedef struct {
     int64_t saved_strings_length;
     int64_t binding_idx;
+
+    /**
+     * If set to true, means that there is checkpoint set in this scope.
+     * Therefore it cannot be removed, because doing so would invalidate 
+     * checkpoint saved state.
+     *
+     * IMPORTANT: This is a workaround to not store massive deep copies of 
+     * scoped data structures like bindings hash tables, or scoped string arenas.
+     * It assumes that ast functionality won't require processor to 
+     * jump into a completely different scope that no longer exists.
+     * In other words all jump can only occure in from current to previous 
+     * active scopes.
+     *
+     * If locked scope is getting removed error will occur.
+     */
+    bool    is_checkpoint_locked;
 } Cn_Ast_Scope;
 
 #ifndef CN_AST_SCOPE_STACK_INITIAL_CAP
@@ -2024,10 +2047,61 @@ typedef struct {
 
 extern Cn_Ast_Data *cn__ast_data;
 
+typedef enum {
+    CN_AST_CHECKPOINT_IGNORE_AST_NODES,
+} Cn_Ast_Checkpoint_Flags;
+
+typedef struct {
+    Cn_Ast_Checkpoint_Flags flags;
+    jmp_buf                 jmpbuf;
+    int64_t                 saved_node_length;
+    uint64_t                saved_type_length;
+    uint64_t                saved_type_children_length;         
+    int64_t                 saved_binding_length;
+    uint64_t                saved_scoped_strings_length;
+    uint64_t                saved_permanent_strings_length;     
+    int64_t                 saved_scope_length;
+    Cn_Ast_Data *           data;
+} Cn_Ast_Checkpoint;
+
+/**
+ * Uses current data from cn__ast_data to store current ast state 
+ * in checkpoint. Wrapping around setjump to also store stack state.
+ *
+ * IMPORTANT: Locks scope checkpoint is set in.
+ *
+ * RETURNS: True if program jumped to this code point. 
+ * False if checkpoint set and no jumping or loading occured.
+ */
+#define cn_ast_checkpoint_set(checkpoint_ptr, data_ptr, flags) (cn__ast_checkpoint_save(checkpoint_ptr, data_ptr, flags), setjmp((checkpoint_ptr)->jmpbuf) != 0)
+
+CNDEF void cn__ast_checkpoint_save(Cn_Ast_Checkpoint *checkpoint, Cn_Ast_Data *data, Cn_Ast_Checkpoint_Flags flags);
+
+/**
+ * Loads state saved in checkpoint and long jumps to the 
+ * set checkpoint. Modifies data stored in cn__ast_data.
+ */
+CNDEF void cn_ast_checkpoint_load(Cn_Ast_Checkpoint *checkpoint);
+
+/**
+ * Removes and nullifies saved state in checkpoint.
+ *
+ * IMPORTANT: Unlocks scope checkpoint was set in.
+ */
+CNDEF void cn_ast_checkpoint_remove(Cn_Ast_Checkpoint *checkpoint);
+
 /**
  * Inits ast functionality, called once before parsing begins.
  */
 CNDEF int cn_ast_init(Cn_Ast_Data *data);
+
+/**
+ * Frees all memory occupied by ast data, 
+ * this will invalidate everything that was parsed, 
+ * analyzed and stored while working with the ast tree, 
+ * including every string and name.
+ */
+CNDEF void cn_ast_free(Cn_Ast_Data *data);
 
 /**
  * Simple macro to get ast node based on its idx.
@@ -3087,45 +3161,52 @@ CNDEF bool cn_parse_float_literal(Cn_String literal, double *out);
  */
 CNDEF Cn_Any cn_ast_expression_evaluate(Cn_Ast_Idx expression_idx, void *buffer);
 
+/**
+ * Clears expression ast nodes from their types undoing typechecking.
+ * Used to reanalyze modified ast nodes.
+ */
+CNDEF void cn_ast_expression_clear_types(Cn_Ast_Idx expression_idx);
+
+/**
+ * Analyzes ast nodes, using current ast data, introduces new types, 
+ * bindings and typechecks any code. 
+ * Is used on existing ast branches, and evaluates those branches to be valid.
+ *
+ * ASSUMES: Passed ast nodes were not yet analyzed in current context, 
+ * otherwise can cause errors.
+ */
+CNDEF void cn_ast_analyze(Cn_Ast_Idx node_idx);
+
 // PRE-PROCESSING SECTION
+
 typedef enum {
-    CN_INSERT,
-    CN_REMOVE,
-} Cn_Modification_Kind;
+    CN_MESSAGE_PARSED_FUNCTION_DEFINITION
+} Cn_Message_Kind;
 
 typedef struct {
-    Cn_String str;
-} Cn_Modification_Insert;
+    Cn_Ast_Idx node_idx;
+} Cn_Message_Parsed_Function_Definition;
+
+typedef union {
+    Cn_Message_Parsed_Function_Definition parsed_function_definition;
+} Cn_Message;
+
+typedef int (Cn_Message_Handler)(Cn_Message_Kind kind, void *message);
+
+extern Cn_Message_Handler *cn_message_handler;
+
+/**
+ * Simple wrapper that checks if message handler not NULL, 
+ * if so it sends specified message to the user.
+ *
+ * RETURNS: True if reload to last checkpoit required, 
+ * false if no modifications occured.
+ */
+CNDEF bool cn_send_message(Cn_Message_Kind kind, Cn_Message message);
 
 typedef struct {
-    int64_t length;
-} Cn_Modification_Remove;
-
-typedef int64_t Cn_Modification_Idx;
-
-#define CN_MUTATION_IDX_NIL 0
-
-typedef struct {
-    int64_t              offset;
-    Cn_Modification_Kind kind;
-
-    union {
-        Cn_Modification_Insert insert;
-        Cn_Modification_Remove remove;
-    };
-} Cn_Modification;
-
-
-
-#ifndef CN_TU_MODIFICATION_LIST_INITIAL_CAP
-#   define CN_TU_MODIFICATION_LIST_INITIAL_CAP 32
-#endif // CN_TU_MODIFICATION_LIST_INITIAL_CAP
-
-typedef struct {
-    int64_t version;
     char *path;
     Cn_String content;
-    Cn_Modification *modification_list;
     Cn_Ast_Data ast_data;
 } Cn_Translation_Unit;
 
@@ -3138,10 +3219,16 @@ typedef enum : uint8_t {
 } Cn_Flags;
 
 /**
- * RETURNS: Cn_Translation_Unit struct that represent classic C translation unit in which all lexing, parsing, infering, modification occurs.
- * IMPORTANT: Takes in path to the .i file, that is intermidiate pre-processed representation of a translation unit.
- * Simply it is a .c file that has all macros expanded and ready to be sent to the compiler.
- * Supplying .c files with macros that are not expanded will result in error, ensure to pass .c file through compiler's pre-processor first.
+ * RETURNS: Cn_Translation_Unit struct that represent 
+ * classic C translation unit in which all lexing, parsing, 
+ * infering, modification occurs.
+ *
+ * IMPORTANT: Takes in path to the .i file, 
+ * that is intermidiate pre-processed representation of a translation unit.
+ * Simply it is a .c file that has all macros expanded 
+ * and ready to be sent to the compiler.
+ * Supplying .c files with macros that are not expanded will result in error, 
+ * ensure to pass .c file through compiler's pre-processor first.
  * In gcc it would be executing the following:
  *      
  *      $ gcc -E -o file.i file.c
@@ -3151,7 +3238,8 @@ typedef enum : uint8_t {
 CNDEF Cn_Translation_Unit cn_tu_make(char *intermidiate_path);
 
 /**
- * This function free's all memory used by the translation unit, including closing previously opened file.
+ * This function free's all memory used by the translation unit, 
+ * including closing previously opened file.
  */
 CNDEF void cn_tu_free(Cn_Translation_Unit *tu);
 
@@ -3163,24 +3251,10 @@ CNDEF void cn_tu_free(Cn_Translation_Unit *tu);
  * Through the processing the messages are enqueued, 
  * and by the end of the process they are triggered,
  * if cn_message_handler is not NULL.
+ *
  * RETURNS: 0 if processing is successful. -1 if error occured.
  */
 CNDEF int cn_tu_process(Cn_Translation_Unit *tu, Cn_Flags flags); 
-
-
-typedef struct {
-    Cn_Translation_Unit *tu;
-
-    Cn_String file_path;
-    int64_t   line_number;
-
-    // TODO: Attach declaration info later.
-} Cn_Message;
-
-typedef void (Cn_Message_Handler)(Cn_Message *message);
-
-extern Cn_Message_Handler *cn_message_handler;
-
 
 #endif // CN_H_
        
@@ -3668,7 +3742,7 @@ CNDEF Cn_String cn_sb_to_str(Cn_String_Builder *sb) {
 
 
 // CHAINED ARENA SECTION
-Cn_Chained_Arena cn_chained_arena_make(uint64_t block_capacity) {
+CNDEF Cn_Chained_Arena cn_chained_arena_make(uint64_t block_capacity) {
     CN_ASSERT(block_capacity > 0);
 
     Cn_Chained_Arena_Block_Header *header = (Cn_Chained_Arena_Block_Header *)CN_REALLOC(NULL, sizeof(Cn_Chained_Arena_Block_Header) + block_capacity);
@@ -3682,7 +3756,7 @@ Cn_Chained_Arena cn_chained_arena_make(uint64_t block_capacity) {
     };
 }
 
-void *cn_chained_arena_alloc(Cn_Chained_Arena *arena, uint64_t size) {
+CNDEF void *cn_chained_arena_alloc(Cn_Chained_Arena *arena, uint64_t size) {
     CN_ASSERT(size > 0);
     CN_ASSERT(size <= arena->block_capacity);
 
@@ -3701,7 +3775,7 @@ void *cn_chained_arena_alloc(Cn_Chained_Arena *arena, uint64_t size) {
     return (uint8_t *)arena->block + header->allocated - size;
 }
 
-void cn_chained_arena_dealloc(Cn_Chained_Arena *arena, uint64_t size) {
+CNDEF void cn_chained_arena_dealloc(Cn_Chained_Arena *arena, uint64_t size) {
     Cn_Chained_Arena_Block_Header *header = CN_CHAINED_ARENA_BLOCK_HEADER(arena->block);
     uint64_t decrease;
 
@@ -3723,7 +3797,7 @@ void cn_chained_arena_dealloc(Cn_Chained_Arena *arena, uint64_t size) {
     }
 }
 
-int64_t cn_chained_arena_allocation_info(Cn_Chained_Arena *arena, void *allocation_ptr, uint64_t *offset) {
+CNDEF int64_t cn_chained_arena_allocation_info(Cn_Chained_Arena *arena, void *allocation_ptr, uint64_t *offset) {
     Cn_Chained_Arena_Block_Header *header;
     uint8_t *ptr = allocation_ptr;
     Cn_Chained_Arena a = *arena;
@@ -3755,12 +3829,28 @@ int64_t cn_chained_arena_allocation_info(Cn_Chained_Arena *arena, void *allocati
     return idx;
 }
 
-void cn_chained_arena_free(Cn_Chained_Arena *arena) {
+CNDEF uint64_t cn_chained_arena_allocated(Cn_Chained_Arena *arena) {
+    uint64_t allocated = 0;
+    Cn_Chained_Arena_Block_Header *header = CN_CHAINED_ARENA_BLOCK_HEADER(arena->block);
+    
+    while (header->prev != NULL) {
+        arena->block = header->prev;
+        allocated += header->allocated;
+        header = CN_CHAINED_ARENA_BLOCK_HEADER(arena->block);
+    }
+
+    allocated += header->allocated;
+
+    return allocated;
+}
+
+CNDEF void cn_chained_arena_free(Cn_Chained_Arena *arena) {
     Cn_Chained_Arena_Block_Header *header = CN_CHAINED_ARENA_BLOCK_HEADER(arena->block);
 
     while (header->prev != NULL) {
         arena->block = header->prev;
         CN_FREE(header);
+        header = CN_CHAINED_ARENA_BLOCK_HEADER(arena->block);
     }
 
     CN_FREE(header);
@@ -5729,6 +5819,8 @@ CNDEF bool cn_any_is_empty(Cn_Any any) {
 
 // AST SECTION
 
+Cn_Ast_Checkpoint cn_ast_checkpoint_message = {0};
+
 const Cn_Binary_Operator CN_BINARY_OPERATORS[] = {
     { CN_BINARY_OP_ARRAY_SUB,       CN_TOKEN_SQR_BRACES_OPEN,   14  },
     { CN_BINARY_OP_FUNCTION,        CN_TOKEN_PARAN_OPEN,        14  },
@@ -5859,8 +5951,73 @@ CNDEF void cn_ast_consume_till(Cn_Lexer *lexer, Cn_Token_Type type) {
     } while (cn_lexer_token(lexer).type != type) ;
 }
 
-
 Cn_Ast_Data *cn__ast_data = NULL;
+
+CNDEF void cn__ast_checkpoint_save(Cn_Ast_Checkpoint *checkpoint, Cn_Ast_Data *data, Cn_Ast_Checkpoint_Flags flags) {
+    CN_ASSERT(cn_array_list_length(&data->scope_stack) > 0);
+    // Locking scope stack.
+    data->scope_stack[cn_array_list_length(&data->scope_stack) - 1].is_checkpoint_locked = true;
+
+    checkpoint->flags = flags;
+    if (!(checkpoint->flags & CN_AST_CHECKPOINT_IGNORE_AST_NODES)) {
+        checkpoint->saved_node_length = cn_array_list_length(&data->node_list);
+    }
+    checkpoint->saved_type_length = cn_chained_arena_allocated(&data->type_arena);
+    checkpoint->saved_type_children_length = cn_chained_arena_allocated(&data->type_children_arena);
+    checkpoint->saved_binding_length = cn_array_list_length(&data->binding_list);
+    checkpoint->saved_scoped_strings_length = cn_chained_arena_allocated(&data->scoped_strings_arena);
+    checkpoint->saved_permanent_strings_length = cn_chained_arena_allocated(&data->permanent_strings_arena);
+    checkpoint->saved_scope_length = cn_array_list_length(&data->scope_stack);
+    checkpoint->data = data;
+}
+
+CNDEF void cn_ast_checkpoint_load(Cn_Ast_Checkpoint *checkpoint) {
+    CN_ASSERT(checkpoint->data != NULL);
+
+    Cn_Ast_Data *d = checkpoint->data;
+
+    if (!(checkpoint->flags & CN_AST_CHECKPOINT_IGNORE_AST_NODES)) {
+        cn_array_list_pop_multiple(&d->node_list, cn_array_list_length(&d->node_list) - checkpoint->saved_node_length);
+    }
+
+    // Removing types from hashset entries.
+    cn_chained_arena_dealloc(&d->type_arena, cn_chained_arena_allocated(&d->type_arena) - checkpoint->saved_type_length);
+    cn_chained_arena_dealloc(&d->type_children_arena, cn_chained_arena_allocated(&d->type_children_arena) - checkpoint->saved_type_children_length);
+
+    // Removing bindings from hashtable entries.
+    for (int i = checkpoint->saved_binding_length; i < cn_array_list_length(&cn__ast_data->binding_list); i++) {
+        // Resolve each binding, properly dispose each binding.
+        if (cn__ast_data->binding_list[i].kind == CN_BINDING_TAG) {
+            if (cn__ast_data->binding_list[i].next_idx == CN_AST_NIL_IDX) {
+                cn_hash_table_remove(&cn__ast_data->tag_binding_table, &cn__ast_data->binding_list[i].name);
+            } else {
+                cn_hash_table_put(&cn__ast_data->tag_binding_table, cn__ast_data->binding_list[i].next_idx, &cn__ast_data->binding_list[i].name);
+            }
+        } else {
+            if (cn__ast_data->binding_list[i].next_idx == CN_AST_NIL_IDX) {
+                cn_hash_table_remove(&cn__ast_data->symbol_binding_table, &cn__ast_data->binding_list[i].name);
+            } else {
+                cn_hash_table_put(&cn__ast_data->symbol_binding_table, cn__ast_data->binding_list[i].next_idx, &cn__ast_data->binding_list[i].name);
+            }
+        }
+    }
+    cn_array_list_pop_multiple(&d->binding_list, cn_array_list_length(&d->binding_list) - checkpoint->saved_binding_length);
+
+    cn_array_list_pop_multiple(&d->scope_stack, cn_array_list_length(&d->scope_stack) - checkpoint->saved_scope_length);
+
+    longjmp(checkpoint->jmpbuf, 1);
+}
+
+CNDEF void cn_ast_checkpoint_remove(Cn_Ast_Checkpoint *checkpoint) {
+    CN_ASSERT(checkpoint->data != NULL);
+
+    Cn_Ast_Data *d = checkpoint->data;
+
+    CN_ASSERT(cn_array_list_length(&d->scope_stack) > 0);
+    // Unlocking scope stack.
+    d->scope_stack[cn_array_list_length(&d->scope_stack) - 1].is_checkpoint_locked = false;
+    *checkpoint = (Cn_Ast_Checkpoint) {0};
+}
 
 CNDEF int cn_ast_init(Cn_Ast_Data *data) {
     data->node_list = cn_array_list_make(Cn_Ast_Node, CN_AST_NODE_LIST_INITIAL_CAP);
@@ -5907,10 +6064,31 @@ CNDEF int cn_ast_init(Cn_Ast_Data *data) {
 
     cn__ast_data = data;
 
-
-
-
     return 0;
+}
+
+CNDEF void cn_ast_free(Cn_Ast_Data *data) {
+    cn_array_list_free(&data->scope_stack);
+
+    cn_chained_arena_free(&data->permanent_strings_arena);
+
+    cn_chained_arena_free(&data->scoped_strings_arena);
+
+    cn_hash_table_free(&data->symbol_binding_table);
+
+    cn_hash_table_free(&data->tag_binding_table);
+
+    cn_array_list_free(&data->binding_list);
+
+    cn_chained_arena_free(&data->type_children_arena);
+
+    cn_hash_set_free(&data->type_ptr_set);
+
+    cn_chained_arena_free(&data->type_arena);
+
+    cn_array_list_free(&data->node_list);
+
+    *data = (Cn_Ast_Data) {0};
 }
 
 CNDEF Cn_Ast_Idx cn_ast_node_list_append(Cn_Ast_Node node) {
@@ -6083,7 +6261,7 @@ CNDEF void cn_ast_print(Cn_Ast_Node *node, int depth) {
                 ADD_IDX(node->selection_statement.condition_expression_idx);
                 ADD_IDX(node->selection_statement.statement_idx);
 
-                if (node->selection_statement.kind == CN_SELECTION_IF) {
+                if (node->selection_statement.kind == CN_AST_SELECTION_IF) {
                     printf(" kind: if\n");
                     ADD_IDX(node->selection_statement.else_statement_idx);
                 }
@@ -6305,22 +6483,22 @@ CNDEF void cn_ast_print(Cn_Ast_Node *node, int depth) {
             {
                 printf(" kind: ");
                 switch(node->direct_declarator.kind) {
-                    case CN_DD_IDENTIFIER:
+                    case CN_AST_DIRECT_DECLARATOR_IDENTIFIER:
                         printf("identifier: %.*s\n", CN_UNPACK(node->direct_declarator.identifier));
                         break;
-                    case CN_DD_GROUPED:
+                    case CN_AST_DIRECT_DECLARATOR_GROUPED:
                         printf("grouped\n");
                         ADD_IDX(node->direct_declarator.declarator_idx);
                         break;
-                    case CN_DD_ARRAY:
+                    case CN_AST_DIRECT_DECLARATOR_ARRAY:
                         printf("array\n");
-                        ADD_IDX(node->direct_declarator.dd_array.expression_idx);
-                        ADD_IDX(node->direct_declarator.dd_array.direct_declarator_idx);
+                        ADD_IDX(node->direct_declarator.array.expression_idx);
+                        ADD_IDX(node->direct_declarator.array.direct_declarator_idx);
                         break;
-                    case CN_DD_FUNCTION:
+                    case CN_AST_DIRECT_DECLARATOR_FUNCTION:
                         printf("function\n");
-                        ADD_IDX(node->direct_declarator.dd_function.parameter_type_list_idx);
-                        ADD_IDX(node->direct_declarator.dd_function.direct_declarator_idx);
+                        ADD_IDX(node->direct_declarator.function.parameter_type_list_idx);
+                        ADD_IDX(node->direct_declarator.function.direct_declarator_idx);
                         break;
                 }
 
@@ -6543,6 +6721,7 @@ CNDEF void cn_ast_scope_stack_push() {
                 // .saved_strings_idx = cn_array_list_length(&cn_ast_saved_strings_list), 
                 .saved_strings_length = 0,
                 .binding_idx = cn_array_list_length(&cn__ast_data->binding_list),
+                .is_checkpoint_locked = false,
                 } ));
 }
 
@@ -6550,12 +6729,26 @@ CNDEF void cn_ast_scope_stack_pop() {
     CN_ASSERT(cn_array_list_length(&cn__ast_data->scope_stack) > 0);
 
     Cn_Ast_Scope *scope = cn_ast_scope_stack_peek();
+
+    if (scope->is_checkpoint_locked) {
+        cn_log(CN_ERROR, "Scope with idx: %ld, is checkpoint locked and cannot be popped, make sure to remove checkpoint before popping the stack.", CN_AST_SCOPE_STACK_CURRENT_IDX);
+        exit(1);
+    }
+
     for (int i = scope->binding_idx; i < cn_array_list_length(&cn__ast_data->binding_list); i++) {
         // Resolve each binding, properly dispose each binding.
         if (cn__ast_data->binding_list[i].kind == CN_BINDING_TAG) {
-            cn_hash_table_put(&cn__ast_data->tag_binding_table, cn__ast_data->binding_list[i].next_idx, &cn__ast_data->binding_list[i].name);
+            if (cn__ast_data->binding_list[i].next_idx == CN_AST_NIL_IDX) {
+                cn_hash_table_remove(&cn__ast_data->tag_binding_table, &cn__ast_data->binding_list[i].name);
+            } else {
+                cn_hash_table_put(&cn__ast_data->tag_binding_table, cn__ast_data->binding_list[i].next_idx, &cn__ast_data->binding_list[i].name);
+            }
         } else {
-            cn_hash_table_put(&cn__ast_data->symbol_binding_table, cn__ast_data->binding_list[i].next_idx, &cn__ast_data->binding_list[i].name);
+            if (cn__ast_data->binding_list[i].next_idx == CN_AST_NIL_IDX) {
+                cn_hash_table_remove(&cn__ast_data->symbol_binding_table, &cn__ast_data->binding_list[i].name);
+            } else {
+                cn_hash_table_put(&cn__ast_data->symbol_binding_table, cn__ast_data->binding_list[i].next_idx, &cn__ast_data->binding_list[i].name);
+            }
         }
     }
     cn_array_list_pop_multiple(&cn__ast_data->binding_list, cn_array_list_length(&cn__ast_data->binding_list) - scope->binding_idx);
@@ -6577,7 +6770,16 @@ CNDEF Cn_String cn__ast_scope_stack_save_string(Cn_String str) {
 
     scope->saved_strings_length += str.length;
 
-    // cn_array_list_append(&cn_ast_saved_strings_list, str);
+    return str;
+}
+
+/**
+ * Permanently saves string.
+ */
+CNDEF Cn_String cn__ast_permanent_save_string(Cn_String str) {
+    void *data = cn_chained_arena_alloc(&cn__ast_data->permanent_strings_arena, str.length);
+    cn_str_copy_to(str, data);
+    str.data = data;
 
     return str;
 }
@@ -6771,7 +6973,7 @@ CNDEF Cn_Ast_Binding_Idx cn_ast_tag_binding_declare(Cn_String tag, Cn_Type_Kind 
     // No previous declaration case.
     if (ref == NULL) {
         // Saving string.
-        tag = cn__ast_scope_stack_save_string(tag);
+        tag = cn__ast_permanent_save_string(tag);
 
         // Making type. 
         Cn_Type *type = cn_chained_arena_alloc(&cn__ast_data->type_arena, sizeof(Cn_Type));
@@ -6804,6 +7006,7 @@ CNDEF Cn_Ast_Binding_Idx cn_ast_tag_binding_declare(Cn_String tag, Cn_Type_Kind 
         
         return cn_array_list_length(&cn__ast_data->binding_list) - 1;
     }
+
 
     Cn_Ast_Binding *binding = cn__ast_data->binding_list + *ref;
     if (binding->type->kind != kind) {
@@ -6840,10 +7043,9 @@ CNDEF Cn_Ast_Binding_Idx cn_ast_tag_binding_declare(Cn_String tag, Cn_Type_Kind 
 
     cn_hash_table_put(&cn__ast_data->tag_binding_table, cn_array_list_length(&cn__ast_data->binding_list) - 1, &tag);
 
+
     return cn_array_list_length(&cn__ast_data->binding_list) - 1;
 }
-
-
 
 CNDEF Cn_Ast_Idx cn_ast_parse_translation_unit(Cn_Lexer *lexer) {
     Cn_Lexer original_state = *lexer;
@@ -6865,8 +7067,6 @@ CNDEF Cn_Ast_Idx cn_ast_parse_translation_unit(Cn_Lexer *lexer) {
     
         cn_ast_typedef_binding_declare(CN_CSTR("__builtin_va_list"), (Cn_Source_Loc) {0}, va);
     }
-
-
 
     while (cn_lexer_token(lexer).type != CN_TOKEN_EOF) {
         next_idx = cn_ast_parse_external_declaration(lexer);
@@ -6908,12 +7108,28 @@ CNDEF Cn_Ast_Idx cn_ast_parse_external_declaration(Cn_Lexer *lexer) {
     // ...
 
     // Last possible case function definition or declaration.
-    child_idx = cn_ast_parse_function_definition_or_declaration(lexer);
 
-    if (child_idx == CN_AST_NIL_IDX)
-        goto error;
+    // Setting checkpoint.
+    if (cn_ast_checkpoint_set(&cn_ast_checkpoint_message, cn__ast_data, CN_AST_CHECKPOINT_IGNORE_AST_NODES)) {
+        printf("Reanalyze ast nodes.\n");
+    } else {
+        child_idx = cn_ast_parse_function_definition_or_declaration(lexer);
+        if (child_idx == CN_AST_NIL_IDX) goto error;
+        node.external_declaration.child_idx = child_idx;
 
-    node.external_declaration.child_idx = child_idx;
+        // Messaging function definition.
+        if (cn_ast_node_get(child_idx)->kind == CN_AST_NODE_FUNCTION_DEFINITION) {
+            bool modified = cn_send_message(CN_MESSAGE_PARSED_FUNCTION_DEFINITION, (Cn_Message) {
+                        .parsed_function_definition = {
+                            .node_idx = node.external_declaration.child_idx,
+                        }
+                    });
+
+            if (modified) cn_ast_checkpoint_load(&cn_ast_checkpoint_message);
+
+            cn_ast_checkpoint_remove(&cn_ast_checkpoint_message);
+        }
+    }
 
     return cn_ast_node_list_append(node);
 
@@ -6931,17 +7147,17 @@ CNDEF Cn_String cn_ast_declarator_info(Cn_Ast_Idx declarator_idx, Cn_Source_Loc 
     Cn_Ast_Node *dd = cn_ast_node_get(decl->declarator.direct_declarator_idx);
     while (true) {
         switch (dd->direct_declarator.kind) {
-            case CN_DD_IDENTIFIER:
+            case CN_AST_DIRECT_DECLARATOR_IDENTIFIER:
                 if (loc != NULL) *loc = dd->loc;
                 return dd->direct_declarator.identifier;
-            case CN_DD_GROUPED:
+            case CN_AST_DIRECT_DECLARATOR_GROUPED:
                 dd = cn_ast_node_get(cn_ast_node_get(dd->direct_declarator.declarator_idx)->declarator.direct_declarator_idx);
                 continue;
-            case CN_DD_ARRAY:
-                dd = cn_ast_node_get(dd->direct_declarator.dd_array.direct_declarator_idx);
+            case CN_AST_DIRECT_DECLARATOR_ARRAY:
+                dd = cn_ast_node_get(dd->direct_declarator.array.direct_declarator_idx);
                 continue;
-            case CN_DD_FUNCTION:
-                dd = cn_ast_node_get(dd->direct_declarator.dd_function.direct_declarator_idx);
+            case CN_AST_DIRECT_DECLARATOR_FUNCTION:
+                dd = cn_ast_node_get(dd->direct_declarator.function.direct_declarator_idx);
                 continue;
         }
         break;
@@ -6960,18 +7176,18 @@ CNDEF Cn_String cn_ast_function_declarator_info(Cn_Ast_Idx declarator_idx, Cn_As
 
     while(true) {
         switch (dd->direct_declarator.kind) {
-            case CN_DD_FUNCTION:
+            case CN_AST_DIRECT_DECLARATOR_FUNCTION:
                 // Abstract declarator end case, no identifier.
-                if (dd->direct_declarator.dd_function.direct_declarator_idx == CN_AST_NIL_IDX) {
-                    *parameter_type_list_idx = dd->direct_declarator.dd_function.parameter_type_list_idx;
+                if (dd->direct_declarator.function.direct_declarator_idx == CN_AST_NIL_IDX) {
+                    *parameter_type_list_idx = dd->direct_declarator.function.parameter_type_list_idx;
                     *loc = dd->loc;
                     return (Cn_String) {0};
                 } 
 
-                Cn_Ast_Node *dd_child = cn_ast_node_get(dd->direct_declarator.dd_function.direct_declarator_idx);
+                Cn_Ast_Node *dd_child = cn_ast_node_get(dd->direct_declarator.function.direct_declarator_idx);
                 // Identifier declarator end case.
-                if (dd_child->direct_declarator.kind == CN_DD_IDENTIFIER) {  
-                    *parameter_type_list_idx = dd->direct_declarator.dd_function.parameter_type_list_idx;
+                if (dd_child->direct_declarator.kind == CN_AST_DIRECT_DECLARATOR_IDENTIFIER) {  
+                    *parameter_type_list_idx = dd->direct_declarator.function.parameter_type_list_idx;
                     *loc = dd_child->loc;
                     return dd_child->direct_declarator.identifier;
                 }
@@ -6980,17 +7196,17 @@ CNDEF Cn_String cn_ast_function_declarator_info(Cn_Ast_Idx declarator_idx, Cn_As
                 dd = dd_child;
                 break;
 
-            case CN_DD_ARRAY:
-                if (dd->direct_declarator.dd_array.direct_declarator_idx == CN_AST_NIL_IDX) return (Cn_String) {0};
-                dd = cn_ast_node_get(dd->direct_declarator.dd_array.direct_declarator_idx);
+            case CN_AST_DIRECT_DECLARATOR_ARRAY:
+                if (dd->direct_declarator.array.direct_declarator_idx == CN_AST_NIL_IDX) return (Cn_String) {0};
+                dd = cn_ast_node_get(dd->direct_declarator.array.direct_declarator_idx);
                 break;
 
-            case CN_DD_GROUPED:
+            case CN_AST_DIRECT_DECLARATOR_GROUPED:
                 if (cn_ast_node_get(dd->direct_declarator.declarator_idx)->declarator.direct_declarator_idx == CN_AST_NIL_IDX) return (Cn_String) {0};
                 dd = cn_ast_node_get(cn_ast_node_get(dd->direct_declarator.declarator_idx)->declarator.direct_declarator_idx);
                 break;
             
-            case CN_DD_IDENTIFIER:
+            case CN_AST_DIRECT_DECLARATOR_IDENTIFIER:
                 return (Cn_String) {0};
         }
     }
@@ -7263,10 +7479,10 @@ CNDEF Cn_Ast_Idx cn_ast_parse_selection_statement(Cn_Lexer *lexer) {
     
 
     if (cn_lexer_expect(lexer, CN_TOKEN_IF)) {
-        node.selection_statement.kind = CN_SELECTION_IF;
+        node.selection_statement.kind = CN_AST_SELECTION_IF;
 
     } else if (cn_lexer_expect(lexer, CN_TOKEN_SWITCH)) {
-        node.selection_statement.kind = CN_SELECTION_SWITCH;
+        node.selection_statement.kind = CN_AST_SELECTION_SWITCH;
 
     } else {
         // cn_log(CN_ERROR, "Expected 'if' or 'switch' in selection statement.");
@@ -7301,7 +7517,7 @@ CNDEF Cn_Ast_Idx cn_ast_parse_selection_statement(Cn_Lexer *lexer) {
     if (statement_idx == CN_AST_NIL_IDX) goto error;
     node.selection_statement.statement_idx = statement_idx;
 
-    if (node.selection_statement.kind == CN_SELECTION_IF && cn_lexer_expect(lexer, CN_TOKEN_ELSE)) {
+    if (node.selection_statement.kind == CN_AST_SELECTION_IF && cn_lexer_expect(lexer, CN_TOKEN_ELSE)) {
         cn_ast_next_token(lexer);
 
         Cn_Ast_Idx else_statement_idx = cn_ast_parse_statement(lexer);
@@ -8002,7 +8218,7 @@ CNDEF Cn_Ast_Idx cn_ast_parse_direct_declarator(Cn_Lexer *lexer, bool *is_abstra
     
     // '(' declarator ')' case.
     if (cn_lexer_expect(lexer, CN_TOKEN_PARAN_OPEN)) {
-        node.direct_declarator.kind = CN_DD_GROUPED;
+        node.direct_declarator.kind = CN_AST_DIRECT_DECLARATOR_GROUPED;
 
         cn_ast_next_token(lexer);
 
@@ -8026,7 +8242,7 @@ CNDEF Cn_Ast_Idx cn_ast_parse_direct_declarator(Cn_Lexer *lexer, bool *is_abstra
     }
     // identifier case.
     else if (cn_lexer_expect(lexer, CN_TOKEN_IDENTIFIER)) {
-        node.direct_declarator.kind = CN_DD_IDENTIFIER;
+        node.direct_declarator.kind = CN_AST_DIRECT_DECLARATOR_IDENTIFIER;
 
         Cn_String identifier = cn_ast_parse_identifier(lexer);
         if (cn_str_empty(identifier)) goto error;
@@ -8048,14 +8264,14 @@ CNDEF Cn_Ast_Idx cn_ast_parse_direct_declarator(Cn_Lexer *lexer, bool *is_abstra
     if (cn_lexer_expect(lexer, CN_TOKEN_SQR_BRACES_OPEN)) {
 
         node = (Cn_Ast_Node) { .kind = CN_AST_NODE_DIRECT_DECLARATOR, .loc = cn_lexer_token(lexer).loc };
-        node.direct_declarator.kind = CN_DD_ARRAY;
+        node.direct_declarator.kind = CN_AST_DIRECT_DECLARATOR_ARRAY;
 
         cn_ast_next_token(lexer);
 
         if (!cn_lexer_expect(lexer, CN_TOKEN_SQR_BRACES_CLOSE)) {
             Cn_Ast_Idx expression_idx = cn_ast_parse_expression(lexer, -1, CN_NO_COMMA_OPERATOR);
             if (expression_idx == CN_AST_NIL_IDX) goto error;
-            node.direct_declarator.dd_array.expression_idx = expression_idx;
+            node.direct_declarator.array.expression_idx = expression_idx;
 
             // Type checking expression.
             Cn_Type *type = cn_ast_expression_typecheck(expression_idx);
@@ -8072,7 +8288,7 @@ CNDEF Cn_Ast_Idx cn_ast_parse_direct_declarator(Cn_Lexer *lexer, bool *is_abstra
         // Extending source loc to highlight whole array '[...]' declarator.
         node.loc.length = cn_source_loc_dist(&node.loc, &cn_lexer_token(lexer).loc);
 
-        node.direct_declarator.dd_array.direct_declarator_idx = direct_declarator_idx;
+        node.direct_declarator.array.direct_declarator_idx = direct_declarator_idx;
 
         return cn_ast_node_list_append(node);
     }
@@ -8080,7 +8296,7 @@ CNDEF Cn_Ast_Idx cn_ast_parse_direct_declarator(Cn_Lexer *lexer, bool *is_abstra
     else if (cn_lexer_expect(lexer, CN_TOKEN_PARAN_OPEN)) {
 
         node = (Cn_Ast_Node) { .kind = CN_AST_NODE_DIRECT_DECLARATOR, .loc = cn_lexer_token(lexer).loc};
-        node.direct_declarator.kind = CN_DD_FUNCTION;
+        node.direct_declarator.kind = CN_AST_DIRECT_DECLARATOR_FUNCTION;
 
         cn_ast_next_token(lexer);
 
@@ -8091,7 +8307,7 @@ CNDEF Cn_Ast_Idx cn_ast_parse_direct_declarator(Cn_Lexer *lexer, bool *is_abstra
             } else {
                 Cn_Ast_Idx parameter_type_list_idx = cn_ast_parse_parameter_type_list(lexer);
                 if (parameter_type_list_idx == CN_AST_NIL_IDX) goto error;
-                node.direct_declarator.dd_function.parameter_type_list_idx = parameter_type_list_idx;
+                node.direct_declarator.function.parameter_type_list_idx = parameter_type_list_idx;
             }
         }
 
@@ -8105,7 +8321,7 @@ CNDEF Cn_Ast_Idx cn_ast_parse_direct_declarator(Cn_Lexer *lexer, bool *is_abstra
         // Extending source loc to highlight whole function '(...)' declarator.
         node.loc.length = cn_source_loc_dist(&node.loc, &cn_lexer_token(lexer).loc);
 
-        node.direct_declarator.dd_function.direct_declarator_idx = direct_declarator_idx;
+        node.direct_declarator.function.direct_declarator_idx = direct_declarator_idx;
 
         return cn_ast_node_list_append(node);
     }
@@ -8387,7 +8603,7 @@ CNDEF Cn_Ast_Idx cn_ast_parse_gnu_typeof_specifier(Cn_Lexer *lexer) {
     }
 
     if (child_idx == CN_AST_NIL_IDX) goto error;
-    node.gnu_typeof_specifier.child_idx = child_idx;
+    node.gnu_typeof_specifier.expression_or_type_name_idx = child_idx;
 
     if (!cn_lexer_expect(lexer, CN_TOKEN_PARAN_CLOSE)) {
         cn_diagnostic(CN_DIAGNOSTIC_ERROR, &cn_lexer_token(lexer).loc, CN_DC_EXPECTED_TOKEN, "Expected ')' in GNU typeof specifier.");
@@ -8959,7 +9175,7 @@ CNDEF Cn_Ast_Idx cn_ast_parse_gnu_asm_label(Cn_Lexer *lexer) {
     }
     cn_ast_next_token(lexer);
 
-    node.gnu_asm_label.label = cn_ast_parse_string(lexer);
+    node.gnu_asm_label.literal = cn_ast_parse_string(lexer);
 
     if (!cn_lexer_expect(lexer, CN_TOKEN_PARAN_CLOSE)) {
         cn_diagnostic(CN_DIAGNOSTIC_ERROR, &cn_lexer_token(lexer).loc, CN_DC_EXPECTED_TOKEN, "Expected ')' token in GNU asm label.");
@@ -9115,7 +9331,7 @@ CNDEF Cn_Type *cn_ast_to_type(Cn_Qualifier_Flags flags, Cn_Ast_Idx type_specifie
                             // Adding member to struct type.
                             binding->type->t_struct.members[i] = (Cn_Type_Struct_Member) { 
                                 .type = member_type, 
-                                .name = cn_ast_declarator_info(d->member_declarator.declarator_idx, NULL),
+                                .name = cn__ast_permanent_save_string(cn_ast_declarator_info(d->member_declarator.declarator_idx, NULL)),
                             };
                             
                             // Setting offset to be next alligned offset and comparing with max align.
@@ -9218,13 +9434,13 @@ CNDEF Cn_Type *cn_ast_to_type(Cn_Qualifier_Flags flags, Cn_Ast_Idx type_specifie
         case CN_AST_TYPE_GNU_TYPEOF:
             {
                 Cn_Ast_Node *typeof_s = cn_ast_node_get(ts->type_specifier.gnu_typeof_idx);
-                Cn_Ast_Node *typeof_child = cn_ast_node_get(typeof_s->gnu_typeof_specifier.child_idx);
+                Cn_Ast_Node *typeof_child = cn_ast_node_get(typeof_s->gnu_typeof_specifier.expression_or_type_name_idx);
 
                 if (typeof_child->kind == CN_AST_NODE_TYPE_NAME) {
                     Cn_Ast_Node *sq = cn_ast_node_get(typeof_child->type_name.specifier_qualifier_idx);
                     result = cn_ast_to_type(sq->specifier_qualifier.qualifiers, sq->specifier_qualifier.type_specifier_idx, typeof_child->type_name.abstract_declarator_idx);
                 } else {
-                    result = cn_ast_expression_get_type(typeof_s->gnu_typeof_specifier.child_idx);
+                    result = cn_ast_expression_get_type(typeof_s->gnu_typeof_specifier.expression_or_type_name_idx);
                 }
             }
             break;
@@ -9273,17 +9489,17 @@ CNDEF Cn_Type *cn_ast_to_type(Cn_Qualifier_Flags flags, Cn_Ast_Idx type_specifie
             while (direct_declarator_idx != CN_AST_NIL_IDX) {
                 dd = cn_ast_node_get(direct_declarator_idx);
 
-                if (dd->direct_declarator.kind == CN_DD_IDENTIFIER) 
+                if (dd->direct_declarator.kind == CN_AST_DIRECT_DECLARATOR_IDENTIFIER) 
                     break;
 
-                if (dd->direct_declarator.kind == CN_DD_GROUPED) {
+                if (dd->direct_declarator.kind == CN_AST_DIRECT_DECLARATOR_GROUPED) {
                     decl = cn_ast_node_get(dd->direct_declarator.declarator_idx);
                     break;
                 }
 
                 switch (dd->direct_declarator.kind) {
-                    case CN_DD_ARRAY:
-                        direct_declarator_idx = dd->direct_declarator.dd_array.direct_declarator_idx;
+                    case CN_AST_DIRECT_DECLARATOR_ARRAY:
+                        direct_declarator_idx = dd->direct_declarator.array.direct_declarator_idx;
 
                         type = (Cn_Type) { .kind = CN_ARRAY };
                         type.flags |= CN_TYPE_COMPLETE;
@@ -9299,7 +9515,7 @@ CNDEF Cn_Type *cn_ast_to_type(Cn_Qualifier_Flags flags, Cn_Ast_Idx type_specifie
                         // Evaluate constant expression, diagnose if unable to get array size.
                         // TODO: Handle VLA.
                         uint8_t buffer[CN_TYPE_SCALAR_MAX_SIZE];
-                        Cn_Any any = cn_ast_expression_evaluate(dd->direct_declarator.dd_array.expression_idx, buffer);
+                        Cn_Any any = cn_ast_expression_evaluate(dd->direct_declarator.array.expression_idx, buffer);
 
                         if (cn_any_is_empty(any)) {
                             cn_diagnostic(CN_DIAGNOSTIC_ERROR, &dd->loc, CN_DC_INVALID_CONSTANT_EXPRESSION, "Invalid constant expression in array declarator.");
@@ -9325,15 +9541,15 @@ CNDEF Cn_Type *cn_ast_to_type(Cn_Qualifier_Flags flags, Cn_Ast_Idx type_specifie
                         result = cn__ast_add_type_if_not(&type);
 
                         break;
-                    case CN_DD_FUNCTION:
-                        direct_declarator_idx = dd->direct_declarator.dd_function.direct_declarator_idx;
+                    case CN_AST_DIRECT_DECLARATOR_FUNCTION:
+                        direct_declarator_idx = dd->direct_declarator.function.direct_declarator_idx;
                         
                         type = (Cn_Type) { .kind = CN_FUNCTION };
                         type.size = 0;
                         type.align = 0;
                         type.t_function.return_type = result;
                         
-                        Cn_Ast_Node *params_list = cn_ast_node_get(dd->direct_declarator.dd_function.parameter_type_list_idx);
+                        Cn_Ast_Node *params_list = cn_ast_node_get(dd->direct_declarator.function.parameter_type_list_idx);
                         
                         // Is true if function declarator contains variadic args.
                         type.t_function.is_variadic = params_list->parameter_type_list.variadic_args;
@@ -9365,7 +9581,7 @@ CNDEF Cn_Type *cn_ast_to_type(Cn_Qualifier_Flags flags, Cn_Ast_Idx type_specifie
                 }
             }
 
-            if (direct_declarator_idx == CN_AST_NIL_IDX || dd->direct_declarator.kind == CN_DD_IDENTIFIER) 
+            if (direct_declarator_idx == CN_AST_NIL_IDX || dd->direct_declarator.kind == CN_AST_DIRECT_DECLARATOR_IDENTIFIER) 
                 break;
         }
     }
@@ -10847,12 +11063,78 @@ CNDEF Cn_Any cn_ast_expression_evaluate(Cn_Ast_Idx expression_idx, void *buffer)
     return (Cn_Any) {0};
 }
 
+CNDEF void cn_ast_expression_clear_types(Cn_Ast_Idx expression_idx) {
+    CN_ASSERT(expression_idx != CN_AST_NIL_IDX);
+    Cn_Ast_Node *node = cn_ast_node_get(expression_idx);
 
+    switch(node->kind) {
+        case CN_AST_NODE_BINARY_EXPRESSION:
+            node->binary_expression.type = NULL;
+            cn_ast_expression_clear_types(node->binary_expression.left_expression_idx);
+            cn_ast_expression_clear_types(node->binary_expression.right_expression_idx);
+            break;
+        case CN_AST_NODE_ACCESS_EXPRESSION:
+            node->access_expression.type = NULL;
+            cn_ast_expression_clear_types(node->access_expression.expression_idx);
+            break;
+        case CN_AST_NODE_FUNCTION_EXPRESSION:
+            node->function_expression.type = NULL;
+            cn_ast_expression_clear_types(node->function_expression.expression_idx);
 
+            Cn_Ast_Idx arg_idx = node->function_expression.argument_list.idx; 
+            int64_t i = 0; 
+            while (arg_idx != CN_AST_NIL_IDX) {
+                cn_ast_expression_clear_types(arg_idx);
+                arg_idx = cn_ast_node_get(arg_idx)->next_idx;
+                i++;
+            }
+            break;
+        case CN_AST_NODE_UNARY_EXPRESSION:
+            node->unary_expression.type = NULL;
+            cn_ast_expression_clear_types(node->unary_expression.expression_idx);
+            break;
+        case CN_AST_NODE_CAST_EXPRESSION:
+            node->cast_expression.type = NULL;
+            cn_ast_expression_clear_types(node->cast_expression.expression_idx);
+            break;
+        case CN_AST_NODE_SIZEOF_EXPRESSION:
+            node->sizeof_expression.type = NULL;
 
+            if (node->kind != CN_AST_NODE_TYPE_NAME) {
+                cn_ast_expression_clear_types(node->sizeof_expression.child_idx);
+            }
+            break;
+        case CN_AST_NODE_TERNARY_EXPRESSION:
+            node->ternary_expression.type = NULL;
+            cn_ast_expression_clear_types(node->ternary_expression.condition_expression_idx);
+            cn_ast_expression_clear_types(node->ternary_expression.false_expression_idx);
+            cn_ast_expression_clear_types(node->ternary_expression.true_expression_idx);
+            break;
+        case CN_AST_NODE_ASSIGNMENT_EXPRESSION:
+            node->assignment_expression.type = NULL;
+            cn_ast_expression_clear_types(node->assignment_expression.left_expression_idx);
+            cn_ast_expression_clear_types(node->assignment_expression.right_expression_idx);
+            break;
+        case CN_AST_NODE_POSTFIX_EXPRESSION:
+            node->postfix_expression.type = NULL;
+            cn_ast_expression_clear_types(node->postfix_expression.expression_idx);
+            break;
+        case CN_AST_NODE_PRIMARY_EXPRESSION:
+            node->primary_expression.type = NULL;
+        default: 
+            break;
+    }
+}
 
 // PRE-PROCESSING SECTION
+
 Cn_Message_Handler *cn_message_handler = NULL;
+
+CNDEF bool cn_send_message(Cn_Message_Kind kind, Cn_Message message) {
+    if (cn_message_handler == NULL) return false;
+
+    return cn_message_handler(kind, &message) != 0;
+}
 
 CNDEF Cn_Translation_Unit cn_tu_make(char *intermidiate_path) {
     // Reading the whole .i file into memory.
@@ -10866,7 +11148,7 @@ CNDEF Cn_Translation_Unit cn_tu_make(char *intermidiate_path) {
     uint64_t size = ftell(file);
     rewind(file);
 
-    void *buffer = CN_REALLOC(NULL, size); // LEAK.
+    void *buffer = CN_REALLOC(NULL, size);
     if (buffer == NULL) {
         cn_log(CN_ERROR, "Memory allocation for string buffer failed while reading the file '%s'.\n", intermidiate_path);
         fclose(file);
@@ -10882,67 +11164,20 @@ CNDEF Cn_Translation_Unit cn_tu_make(char *intermidiate_path) {
 
     fclose(file);
 
-    // Saving added file as single insert modification, so AST can of it can be constructed once cn_tu_process(...) is called.
     Cn_Translation_Unit tu = {
-        .version = 0,
         .path = intermidiate_path,
-        .content = {0},
-        .modification_list = cn_array_list_make(Cn_Modification, CN_TU_MODIFICATION_LIST_INITIAL_CAP),
+        .content = CN_STR((int64_t)size, buffer),
     };
 
-    cn_array_list_append(&tu.modification_list, ((Cn_Modification) { .offset = 0, .kind = CN_INSERT, .insert = ((Cn_Modification_Insert){ CN_STR(size, buffer) }) }) );
+
+    cn_ast_init(&tu.ast_data);
+    tu.ast_data.source = tu.content;
 
     return tu;
 }
 
-
 CNDEF int cn_tu_process(Cn_Translation_Unit *tu, Cn_Flags flags) {
-    // Check if there any modifications.
-    // Process them if there are.
-    // Start size with previous content length.
-    // Expected to be zero by default.
-    int64_t size = tu->content.length;
-    for (int64_t i = 0; i < cn_array_list_length(&tu->modification_list); i++) {
-        // TODO: Account for overlaps, and resolve them.
-        switch (tu->modification_list[i].kind) {
-            case CN_INSERT:
-                size += tu->modification_list[i].insert.str.length;
-                break;
-            case CN_REMOVE:
-                CN_TODO("Implement remove modification.");
-                // size -= tu->modification_list[i].remove.length;
-                break;
-        }
-    }
-
-    char *buffer = (char *)CN_REALLOC(NULL, size);
-    
-    int64_t buffer_offset = 0;
-    int64_t content_offset = 0;
-    for (int64_t i = 0; i < cn_array_list_length(&tu->modification_list); i++) {
-        memcpy(buffer + buffer_offset, tu->content.data + content_offset, tu->modification_list[i].offset - content_offset);
-        buffer_offset += tu->modification_list[i].offset - content_offset;
-        content_offset = tu->modification_list[i].offset;
-
-        switch (tu->modification_list[i].kind) {
-            case CN_INSERT:
-                cn_str_copy_to(tu->modification_list[i].insert.str, buffer);
-                break;
-            case CN_REMOVE:
-                CN_TODO("Implement remove modification.");
-                break;
-            default:
-                CN_UNREACHABLE("Unexpected modification kind encountered.");
-                break;
-        }
-    }
-
-    CN_FREE(tu->content.data);
-
-    tu->content.length = size;
-    tu->content.data = buffer;
-
-    cn__ast_data->source = tu->content;
+    cn__ast_data = &tu->ast_data;
 
     // Printing source.
     if (flags & CN_PRINT_SOURCE) {
@@ -11037,8 +11272,8 @@ CNDEF int cn_tu_process(Cn_Translation_Unit *tu, Cn_Flags flags) {
 }
 
 CNDEF void cn_tu_free(Cn_Translation_Unit *tu) {
+    cn_ast_free(&tu->ast_data);
     CN_FREE(tu->content.data);
-    cn_array_list_free(&tu->modification_list);
 }
 
 
