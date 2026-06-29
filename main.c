@@ -1,21 +1,18 @@
-int foo() {
-    struct my_struct {
-        int x, y;
-    };
+#include <stdio.h>
 
-    struct my_struct s;
+typedef struct {
+    float x, y;
+} Vec2f;
 
-    return s.x;
+int foo(int x) {
+    printf("Hello from modified foo -> bar!\n");
+    return x;
 }
 
 int main() {
-    struct my_struct {
-        float x, y;
-    };
-
-    struct my_struct s;
-
-    return 0;
+    return foo(8);
 }
+
+
 
 

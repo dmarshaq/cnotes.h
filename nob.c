@@ -519,8 +519,21 @@ int msg_handler(Cn_Message_Kind kind, void *message) {
         case CN_MESSAGE_PARSED_FUNCTION_DEFINITION:
             {   
                 Cn_Message_Parsed_Function_Definition *m = message;
-                cn_ast_print(cn_ast_node_get(m->node_idx), 0);
-                return 1;
+
+
+                //  Cn_Ast_Node *node = cn_ast_node_get(m->node_idx);
+
+                //  node = cn_ast_node_get(node->function_definition.declarator_idx);
+                //  node = cn_ast_node_get(node->declarator.direct_declarator_idx);
+                //  node = cn_ast_node_get(node->direct_declarator.function.direct_declarator_idx);
+
+                //  Cn_String foo = CN_CSTR("foo");
+                //  if (cn_str_equals(&node->direct_declarator.identifier, &foo)) {
+                //      node->direct_declarator.identifier = CN_CSTR("bar");
+                //      return 1;
+                //  }
+                            
+                return 0;
             }
         default: 
             return 0;
@@ -554,7 +567,8 @@ int cn_command(int *argc, char ***argv) {
     cn_message_handler = msg_handler;
     Cn_Translation_Unit tu = cn_tu_make("main.i");
     
-    if (cn_tu_process(&tu, 0) == -1) {
+    // if (cn_tu_process(&tu, CN_PRINT_BINDINGS | CN_PRINT_TYPES | CN_PRINT_AST) == -1) {
+    if (cn_tu_process(&tu, CN_PRINT_TOKENS) == -1) {
         cn_tu_free(&tu);
         return 1;
     }
@@ -564,7 +578,6 @@ int cn_command(int *argc, char ***argv) {
     // Compiling main executable.
     nob_cc(&cmd);
     nob_cc_flags(&cmd);
-    nob_cmd_append(&cmd, "-c");
     nob_cc_inputs(&cmd, "main.i");
     nob_cc_output(&cmd, "main");
 
