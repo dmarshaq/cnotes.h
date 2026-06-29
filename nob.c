@@ -520,18 +520,31 @@ int msg_handler(Cn_Message_Kind kind, void *message) {
             {   
                 Cn_Message_Parsed_Function_Definition *m = message;
 
+                Cn_Ast_Node *node = cn_ast_node_get(m->node_idx);
+                Cn_String file_name_main = CN_CSTR("main.c");
+                if (cn_str_equals(&node->loc.file, &file_name_main)) {
 
-                //  Cn_Ast_Node *node = cn_ast_node_get(m->node_idx);
+                    Cn_String function_name = cn_get_declarator_info(m->node_idx, NULL);
+                    ;
 
-                //  node = cn_ast_node_get(node->function_definition.declarator_idx);
-                //  node = cn_ast_node_get(node->declarator.direct_declarator_idx);
-                //  node = cn_ast_node_get(node->direct_declarator.function.direct_declarator_idx);
+                    Cn_Ast_Linked_List print_statement_args = {0};
+                    cn_ast_linked_list_add(
+                            &print_statement_args, 
+                            cn_build_string(cn_str_format(CN_STR_BUFFER_EMPTY(64), "Hello from cnotes! in '%.*s' function!\\n", CN_UNPACK(function_name)), .alloc = true)
+                            );
 
-                //  Cn_String foo = CN_CSTR("foo");
-                //  if (cn_str_equals(&node->direct_declarator.identifier, &foo)) {
-                //      node->direct_declarator.identifier = CN_CSTR("bar");
-                //      return 1;
-                //  }
+                    Cn_Ast_Idx print_statement = cn_build_expr_statement(
+                            cn_build_func_call(cn_build_identifier(CN_CSTR("printf"), .alloc = true), print_statement_args)
+                                );
+                    
+                    cn_ast_linked_list_prepend(
+                            &cn_ast_node_get(node->function_definition.compound_statement_idx)->compound_statement.statement_or_declaration_list, 
+                            print_statement
+                            );
+
+
+                    return 1;
+                }
                             
                 return 0;
             }

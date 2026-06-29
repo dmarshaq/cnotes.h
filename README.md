@@ -157,13 +157,6 @@ Items below are either marked `CN_TODO` in the source, stubbed out with an empty
 
 ---
  
-### Source modification pipeline
- 
-- **`CN_REMOVE` modification kind** — `cn_tu_process` processes `CN_INSERT` modifications but calls `CN_TODO("Implement remove modification.")` for `CN_REMOVE`. The `Cn_Modification_Remove` struct and enum value are declared and ready.
-- **Modification overlap resolution** — a `// TODO: Account for overlaps, and resolve them.` comment sits at the top of the modification-application loop; overlapping or out-of-order patches are not detected.
-
----
- 
 ### Binding and symbol table
  
 - **`cn_ast_binding_table_put` / `cn_ast_binding_table_get` documentation** — both functions are marked `// TODO: Write documentation.` in the header.
@@ -185,12 +178,22 @@ Items below are either marked `CN_TODO` in the source, stubbed out with an empty
 - Array declarators currently require a compile-time-constant expression. The comment in `cn_ast_to_type` reads `// TODO: Handle VLA.`; if `cn_ast_expression_evaluate` returns an empty `Cn_Any`, the declarator is rejected with `CN_DC_INVALID_CONSTANT_EXPRESSION` instead of accepting a runtime-sized array.
 
 ---
- 
-### `Cn_Message` / post-processing hooks
- 
-- The `Cn_Message` / `Cn_Message_Handler` API (`cn_message_handler`) is declared and the handler pointer is exported, but no messages are ever enqueued or fired during `cn_tu_process`. The comment in the `cn_tu_process` docs says "messages are enqueued … and by the end of the process they are triggered" — this mechanism is not yet wired up.
+
+### Diagnostics and Debugging
+
+- AST based diagnostic snippets, source location correct resolution.
+- Functions to dump data structures and print current state for debugging.
 
 ---
+
+### Testing
+
+- AST Parsing functionality testing, with proper edge cases for each parsing function.
+- AST Modification and meta program testing.
+- Expected diagnostic testing, checking if diagnostics are deterministic and correct.
+
+---
+ 
 
 ## License
 

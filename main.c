@@ -4,10 +4,14 @@ typedef struct {
     float x, y;
 } Vec2f;
 
-int foo(int x) {
-    printf("Hello from modified foo -> bar!\n");
+int bar(int x) {
     return x;
 }
+
+int foo(int x) {
+    return bar(x);
+}
+
 
 int main() {
     return foo(8);
