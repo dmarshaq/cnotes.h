@@ -3341,7 +3341,12 @@ typedef enum : uint8_t {
     CN_PRINT_AST      = 0x04,
     CN_PRINT_TYPES    = 0x08,
     CN_PRINT_BINDINGS = 0x10,
+    CN_NO_CODE_OUTPUT = 0x20,
 } Cn_Flags;
+
+typedef struct {
+    Cn_String source;
+} Cn_Tu_Make_Opt;
 
 /**
  * RETURNS: Cn_Translation_Unit struct that represent 
@@ -3360,7 +3365,9 @@ typedef enum : uint8_t {
  *
  * This will generate .i file, path to which can be safely specified here.
  */
-CNDEF Cn_Translation_Unit cn_tu_make(char *intermidiate_path);
+#define cn_tu_make(intermidiate_path, ...) cn_tu_make_opt(intermidiate_path, (Cn_Tu_Make_Opt) { __VA_ARGS__ })
+
+CNDEF Cn_Translation_Unit cn_tu_make_opt(char *intermidiate_path, Cn_Tu_Make_Opt opt);
 
 /**
  * Processes the translation unit from top to bottom.
@@ -11551,11 +11558,11 @@ CNDEF Cn_Type *cn_ast_expression_typecheck(Cn_Ast_Idx expression_idx) {
     }
     
     // TEMPORARY: outputing typechecked result.
-    if (result != NULL) {
-        Cn_String typename = CN_STR_BUFFER_EMPTY(128);
-        cn_type_stringify(typename, result);
-        cn_diagnostic(CN_DIAGNOSTIC_INFO, &node->loc, CN_DC_ZERO, "%.*s", CN_UNPACK(typename));
-    }
+    // if (result != NULL) {
+    //     Cn_String typename = CN_STR_BUFFER_EMPTY(128);
+    //     cn_type_stringify(typename, result);
+    //     cn_diagnostic(CN_DIAGNOSTIC_INFO, &node->loc, CN_DC_ZERO, "%.*s", CN_UNPACK(typename));
+    // }
     
     return result;
 }
@@ -12484,7 +12491,19 @@ CNDEF bool cn_send_message(Cn_Message_Kind kind, Cn_Message message) {
     return cn_message_handler(kind, &message) != 0;
 }
 
-CNDEF Cn_Translation_Unit cn_tu_make(char *intermidiate_path) {
+CNDEF Cn_Translation_Unit cn_tu_make_opt(char *intermidiate_path, Cn_Tu_Make_Opt opt) {
+    if (!cn_str_is_empty(opt.source)) {
+        Cn_Translation_Unit tu = {
+            .path = intermidiate_path,
+            .content = opt.source,
+        };
+
+        cn_ast_init(&tu.ast_data);
+        tu.ast_data.source = tu.content;
+
+        return tu;
+    }
+
     // Reading the whole .i file into memory.
     FILE *file = fopen(intermidiate_path, "rb");
     if (file == NULL) {
@@ -12621,7 +12640,7 @@ CNDEF int cn_tu_process(Cn_Translation_Unit *tu, Cn_Flags flags) {
     }
 
     // Emit AST back to the same .i file.
-    {
+    if (!(flags & CN_NO_CODE_OUTPUT)) {
         FILE *out = fopen(tu->path, "w");
         if (out == NULL) {
             cn_log(CN_ERROR, "Failed to open '%s' for writing.", tu->path);

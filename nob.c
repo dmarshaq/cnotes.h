@@ -606,7 +606,8 @@ int cn_command(int *argc, char ***argv) {
 
 
 int main(int argc, char **argv) {
-    
+    nob_set_log_handler(nob_cancer_log_handler);
+
     NOB_GO_REBUILD_URSELF_PLUS(argc, argv, "cnotes.h");
     
     const char *program_name = shift(argv, argc);
