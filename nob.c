@@ -421,8 +421,11 @@ int test_command(int *argc, char ***argv) {
     // Executing tests
     Nob_Cmd cmd = {0};
 
+    int failed = 0;
+    
     nob_da_foreach(Test_Record, r, &records) {
         test_execute(r, &cmd);
+        if (r->status != SUCCESS) failed += 1;
     }
     
     // Showing test results
@@ -453,11 +456,18 @@ int test_command(int *argc, char ***argv) {
     
         fprintf(stderr, "\n");
     }
+    
+    if (failed > 0) {
+        nob_log(NOB_ERROR, "test: [%lu/%lu] passed.", records.count - failed, records.count);
+    } else {
+        nob_log(NOB_INFO, "test: [%lu/%lu] passed.", records.count - failed, records.count);
+    }
+
 
     NOB_FREE(cmd.items);
     arena_free(&arena_strings);
 
-    return 0;
+    return failed > 0;
 }
 
 int record_command(int *argc, char ***argv) {

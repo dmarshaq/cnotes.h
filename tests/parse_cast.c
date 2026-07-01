@@ -1,0 +1,28 @@
+// Test: Cast expression parsing
+#include "../testing_utility.h"
+
+const Cn_String src = CN_STR_BUFFER(
+    "int test_casts(void) {\n"
+    "    int i = 42;\n"
+    "    float f = 3.14;\n"
+    "    char c = 'A';\n"
+    "    void *ptr;\n"
+    "\n"
+    "    f = (float)i;\n"
+    "    i = (int)f;\n"
+    "    c = (char)i;\n"
+    "    i = (int)c;\n"
+    "\n"
+    "    ptr = (void *)&i;\n"
+    "    i = *(int *)ptr;\n"
+    "\n"
+    "    return i;\n"
+    "}\n"
+);
+
+int main(void) {
+    cn_diagnostic_handler = &cn_test_diagnostic_handler;
+    Cn_Translation_Unit tu = cn_tu_make("input.i", .source = src);
+    cn_tu_process(&tu, CN_NO_CODE_OUTPUT);
+    return 0;
+}
