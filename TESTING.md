@@ -103,6 +103,7 @@ int main(void) {
 | `lexer_tokens.c` | Token recognition (keywords, operators, literals) | 1 |
 | `lexer_state.c` | Lexer state (peek, expect, navigation) | 1 |
 | `type_system.c` | Type creation, predicates, comparison | 1 |
+| `ast_modification.c` | AST building and modification via message handler | 1 |
 
 ---
 
@@ -130,11 +131,9 @@ int main(void) {
 | Feature | Error | Notes |
 |---------|-------|-------|
 | `long double` | "Specified type width on non 'int' type" | Type specifier not fully supported |
-| Multi-dimensional arrays | "Expected ';' at the end of declaration" | `int arr[5][10]` fails |
 | Binary literals | Returns false | `0b1010` not supported |
 | Octal literals | Lexer issue | `0777` not tokenized correctly |
-| Char literals | Lexer + Parsing issue | `A` not tokenized at all |
-| Address of lvalue | Typechecking issue | Taking address of local variable causes lvalue error diagnostic |
+| Char literals | Lexer + Parsing issue | `A` char literals are not implemented yet |
 
 ---
 
@@ -154,14 +153,14 @@ int main(void) {
 - [x] Type predicates (`cn_type_is_*`)
 
 ### Priority 4: Parser (more coverage)
-- [ ] Function calls and arguments
-- [ ] Cast expressions
-- [ ] Pointer arithmetic
-- [ ] More error cases
+- [x] Function calls and arguments
+- [x] Cast expressions
+- [x] Pointer arithmetic
+- [x] More error cases
 
 ### Priority 5: AST Building (Meta-programming)
-- [ ] `cn_build_*` functions
-- [ ] AST modification
+- [x] `cn_build_*` functions
+- [x] AST modification
 
 ---
 

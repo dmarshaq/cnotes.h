@@ -5,7 +5,7 @@ const Cn_String src = CN_STR_BUFFER(
     "int test_casts(void) {\n"
     "    int i = 42;\n"
     "    float f = 3.14;\n"
-    "    char c = 'A';\n"
+    "    char c = 65;\n" // NOTE: Char literals are not supported yet.
     "    void *ptr;\n"
     "\n"
     "    f = (float)i;\n"
