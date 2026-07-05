@@ -16,14 +16,14 @@ int *hash_table_get(int **table, const char *key) {
 int main(void) {
     int *table = cn_hash_table_make(Cn_String, int, 3, (Cn_Hash_Function *)cn_str_hash, (Cn_Equals_Function *)cn_str_equals);
 
-    cn_hash_table_print((void **)&table);
+    cn_hash_table_print(stdout, (void **)&table);
 
     CN_ASSERT(cn_hash_table_count(&table)     == 0);
 
     hash_table_put(&table, 0xABC, "foo");
     hash_table_put(&table, -9, "bar");
 
-    cn_hash_table_print((void **)&table);
+    cn_hash_table_print(stdout, (void **)&table);
 
     CN_ASSERT(cn_hash_table_count(&table)    == 2);
 
@@ -41,7 +41,7 @@ int main(void) {
     hash_table_put(&table, 8, "ir");
     hash_table_put(&table, 9, "jq");
 
-    cn_hash_table_print((void **)&table);
+    cn_hash_table_print(stdout, (void **)&table);
 
     CN_ASSERT(cn_hash_table_count(&table)    == 12);
 
@@ -68,7 +68,7 @@ int main(void) {
         hash_table_put(&table, items[i], keys[i]);
     }
 
-    cn_hash_table_print((void **)&table);
+    cn_hash_table_print(stdout, (void **)&table);
 
     CN_ASSERT(*(int *)hash_table_get(&table, "foo") == 0xABC);
     CN_ASSERT(*(int *)hash_table_get(&table, "bar") == -9);

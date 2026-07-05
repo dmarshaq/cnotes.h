@@ -529,10 +529,14 @@ int msg_handler(Cn_Message_Kind kind, void *message) {
         case CN_MESSAGE_PARSED_FUNCTION_DEFINITION:
             {   
                 Cn_Message_Parsed_Function_Definition *m = message;
+                
 
                 Cn_Ast_Node *node = cn_ast_node_get(m->node_idx);
                 Cn_String file_name_main = CN_CSTR("main.c");
                 if (cn_str_equals(&node->loc.file, &file_name_main)) {
+                    
+                    cn_log(CN_INFO, "Function definition from main:");
+                    cn_emit(m->node_idx, &cn_emit_write_file, .ctx = stderr, .max_lines = 0, .indent = 1);
 
                     Cn_Ast_Idx identifier_idx;
                     cn_get_declarator_info(m->node_idx, &identifier_idx);
@@ -542,9 +546,9 @@ int msg_handler(Cn_Message_Kind kind, void *message) {
                             &cn_ast_node_get(node->function_definition.compound_statement_idx)->compound_statement.statement_or_declaration_list.idx,
                             cn_build_expr_statement(
                                 cn_build_func_call(
-                                    cn_build_identifier(CN_CSTR("printf"), .alloc = true), 
+                                    cn_build_identifier(CN_CSTR("printf")), 
                                     cn_build_linked_list(
-                                        cn_build_string(CN_CSTR("Hello from cnotes! in '%s' function!\\n"), .alloc = true),
+                                        cn_build_string(CN_CSTR("Hello from cnotes! in '%s' function!\\n")),
                                         cn_build_string(function_name, .alloc = true)
                                         )
                                     )
@@ -589,7 +593,7 @@ int cn_command(int *argc, char ***argv) {
     Cn_Translation_Unit tu = cn_tu_make("main.i");
     
     // if (cn_tu_process(&tu, CN_PRINT_BINDINGS | CN_PRINT_TYPES | CN_PRINT_AST) == -1) {
-    if (cn_tu_process(&tu, CN_PRINT_TOKENS) == -1) {
+    if (cn_tu_process(&tu, 0) == -1) {
         cn_tu_free(&tu);
         return 1;
     }

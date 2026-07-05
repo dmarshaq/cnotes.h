@@ -22,13 +22,13 @@ int main(void) {
         hash_table_put(&table, items[i], keys[i]);
     }
 
-    cn_hash_table_print((void **)&table);
+    cn_hash_table_print(stdout, (void **)&table);
 
     for (int i = 0; i < (int)(sizeof(items) / sizeof(items[0])); i++) {
         hash_table_remove(&table, keys[i]);
     }
 
-    cn_hash_table_print((void **)&table);
+    cn_hash_table_print(stdout, (void **)&table);
 
     return 0;
 }
