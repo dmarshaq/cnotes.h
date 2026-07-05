@@ -535,9 +535,6 @@ int msg_handler(Cn_Message_Kind kind, void *message) {
                 Cn_String file_name_main = CN_CSTR("main.c");
                 if (cn_str_equals(&node->loc.file, &file_name_main)) {
                     
-                    cn_log(CN_INFO, "Function definition from main:");
-                    cn_emit(m->node_idx, &cn_emit_write_file, .ctx = stderr, .max_lines = 0, .indent = 1);
-
                     Cn_Ast_Idx identifier_idx;
                     cn_get_declarator_info(m->node_idx, &identifier_idx);
                     Cn_String function_name = cn_ast_node_get(identifier_idx)->identifier.name;
@@ -554,6 +551,17 @@ int msg_handler(Cn_Message_Kind kind, void *message) {
                                     )
                                 )
                             );
+
+
+                    cn_log(CN_INFO, "Function definition from main.c:");
+                    int64_t offset, length;
+                    cn_emit(m->node_idx, &cn_emit_write_file, .ctx = stderr, .max_lines = 1, .indent = 1, .highlight_idx = identifier_idx, .highlight_length = &length, .highlight_offset = &offset);
+                    for (int i = 0; i < offset; i++) fputc(' ', stderr);
+                    if (length > 0) fputc('^', stderr);
+                    for (int i = 1; i < length; i++) fputc('^', stderr);
+
+                    fputc('\n', stderr);
+
 
                     return 1;
                 }

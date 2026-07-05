@@ -4,13 +4,13 @@ int bar(int x) {
     return x;
 }
 
-int foo(int x) {
-    return bar(x);
+int foo() {
+    return bar(8);
 }
 
 int main() {
     printf("Hello world!\n");
-    foo(8);
+    foo();
     return 0;
 }
 
