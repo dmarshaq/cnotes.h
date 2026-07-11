@@ -539,29 +539,42 @@ int msg_handler(Cn_Message_Kind kind, void *message) {
                     cn_get_declarator_info(m->node_idx, &identifier_idx);
                     Cn_String function_name = cn_ast_node_get(identifier_idx)->identifier.name;
 
-                    cn_linked_list_insert(
-                            &cn_ast_node_get(node->function_definition.compound_statement_idx)->compound_statement.statement_or_declaration_list.idx,
-                            cn_build_expr_statement(
-                                cn_build_func_call(
-                                    cn_build_identifier(CN_CSTR("printf")), 
-                                    cn_build_linked_list(
-                                        cn_build_string(CN_CSTR("Hello from cnotes! in '%s' function!\\n")),
-                                        cn_build_string(function_name, .alloc = true)
-                                        )
+                    Cn_Ast_Idx expr1 = cn_build_expr_statement(
+                            cn_build_func_call(
+                                cn_build_identifier(CN_CSTR("printf")), 
+                                cn_build_linked_list(
+                                    cn_build_string(CN_CSTR("Hello from cnotes! in '%s' function!\\n")),
+                                    cn_build_string(function_name, .alloc = true)
                                     )
                                 )
                             );
+                    cn_replace(
+                            &cn_ast_node_get(node->function_definition.compound_statement_idx)->compound_statement.statement_or_declaration_list.first_idx,
+                            expr1,
+                            node->function_definition.compound_statement_idx
+                            );
 
+                    Cn_Ast_Idx number = cn_build_integer(CN_CSTR("7"));
+                    Cn_Ast_Idx expr = cn_build_expr_statement(
+                                cn_build_binary(
+                                    CN_BINARY_OP_ADDITION, 
+                                    cn_build_integer(CN_CSTR("6")), 
+                                    number
+                                    )
+                            );
 
-                    cn_log(CN_INFO, "Function definition from main.c:");
-                    int64_t offset, length;
-                    cn_emit(m->node_idx, &cn_emit_write_file, .ctx = stderr, .max_lines = 1, .indent = 1, .highlight_idx = identifier_idx, .highlight_length = &length, .highlight_offset = &offset);
-                    for (int i = 0; i < offset; i++) fputc(' ', stderr);
-                    if (length > 0) fputc('^', stderr);
-                    for (int i = 1; i < length; i++) fputc('^', stderr);
+                                
+                    cn_replace(
+                            &cn_ast_node_get(node->function_definition.compound_statement_idx)->compound_statement.statement_or_declaration_list.first_idx, 
+                            expr,
+                            node->function_definition.compound_statement_idx
+                            );
 
-                    fputc('\n', stderr);
-
+                    
+                    cn_diagnostic_node(CN_DIAGNOSTIC_INFO, number, CN_DC_ZERO, "Diagnostic info.");
+                    // cn_ast_linked_list_foreach_idx(i, &cn_ast_node_get(node->function_definition.compound_statement_idx)->compound_statement.statement_or_declaration_list) {
+                    //     cn_diagnostic_node(CN_DIAGNOSTIC_WARNING, i, CN_DC_ZERO, "Diagnostic info.");
+                    // }
 
                     return 1;
                 }
