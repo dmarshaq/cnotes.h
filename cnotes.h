@@ -1225,7 +1225,7 @@ typedef uint32_t Cn_Ast_Idx;
 
 typedef struct {
     Cn_Ast_Idx last_idx;
-    Cn_Ast_Idx idx;
+    Cn_Ast_Idx first_idx;
     int64_t length;
 } Cn_Ast_Linked_List;
 
@@ -2212,14 +2212,14 @@ CNDEF Cn_Ast_Idx cn_ast_node_list_append(Cn_Ast_Node node);
  * 'it' is each node in the intrusive list of nodes.
  * list is pointer to the Cn_Ast_Linked_List.
  */
-#define cn_ast_linked_list_foreach(it, list) for (Cn_Ast_Node *it = cn_ast_node_get((list)->idx); it != cn_ast_node_get(CN_AST_NIL_IDX); it = cn_ast_node_get(it->next_idx))
+#define cn_ast_linked_list_foreach(it, list) for (Cn_Ast_Node *it = cn_ast_node_get((list)->first_idx); it != cn_ast_node_get(CN_AST_NIL_IDX); it = cn_ast_node_get(it->next_idx))
 
 /**
  * This is a simple macro that unwrawps into for loop, where
  * 'it' is each node idx in the intrusive list of nodes.
  * list is pointer to the Cn_Ast_Linked_List.
  */
-#define cn_ast_linked_list_foreach_idx(it, list) for (Cn_Ast_Idx it = (list)->idx; it != CN_AST_NIL_IDX; it = cn_ast_node_get(it)->next_idx)
+#define cn_ast_linked_list_foreach_idx(it, list) for (Cn_Ast_Idx it = (list)->first_idx; it != CN_AST_NIL_IDX; it = cn_ast_node_get(it)->next_idx)
 
 CNDEF void cn_ast_linked_list_set_parent(Cn_Ast_Idx parent_idx, Cn_Ast_Linked_List *list);
 
@@ -3681,7 +3681,7 @@ CNDEF void cn_tu_free(Cn_Translation_Unit *tu);
  * Because it automatically tracks node changes 
  * and guarantees proper diagnostics.
  */
-CNDEF void cn_replace(Cn_Ast_Idx *original, Cn_Ast_Idx new);
+CNDEF void cn_replace(Cn_Ast_Idx *original, Cn_Ast_Idx new, Cn_Ast_Idx parent_idx);
 
 /**
  * Inserts new node into linked list, based of specified list_node.
@@ -3690,15 +3690,13 @@ CNDEF void cn_replace(Cn_Ast_Idx *original, Cn_Ast_Idx new);
  * If *list_node is NIL, the function will just assume its 
  * empty linked list and insert in the position of list_node. 
  */
-CNDEF void cn_linked_list_insert(Cn_Ast_Idx *list_node, Cn_Ast_Idx new);
+CNDEF void cn_linked_list_insert(Cn_Ast_Idx *list_node, Cn_Ast_Idx new, Cn_Ast_Idx parent_idx);
 
 /**
  * Optional values that can be set for any cn_build_* function.
  */
 typedef struct {
     /**
-     * alloc:
-     *
      * Defines whether call to build function should allocate 
      * memory internally in permanent arena for any supplied data.
      *
@@ -3710,6 +3708,13 @@ typedef struct {
      * memory over and over again for the same piece of string data.
      */
     bool alloc;
+
+    /**
+     * File and line are information that will indicate from where specific 
+     * build function was called, used to trace meta program code insertions.
+     */
+    const char *file;
+    int64_t line;
 } Cn_Build_Opt;
 
 #ifndef CN_BUILD_OPT_DEFAULT_ALLOC
@@ -3719,7 +3724,7 @@ typedef struct {
 /**
  * Builds linked list out of supplied nodes.
  *
- * Accepts variadics stream of nodes in order to be inserted into 
+ * Accepts variadic array of nodes in order to be inserted into 
  * linked list.
  *
  * IMPORTANT: If supplied nodes were members of different 
@@ -3732,45 +3737,45 @@ typedef struct {
  *
  * RETURNS: Linekd list composed of supplied nodes.
  */
-#define cn_build_linked_list(...) cn_build_linked_list_args((Cn_Ast_Idx[]) { __VA_ARGS__ }, sizeof((Cn_Ast_Idx[]) { __VA_ARGS__ }) / sizeof(Cn_Ast_Idx), __FILE__, __LINE__)
+#define cn_build_linked_list(...) cn__build_linked_list((Cn_Ast_Idx[]) { __VA_ARGS__ }, sizeof((Cn_Ast_Idx[]) { __VA_ARGS__ }) / sizeof(Cn_Ast_Idx), __FILE__, __LINE__)
 
-CNDEF Cn_Ast_Linked_List cn_build_linked_list_args(Cn_Ast_Idx members[], int64_t length, const char *file, int64_t line);
+CNDEF Cn_Ast_Linked_List cn__build_linked_list(Cn_Ast_Idx members[], int64_t length, const char *file, int64_t line);
 
 /**
  * Builds identifier with supplied name.
  * 
  * RETURNS: Built identifier.
  */
-#define cn_build_identifier(name, ...) cn_build_identifier_opt(name, (Cn_Build_Opt) { .alloc = CN_BUILD_OPT_DEFAULT_ALLOC, __VA_ARGS__ })
+#define cn_build_identifier(name, ...) cn__build_identifier(name, (Cn_Build_Opt) { .alloc = CN_BUILD_OPT_DEFAULT_ALLOC, __VA_ARGS__ })
 
-CNDEF Cn_Ast_Idx cn_build_identifier_opt(Cn_String name, Cn_Build_Opt opt);
+CNDEF Cn_Ast_Idx cn__build_identifier(Cn_String name, Cn_Build_Opt opt);
 
 /**
  * Builds integer with supplied value.
  *
  * RETURNS: Built integer.
  */
-#define cn_build_integer(value, ...) cn_build_integer_opt(value, (Cn_Build_Opt) { .alloc = CN_BUILD_OPT_DEFAULT_ALLOC, __VA_ARGS__ })
+#define cn_build_integer(value, ...) cn__build_integer(value, (Cn_Build_Opt) { .alloc = CN_BUILD_OPT_DEFAULT_ALLOC, __VA_ARGS__ })
 
-CNDEF Cn_Ast_Idx cn_build_integer_opt(Cn_String value, Cn_Build_Opt opt);
+CNDEF Cn_Ast_Idx cn__build_integer(Cn_String value, Cn_Build_Opt opt);
 
 /**
  * Builds float with supplied value.
  * 
  * RETURNS: Built float.
  */
-#define cn_build_float(value, ...) cn_build_float_opt(value, (Cn_Build_Opt) { .alloc = CN_BUILD_OPT_DEFAULT_ALLOC, __VA_ARGS__ })
+#define cn_build_float(value, ...) cn__build_float(value, (Cn_Build_Opt) { .alloc = CN_BUILD_OPT_DEFAULT_ALLOC, __VA_ARGS__ })
 
-CNDEF Cn_Ast_Idx cn_build_float_opt(Cn_String value, Cn_Build_Opt opt);
+CNDEF Cn_Ast_Idx cn__build_float(Cn_String value, Cn_Build_Opt opt);
 
 /**
  * Builds string with supplied str.
  * 
  * RETURNS: Built string.
  */
-#define cn_build_string(str, ...) cn_build_string_opt(str, (Cn_Build_Opt) { .alloc = CN_BUILD_OPT_DEFAULT_ALLOC, __VA_ARGS__ })
+#define cn_build_string(str, ...) cn__build_string(str, (Cn_Build_Opt) { .alloc = CN_BUILD_OPT_DEFAULT_ALLOC, __VA_ARGS__ })
 
-CNDEF Cn_Ast_Idx cn_build_string_opt(Cn_String str, Cn_Build_Opt opt);
+CNDEF Cn_Ast_Idx cn__build_string(Cn_String str, Cn_Build_Opt opt);
 
 /**
  * Builds binary expression, left and right params must be 
@@ -3778,9 +3783,9 @@ CNDEF Cn_Ast_Idx cn_build_string_opt(Cn_String str, Cn_Build_Opt opt);
  * 
  * RETURNS: Built binary expression.
  */
-#define cn_build_binary(op, left, right, ...) cn_build_binary_opt(op, left, right, (Cn_Build_Opt) { __VA_ARGS__ })
+#define cn_build_binary(op, left, right, ...) cn__build_binary(op, left, right, (Cn_Build_Opt) { __VA_ARGS__ })
 
-CNDEF Cn_Ast_Idx cn_build_binary_opt(Cn_Binary_Operator_Kind op, Cn_Ast_Idx left, Cn_Ast_Idx right, Cn_Build_Opt opt);
+CNDEF Cn_Ast_Idx cn__build_binary(Cn_Binary_Operator_Kind op, Cn_Ast_Idx left, Cn_Ast_Idx right, Cn_Build_Opt opt);
 
 /**
  * Builds unary expression, expression must be 
@@ -3788,9 +3793,9 @@ CNDEF Cn_Ast_Idx cn_build_binary_opt(Cn_Binary_Operator_Kind op, Cn_Ast_Idx left
  * 
  * RETURNS: Built unary expression.
  */
-#define cn_build_unary(op, expression, ...) cn_build_unary_opt(op, expression, (Cn_Build_Opt) { __VA_ARGS__ })
+#define cn_build_unary(op, expression, ...) cn__build_unary(op, expression, (Cn_Build_Opt) { __VA_ARGS__ })
 
-CNDEF Cn_Ast_Idx cn_build_unary_opt(Cn_Unary_Operator_Kind op, Cn_Ast_Idx expression, Cn_Build_Opt opt);
+CNDEF Cn_Ast_Idx cn__build_unary(Cn_Unary_Operator_Kind op, Cn_Ast_Idx expression, Cn_Build_Opt opt);
 
 /**
  * Builds function call expression, callee must be 
@@ -3801,9 +3806,9 @@ CNDEF Cn_Ast_Idx cn_build_unary_opt(Cn_Unary_Operator_Kind op, Cn_Ast_Idx expres
  * 
  * RETURNS: Built function call expression.
  */
-#define cn_build_func_call(callee, arg_list, ...) cn_build_func_call_opt(callee, arg_list, (Cn_Build_Opt) { __VA_ARGS__ })
+#define cn_build_func_call(callee, arg_list, ...) cn__build_func_call(callee, arg_list, (Cn_Build_Opt) { __VA_ARGS__ })
 
-CNDEF Cn_Ast_Idx cn_build_func_call_opt(Cn_Ast_Idx callee, Cn_Ast_Linked_List arg_list, Cn_Build_Opt opt);
+CNDEF Cn_Ast_Idx cn__build_func_call(Cn_Ast_Idx callee, Cn_Ast_Linked_List arg_list, Cn_Build_Opt opt);
 
 /**
  * Builds expression statement, expression must be 
@@ -3811,9 +3816,9 @@ CNDEF Cn_Ast_Idx cn_build_func_call_opt(Cn_Ast_Idx callee, Cn_Ast_Linked_List ar
  * 
  * RETURNS: Built expression statement.
  */
-#define cn_build_expr_statement(expression, ...) cn_build_expr_statement_opt(expression, (Cn_Build_Opt) { __VA_ARGS__ })
+#define cn_build_expr_statement(expression, ...) cn__build_expr_statement(expression, (Cn_Build_Opt) { __VA_ARGS__ })
 
-CNDEF Cn_Ast_Idx cn_build_expr_statement_opt(Cn_Ast_Idx expression, Cn_Build_Opt opt);
+CNDEF Cn_Ast_Idx cn__build_expr_statement(Cn_Ast_Idx expression, Cn_Build_Opt opt);
 
 
 
@@ -6505,8 +6510,8 @@ CNDEF void cn_ast_linked_list_set_parent(Cn_Ast_Idx parent_idx, Cn_Ast_Linked_Li
 }
 
 CNDEF void cn_ast_linked_list_add(Cn_Ast_Linked_List *list, Cn_Ast_Idx next_idx) {
-    if (list->idx == CN_AST_NIL_IDX) {
-        list->idx = next_idx;
+    if (list->first_idx == CN_AST_NIL_IDX) {
+        list->first_idx = next_idx;
         list->last_idx = next_idx;
     } else {
         cn_ast_node_get(list->last_idx)->next_idx = next_idx;
@@ -6622,7 +6627,7 @@ CNDEF void cn_ast_print(Cn_Ast_Node *node, int depth) {
 
 #define ADD_IDX(idx) do { if (idx != CN_AST_NIL_IDX) { CN_ASSERT(next < (int)CN_ARRAY_LENGTH(idxs)); idxs[next++] = idx; } } while(0)
 
-#define ADD_LIST(list) do { CN_ASSERT(next < (int)CN_ARRAY_LENGTH(idxs)); idxs[next] = (list)->idx; is_list[next++] = true; } while(0)
+#define ADD_LIST(list) do { CN_ASSERT(next < (int)CN_ARRAY_LENGTH(idxs)); idxs[next] = (list)->first_idx; is_list[next++] = true; } while(0)
     
     // Printing info about specific nodes.
     switch(node->kind) {
@@ -7806,7 +7811,7 @@ CNDEF int cn__emit_type_specifier(Cn_Ast_Idx type_spec_idx, Cn_Emit_Write *func,
                     if (ok != 0) return ok;
 
                     // Only emit body if there are members.
-                    if (su->struct_specifier.member_declaration_list.idx != CN_AST_NIL_IDX) {
+                    if (su->struct_specifier.member_declaration_list.first_idx != CN_AST_NIL_IDX) {
                         cn__emit_str(CN_STR_LIT(" {"), func, opt);
                         ok = cn__emit_newline(func, opt);
                         if (ok != 0) return ok;
@@ -7826,7 +7831,7 @@ CNDEF int cn__emit_type_specifier(Cn_Ast_Idx type_spec_idx, Cn_Emit_Write *func,
                     ok = cn__emit_opt(su->union_specifier.identifier_idx, func, opt);
                     if (ok != 0) return ok;
 
-                    if (su->union_specifier.member_declaration_list.idx != CN_AST_NIL_IDX) {
+                    if (su->union_specifier.member_declaration_list.first_idx != CN_AST_NIL_IDX) {
                         cn__emit_str(CN_STR_LIT(" {"), func, opt);
                         ok = cn__emit_newline(func, opt);
                         if (ok != 0) return ok;
@@ -8017,7 +8022,7 @@ CNDEF int cn__emit_gnu_attribute(Cn_Ast_Idx attr_idx, Cn_Emit_Write *func, Cn_Em
     if (ok != 0) return ok;
 
     // Emit arguments if present.
-    if (attr->gnu_attribute.argument_list.idx != CN_AST_NIL_IDX) {
+    if (attr->gnu_attribute.argument_list.first_idx != CN_AST_NIL_IDX) {
         cn__emit_str(CN_STR_LIT("("), func, opt);
         bool first = true;
         cn_ast_linked_list_foreach(arg, &attr->gnu_attribute.argument_list) {
@@ -11766,7 +11771,7 @@ CNDEF Cn_Type *cn__ast_function_expression_typecheck(Cn_Ast_Node *node) {
 
     // Each argument must be assignable to its corresponding parameter type.
     // NOTE: Not using linked list foreach cause we need to supply idx's to typechecking function.
-    Cn_Ast_Idx arg_idx = node->function_expression.argument_list.idx;
+    Cn_Ast_Idx arg_idx = node->function_expression.argument_list.first_idx;
     int64_t i = 0;
     while (arg_idx != CN_AST_NIL_IDX) {
         Cn_Type *arg_type = cn_ast_expression_typecheck(arg_idx);
@@ -12898,7 +12903,7 @@ CNDEF void cn_ast_expression_clear_types(Cn_Ast_Idx expression_idx) {
             node->function_expression.type = NULL;
             cn_ast_expression_clear_types(node->function_expression.expression_idx);
 
-            Cn_Ast_Idx arg_idx = node->function_expression.argument_list.idx; 
+            Cn_Ast_Idx arg_idx = node->function_expression.argument_list.first_idx; 
             int64_t i = 0; 
             while (arg_idx != CN_AST_NIL_IDX) {
                 cn_ast_expression_clear_types(arg_idx);
@@ -13963,27 +13968,29 @@ CNDEF void cn_tu_free(Cn_Translation_Unit *tu) {
     if (!tu->no_malloc) CN_FREE(tu->content.data);
 }
 
-CNDEF void cn_replace(Cn_Ast_Idx *original, Cn_Ast_Idx new) {
+CNDEF void cn_replace(Cn_Ast_Idx *original, Cn_Ast_Idx new, Cn_Ast_Idx parent_idx) {
     Cn_Ast_Node *node = cn_ast_node_get(new);
     node->flags |= CN_AST_NODE_IS_REPLACED;
     node->replaced_idx = *original;
+    node->parent_idx = parent_idx;
     *original = new;
 }
 
-CNDEF void cn_linked_list_insert(Cn_Ast_Idx *list_node, Cn_Ast_Idx new) {
+CNDEF void cn_linked_list_insert(Cn_Ast_Idx *list_node, Cn_Ast_Idx new, Cn_Ast_Idx parent_idx) {
     if (*list_node == CN_AST_NIL_IDX) {
-        cn_replace(list_node, new);
+        cn_replace(list_node, new, parent_idx);
         return;
     }
 
     Cn_Ast_Node *node = cn_ast_node_get(new);
     node->flags |= CN_AST_NODE_IS_REPLACED;
     node->replaced_idx = CN_AST_NIL_IDX;
+    node->parent_idx = parent_idx;
     node->next_idx = *list_node;
     *list_node = new;
 }
 
-CNDEF Cn_Ast_Linked_List cn_build_linked_list_args(Cn_Ast_Idx members[], int64_t length, const char *file, int64_t line) {
+CNDEF Cn_Ast_Linked_List cn__build_linked_list(Cn_Ast_Idx members[], int64_t length, const char *file, int64_t line) {
     Cn_Ast_Linked_List list = {0};
         
     for (int i = 0; i < length; i++) {
@@ -13998,13 +14005,33 @@ CNDEF Cn_Ast_Linked_List cn_build_linked_list_args(Cn_Ast_Idx members[], int64_t
 
 const Cn_Location cn_build_loc = { CN_STR_BUFFER("<built>"), 0, 0 };
 
-#define cn__build_wrap_if_primary(idx)\
-    (cn_ast_is_primary(idx) ? cn_ast_node_list_append((Cn_Ast_Node) { .kind = CN_AST_NODE_PRIMARY_EXPRESSION, .loc = cn_build_loc, .primary_expression.literal_idx = (idx), }) : (idx))
+CNDEF Cn_Ast_Idx cn__build_wrap_if_primary(Cn_Ast_Idx idx) {
+    if (cn_ast_is_primary(idx)) {
+        return cn_ast_node_list_append((Cn_Ast_Node) { 
+                    .kind = CN_AST_NODE_PRIMARY_EXPRESSION, 
+                    .loc = cn_ast_node_get(idx)->loc, 
+                    .src = cn_ast_node_get(idx)->src, 
+                    .primary_expression.literal_idx = (idx), 
+                });
+    }
 
-CNDEF Cn_Ast_Idx cn_build_identifier_opt(Cn_String name, Cn_Build_Opt opt) {
+    return idx;
+}
+
+CNDEF Cn_String cn__build_make_location(const char *func, const char *file, int64_t line) {
+    Cn_String_Builder sb = cn_sb_make(CN_SB_STACK_STORAGE_CAP);
+    Cn_String loc = cn_sb_to_str(&sb);
+    cn_sb_append_format(&sb, "<from %s() at %s:%ld>", func, file, line);
+    loc =  cn__ast_permanent_save_string(loc);
+    cn_sb_free(&sb);
+    return loc;
+}
+
+CNDEF Cn_Ast_Idx cn__build_identifier(Cn_String name, Cn_Build_Opt opt) {
     Cn_Ast_Node node = {
         .kind = CN_AST_NODE_IDENTIFIER,
-        .loc = cn_build_loc,
+        .flags = CN_AST_NODE_SYNTHETIC,
+        .loc.file = cn__build_make_location(__FUNCTION__, opt.file, opt.line),
     };
 
     if (opt.alloc) {
@@ -14016,10 +14043,11 @@ CNDEF Cn_Ast_Idx cn_build_identifier_opt(Cn_String name, Cn_Build_Opt opt) {
     return cn_ast_node_list_append(node);
 }
 
-CNDEF Cn_Ast_Idx cn_build_integer_opt(Cn_String value, Cn_Build_Opt opt) {
+CNDEF Cn_Ast_Idx cn__build_integer(Cn_String value, Cn_Build_Opt opt) {
     Cn_Ast_Node node = {
         .kind = CN_AST_NODE_INTEGER,
-        .loc = cn_build_loc,
+        .flags = CN_AST_NODE_SYNTHETIC,
+        .loc.file = cn__build_make_location(__FUNCTION__, opt.file, opt.line),
     };
 
     if (opt.alloc) {
@@ -14031,10 +14059,11 @@ CNDEF Cn_Ast_Idx cn_build_integer_opt(Cn_String value, Cn_Build_Opt opt) {
     return cn_ast_node_list_append(node);
 }
 
-CNDEF Cn_Ast_Idx cn_build_float_opt(Cn_String value, Cn_Build_Opt opt) {
+CNDEF Cn_Ast_Idx cn__build_float(Cn_String value, Cn_Build_Opt opt) {
     Cn_Ast_Node node = {
         .kind = CN_AST_NODE_FLOAT,
-        .loc = cn_build_loc,
+        .flags = CN_AST_NODE_SYNTHETIC,
+        .loc.file = cn__build_make_location(__FUNCTION__, opt.file, opt.line),
     };
 
     if (opt.alloc) {
@@ -14046,10 +14075,11 @@ CNDEF Cn_Ast_Idx cn_build_float_opt(Cn_String value, Cn_Build_Opt opt) {
     return cn_ast_node_list_append(node);
 }
 
-CNDEF Cn_Ast_Idx cn_build_string_opt(Cn_String str, Cn_Build_Opt opt) {
+CNDEF Cn_Ast_Idx cn__build_string(Cn_String str, Cn_Build_Opt opt) {
     Cn_Ast_Node node = {
         .kind = CN_AST_NODE_STRING,
-        .loc = cn_build_loc,
+        .flags = CN_AST_NODE_SYNTHETIC,
+        .loc.file = cn__build_make_location(__FUNCTION__, opt.file, opt.line),
     };
 
     if (opt.alloc) {
@@ -14061,12 +14091,11 @@ CNDEF Cn_Ast_Idx cn_build_string_opt(Cn_String str, Cn_Build_Opt opt) {
     return cn_ast_node_list_append(node);
 }
 
-CNDEF Cn_Ast_Idx cn_build_binary_opt(Cn_Binary_Operator_Kind op, Cn_Ast_Idx left, Cn_Ast_Idx right, Cn_Build_Opt opt) {
-    CN_UNUSED(opt);
-
+CNDEF Cn_Ast_Idx cn__build_binary(Cn_Binary_Operator_Kind op, Cn_Ast_Idx left, Cn_Ast_Idx right, Cn_Build_Opt opt) {
     Cn_Ast_Node node = {
         .kind = CN_AST_NODE_BINARY_EXPRESSION,
-        .loc = cn_build_loc,
+        .flags = CN_AST_NODE_SYNTHETIC,
+        .loc.file = cn__build_make_location(__FUNCTION__, opt.file, opt.line),
     };
 
     node.binary_expression.operator_kind = op;
@@ -14076,12 +14105,11 @@ CNDEF Cn_Ast_Idx cn_build_binary_opt(Cn_Binary_Operator_Kind op, Cn_Ast_Idx left
     return cn_ast_node_list_append(node);
 }
 
-CNDEF Cn_Ast_Idx cn_build_unary_opt(Cn_Unary_Operator_Kind op, Cn_Ast_Idx expression, Cn_Build_Opt opt) {
-    CN_UNUSED(opt);
-
+CNDEF Cn_Ast_Idx cn__build_unary(Cn_Unary_Operator_Kind op, Cn_Ast_Idx expression, Cn_Build_Opt opt) {
     Cn_Ast_Node node = {
         .kind = CN_AST_NODE_UNARY_EXPRESSION,
-        .loc = cn_build_loc,
+        .flags = CN_AST_NODE_SYNTHETIC,
+        .loc.file = cn__build_make_location(__FUNCTION__, opt.file, opt.line),
     };
 
     node.unary_expression.operator_kind = op;
@@ -14090,17 +14118,16 @@ CNDEF Cn_Ast_Idx cn_build_unary_opt(Cn_Unary_Operator_Kind op, Cn_Ast_Idx expres
     return cn_ast_node_list_append(node);
 }
 
-CNDEF Cn_Ast_Idx cn_build_func_call_opt(Cn_Ast_Idx callee, Cn_Ast_Linked_List arg_list, Cn_Build_Opt opt) {
-    CN_UNUSED(opt);
-
+CNDEF Cn_Ast_Idx cn__build_func_call(Cn_Ast_Idx callee, Cn_Ast_Linked_List arg_list, Cn_Build_Opt opt) {
     Cn_Ast_Node node = {
         .kind = CN_AST_NODE_FUNCTION_EXPRESSION,
-        .loc = cn_build_loc,
+        .flags = CN_AST_NODE_SYNTHETIC,
+        .loc.file = cn__build_make_location(__FUNCTION__, opt.file, opt.line),
     };
 
     node.function_expression.expression_idx = cn__build_wrap_if_primary(callee);
 
-    Cn_Ast_Idx *idx = &arg_list.idx;
+    Cn_Ast_Idx *idx = &arg_list.first_idx;
     Cn_Ast_Idx *next_idx;
     while(true) {
         if (*idx == CN_AST_NIL_IDX) break;
@@ -14118,12 +14145,11 @@ CNDEF Cn_Ast_Idx cn_build_func_call_opt(Cn_Ast_Idx callee, Cn_Ast_Linked_List ar
     return cn_ast_node_list_append(node);
 }
 
-CNDEF Cn_Ast_Idx cn_build_expr_statement_opt(Cn_Ast_Idx expression, Cn_Build_Opt opt) {
-    CN_UNUSED(opt);
-
+CNDEF Cn_Ast_Idx cn__build_expr_statement(Cn_Ast_Idx expression, Cn_Build_Opt opt) {
     Cn_Ast_Node node = {
         .kind = CN_AST_NODE_EXPRESSION_STATEMENT,
-        .loc = cn_build_loc,
+        .flags = CN_AST_NODE_SYNTHETIC,
+        .loc.file = cn__build_make_location(__FUNCTION__, opt.file, opt.line),
     };
 
     node.expression_statement.expression_idx = cn__build_wrap_if_primary(expression);
