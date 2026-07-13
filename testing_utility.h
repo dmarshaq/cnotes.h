@@ -45,6 +45,7 @@ void cn__json_escape_cstr(FILE *f, char *str) {
 }
 
 CNDEF void cn_test_diagnostic_handler(Cn_Diagnostic_Level level, Cn_Location *loc, Cn_Diagnostic_Code code, Cn_String span, const char *format, va_list args) {
+    CN_UNUSED(span);
 
     if (level < cn_min_diagnostic_level)
         return;

@@ -21,49 +21,51 @@
 #endif // CN_FREE
 
 #ifdef _WIN32
-#    define CN_LINE_END "\r\n"
+#   define CN_LINE_END "\r\n"
 #else
-#    define CN_LINE_END "\n"
+#   define CN_LINE_END "\n"
 #endif // _WIN32
 
 #define CN_INDENT "    "
 
 #ifdef CN_ANSI_NO_COLOR
-#   define CN_ANSI_BLACK
-#   define CN_ANSI_RED
-#   define CN_ANSI_GREEN
-#   define CN_ANSI_YELLOW
-#   define CN_ANSI_BLUE
-#   define CN_ANSI_MAGENTA
-#   define CN_ANSI_CYAN
-#   define CN_ANSI_WHITE
-#   define CN_ANSI_RESET
-#   define CN_ANSI_BRIGHT_BLACK
-#   define CN_ANSI_BRIGHT_RED
-#   define CN_ANSI_BRIGHT_GREEN
-#   define CN_ANSI_BRIGHT_YELLOW
-#   define CN_ANSI_BRIGHT_BLUE
-#   define CN_ANSI_BRIGHT_MAGENTA
-#   define CN_ANSI_BRIGHT_CYAN
-#   define CN_ANSI_BRIGHT_WHITE
+#   define CN_ANSI_BLACK            ""
+#   define CN_ANSI_RED              ""
+#   define CN_ANSI_GREEN            ""
+#   define CN_ANSI_YELLOW           ""
+#   define CN_ANSI_BLUE             ""
+#   define CN_ANSI_MAGENTA          ""
+#   define CN_ANSI_CYAN             ""
+#   define CN_ANSI_WHITE            ""
+#   define CN_ANSI_RESET            ""
+#   define CN_ANSI_BRIGHT_BLACK     ""
+#   define CN_ANSI_BRIGHT_RED       ""
+#   define CN_ANSI_BRIGHT_GREEN     ""
+#   define CN_ANSI_BRIGHT_YELLOW    ""
+#   define CN_ANSI_BRIGHT_BLUE      ""
+#   define CN_ANSI_BRIGHT_MAGENTA   ""
+#   define CN_ANSI_BRIGHT_CYAN      ""
+#   define CN_ANSI_BRIGHT_WHITE     ""
+#   define CN_ANSI_BOLD             ""
 #else
-#   define CN_ANSI_BLACK          "\x1b[30m"
-#   define CN_ANSI_RED            "\x1b[31m"
-#   define CN_ANSI_GREEN          "\x1b[32m"
-#   define CN_ANSI_YELLOW         "\x1b[33m"
-#   define CN_ANSI_BLUE           "\x1b[34m"
-#   define CN_ANSI_MAGENTA        "\x1b[35m"
-#   define CN_ANSI_CYAN           "\x1b[36m"
-#   define CN_ANSI_WHITE          "\x1b[37m"
-#   define CN_ANSI_RESET          "\x1b[0m"
-#   define CN_ANSI_BRIGHT_BLACK   "\x1b[90m"
-#   define CN_ANSI_BRIGHT_RED     "\x1b[91m"
-#   define CN_ANSI_BRIGHT_GREEN   "\x1b[92m"
-#   define CN_ANSI_BRIGHT_YELLOW  "\x1b[93m"
-#   define CN_ANSI_BRIGHT_BLUE    "\x1b[94m"
-#   define CN_ANSI_BRIGHT_MAGENTA "\x1b[95m"
-#   define CN_ANSI_BRIGHT_CYAN    "\x1b[96m"
-#   define CN_ANSI_BRIGHT_WHITE   "\x1b[97m"
+#   define CN_ANSI_BLACK            "\x1b[30m"
+#   define CN_ANSI_RED              "\x1b[31m"
+#   define CN_ANSI_GREEN            "\x1b[32m"
+#   define CN_ANSI_YELLOW           "\x1b[33m"
+#   define CN_ANSI_BLUE             "\x1b[34m"
+#   define CN_ANSI_MAGENTA          "\x1b[35m"
+#   define CN_ANSI_CYAN             "\x1b[36m"
+#   define CN_ANSI_WHITE            "\x1b[37m"
+#   define CN_ANSI_RESET            "\x1b[0m"
+#   define CN_ANSI_BRIGHT_BLACK     "\x1b[90m"
+#   define CN_ANSI_BRIGHT_RED       "\x1b[91m"
+#   define CN_ANSI_BRIGHT_GREEN     "\x1b[92m"
+#   define CN_ANSI_BRIGHT_YELLOW    "\x1b[93m"
+#   define CN_ANSI_BRIGHT_BLUE      "\x1b[94m"
+#   define CN_ANSI_BRIGHT_MAGENTA   "\x1b[95m"
+#   define CN_ANSI_BRIGHT_CYAN      "\x1b[96m"
+#   define CN_ANSI_BRIGHT_WHITE     "\x1b[97m"
+#   define CN_ANSI_BOLD             "\x1b[1m"
 #endif // CN_ANSI_NO_COLOR
 
 #include <stdio.h>
@@ -2195,7 +2197,7 @@ CNDEF Cn_Ast_Node *cn_ast_node_get(Cn_Ast_Idx idx);
 /**
  * Sets parent of all idx's supplied to parent_idx.
  */
-#define cn_ast_node_set_parent(parent_idx, ...) cn__ast_node_set_parent(parent_idx, (Cn_Ast_Idx []) { __VA_ARGS__ }, sizeof (Cn_Ast_Idx []) { __VA_ARGS__ })
+#define cn_ast_node_set_parent(parent_idx, ...) cn__ast_node_set_parent(parent_idx, (Cn_Ast_Idx []) { __VA_ARGS__ }, sizeof((Cn_Ast_Idx []) { __VA_ARGS__ }) / sizeof(Cn_Ast_Idx))
 
 CNDEF void cn__ast_node_set_parent(Cn_Ast_Idx parent_idx, Cn_Ast_Idx idxs[], size_t length);
 
@@ -3568,7 +3570,12 @@ typedef enum {
 
 extern Cn_Diagnostic_Level cn_min_diagnostic_level;
 
-typedef void (Cn_Diagnostic_Handler)(Cn_Diagnostic_Level level, Cn_Location *loc, Cn_Diagnostic_Code code, Cn_String span, const char *format, va_list args);
+typedef struct {
+    int64_t offset;
+    int64_t length;
+} Cn_Diagnostic_Annotation;
+
+typedef void (Cn_Diagnostic_Handler)(Cn_Diagnostic_Level level, Cn_Location *loc, Cn_Diagnostic_Code code, Cn_String span, Cn_Diagnostic_Annotation annotations[], size_t annotations_length, const char *format, va_list args);
 
 extern Cn_Diagnostic_Handler *cn_diagnostic_handler;
 
@@ -3746,7 +3753,7 @@ CNDEF Cn_Ast_Linked_List cn__build_linked_list(Cn_Ast_Idx members[], int64_t len
  * 
  * RETURNS: Built identifier.
  */
-#define cn_build_identifier(name, ...) cn__build_identifier(name, (Cn_Build_Opt) { .alloc = CN_BUILD_OPT_DEFAULT_ALLOC, __VA_ARGS__ })
+#define cn_build_identifier(name, ...) cn__build_identifier(name, (Cn_Build_Opt) { .alloc = CN_BUILD_OPT_DEFAULT_ALLOC, .file = __FILE__, .line =__LINE__, __VA_ARGS__ })
 
 CNDEF Cn_Ast_Idx cn__build_identifier(Cn_String name, Cn_Build_Opt opt);
 
@@ -3755,7 +3762,7 @@ CNDEF Cn_Ast_Idx cn__build_identifier(Cn_String name, Cn_Build_Opt opt);
  *
  * RETURNS: Built integer.
  */
-#define cn_build_integer(value, ...) cn__build_integer(value, (Cn_Build_Opt) { .alloc = CN_BUILD_OPT_DEFAULT_ALLOC, __VA_ARGS__ })
+#define cn_build_integer(value, ...) cn__build_integer(value, (Cn_Build_Opt) { .alloc = CN_BUILD_OPT_DEFAULT_ALLOC, .file = __FILE__, .line =__LINE__, __VA_ARGS__ })
 
 CNDEF Cn_Ast_Idx cn__build_integer(Cn_String value, Cn_Build_Opt opt);
 
@@ -3764,7 +3771,7 @@ CNDEF Cn_Ast_Idx cn__build_integer(Cn_String value, Cn_Build_Opt opt);
  * 
  * RETURNS: Built float.
  */
-#define cn_build_float(value, ...) cn__build_float(value, (Cn_Build_Opt) { .alloc = CN_BUILD_OPT_DEFAULT_ALLOC, __VA_ARGS__ })
+#define cn_build_float(value, ...) cn__build_float(value, (Cn_Build_Opt) { .alloc = CN_BUILD_OPT_DEFAULT_ALLOC, .file = __FILE__, .line =__LINE__, __VA_ARGS__ })
 
 CNDEF Cn_Ast_Idx cn__build_float(Cn_String value, Cn_Build_Opt opt);
 
@@ -3773,7 +3780,7 @@ CNDEF Cn_Ast_Idx cn__build_float(Cn_String value, Cn_Build_Opt opt);
  * 
  * RETURNS: Built string.
  */
-#define cn_build_string(str, ...) cn__build_string(str, (Cn_Build_Opt) { .alloc = CN_BUILD_OPT_DEFAULT_ALLOC, __VA_ARGS__ })
+#define cn_build_string(str, ...) cn__build_string(str, (Cn_Build_Opt) { .alloc = CN_BUILD_OPT_DEFAULT_ALLOC, .file = __FILE__, .line =__LINE__, __VA_ARGS__ })
 
 CNDEF Cn_Ast_Idx cn__build_string(Cn_String str, Cn_Build_Opt opt);
 
@@ -3783,7 +3790,7 @@ CNDEF Cn_Ast_Idx cn__build_string(Cn_String str, Cn_Build_Opt opt);
  * 
  * RETURNS: Built binary expression.
  */
-#define cn_build_binary(op, left, right, ...) cn__build_binary(op, left, right, (Cn_Build_Opt) { __VA_ARGS__ })
+#define cn_build_binary(op, left, right, ...) cn__build_binary(op, left, right, (Cn_Build_Opt) { .file = __FILE__, .line =__LINE__, __VA_ARGS__ })
 
 CNDEF Cn_Ast_Idx cn__build_binary(Cn_Binary_Operator_Kind op, Cn_Ast_Idx left, Cn_Ast_Idx right, Cn_Build_Opt opt);
 
@@ -3793,7 +3800,7 @@ CNDEF Cn_Ast_Idx cn__build_binary(Cn_Binary_Operator_Kind op, Cn_Ast_Idx left, C
  * 
  * RETURNS: Built unary expression.
  */
-#define cn_build_unary(op, expression, ...) cn__build_unary(op, expression, (Cn_Build_Opt) { __VA_ARGS__ })
+#define cn_build_unary(op, expression, ...) cn__build_unary(op, expression, (Cn_Build_Opt) { .file = __FILE__, .line =__LINE__, __VA_ARGS__ })
 
 CNDEF Cn_Ast_Idx cn__build_unary(Cn_Unary_Operator_Kind op, Cn_Ast_Idx expression, Cn_Build_Opt opt);
 
@@ -3806,7 +3813,7 @@ CNDEF Cn_Ast_Idx cn__build_unary(Cn_Unary_Operator_Kind op, Cn_Ast_Idx expressio
  * 
  * RETURNS: Built function call expression.
  */
-#define cn_build_func_call(callee, arg_list, ...) cn__build_func_call(callee, arg_list, (Cn_Build_Opt) { __VA_ARGS__ })
+#define cn_build_func_call(callee, arg_list, ...) cn__build_func_call(callee, arg_list, (Cn_Build_Opt) { .file = __FILE__, .line =__LINE__, __VA_ARGS__ })
 
 CNDEF Cn_Ast_Idx cn__build_func_call(Cn_Ast_Idx callee, Cn_Ast_Linked_List arg_list, Cn_Build_Opt opt);
 
@@ -3816,7 +3823,7 @@ CNDEF Cn_Ast_Idx cn__build_func_call(Cn_Ast_Idx callee, Cn_Ast_Linked_List arg_l
  * 
  * RETURNS: Built expression statement.
  */
-#define cn_build_expr_statement(expression, ...) cn__build_expr_statement(expression, (Cn_Build_Opt) { __VA_ARGS__ })
+#define cn_build_expr_statement(expression, ...) cn__build_expr_statement(expression, (Cn_Build_Opt) { .file = __FILE__, .line =__LINE__, __VA_ARGS__ })
 
 CNDEF Cn_Ast_Idx cn__build_expr_statement(Cn_Ast_Idx expression, Cn_Build_Opt opt);
 
@@ -13625,112 +13632,75 @@ CNDEF bool cn__find_prev_line(Cn_String source, int64_t *bol, int64_t *eol) {
 #define CN__DIAGNOSTIC_PREV_LINE_PRINT_COUNT 1
 #define CN__DIAGNOSTIC_NEXT_LINE_PRINT_COUNT 1
 
-CNDEF void cn_default_diagnostic_handler(Cn_Diagnostic_Level level, Cn_Location *loc, Cn_Diagnostic_Code code, Cn_String span, const char *format, va_list args) {
+CNDEF void cn_default_diagnostic_handler(Cn_Diagnostic_Level level, Cn_Location *loc, Cn_Diagnostic_Code code, Cn_String span, Cn_Diagnostic_Annotation annotations[], size_t annotations_length, const char *format, va_list args) {
+    if (level < cn_min_diagnostic_level) return;
+    const char *ansi_color = "";
+
+    switch (level) {
+        case CN_DIAGNOSTIC_INFO:
+            ansi_color = CN_ANSI_BRIGHT_BLUE CN_ANSI_BOLD ;
+            fprintf(stderr, CN_ANSI_BRIGHT_BLUE CN_ANSI_BOLD "info: "CN_ANSI_RESET);
+            break;
+        case CN_DIAGNOSTIC_WARNING:
+            ansi_color = CN_ANSI_YELLOW CN_ANSI_BOLD ;
+            fprintf(stderr, CN_ANSI_YELLOW CN_ANSI_BOLD "warning: "CN_ANSI_RESET);
+            break;
+        case CN_DIAGNOSTIC_ERROR:
+            ansi_color = CN_ANSI_BRIGHT_RED CN_ANSI_BOLD ;
+            fprintf(stderr, CN_ANSI_BRIGHT_RED CN_ANSI_BOLD "error: "CN_ANSI_RESET);
+            break;
+    }
+
+    if (loc->line == 0 && loc->column == 0) {
+        fprintf(stderr, CN_ANSI_BOLD"%.*s"CN_ANSI_RESET" ", CN_UNPACK(loc->file));
+    } else {
+        fprintf(stderr, CN_ANSI_BOLD"%.*s:%ld:%ld:"CN_ANSI_RESET" ", CN_UNPACK(loc->file), loc->line, loc->column);
+    }
+
+    if (!cn_str_is_empty(CN_DIAGNOSTIC_CODES[code])) {
+        fprintf(stderr, "%.*s: ", CN_UNPACK(CN_DIAGNOSTIC_CODES[code]));
+    } else {
+        fprintf(stderr, "CN%04d: ", code);
+    }
+    
+    vfprintf(stderr, format, args);
+    fputs(CN_LINE_END CN_LINE_END CN_ANSI_CYAN, stderr);
+
+    // Printing span line by line, offseting by 1 indent level.
+    int64_t eol;
+    Cn_String line;
+    while (true) {
+        eol = cn_str_find_left(span, CN_STR_LIT(CN_LINE_END));
+        if (eol == -1) break;
+        eol += sizeof(CN_LINE_END) - 1;
+
+        line = cn_str_get_chars(span, eol);
+        span = cn_str_eat_chars(span, eol);
+
+        // Handling annotations.
+        // Right now supporting only one annotation.
+        for (size_t i = 0; i < annotations_length; i++) {
+            if
+        }
+
+        fprintf(stderr, CN_INDENT"%.*s", CN_UNPACK(line));
+    }
+
+    fputs(CN_ANSI_RESET CN_LINE_END, stderr);
+}
+
+CNDEF void cn_null_diagnostic_handler(Cn_Diagnostic_Level level, Cn_Location *loc, Cn_Diagnostic_Code code, Cn_String span, Cn_Diagnostic_Annotation annotations[], size_t annotations_length, const char *format, va_list args) {
     CN_UNUSED(level);
     CN_UNUSED(loc);
     CN_UNUSED(code);
     CN_UNUSED(span);
-    CN_UNUSED(format);
-    CN_UNUSED(args);
-    CN_TODO("cn_default_diagnostic_handler");
-    //if (level < cn_min_diagnostic_level)
-    //    return;
-
-    //const char *ansi_color = "";
-
-    //switch (level) {
-    //    case CN_DIAGNOSTIC_INFO:
-    //        ansi_color = CN_ANSI_BRIGHT_BLUE;
-    //        fprintf(stderr, CN_ANSI_BRIGHT_BLUE"info: "CN_ANSI_RESET);
-    //        break;
-    //    case CN_DIAGNOSTIC_WARNING:
-    //        ansi_color = CN_ANSI_YELLOW;
-    //        fprintf(stderr, CN_ANSI_YELLOW"warning: "CN_ANSI_RESET);
-    //        break;
-    //    case CN_DIAGNOSTIC_ERROR:
-    //        ansi_color = CN_ANSI_BRIGHT_RED;
-    //        fprintf(stderr, CN_ANSI_BRIGHT_RED"error: "CN_ANSI_RESET);
-    //        break;
-    //}
-
-    //fprintf(stderr, CN_ANSI_BRIGHT_WHITE"%.*s:%ld:%ld:"CN_ANSI_RESET" ", CN_UNPACK(loc->file), loc->line, loc->column);
-
-    //if (!cn_str_is_empty(CN_DIAGNOSTIC_CODES[code])) {
-    //    fprintf(stderr, "%.*s:", CN_UNPACK(CN_DIAGNOSTIC_CODES[code]));
-    //} else {
-    //    fprintf(stderr, "CN%04d:", code);
-    //}
-
-    //fputs(CN_LINE_END, stderr);
-
-    //Cn_String src = cn__ast_data->sourcei;
-    //int64_t end = cn_str_find_left(cn_str_eat_chars(src, loc->bol), CN_CSTR(CN_LINE_END)) + loc->bol;
-
-    //int64_t bol = loc->bol;
-    //int64_t eol = end;
-    //Cn_String line;
-
-    //// Getting lines of all previous lines saved to temporary stack.
-    //if (loc->line > 1) {
-    //    Cn_String stack[CN__DIAGNOSTIC_PREV_LINE_PRINT_COUNT];
-    //    int64_t len = 0;
-    //    for (int64_t i = 0; i < CN__DIAGNOSTIC_PREV_LINE_PRINT_COUNT; i++) {
-    //        if (len >= loc->line - 1 || !cn__find_prev_line(src, &bol, &eol)) break;
-
-    //        stack[i] = cn_str_substring(src, bol, eol);
-    //        len++;
-    //    }
-
-    //    // Printing previous lines.
-    //    for (int64_t i = len; i > 0; i--) {
-    //        line = stack[i - 1];
-    //        fprintf(stderr, "%4lu | %.*s"CN_LINE_END, loc->line - i, CN_UNPACK(line));
-    //    }
-    //}
-
-    //// Printing current line.
-    //{
-    //    line = cn_str_substring(src, loc->bol, end);
-
-    //    int64_t underline_offset = loc->column - 1;
-    //    fprintf(stderr, "%4lu | %.*s", loc->line, CN_UNPACK(cn_str_substring(line, 0, underline_offset)));
-    //    fputs(ansi_color, stderr);
-    //    fprintf(stderr, "%.*s"CN_ANSI_RESET, CN_UNPACK(cn_str_substring(line, underline_offset, underline_offset + loc->length)));
-    //    fprintf(stderr, "%.*s"CN_LINE_END, CN_UNPACK(cn_str_substring(line, underline_offset + loc->length, line.length)));
-    //    fprintf(stderr, "     | %*s", (int)underline_offset, "");
-    //    fputs(ansi_color, stderr);
-    //    fputc('^', stderr);
-
-    //    for(int64_t i = 1; i < loc->length; i++)
-    //        fputc('~', stderr);
-    //    fputc(' ', stderr);
-    //    vfprintf(stderr, format, args);
-    //    fputs(CN_ANSI_RESET CN_LINE_END, stderr);
-    //}
-
-
-    //// Printing next lines.
-    //bol = loc->bol;
-    //eol = end;
-    //for (int64_t i = 0; i < CN__DIAGNOSTIC_NEXT_LINE_PRINT_COUNT; i++) {
-    //    if (!cn__find_next_line(src, &bol, &eol)) break;
-
-    //    line = cn_str_substring(src, bol, eol);
-    //    fprintf(stderr, "%4lu | %.*s"CN_LINE_END, loc->line + i + 1, CN_UNPACK(line));
-    //}
-
-}
-
-CNDEF void cn_null_diagnostic_handler(Cn_Diagnostic_Level level, Cn_Location *loc, Cn_Diagnostic_Code code, Cn_String span, const char *format, va_list args) {
-    CN_UNUSED(level);
-    CN_UNUSED(loc);
-    CN_UNUSED(code);
-    CN_UNUSED(span);
+    CN_UNUSED(annotations);
+    CN_UNUSED(annotations_length);
     CN_UNUSED(format);
     CN_UNUSED(args);
 }
 
-CNDEF void cn_diagnostic_src(Cn_Diagnostic_Level level, Cn_Location *loc, Cn_Source *src, Cn_Diagnostic_Code code, const char *format, ...) {
+CNDEF void cn__diagnostic_src(Cn_Diagnostic_Level level, Cn_Location *loc, Cn_Source *src, Cn_Diagnostic_Code code, const char *format, va_list args) {
     switch (level) {
         case CN_DIAGNOSTIC_WARNING:
             cn__ast_data->warning_count++;
@@ -13742,14 +13712,46 @@ CNDEF void cn_diagnostic_src(Cn_Diagnostic_Level level, Cn_Location *loc, Cn_Sou
             break;
     }
 
-    CN_TODO("cn_diagnostic_src");
-    // va_list args;
-    // va_start(args, format);
-    // cn_diagnostic_handler(level, loc, code, format, args);
-    // va_end(args);
+    int64_t index;
+
+    Cn_String span_left = cn_str_get_chars(src->source, src->offset);
+    index = cn_str_find_right(span_left, CN_STR_LIT(CN_LINE_END));
+    if (index != -1) {
+        span_left = cn_str_eat_chars(span_left, index + sizeof(CN_LINE_END) - 1);
+    }
+
+    Cn_String span_right = cn_str_eat_chars(src->source, src->offset);
+    index = cn_str_find_left(span_right, CN_STR_LIT(CN_LINE_END));
+    if (index != -1) {
+        span_right = cn_str_get_chars(span_right, index + sizeof(CN_LINE_END) - 1);
+    }
+
+    Cn_String span = CN_STR(span_left.length + span_right.length, span_left.data);
+
+    Cn_Diagnostic_Annotation annotations[1] = {
+        { .offset = src->offset - (span_left.data - src->source.data), .length = src->length }
+    };
+    cn_default_diagnostic_handler(level, loc, code, span, annotations, CN_ARRAY_LENGTH(annotations), format, args);
+}
+
+CNDEF void cn_diagnostic_src(Cn_Diagnostic_Level level, Cn_Location *loc, Cn_Source *src, Cn_Diagnostic_Code code, const char *format, ...) {
+    va_list args;
+    va_start(args, format);
+    cn__diagnostic_src(level, loc, src, code, format, args);
+    va_end(args);
 }
 
 CNDEF void cn_diagnostic_node(Cn_Diagnostic_Level level, Cn_Ast_Idx idx, Cn_Diagnostic_Code code, const char *format, ...) {
+    CN_ASSERT(idx != CN_AST_NIL_IDX);
+
+    if (!(cn_ast_node_get(idx)->flags & CN_AST_NODE_SYNTHETIC)) {
+        va_list args;
+        va_start(args, format);
+        cn__diagnostic_src(level, &cn_ast_node_get(idx)->loc, &cn_ast_node_get(idx)->src, code, format, args);
+        va_end(args);
+        return;
+    }
+
     switch (level) {
         case CN_DIAGNOSTIC_WARNING:
             cn__ast_data->warning_count++;
@@ -13762,18 +13764,55 @@ CNDEF void cn_diagnostic_node(Cn_Diagnostic_Level level, Cn_Ast_Idx idx, Cn_Diag
     }
 
     Cn_Ast_Node *node = cn_ast_node_get(idx);
-    CN_TODO("cn_diagnostic_node");
 
-    // va_list args;
-    // va_start(args, format);
-    // cn_diagnostic_handler(level, &node->loc, code, format, args);
-    // va_end(args);
+    Cn_Ast_Idx parent_idx = idx; 
+    while (true) {
+        CN_ASSERT(parent_idx != CN_AST_NIL_IDX);
+        switch (cn_ast_node_get(parent_idx)->kind) {
+            case CN_AST_NODE_TRANSLATION_UNIT:
+            case CN_AST_NODE_EXTERNAL_DECLARATION:
+            case CN_AST_NODE_COMPOUND_STATEMENT:
+            case CN_AST_NODE_JUMP_STATEMENT:
+            case CN_AST_NODE_EXPRESSION_STATEMENT:
+            case CN_AST_NODE_SELECTION_STATEMENT:
+                break;
+            default: 
+                parent_idx = cn_ast_node_get(parent_idx)->parent_idx;
+                continue;
+        }
 
-    // // TODO: Handle purely created nodes.
-    // if (node->flags & CN_AST_NODE_IS_REPLACED && node->replaced_idx != CN_AST_NIL_IDX) {
-    //     node = cn_ast_node_get(node->replaced_idx);
-    //     cn_diagnostic_node(CN_DIAGNOSTIC_INFO, node->replaced_idx, CN_DC_FROM, "From ast node here.");
-    // }
+        break;
+    }
+
+    Cn_String span = {0};
+
+    Cn_String_Builder sb = cn_sb_make(CN_SB_STACK_STORAGE_CAP);
+    
+    int64_t length, offset;
+    cn_emit(parent_idx, &cn_emit_write_sb, .ctx = &sb, .max_lines = 1, .highlight_idx = idx, .highlight_length = &length, .highlight_offset = &offset);
+
+    span = cn_sb_to_str(&sb);
+
+    Cn_Diagnostic_Annotation annotations[1] = {
+        { .offset = offset, .length = length }
+    };
+
+    va_list args;
+    va_start(args, format);
+    cn_default_diagnostic_handler(level, &node->loc, code, span, annotations, CN_ARRAY_LENGTH(annotations), format, args);
+    va_end(args);
+    
+    parent_idx = idx; 
+    while (!(cn_ast_node_get(parent_idx)->flags & CN_AST_NODE_IS_REPLACED)) {
+        parent_idx = cn_ast_node_get(parent_idx)->parent_idx;
+    }
+
+    node = cn_ast_node_get(parent_idx);
+    if (node->replaced_idx != CN_AST_NIL_IDX) {
+        node->flags |= CN_AST_NODE_USE_REPLACED;
+        cn_diagnostic_node(CN_DIAGNOSTIC_INFO, node->replaced_idx, CN_DC_FROM, "From ast node here.");
+        node->flags &= ~CN_AST_NODE_USE_REPLACED;
+    }
 }
 
 
@@ -14003,16 +14042,16 @@ CNDEF Cn_Ast_Linked_List cn__build_linked_list(Cn_Ast_Idx members[], int64_t len
     return list;
 }
 
-const Cn_Location cn_build_loc = { CN_STR_BUFFER("<built>"), 0, 0 };
-
 CNDEF Cn_Ast_Idx cn__build_wrap_if_primary(Cn_Ast_Idx idx) {
     if (cn_ast_is_primary(idx)) {
-        return cn_ast_node_list_append((Cn_Ast_Node) { 
+        Cn_Ast_Idx parent_idx = cn_ast_node_list_append((Cn_Ast_Node) { 
                     .kind = CN_AST_NODE_PRIMARY_EXPRESSION, 
                     .loc = cn_ast_node_get(idx)->loc, 
                     .src = cn_ast_node_get(idx)->src, 
                     .primary_expression.literal_idx = (idx), 
                 });
+        cn_ast_node_get(idx)->parent_idx = parent_idx;
+        return parent_idx;
     }
 
     return idx;
@@ -14020,9 +14059,8 @@ CNDEF Cn_Ast_Idx cn__build_wrap_if_primary(Cn_Ast_Idx idx) {
 
 CNDEF Cn_String cn__build_make_location(const char *func, const char *file, int64_t line) {
     Cn_String_Builder sb = cn_sb_make(CN_SB_STACK_STORAGE_CAP);
-    Cn_String loc = cn_sb_to_str(&sb);
-    cn_sb_append_format(&sb, "<from %s() at %s:%ld>", func, file, line);
-    loc =  cn__ast_permanent_save_string(loc);
+    cn_sb_append_format(&sb, "<%s() at %s:%ld>", func, file, line);
+    Cn_String loc = cn__ast_permanent_save_string(cn_sb_to_str(&sb));
     cn_sb_free(&sb);
     return loc;
 }
@@ -14102,7 +14140,12 @@ CNDEF Cn_Ast_Idx cn__build_binary(Cn_Binary_Operator_Kind op, Cn_Ast_Idx left, C
     node.binary_expression.left_expression_idx = cn__build_wrap_if_primary(left);
     node.binary_expression.right_expression_idx = cn__build_wrap_if_primary(right);
 
-    return cn_ast_node_list_append(node);
+    Cn_Ast_Idx parent = cn_ast_node_list_append(node);
+    cn_ast_node_set_parent(parent, 
+            node.binary_expression.left_expression_idx,
+            node.binary_expression.right_expression_idx,
+            );
+    return parent;
 }
 
 CNDEF Cn_Ast_Idx cn__build_unary(Cn_Unary_Operator_Kind op, Cn_Ast_Idx expression, Cn_Build_Opt opt) {
@@ -14115,7 +14158,11 @@ CNDEF Cn_Ast_Idx cn__build_unary(Cn_Unary_Operator_Kind op, Cn_Ast_Idx expressio
     node.unary_expression.operator_kind = op;
     node.unary_expression.expression_idx = cn__build_wrap_if_primary(expression);
 
-    return cn_ast_node_list_append(node);
+    Cn_Ast_Idx parent = cn_ast_node_list_append(node);
+    cn_ast_node_set_parent(parent, 
+            node.unary_expression.expression_idx
+            );
+    return parent;
 }
 
 CNDEF Cn_Ast_Idx cn__build_func_call(Cn_Ast_Idx callee, Cn_Ast_Linked_List arg_list, Cn_Build_Opt opt) {
@@ -14142,7 +14189,10 @@ CNDEF Cn_Ast_Idx cn__build_func_call(Cn_Ast_Idx callee, Cn_Ast_Linked_List arg_l
 
     node.function_expression.argument_list = arg_list;
 
-    return cn_ast_node_list_append(node);
+    Cn_Ast_Idx parent = cn_ast_node_list_append(node);
+    cn_ast_node_set_parent(parent, node.function_expression.expression_idx);
+    cn_ast_linked_list_set_parent(parent, &node.function_expression.argument_list);
+    return parent;
 }
 
 CNDEF Cn_Ast_Idx cn__build_expr_statement(Cn_Ast_Idx expression, Cn_Build_Opt opt) {
@@ -14154,7 +14204,9 @@ CNDEF Cn_Ast_Idx cn__build_expr_statement(Cn_Ast_Idx expression, Cn_Build_Opt op
 
     node.expression_statement.expression_idx = cn__build_wrap_if_primary(expression);
 
-    return cn_ast_node_list_append(node);
+    Cn_Ast_Idx parent = cn_ast_node_list_append(node);
+    cn_ast_node_set_parent(parent, node.expression_statement.expression_idx);
+    return parent;
 }
 
 
