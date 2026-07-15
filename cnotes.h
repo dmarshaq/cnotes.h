@@ -13589,49 +13589,6 @@ Cn_Diagnostic_Level cn_min_diagnostic_level = CN_DIAGNOSTIC_INFO;
 
 Cn_Diagnostic_Handler *cn_diagnostic_handler = &cn_default_diagnostic_handler;
 
-/**
- * Given current bol, eol and source, it will find next bol 
- * with it's eol and overwrite supplied value of bol and eol.
- * RETURNS: True if successfuly found next bol, false otherwise.
- */
-CNDEF bool cn__find_next_line(Cn_String source, int64_t *bol, int64_t *eol) {
-    source = cn_str_eat_chars(source, *eol + strlen(CN_LINE_END));
-
-    int64_t end = cn_str_find_left(source, CN_CSTR(CN_LINE_END));
-    if (end < 0) return false;
-
-    *bol = *eol + strlen(CN_LINE_END); 
-    *eol = end + *bol;
-
-    return true;
-}
-
-/**
- * Given current bol, eol and source, it will find previous bol 
- * with it's eol and overwrite supplied value of bol and eol.
- *
- * RETURNS: True if successfuly found previous bol, false otherwise.
- */
-CNDEF bool cn__find_prev_line(Cn_String source, int64_t *bol, int64_t *eol) {
-    if ((*bol - (int64_t)strlen(CN_LINE_END)) < 0) return false;
-
-    source = cn_str_get_chars(source, *bol - strlen(CN_LINE_END));
-
-    int64_t start = cn_str_find_right(source, CN_CSTR(CN_LINE_END));
-    if (start < 0) 
-        start = 0;
-    else 
-        start += strlen(CN_LINE_END);
-
-    *eol = *bol - strlen(CN_LINE_END); 
-    *bol = start;
-
-    return true;
-}
-
-#define CN__DIAGNOSTIC_PREV_LINE_PRINT_COUNT 1
-#define CN__DIAGNOSTIC_NEXT_LINE_PRINT_COUNT 1
-
 CNDEF void cn_default_diagnostic_handler(Cn_Diagnostic_Level level, Cn_Location *loc, Cn_Diagnostic_Code code, Cn_String span, Cn_Diagnostic_Annotation annotations[], size_t annotations_length, const char *format, va_list args) {
     if (level < cn_min_diagnostic_level) return;
     const char *ansi_color = "";
@@ -13660,30 +13617,94 @@ CNDEF void cn_default_diagnostic_handler(Cn_Diagnostic_Level level, Cn_Location 
     if (!cn_str_is_empty(CN_DIAGNOSTIC_CODES[code])) {
         fprintf(stderr, "%.*s: ", CN_UNPACK(CN_DIAGNOSTIC_CODES[code]));
     } else {
-        fprintf(stderr, "CN%04d: ", code);
+        fprintf(stderr, CN_ANSI_BRIGHT_BLACK"[CN%04d]"CN_ANSI_RESET": ", code);
     }
     
+
+    // Simple sorting + overlap resolution.
+    {
+        Cn_Diagnostic_Annotation temp;
+        size_t min;
+        int64_t overlap = 0;
+        for (size_t j = 0; j < annotations_length - 1; j++) {
+            min = j;
+            for (size_t i = j + 1; i < annotations_length; i++) {
+                if (annotations[i].offset < annotations[min].offset) {
+                    min = i;
+                }
+            }
+
+            if (min != j) {
+                temp = annotations[j];
+                annotations[j] = annotations[min];
+                annotations[min] = temp;
+
+            }
+
+            if (annotations[j].offset <= overlap) {
+                // First annotation always wins, if overlap.
+                annotations[j].length = 0;
+            } else {
+                overlap = annotations[j].offset + annotations[j].length;
+            }
+        }
+    }
+
     vfprintf(stderr, format, args);
-    fputs(CN_LINE_END CN_LINE_END CN_ANSI_CYAN, stderr);
+    fputs(CN_LINE_END CN_LINE_END, stderr);
 
     // Printing span line by line, offseting by 1 indent level.
     int64_t eol;
+    int64_t line_offset = 0;
     Cn_String line;
     while (true) {
         eol = cn_str_find_left(span, CN_STR_LIT(CN_LINE_END));
         if (eol == -1) break;
-        eol += sizeof(CN_LINE_END) - 1;
 
         line = cn_str_get_chars(span, eol);
-        span = cn_str_eat_chars(span, eol);
+        span = cn_str_eat_chars(span, eol + sizeof(CN_LINE_END) - 1);
 
-        // Handling annotations.
-        // Right now supporting only one annotation.
-        for (size_t i = 0; i < annotations_length; i++) {
-            if
+        // Applying annotations.
+        fputs(CN_INDENT, stderr);
+        int64_t printed = 0;
+        Cn_String snippet = {0};
+        while (annotations_length > 0 && annotations->offset < line.length + line_offset) {
+            if (annotations->length == 0) {
+                goto annotations_next;
+            }
+
+            int64_t inline_offset = annotations->offset - line_offset;
+            if (inline_offset < 0) {
+                goto annotations_next;
+            }
+
+            // Printing till annotation.
+            if (inline_offset > printed) {
+                snippet = cn_str_substring(line, printed, inline_offset);
+                fprintf(stderr, "%.*s", CN_UNPACK(snippet));
+                printed += inline_offset;
+            }
+
+            // Printing annotated snippet.
+            int64_t length = annotations->length < line.length - printed ? annotations->length : line.length - printed;
+            snippet = cn_str_substring(line, printed, printed + length);
+            fprintf(stderr, "%s%.*s"CN_ANSI_RESET, ansi_color, CN_UNPACK(snippet));
+            printed += length;
+
+
+annotations_next:
+            annotations++;
+            annotations_length--;
         }
 
-        fprintf(stderr, CN_INDENT"%.*s", CN_UNPACK(line));
+        if (printed < line.length) {
+            snippet = cn_str_substring(line, printed, line.length);
+            fprintf(stderr, "%.*s", CN_UNPACK(snippet));
+        }
+
+        fputs(CN_LINE_END, stderr);
+
+        line_offset += line.length + sizeof(CN_LINE_END) - 1;
     }
 
     fputs(CN_ANSI_RESET CN_LINE_END, stderr);
@@ -13719,6 +13740,8 @@ CNDEF void cn__diagnostic_src(Cn_Diagnostic_Level level, Cn_Location *loc, Cn_So
     if (index != -1) {
         span_left = cn_str_eat_chars(span_left, index + sizeof(CN_LINE_END) - 1);
     }
+
+    span_left = cn_str_eat_spaces(span_left);
 
     Cn_String span_right = cn_str_eat_chars(src->source, src->offset);
     index = cn_str_find_left(span_right, CN_STR_LIT(CN_LINE_END));

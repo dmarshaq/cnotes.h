@@ -44,8 +44,10 @@ void cn__json_escape_cstr(FILE *f, char *str) {
     cn__json_escape_str(f, CN_CSTR(str));
 }
 
-CNDEF void cn_test_diagnostic_handler(Cn_Diagnostic_Level level, Cn_Location *loc, Cn_Diagnostic_Code code, Cn_String span, const char *format, va_list args) {
+CNDEF void cn_test_diagnostic_handler(Cn_Diagnostic_Level level, Cn_Location *loc, Cn_Diagnostic_Code code, Cn_String span, Cn_Diagnostic_Annotation annotations[], size_t annotations_length, const char *format, va_list args) {
     CN_UNUSED(span);
+    CN_UNUSED(annotations);
+    CN_UNUSED(annotations_length);
 
     if (level < cn_min_diagnostic_level)
         return;
