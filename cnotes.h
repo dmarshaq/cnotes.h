@@ -932,6 +932,11 @@ CNDEF bool cn_lexer_expect(Cn_Lexer *lexer, Cn_Token_Type type);
  */
 CNDEF Cn_Token cn_lexer_peek(Cn_Lexer *lexer, int64_t offset);
 
+/**
+ * RETURNS: Static string of the token type. Used in messages.
+ */
+CNDEF const char *cn_token_kind_name(Cn_Token_Type type);
+
 // TYPE SECTION
 
 typedef struct cn_type Cn_Type;
@@ -1009,7 +1014,10 @@ typedef struct {
 } Cn_Type_Enum_Member;
 
 typedef struct {
-    bool is_signed;
+    Cn_String tag;
+
+    Cn_Type *member_type;
+
     int64_t members_length;
     Cn_Type_Enum_Member *members;
 } Cn_Type_Enum;
@@ -1275,6 +1283,7 @@ typedef enum : uint8_t {
 
     CN_AST_TYPE_TYPEDEF,
     CN_AST_TYPE_STRUCT_OR_UNION,
+    CN_AST_TYPE_ENUM,
     CN_AST_TYPE_GNU_TYPEOF,
 } Cn_Ast_Type_Kind;
 
@@ -1548,6 +1557,8 @@ typedef enum cn_ast_node_kind : uint8_t {
     CN_AST_NODE_UNION_SPECIFIER,
     CN_AST_NODE_MEMBER_DECLARATION,
     CN_AST_NODE_MEMBER_DECLARATOR,
+    CN_AST_NODE_ENUM_SPECIFIER,
+    CN_AST_NODE_ENUMERATOR,
     CN_AST_NODE_ATTRIBUTE_SPECIFIER,
     CN_AST_NODE_ATTRIBUTE,
     CN_AST_NODE_GNU_ATTRIBUTE_SPECIFIER,
@@ -1755,6 +1766,7 @@ typedef struct {
     union {
         Cn_String typedef_name;
         Cn_Ast_Idx struct_or_union_idx;
+        Cn_Ast_Idx enum_idx;
         Cn_Ast_Idx gnu_typeof_idx;
     };
 } Cn_Ast_Node_Type_Specifier;
@@ -1798,6 +1810,21 @@ typedef struct {
     Cn_Ast_Idx declarator_idx;
     Cn_Ast_Idx bitfield_expression_idx;
 } Cn_Ast_Node_Member_Declarator;
+
+typedef struct {
+    Cn_Ast_Idx identifier_idx;
+    Cn_Ast_Linked_List attribute_specifier_sequence;
+    Cn_Ast_Linked_List gnu_attribute_specifier_sequence;
+    Cn_Ast_Idx specifier_qualifer_idx;
+    Cn_Ast_Linked_List enumerator_list;
+} Cn_Ast_Node_Enum_Specifier;
+
+typedef struct {
+    Cn_Ast_Idx identifier_idx;
+    Cn_Ast_Linked_List attribute_specifier_sequence;
+    Cn_Ast_Linked_List gnu_attribute_specifier_sequence;
+    Cn_Ast_Idx expression_idx;
+} Cn_Ast_Node_Enumerator;
 
 typedef struct {
     Cn_Ast_Linked_List attribute_list;
@@ -1893,6 +1920,8 @@ typedef struct cn_ast_node {
         Cn_Ast_Node_Union_Specifier             union_specifier;
         Cn_Ast_Node_Member_Declaration          member_declaration;
         Cn_Ast_Node_Member_Declarator           member_declarator;
+        Cn_Ast_Node_Enum_Specifier              enum_specifier;
+        Cn_Ast_Node_Enumerator                  enumerator;
         Cn_Ast_Node_Attribute_Specifier         attribute_specifier;
         Cn_Ast_Node_Attribute                   attribute;
         Cn_Ast_Node_Gnu_Attribute_Specifier     gnu_attribute_specifier;
@@ -1942,7 +1971,7 @@ typedef struct {
 } Cn_Ast_Binding_Function;
 
 typedef struct {
-    // TODO: Binding enum constant.
+    int64_t value; 
 } Cn_Ast_Binding_Enum_Constant;
 
 typedef struct {
@@ -2385,6 +2414,14 @@ CNDEF Cn_Ast_Binding_Idx cn_ast_variable_binding_declare(Cn_String name, Cn_Ast_
 CNDEF Cn_Ast_Binding_Idx cn_ast_typedef_binding_declare(Cn_String name, Cn_Ast_Idx source_idx, Cn_Type *type);
 
 /**
+ * Adds new enum constant binding to the current scope.
+ * If same binding already exists handles redeclaration, redefinition of the binding.
+ *
+ * RETURNS: NIL if error occured, binding idx on success.
+ */
+CNDEF Cn_Ast_Binding_Idx cn_ast_enum_constant_binding_declare(Cn_String name, Cn_Ast_Idx source_idx, Cn_Type *type, int64_t value);
+
+/**
  * Declares new tag binding to the current scope. 
  *
  * If same binding already exists handles redeclaration.
@@ -2399,6 +2436,20 @@ CNDEF Cn_Ast_Binding_Idx cn_ast_typedef_binding_declare(Cn_String name, Cn_Ast_I
  * RETURNS: NIL if error occured, binding idx on success.
  */
 CNDEF Cn_Ast_Binding_Idx cn_ast_tag_binding_declare(Cn_String tag, Cn_Type_Kind kind);
+
+/**
+ * Parses signle token type, if token is not of the expected type, emits error diagnostic.
+ * 
+ * RETURNS: True if successfully parsed token, false otherwise.
+ */
+CNDEF bool cn_parse_expect(Cn_Lexer *lexer, Cn_Token_Type type);
+
+/**
+ * Parses signle token type, if token is not of the expected type, skips.
+ * 
+ * RETURNS: True if successfully parsed token, false otherwise.
+ */
+CNDEF bool cn_parse_optional(Cn_Lexer *lexer, Cn_Token_Type type);
 
 /**
  * Parses code starting of with lexer current token as translation unit.
@@ -3229,6 +3280,26 @@ CNDEF int cn_ast_parse_member_declarator_list(Cn_Lexer *lexer, Cn_Ast_Linked_Lis
 CNDEF Cn_Ast_Idx cn_ast_parse_member_declarator(Cn_Lexer *lexer);
 
 /**
+ * Parses code starting of with lexer current token as enum specifier.
+ *
+ *  enum_specifier
+ *          : 'enum' attribute_specifier_sequence gnu_attribute_specifier_sequence
+ *          ( identifier? (':' specifier_qualifier)? '{' enumerator* '}' ) 
+ *          | identifier  (':' specifier_qualifier)?
+ *          ;
+ */
+CNDEF Cn_Ast_Idx cn_ast_parse_enum_specifier(Cn_Lexer *lexer);
+
+/**
+ * Parses code starting of with lexer current token as enumerator.
+ *
+ *  enumerator
+ *          : identifier attribute_specifier_sequence gnu_attribute_specifier_sequence ('=' expression)? ','
+ *          ;
+ */
+CNDEF Cn_Ast_Idx cn_ast_parse_enumerator(Cn_Lexer *lexer);
+
+/**
  * Parses code starting of with lexer current token as attribute specifier sequence.
  *
  * attribute_specifier_sequence
@@ -3383,7 +3454,7 @@ CNDEF void cn_ast_expression_clear_types(Cn_Ast_Idx expression_idx);
 /**
  * Reparse given ast node as translation unit.
  *
- * IMPORTANT: Analysis funtions perfom:
+ * IMPORTANT: Reparse funtions perfom:
  *  Structural AST validation.
  *  Type resolution via cn_ast_to_type.
  *  Binding creation for variables, functions, typedefs, tags.
@@ -5587,6 +5658,108 @@ CNDEF Cn_Token cn_lexer_peek(Cn_Lexer *lexer, int64_t offset) {
     return lexer->queue[(lexer->current_idx + offset) % CN_LEXER_QUEUE_COUNT];
 }
 
+CNDEF const char *cn_token_kind_name(Cn_Token_Type type) {
+    switch(type) {
+        case CN_TOKEN_EOF:              return "<eof>";
+        case CN_TOKEN_UNKNOWN:          return "<unknown>";
+        case CN_TOKEN_STRING:           return "<string literal>";
+        case CN_TOKEN_COMMENT:          return "<comment>";
+        case CN_TOKEN_LINE_MARKER:      return "<line marker>";
+        case CN_TOKEN_INTEGER_VALUE:    return "<integer literal>";
+        case CN_TOKEN_FLOAT_VALUE:      return "<float literal>";
+        case CN_TOKEN_IDENTIFIER:       return "<identifier>";
+        // Keyword tokens
+        case CN_TOKEN_GNU_EXTENSION:    return "__extension__";
+        case CN_TOKEN_GNU_ATTRIBUTE:    return "__attribute__";
+        case CN_TOKEN_CONST:            return "const";
+        case CN_TOKEN_RESTRICT:         return "restrict";
+        case CN_TOKEN_VOLATILE:         return "volatile";
+        case CN_TOKEN_ATOMIC:           return "_Atomic";
+        case CN_TOKEN_STATIC:           return "static";
+        case CN_TOKEN_EXTERN:           return "extern";
+        case CN_TOKEN_REGISTER:         return "register";
+        case CN_TOKEN_AUTO:             return "auto";
+        case CN_TOKEN_TYPEDEF:          return "typedef";
+        case CN_TOKEN_SIGNED:           return "signed";
+        case CN_TOKEN_UNSIGNED:         return "unsigned";
+        case CN_TOKEN_SHORT:            return "short";
+        case CN_TOKEN_LONG:             return "long";
+        case CN_TOKEN_INT:              return "int";
+        case CN_TOKEN_CHAR:             return "char";
+        case CN_TOKEN_FLOAT:            return "float";
+        case CN_TOKEN_DOUBLE:           return "double";
+        case CN_TOKEN_BOOL:             return "_Bool";
+        case CN_TOKEN_VOID:             return "void";
+        case CN_TOKEN_STRUCT:           return "struct";
+        case CN_TOKEN_ENUM:             return "enum";
+        case CN_TOKEN_UNION:            return "union";
+        case CN_TOKEN_GNU_TYPEOF:       return "typeof";
+        case CN_TOKEN_IF:               return "if";
+        case CN_TOKEN_ELSE:             return "else";
+        case CN_TOKEN_SWITCH:           return "switch";
+        case CN_TOKEN_WHILE:            return "while";
+        case CN_TOKEN_DO:               return "do";
+        case CN_TOKEN_FOR:              return "for";
+        case CN_TOKEN_GOTO:             return "goto";
+        case CN_TOKEN_CONTINUE:         return "continue";
+        case CN_TOKEN_BREAK:            return "break";
+        case CN_TOKEN_RETURN:           return "return";
+        case CN_TOKEN_SIZEOF:           return "sizeof";
+        case CN_TOKEN_INLINE:           return "inline";
+        case CN_TOKEN_NORETURN:         return "_Noreturn";
+        case CN_TOKEN_ASM:              return "asm";
+        // Literal tokens
+        case CN_TOKEN_COLON:            return ":";
+        case CN_TOKEN_SEMICOLON:        return ";";
+        case CN_TOKEN_PARAN_OPEN:       return "(";
+        case CN_TOKEN_PARAN_CLOSE:      return ")";
+        case CN_TOKEN_CURLY_OPEN:       return "{";
+        case CN_TOKEN_CURLY_CLOSE:      return "}";
+        case CN_TOKEN_SQR_BRACES_OPEN:  return "[";
+        case CN_TOKEN_SQR_BRACES_CLOSE: return "]";
+        case CN_TOKEN_COMMA:            return ",";
+        case CN_TOKEN_DOT:              return ".";
+        case CN_TOKEN_ARROW:            return "->";
+        case CN_TOKEN_ASSIGN:           return "=";
+        case CN_TOKEN_ASTERISK:         return "*";
+        case CN_TOKEN_SLASH:            return "/";
+        case CN_TOKEN_PLUS:             return "+";
+        case CN_TOKEN_MINUS:            return "-";
+        case CN_TOKEN_PERCENT:          return "%";
+        case CN_TOKEN_INCREMENT:        return "++";
+        case CN_TOKEN_DECREMENT:        return "--";
+        case CN_TOKEN_LSHIFT:           return "<<";
+        case CN_TOKEN_RSHIFT:           return ">>";
+        case CN_TOKEN_LESS:             return "<";
+        case CN_TOKEN_GREATER:          return ">";
+        case CN_TOKEN_LESS_EQ:          return "<=";
+        case CN_TOKEN_GREATER_EQ:       return ">=";
+        case CN_TOKEN_EQ:               return "==";
+        case CN_TOKEN_NOT_EQ:           return "!=";
+        case CN_TOKEN_AMPERSAND:        return "&";
+        case CN_TOKEN_HAT:              return "^";
+        case CN_TOKEN_BAR:              return "|";
+        case CN_TOKEN_AND:              return "&&";
+        case CN_TOKEN_OR:               return "||";
+        case CN_TOKEN_EXCLAMATION:      return "!";
+        case CN_TOKEN_TILDE:            return "~";
+        case CN_TOKEN_LSHIFT_ASSIGN:    return "<<=";
+        case CN_TOKEN_RSHIFT_ASSIGN:    return ">>=";
+        case CN_TOKEN_MULTIPLY_ASSIGN:  return "*=";
+        case CN_TOKEN_DIVIDE_ASSIGN:    return "/=";
+        case CN_TOKEN_MODULO_ASSIGN:    return "%=";
+        case CN_TOKEN_PLUS_ASSIGN:      return "+=";
+        case CN_TOKEN_MINUS_ASSIGN:     return "-=";
+        case CN_TOKEN_BIT_AND_ASSIGN:   return "&=";
+        case CN_TOKEN_BIT_XOR_ASSIGN:   return "^=";
+        case CN_TOKEN_BIT_OR_ASSIGN:    return "|=";
+        case CN_TOKEN_QUESTION:         return "?";
+        case CN_TOKEN_ELLIPSIS:         return "...";
+    }
+
+    return "<invalid token>";
+}
+
 CNDEF void cn_lexer_print_snippet(Cn_Lexer *lexer, uint64_t index, int64_t length) {
     Cn_String line = cn_str_eat_chars(lexer->content, lexer->bol);
     int64_t end = cn_str_find_char_left(line, '\n');
@@ -7146,63 +7319,66 @@ CNDEF void cn_ast_print(Cn_Ast_Node *node, int depth) {
         
     }
 
-
     cn_ast_print_prefixes[depth] = NULL;
 }
 
 CNDEF const char *cn_ast_node_kind_name(Cn_Ast_Node_Kind kind) {
     switch (kind) {
-        case CN_AST_NODE_UNKNOWN:                 return "UNKNOWN";
-        case CN_AST_NODE_ERROR:                   return "ERROR";
-        case CN_AST_NODE_CODE:                    return "CODE";
-        case CN_AST_NODE_TRANSLATION_UNIT:        return "TRANSLATION_UNIT";
-        case CN_AST_NODE_EXTERNAL_DECLARATION:    return "EXTERNAL_DECLARATION";
-        case CN_AST_NODE_DECLARATION:             return "DECLARATION";
-        case CN_AST_NODE_FUNCTION_DEFINITION:     return "FUNCTION_DEFINITION";
-        case CN_AST_NODE_ASM_DEFINITION:          return "ASM_DEFINITION";
-        case CN_AST_NODE_COMPOUND_STATEMENT:      return "COMPOUND_STATEMENT";
-        case CN_AST_NODE_SELECTION_STATEMENT:     return "SELECTION_STATEMENT";
-        case CN_AST_NODE_ITERATION_STATEMENT:     return "ITERATION_STATEMENT";
-        case CN_AST_NODE_JUMP_STATEMENT:          return "JUMP_STATEMENT";
-        case CN_AST_NODE_LABELED_STATEMENT:       return "LABELED_STATEMENT";
-        case CN_AST_NODE_EXPRESSION_STATEMENT:    return "EXPRESSION_STATEMENT";
-        case CN_AST_NODE_BINARY_EXPRESSION:       return "BINARY_EXPRESSION";
-        case CN_AST_NODE_ACCESS_EXPRESSION:       return "ACCESS_EXPRESSION";
-        case CN_AST_NODE_FUNCTION_EXPRESSION:     return "FUNCTION_EXPRESSION";
-        case CN_AST_NODE_UNARY_EXPRESSION:        return "UNARY_EXPRESSION";
-        case CN_AST_NODE_CAST_EXPRESSION:         return "CAST_EXPRESSION";
-        case CN_AST_NODE_SIZEOF_EXPRESSION:       return "SIZEOF_EXPRESSION";
-        case CN_AST_NODE_TERNARY_EXPRESSION:      return "TERNARY_EXPRESSION";
-        case CN_AST_NODE_ASSIGNMENT_EXPRESSION:   return "ASSIGNMENT_EXPRESSION";
-        case CN_AST_NODE_POSTFIX_EXPRESSION:      return "POSTFIX_EXPRESSION";
-        case CN_AST_NODE_PRIMARY_EXPRESSION:      return "PRIMARY_EXPRESSION";
-        case CN_AST_NODE_IDENTIFIER:              return "IDENTIFIER";
-        case CN_AST_NODE_INTEGER:                 return "INTEGER";
-        case CN_AST_NODE_FLOAT:                   return "FLOAT";
-        case CN_AST_NODE_STRING:                  return "STRING";
-        case CN_AST_NODE_INIT_DECLARATOR_LIST:    return "INIT_DECLARATOR_LIST";
-        case CN_AST_NODE_INIT_DECLARATOR:         return "INIT_DECLARATOR";
-        case CN_AST_NODE_INITIALIZER:             return "INITIALIZER";
-        case CN_AST_NODE_ABSTRACT_DECLARATOR:     return "ABSTRACT_DECLARATOR";
-        case CN_AST_NODE_DECLARATOR:              return "DECLARATOR";
-        case CN_AST_NODE_POINTER:                 return "POINTER";
-        case CN_AST_NODE_DIRECT_DECLARATOR:       return "DIRECT_DECLARATOR";
-        case CN_AST_NODE_DECLARATION_SPECIFIERS:  return "DECLARATION_SPECIFIERS";
-        case CN_AST_NODE_GNU_TYPEOF_SPECIFIER:    return "GNU_TYPEOF_SPECIFIER";
-        case CN_AST_NODE_TYPE_SPECIFIER:          return "TYPE_SPECIFIER";
-        case CN_AST_NODE_TYPE_NAME:               return "TYPE_NAME";
-        case CN_AST_NODE_SPECIFIER_QUALIFIER:     return "SPECIFIER_QUALIFIER";
-        case CN_AST_NODE_PARAMETER_TYPE_LIST:     return "PARAMETER_TYPE_LIST";
-        case CN_AST_NODE_PARAMETER_DECLARATION:   return "PARAMETER_DECLARATION";
-        case CN_AST_NODE_STRUCT_SPECIFIER:        return "STRUCT_SPECIFIER";
-        case CN_AST_NODE_UNION_SPECIFIER:         return "UNION_SPECIFIER";
-        case CN_AST_NODE_MEMBER_DECLARATION:      return "MEMBER_DECLARATION";
-        case CN_AST_NODE_MEMBER_DECLARATOR:       return "MEMBER_DECLARATOR";
-        case CN_AST_NODE_GNU_ATTRIBUTE_SPECIFIER: return "GNU_ATTRIBUTE_SPECIFIER";
-        case CN_AST_NODE_GNU_ATTRIBUTE:           return "GNU_ATTRIBUTE";
-        case CN_AST_NODE_GNU_ASM_LABEL:           return "GNU_ASM_LABEL";
-        default:                                  return "<invalid kind>";
+        case CN_AST_NODE_UNKNOWN:                   return "UNKNOWN";
+        case CN_AST_NODE_ERROR:                     return "ERROR";
+        case CN_AST_NODE_CODE:                      return "CODE";
+        case CN_AST_NODE_TRANSLATION_UNIT:          return "TRANSLATION_UNIT";
+        case CN_AST_NODE_EXTERNAL_DECLARATION:      return "EXTERNAL_DECLARATION";
+        case CN_AST_NODE_DECLARATION:               return "DECLARATION";
+        case CN_AST_NODE_FUNCTION_DEFINITION:       return "FUNCTION_DEFINITION";
+        case CN_AST_NODE_ASM_DEFINITION:            return "ASM_DEFINITION";
+        case CN_AST_NODE_COMPOUND_STATEMENT:        return "COMPOUND_STATEMENT";
+        case CN_AST_NODE_SELECTION_STATEMENT:       return "SELECTION_STATEMENT";
+        case CN_AST_NODE_ITERATION_STATEMENT:       return "ITERATION_STATEMENT";
+        case CN_AST_NODE_JUMP_STATEMENT:            return "JUMP_STATEMENT";
+        case CN_AST_NODE_LABELED_STATEMENT:         return "LABELED_STATEMENT";
+        case CN_AST_NODE_EXPRESSION_STATEMENT:      return "EXPRESSION_STATEMENT";
+        case CN_AST_NODE_BINARY_EXPRESSION:         return "BINARY_EXPRESSION";
+        case CN_AST_NODE_ACCESS_EXPRESSION:         return "ACCESS_EXPRESSION";
+        case CN_AST_NODE_FUNCTION_EXPRESSION:       return "FUNCTION_EXPRESSION";
+        case CN_AST_NODE_UNARY_EXPRESSION:          return "UNARY_EXPRESSION";
+        case CN_AST_NODE_CAST_EXPRESSION:           return "CAST_EXPRESSION";
+        case CN_AST_NODE_SIZEOF_EXPRESSION:         return "SIZEOF_EXPRESSION";
+        case CN_AST_NODE_TERNARY_EXPRESSION:        return "TERNARY_EXPRESSION";
+        case CN_AST_NODE_ASSIGNMENT_EXPRESSION:     return "ASSIGNMENT_EXPRESSION";
+        case CN_AST_NODE_POSTFIX_EXPRESSION:        return "POSTFIX_EXPRESSION";
+        case CN_AST_NODE_PRIMARY_EXPRESSION:        return "PRIMARY_EXPRESSION";
+        case CN_AST_NODE_IDENTIFIER:                return "IDENTIFIER";
+        case CN_AST_NODE_INTEGER:                   return "INTEGER";
+        case CN_AST_NODE_FLOAT:                     return "FLOAT";
+        case CN_AST_NODE_STRING:                    return "STRING";
+        case CN_AST_NODE_INIT_DECLARATOR_LIST:      return "INIT_DECLARATOR_LIST";
+        case CN_AST_NODE_INIT_DECLARATOR:           return "INIT_DECLARATOR";
+        case CN_AST_NODE_INITIALIZER:               return "INITIALIZER";
+        case CN_AST_NODE_ABSTRACT_DECLARATOR:       return "ABSTRACT_DECLARATOR";
+        case CN_AST_NODE_DECLARATOR:                return "DECLARATOR";
+        case CN_AST_NODE_POINTER:                   return "POINTER";
+        case CN_AST_NODE_DIRECT_DECLARATOR:         return "DIRECT_DECLARATOR";
+        case CN_AST_NODE_DECLARATION_SPECIFIERS:    return "DECLARATION_SPECIFIERS";
+        case CN_AST_NODE_GNU_TYPEOF_SPECIFIER:      return "GNU_TYPEOF_SPECIFIER";
+        case CN_AST_NODE_TYPE_SPECIFIER:            return "TYPE_SPECIFIER";
+        case CN_AST_NODE_TYPE_NAME:                 return "TYPE_NAME";
+        case CN_AST_NODE_SPECIFIER_QUALIFIER:       return "SPECIFIER_QUALIFIER";
+        case CN_AST_NODE_PARAMETER_TYPE_LIST:       return "PARAMETER_TYPE_LIST";
+        case CN_AST_NODE_PARAMETER_DECLARATION:     return "PARAMETER_DECLARATION";
+        case CN_AST_NODE_STRUCT_SPECIFIER:          return "STRUCT_SPECIFIER";
+        case CN_AST_NODE_UNION_SPECIFIER:           return "UNION_SPECIFIER";
+        case CN_AST_NODE_MEMBER_DECLARATION:        return "MEMBER_DECLARATION";
+        case CN_AST_NODE_MEMBER_DECLARATOR:         return "MEMBER_DECLARATOR";
+        case CN_AST_NODE_ENUM_SPECIFIER:            return "ENUM_SPECIFIER";
+        case CN_AST_NODE_ENUMERATOR:                return "ENUMERATOR";
+        case CN_AST_NODE_ATTRIBUTE_SPECIFIER:       return "ATTRIBUTE_SPECIFIER";
+        case CN_AST_NODE_ATTRIBUTE:                 return "ATTRIBUTE";
+        case CN_AST_NODE_GNU_ATTRIBUTE_SPECIFIER:   return "GNU_ATTRIBUTE_SPECIFIER";
+        case CN_AST_NODE_GNU_ATTRIBUTE:             return "GNU_ATTRIBUTE";
+        case CN_AST_NODE_GNU_ASM_LABEL:             return "GNU_ASM_LABEL";
     }
+    return "<invalid kind>";
 }
 
 CNDEF void cn_emit_write_file(Cn_String str, void *ctx) {
@@ -8468,6 +8644,41 @@ CNDEF Cn_Ast_Binding_Idx cn_ast_typedef_binding_declare(Cn_String name, Cn_Ast_I
     return cn_ast_binding_table_put(binding, &cn__ast_data->symbol_binding_table);
 }
 
+CNDEF Cn_Ast_Binding_Idx cn_ast_enum_constant_binding_declare(Cn_String name, Cn_Ast_Idx source_idx, Cn_Type *type, int64_t value) {
+    CN_ASSERT(cn_array_list_length(&cn__ast_data->scope_stack) > 0);
+
+    Cn_Ast_Binding binding = { 
+        .kind = CN_BINDING_ENUM_CONSTANT,
+        .src = source_idx,
+        .type = type,
+        .scope_idx = CN_AST_SCOPE_STACK_CURRENT_IDX,
+    };
+
+    binding.b_enum_constant.value = value;
+    
+    // Getting currently visible binding with the same name if such exists.
+    Cn_Ast_Binding_Idx current_idx = cn_ast_binding_table_get(name, &cn__ast_data->symbol_binding_table);
+    if (current_idx != CN_AST_NIL_BINDING_IDX) {
+        Cn_Ast_Binding *current = cn_ast_binding_get(current_idx);
+        binding.name = current->name;
+
+        // Handling redeclaration, redifinition.
+        if (current->scope_idx == CN_AST_SCOPE_STACK_CURRENT_IDX) {
+            // If bindings conflict in general, based on type or kind.
+            if (cn__ast_bindings_conflict(current, &binding)) return CN_AST_NIL_BINDING_IDX;
+
+            // Enum constant is not allowed to be redefined.
+            cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, source_idx, CN_DC_ILLEGAL_BINDING, "'%.*s' enum constant redifinition.", CN_UNPACK(name));
+            return CN_AST_NIL_BINDING_IDX;
+        }
+    } else {
+        binding.name = cn__ast_scope_stack_save_string(name);
+    }
+
+    binding.next_idx = current_idx;
+    return cn_ast_binding_table_put(binding, &cn__ast_data->symbol_binding_table);
+}
+
 CNDEF Cn_Ast_Binding_Idx cn_ast_tag_binding_declare(Cn_String tag, Cn_Type_Kind kind) {
     CN_ASSERT(cn_array_list_length(&cn__ast_data->scope_stack) > 0);
     CN_ASSERT(kind == CN_STRUCT || kind == CN_UNION || kind == CN_ENUM);
@@ -8490,7 +8701,7 @@ CNDEF Cn_Ast_Binding_Idx cn_ast_tag_binding_declare(Cn_String tag, Cn_Type_Kind 
                 type->t_union.tag = tag;
                 break;
             case CN_ENUM:
-                CN_TODO("Enum binding.");
+                type->t_enum.tag = tag;
                 break;
             default:
                 break;
@@ -8531,7 +8742,7 @@ CNDEF Cn_Ast_Binding_Idx cn_ast_tag_binding_declare(Cn_String tag, Cn_Type_Kind 
             type->t_union.tag = tag;
             break;
         case CN_ENUM:
-            CN_TODO("Enum binding.");
+            type->t_enum.tag = tag;
             break;
         default:
             break;
@@ -8549,6 +8760,25 @@ CNDEF Cn_Ast_Binding_Idx cn_ast_tag_binding_declare(Cn_String tag, Cn_Type_Kind 
 
 
     return cn_array_list_length(&cn__ast_data->binding_list) - 1;
+}
+
+CNDEF bool cn_parse_expect(Cn_Lexer *lexer, Cn_Token_Type type) {
+    if (cn_lexer_expect(lexer, type)) {
+        cn_lexer_next_token(lexer);
+        return true;
+    }
+
+    Cn_Token token = cn_lexer_peek(lexer, -1);
+    cn_diagnostic_src(CN_DIAGNOSTIC_ERROR, &token.loc, &token.src, CN_DC_EXPECTED_TOKEN, "Expected '%s' token, but got '%s'.", cn_token_kind_name(type), cn_token_kind_name(cn_lexer_token(lexer).type));
+    return false;
+}
+
+CNDEF bool cn_parse_optional(Cn_Lexer *lexer, Cn_Token_Type type) {
+    if (cn_lexer_expect(lexer, type)) {
+        cn_lexer_next_token(lexer);
+        return true;
+    }
+    return false;
 }
 
 CNDEF Cn_Ast_Idx cn_ast_parse_translation_unit(Cn_Lexer *lexer) {
@@ -8808,11 +9038,7 @@ CNDEF Cn_Ast_Idx cn_ast_parse_function_definition_or_declaration(Cn_Lexer *lexer
         if (!ok) goto error;
 
         // ';' at the end check.
-        if (!cn_lexer_expect(lexer, CN_TOKEN_SEMICOLON)) {
-            cn_diagnostic_src(CN_DIAGNOSTIC_ERROR, &cn_lexer_token(lexer).loc, &cn_lexer_token(lexer).src, CN_DC_EXPECTED_TOKEN, "Expected ';' at the end of declaration.");
-            goto error_recover;
-        }
-        cn_lexer_next_token(lexer);
+        if (!cn_parse_expect(lexer, CN_TOKEN_SEMICOLON)) goto error_recover;
         
         // Adding types that are used by declarators.
         ok = cn_ast_analyze_declaration(node.declaration.declaration_specifiers_idx, node.declaration.init_declarator_list_idx);
@@ -9063,11 +9289,7 @@ CNDEF Cn_Ast_Idx cn_ast_parse_compound_statement(Cn_Lexer *lexer, bool use_curre
 
     Cn_Ast_Idx child_idx;
 
-    if (!cn_lexer_expect(lexer, CN_TOKEN_CURLY_OPEN)) {
-        cn_diagnostic_src(CN_DIAGNOSTIC_ERROR, &cn_lexer_token(lexer).loc, &cn_lexer_token(lexer).src, CN_DC_EXPECTED_TOKEN, "Expected '{' in the beginning of compound statement.");
-        goto error;
-    }
-    cn_lexer_next_token(lexer);
+    if (!cn_parse_expect(lexer, CN_TOKEN_CURLY_OPEN)) goto error;
 
     // Stepping into scope.
     if (!use_current_scope) cn_ast_scope_stack_push();
@@ -9228,12 +9450,8 @@ CNDEF Cn_Ast_Idx cn_ast_parse_jump_statement(Cn_Lexer *lexer) {
             }
     }
     
-    if (!cn_lexer_expect(lexer, CN_TOKEN_SEMICOLON)) {
-        cn_diagnostic_src(CN_DIAGNOSTIC_ERROR, &cn_lexer_token(lexer).loc, &cn_lexer_token(lexer).src, CN_DC_EXPECTED_TOKEN, "Expected ';' at the end of jump statement.");
-        goto error;
-    }
-    cn_lexer_next_token(lexer);
 
+    if (!cn_parse_expect(lexer, CN_TOKEN_SEMICOLON)) goto error;
     
     Cn_Ast_Idx parent = cn_ast_node_list_append(node);
     cn_ast_node_set_parent(parent, 
@@ -9277,14 +9495,9 @@ CNDEF Cn_Ast_Idx cn_ast_parse_expression_statement(Cn_Lexer *lexer) {
     
     node.expression_statement.expression_idx = expression_idx;
 
-    if (!cn_lexer_expect(lexer, CN_TOKEN_SEMICOLON)) {
-        Cn_Token prev = cn_lexer_peek(lexer, -1);
-        cn_diagnostic_src(CN_DIAGNOSTIC_ERROR, &prev.loc, &prev.src, CN_DC_EXPECTED_TOKEN, "Expected ';' at the end of expression statement.");
-        goto error;
-    }
-    node.src.length = cn_source_dist(&node.src, &cn_lexer_token(lexer).src);
+    if (!cn_parse_expect(lexer, CN_TOKEN_SEMICOLON)) goto error;
 
-    cn_lexer_next_token(lexer);
+    node.src.length = cn_source_dist(&node.src, &cn_lexer_token(lexer).src);
 
     // Type checking parsed expression.
     Cn_Type *type = cn_ast_expression_typecheck(node.expression_statement.expression_idx);
@@ -9324,7 +9537,7 @@ error:
     return (Cn_Ast_Linked_List) {0};
 }
 
-CNDEF Cn_Ast_Idx cn_ast_parse_expression_increasing_precedence(Cn_Lexer *lexer, Cn_Ast_Idx left_idx, int min_precedence, Cn_Expression_Parsing_Flags flags) {
+CNDEF Cn_Ast_Idx cn_ast_parse_expression_increasing_precedence(Cn_Lexer *lexer, Cn_Ast_Idx left_idx, int min_precedence, Cn_Expression_Parsing_Flags flags) {;
     Cn_Lexer original_state = *lexer;
 
     // Ternary operator case. TODO: Make macro so its not hardcoded precedence 2.
@@ -9344,11 +9557,7 @@ CNDEF Cn_Ast_Idx cn_ast_parse_expression_increasing_precedence(Cn_Lexer *lexer, 
 
         node.ternary_expression.true_expression_idx = child_idx;
 
-        if (!cn_lexer_expect(lexer, CN_TOKEN_COLON)) {
-            cn_diagnostic_src(CN_DIAGNOSTIC_ERROR, &cn_lexer_token(lexer).loc, &cn_lexer_token(lexer).src, CN_DC_EXPECTED_TOKEN, "Expected ':' in ternary expression.");
-            goto error;
-        }
-        cn_lexer_next_token(lexer);
+        if (!cn_parse_expect(lexer, CN_TOKEN_COLON)) goto error;
 
         child_idx = cn_ast_parse_expression(lexer, -1, flags);
         if (child_idx == CN_AST_NIL_IDX) goto error;
@@ -9391,14 +9600,9 @@ CNDEF Cn_Ast_Idx cn_ast_parse_expression_increasing_precedence(Cn_Lexer *lexer, 
                 bool ok;
                 node.function_expression.argument_list = cn_ast_parse_argument_list(lexer, &ok);
                 if (!ok) goto error;
-
-                if (!cn_lexer_expect(lexer, CN_TOKEN_PARAN_CLOSE)) {
-                    cn_diagnostic_src(CN_DIAGNOSTIC_ERROR, &cn_lexer_token(lexer).loc, &cn_lexer_token(lexer).src, CN_DC_EXPECTED_TOKEN, "Expected ')' in function call expression.");
-                    goto error;
-                }
             }
-            cn_lexer_next_token(lexer);
 
+            if (!cn_parse_expect(lexer, CN_TOKEN_PARAN_CLOSE)) goto error;
 
             Cn_Ast_Idx parent = cn_ast_node_list_append(node);
             cn_ast_node_set_parent(parent, node.function_expression.expression_idx);
@@ -9430,17 +9634,11 @@ CNDEF Cn_Ast_Idx cn_ast_parse_expression_increasing_precedence(Cn_Lexer *lexer, 
         // Array subscript case.
         Cn_Ast_Node node = { .kind = CN_AST_NODE_BINARY_EXPRESSION, .loc = cn_lexer_token(lexer).loc, .src = cn_lexer_token(lexer).src };
 
-        if (cn_lexer_expect(lexer, CN_TOKEN_SQR_BRACES_OPEN)) {
-            cn_lexer_next_token(lexer);
-
+        if (cn_parse_optional(lexer, CN_TOKEN_SQR_BRACES_OPEN)) {
             Cn_Ast_Idx right_idx = cn_ast_parse_expression(lexer, precedence, flags);
             if (right_idx == CN_AST_NIL_IDX) goto error;
 
-            if (!cn_lexer_expect(lexer, CN_TOKEN_SQR_BRACES_CLOSE)) {
-                cn_diagnostic_src(CN_DIAGNOSTIC_ERROR, &cn_lexer_token(lexer).loc, &cn_lexer_token(lexer).src, CN_DC_EXPECTED_TOKEN, "Expected ']' in array subscript expression.");
-                goto error;
-            }
-            cn_lexer_next_token(lexer);
+            if (!cn_parse_expect(lexer, CN_TOKEN_SQR_BRACES_CLOSE)) goto error;
 
             node.binary_expression = ((Cn_Ast_Node_Binary_Expression) {
                     .left_expression_idx = left_idx, 
@@ -9577,11 +9775,7 @@ CNDEF Cn_Ast_Idx cn_ast_parse_expression_leaf(Cn_Lexer *lexer, Cn_Expression_Par
             Cn_Ast_Idx type_name_idx = cn_ast_parse_type_name(lexer);
             if (type_name_idx == CN_AST_NIL_IDX) goto error;
             
-            if (!cn_lexer_expect(lexer, CN_TOKEN_PARAN_CLOSE)) {
-                cn_diagnostic_src(CN_DIAGNOSTIC_ERROR, &cn_lexer_token(lexer).loc, &cn_lexer_token(lexer).src, CN_DC_EXPECTED_TOKEN, "Expected ')' closing parenthesis at the end of cast expression.");
-                goto error;
-            }
-            cn_lexer_next_token(lexer);
+            if (!cn_parse_expect(lexer, CN_TOKEN_PARAN_CLOSE)) goto error;
             
             // TODO: Compound literal case.
 
@@ -9606,11 +9800,7 @@ CNDEF Cn_Ast_Idx cn_ast_parse_expression_leaf(Cn_Lexer *lexer, Cn_Expression_Par
         Cn_Ast_Idx expression_idx = cn_ast_parse_expression(lexer, -1, 0);
         if (expression_idx == CN_AST_NIL_IDX) goto error;
         
-        if (!cn_lexer_expect(lexer, CN_TOKEN_PARAN_CLOSE)) {
-            cn_diagnostic_src(CN_DIAGNOSTIC_ERROR, &cn_lexer_token(lexer).loc, &cn_lexer_token(lexer).src, CN_DC_EXPECTED_TOKEN, "Expected ')' closing parenthesis at the end of parenthesized expression.");
-            goto error;
-        }
-        cn_lexer_next_token(lexer);
+        if (!cn_parse_expect(lexer, CN_TOKEN_PARAN_CLOSE)) goto error;
 
         return expression_idx;
     }
@@ -9631,12 +9821,7 @@ CNDEF Cn_Ast_Idx cn_ast_parse_expression_leaf(Cn_Lexer *lexer, Cn_Expression_Par
                 Cn_Ast_Idx type_name_idx = cn_ast_parse_type_name(lexer);
                 if (type_name_idx == CN_AST_NIL_IDX) goto error;
 
-
-                if (!cn_lexer_expect(lexer, CN_TOKEN_PARAN_CLOSE)) {
-                    cn_diagnostic_src(CN_DIAGNOSTIC_ERROR, &cn_lexer_token(lexer).loc, &cn_lexer_token(lexer).src, CN_DC_EXPECTED_TOKEN, "Expected ')' closing parenthesis at the end of sizeof expression.");
-                    goto error;
-                }
-                cn_lexer_next_token(lexer);
+                if (!cn_parse_expect(lexer, CN_TOKEN_PARAN_CLOSE)) goto error;
 
                 node.sizeof_expression = (Cn_Ast_Node_Sizeof_Expression) {
                     .child_idx = type_name_idx
@@ -9884,12 +10069,7 @@ CNDEF Cn_Ast_Idx cn_ast_parse_pointer(Cn_Lexer *lexer) {
 
     Cn_Ast_Node node = { .kind = CN_AST_NODE_POINTER, .loc = cn_lexer_token(lexer).loc, .src = cn_lexer_token(lexer).src };
     
-    if (!cn_lexer_expect(lexer, CN_TOKEN_ASTERISK)) {
-        cn_diagnostic_src(CN_DIAGNOSTIC_ERROR, &cn_lexer_token(lexer).loc, &cn_lexer_token(lexer).src, CN_DC_EXPECTED_TOKEN, "Expected '*' when parsing pointer.");
-        goto error;
-    }
-
-    cn_lexer_next_token(lexer);
+    if (!cn_parse_expect(lexer, CN_TOKEN_ASTERISK)) goto error;
     
     int ok;
     while (true) {
@@ -9938,12 +10118,7 @@ CNDEF Cn_Ast_Idx cn_ast_parse_direct_declarator(Cn_Lexer *lexer, bool *is_abstra
         // Making above declarator abstract if its child is abstract too.
         *is_abstract = cn_ast_node_get(child_idx)->kind == CN_AST_NODE_ABSTRACT_DECLARATOR;
 
-        if (!cn_lexer_expect(lexer, CN_TOKEN_PARAN_CLOSE)) {
-            cn_diagnostic_src(CN_DIAGNOSTIC_ERROR, &cn_lexer_token(lexer).loc, &cn_lexer_token(lexer).src, CN_DC_EXPECTED_TOKEN, "Expected ')' when parsing direct declarator.");
-            goto error;
-        }
-
-        cn_lexer_next_token(lexer);
+        if (!cn_parse_expect(lexer, CN_TOKEN_PARAN_CLOSE)) goto error;
 
         direct_declarator_idx = cn_ast_node_list_append(node);
 
@@ -9981,12 +10156,7 @@ CNDEF Cn_Ast_Idx cn_ast_parse_direct_declarator(Cn_Lexer *lexer, bool *is_abstra
                 if (type == NULL) goto error;
             }
 
-            if (!cn_lexer_expect(lexer, CN_TOKEN_SQR_BRACES_CLOSE)) {
-                cn_diagnostic_src(CN_DIAGNOSTIC_ERROR, &cn_lexer_token(lexer).loc, &cn_lexer_token(lexer).src, CN_DC_EXPECTED_TOKEN, "Expected ']' when parsing direct declarator.");
-                goto error;
-            }
-
-            cn_lexer_next_token(lexer);
+            if (!cn_parse_expect(lexer, CN_TOKEN_SQR_BRACES_CLOSE)) goto error;
 
             // Extending source loc to highlight whole array '[...]' declarator.
             node.src.length = cn_source_dist(&node.src, &cn_lexer_token(lexer).src);
@@ -9998,7 +10168,7 @@ CNDEF Cn_Ast_Idx cn_ast_parse_direct_declarator(Cn_Lexer *lexer, bool *is_abstra
             cn_ast_node_set_parent(direct_declarator_idx, node.direct_declarator.array.direct_declarator_idx);
             continue;
         }
-    // direct_declarator '(' ('void' | parameter_type_list)? ')' case.
+        // direct_declarator '(' ('void' | parameter_type_list)? ')' case.
         else if (cn_lexer_expect(lexer, CN_TOKEN_PARAN_OPEN)) {
 
             node = (Cn_Ast_Node) { .kind = CN_AST_NODE_DIRECT_DECLARATOR, .loc = cn_lexer_token(lexer).loc};
@@ -10017,12 +10187,7 @@ CNDEF Cn_Ast_Idx cn_ast_parse_direct_declarator(Cn_Lexer *lexer, bool *is_abstra
                 }
             }
 
-            if (!cn_lexer_expect(lexer, CN_TOKEN_PARAN_CLOSE)) {
-                cn_diagnostic_src(CN_DIAGNOSTIC_ERROR, &cn_lexer_token(lexer).loc, &cn_lexer_token(lexer).src, CN_DC_EXPECTED_TOKEN, "Expected ')' when parsing direct declarator.");
-                goto error;
-            }
-
-            cn_lexer_next_token(lexer);
+            if (!cn_parse_expect(lexer, CN_TOKEN_PARAN_CLOSE)) goto error;
 
             // Extending source loc to highlight whole function '(...)' declarator.
             node.src.length = cn_source_dist(&node.src, &cn_lexer_token(lexer).src);
@@ -10362,17 +10527,8 @@ CNDEF Cn_Ast_Idx cn_ast_parse_gnu_typeof_specifier(Cn_Lexer *lexer) {
     Cn_Lexer original_state = *lexer;
     Cn_Ast_Node node = { .kind = CN_AST_NODE_GNU_TYPEOF_SPECIFIER, .loc = cn_lexer_token(lexer).loc, .src = cn_lexer_token(lexer).src };
 
-    if (!cn_lexer_expect(lexer, CN_TOKEN_GNU_TYPEOF)) {
-        cn_diagnostic_src(CN_DIAGNOSTIC_ERROR, &cn_lexer_token(lexer).loc, &cn_lexer_token(lexer).src, CN_DC_EXPECTED_TOKEN, "Expected 'typeof' in GNU typeof specifier.");
-        goto error;
-    }
-    cn_lexer_next_token(lexer);
-
-    if (!cn_lexer_expect(lexer, CN_TOKEN_PARAN_OPEN)) {
-        cn_diagnostic_src(CN_DIAGNOSTIC_ERROR, &cn_lexer_token(lexer).loc, &cn_lexer_token(lexer).src, CN_DC_EXPECTED_TOKEN, "Expected '(' in GNU typeof specifier.");
-        goto error;
-    }
-    cn_lexer_next_token(lexer);
+    if (!cn_parse_expect(lexer, CN_TOKEN_GNU_TYPEOF)) goto error;
+    if (!cn_parse_expect(lexer, CN_TOKEN_PARAN_OPEN)) goto error;
 
     Cn_Ast_Idx child_idx;
 
@@ -10388,11 +10544,7 @@ CNDEF Cn_Ast_Idx cn_ast_parse_gnu_typeof_specifier(Cn_Lexer *lexer) {
     if (child_idx == CN_AST_NIL_IDX) goto error;
     node.gnu_typeof_specifier.expression_or_type_name_idx = child_idx;
 
-    if (!cn_lexer_expect(lexer, CN_TOKEN_PARAN_CLOSE)) {
-        cn_diagnostic_src(CN_DIAGNOSTIC_ERROR, &cn_lexer_token(lexer).loc, &cn_lexer_token(lexer).src, CN_DC_EXPECTED_TOKEN, "Expected ')' in GNU typeof specifier.");
-        goto error;
-    }
-    cn_lexer_next_token(lexer);
+    if (!cn_parse_expect(lexer, CN_TOKEN_PARAN_CLOSE)) goto error;
 
     Cn_Ast_Idx parent = cn_ast_node_list_append(node);
     cn_ast_node_set_parent(parent, node.gnu_typeof_specifier.expression_or_type_name_idx);
@@ -10455,7 +10607,23 @@ CNDEF Cn_Ast_Idx cn_ast_try_parse_type_specifier(Cn_Lexer *lexer, Cn_Ast_Idx out
 
         return 0;
     }
+    
+    // Checking if token is enum.
+    if (cn_lexer_expect(lexer, CN_TOKEN_ENUM)) {
+        node->type_specifier.kind = CN_AST_TYPE_ENUM;
 
+        Cn_Ast_Idx enum_idx = cn_ast_parse_enum_specifier(lexer);
+        // Getting node again because array list that stores nodes might 
+        // have been resized, invalidating previous pointer.
+        node = cn_ast_node_get(output_idx);
+
+        if (enum_idx == CN_AST_NIL_IDX) goto error;
+        node->type_specifier.enum_idx = enum_idx;
+
+        return 0;
+    }
+
+    // Checking if typeof.
     if (cn_lexer_expect(lexer, CN_TOKEN_GNU_TYPEOF)) {   
         node->type_specifier.kind = CN_AST_TYPE_GNU_TYPEOF;
         
@@ -10469,9 +10637,6 @@ CNDEF Cn_Ast_Idx cn_ast_try_parse_type_specifier(Cn_Lexer *lexer, Cn_Ast_Idx out
 
         return 0;
     }
-
-    // INCOMPLETE:
-    // Checking if token(s) is enum specifier.
 
     // Checking if token is type sign.
     if (cn_lexer_expect(lexer, CN_TOKEN_SIGNED)) {
@@ -10786,11 +10951,7 @@ CNDEF Cn_Ast_Idx cn_ast_parse_member_declaration(Cn_Lexer *lexer) {
     if (cn_ast_parse_member_declarator_list(lexer, &node.member_declaration.member_declarator_list) != 0) 
         goto error;
 
-    if (!cn_lexer_expect(lexer, CN_TOKEN_SEMICOLON)) {
-        cn_diagnostic_src(CN_DIAGNOSTIC_ERROR, &cn_lexer_token(lexer).loc, &cn_lexer_token(lexer).src, CN_DC_EXPECTED_TOKEN, "Expected ';' at the end of member declaration.");
-        goto error;
-    }
-    cn_lexer_next_token(lexer);
+    if (!cn_parse_expect(lexer, CN_TOKEN_SEMICOLON)) goto error;
 
     Cn_Ast_Idx parent = cn_ast_node_list_append(node);
     cn_ast_node_set_parent(parent, node.member_declaration.specifier_qualifier_idx);
@@ -10852,6 +11013,104 @@ error:
     return CN_AST_NIL_IDX;
 }
 
+CNDEF Cn_Ast_Idx cn_ast_parse_enum_specifier(Cn_Lexer *lexer) {
+    Cn_Lexer original_state = *lexer;
+
+    Cn_Ast_Node node = { .kind = CN_AST_NODE_ENUM_SPECIFIER, .loc = cn_lexer_token(lexer).loc, .src = cn_lexer_token(lexer).src };
+    
+    if (!cn_parse_expect(lexer, CN_TOKEN_ENUM)) goto error;
+    
+    bool ok;
+
+    node.enum_specifier.attribute_specifier_sequence = cn_ast_parse_attribute_specifier_sequence(lexer, &ok);
+    if (!ok) goto error;
+
+    node.enum_specifier.gnu_attribute_specifier_sequence = cn_ast_parse_gnu_attribute_specifier_sequence(lexer, &ok);
+    if (!ok) goto error;
+
+    if (cn_lexer_expect(lexer, CN_TOKEN_IDENTIFIER)) {
+        Cn_Ast_Idx identifier_idx = cn_ast_parse_identifier(lexer);
+        if (identifier_idx == CN_AST_NIL_IDX) goto error;
+        node.enum_specifier.identifier_idx = identifier_idx;
+    }
+
+    if (cn_parse_optional(lexer, CN_TOKEN_COLON)) {
+        Cn_Ast_Idx specifier_qualifier_idx = cn_ast_parse_specifier_qualifier(lexer);
+        if (specifier_qualifier_idx == CN_AST_NIL_IDX) goto error;
+        node.enum_specifier.specifier_qualifer_idx = specifier_qualifier_idx;
+    }
+
+    bool is_enum_definition_optional = node.enum_specifier.identifier_idx != CN_AST_NIL_IDX;
+
+    if (cn_parse_optional(lexer, CN_TOKEN_CURLY_OPEN)) {
+        
+        Cn_Ast_Idx enumerator_idx;
+        while (!cn_lexer_expect(lexer, CN_TOKEN_CURLY_CLOSE)) {
+            enumerator_idx = cn_ast_parse_enumerator(lexer);
+            if (enumerator_idx == CN_AST_NIL_IDX) goto error;
+            cn_ast_linked_list_add(&node.enum_specifier.enumerator_list, enumerator_idx);
+        }
+        
+        cn_parse_expect(lexer, CN_TOKEN_CURLY_CLOSE);
+    } else if (!is_enum_definition_optional) {
+        cn_diagnostic_src(CN_DIAGNOSTIC_ERROR, &cn_lexer_token(lexer).loc, &cn_lexer_token(lexer).src, CN_DC_EXPECTED_TOKEN, "Expected enum definition '{' in enum specifier.");
+        goto error;
+    }
+
+    Cn_Ast_Idx parent = cn_ast_node_list_append(node);
+    cn_ast_linked_list_set_parent(parent, &node.enum_specifier.attribute_specifier_sequence);
+    cn_ast_linked_list_set_parent(parent, &node.enum_specifier.gnu_attribute_specifier_sequence);
+    cn_ast_linked_list_set_parent(parent, &node.enum_specifier.enumerator_list);
+    cn_ast_node_set_parent(parent, 
+            node.enum_specifier.identifier_idx,
+            node.enum_specifier.specifier_qualifer_idx,
+            );
+    return parent;
+
+error:
+    *lexer = original_state;
+    return CN_AST_NIL_IDX;
+}
+
+CNDEF Cn_Ast_Idx cn_ast_parse_enumerator(Cn_Lexer *lexer) {
+    Cn_Lexer original_state = *lexer;
+
+    Cn_Ast_Node node = { .kind = CN_AST_NODE_ENUMERATOR, .loc = cn_lexer_token(lexer).loc, .src = cn_lexer_token(lexer).src };
+
+    if (cn_lexer_expect(lexer, CN_TOKEN_IDENTIFIER)) {
+        Cn_Ast_Idx identifier_idx = cn_ast_parse_identifier(lexer);
+        if (identifier_idx == CN_AST_NIL_IDX) goto error;
+        node.enumerator.identifier_idx = identifier_idx;
+    }
+
+    bool ok;
+
+    node.enumerator.attribute_specifier_sequence = cn_ast_parse_attribute_specifier_sequence(lexer, &ok);
+    if (!ok) goto error;
+
+    node.enumerator.gnu_attribute_specifier_sequence = cn_ast_parse_gnu_attribute_specifier_sequence(lexer, &ok);
+    if (!ok) goto error;
+
+    if (cn_parse_optional(lexer, CN_TOKEN_ASSIGN)) {
+        Cn_Ast_Idx expression_idx = cn_ast_parse_expression(lexer, -1, CN_NO_COMMA_OPERATOR);
+        if (expression_idx == CN_AST_NIL_IDX) goto error;
+        node.enumerator.expression_idx = expression_idx;
+    }
+
+    Cn_Ast_Idx parent = cn_ast_node_list_append(node);
+    cn_ast_linked_list_set_parent(parent, &node.enumerator.attribute_specifier_sequence);
+    cn_ast_linked_list_set_parent(parent, &node.enumerator.gnu_attribute_specifier_sequence);
+    cn_ast_node_set_parent(parent, 
+            node.enumerator.identifier_idx,
+            node.enumerator.expression_idx,
+            );
+    return parent;
+
+error:
+    *lexer = original_state;
+    return CN_AST_NIL_IDX;
+}
+
 CNDEF Cn_Ast_Linked_List cn_ast_parse_attribute_specifier_sequence(Cn_Lexer *lexer, bool *ok) {
     Cn_Lexer original_state = *lexer;
 
@@ -10880,35 +11139,17 @@ CNDEF Cn_Ast_Idx cn_ast_parse_attribute_specifier(Cn_Lexer *lexer) {
 
     Cn_Ast_Node node = { .kind = CN_AST_NODE_ATTRIBUTE_SPECIFIER, .loc = cn_lexer_token(lexer).loc, .src = cn_lexer_token(lexer).src };
     
-    if (!cn_lexer_expect(lexer, CN_TOKEN_SQR_BRACES_OPEN)) {
-        cn_diagnostic_src(CN_DIAGNOSTIC_ERROR, &cn_lexer_token(lexer).loc, &cn_lexer_token(lexer).src, CN_DC_EXPECTED_TOKEN, "Expected '[' token in attribute specifier.");
-        goto error;
-    }
-    cn_lexer_next_token(lexer);
-
-    if (!cn_lexer_expect(lexer, CN_TOKEN_SQR_BRACES_OPEN)) {
-        cn_diagnostic_src(CN_DIAGNOSTIC_ERROR, &cn_lexer_token(lexer).loc, &cn_lexer_token(lexer).src, CN_DC_EXPECTED_TOKEN, "Expected '[' token in attribute specifier.");
-        goto error;
-    }
-    cn_lexer_next_token(lexer);
+    if (!cn_parse_expect(lexer, CN_TOKEN_SQR_BRACES_OPEN)) goto error;
+    if (!cn_parse_expect(lexer, CN_TOKEN_SQR_BRACES_OPEN)) goto error;
 
     if (!cn_lexer_expect(lexer, CN_TOKEN_SQR_BRACES_CLOSE)) {
         bool ok;
         node.attribute_specifier.attribute_list = cn_ast_parse_attribute_list(lexer, &ok); 
         if (!ok) goto error;
-
-        if (!cn_lexer_expect(lexer, CN_TOKEN_SQR_BRACES_CLOSE)) {
-            cn_diagnostic_src(CN_DIAGNOSTIC_ERROR, &cn_lexer_token(lexer).loc, &cn_lexer_token(lexer).src, CN_DC_EXPECTED_TOKEN, "Expected ']' token in GNU attribute specifier.");
-            goto error;
-        }
     }
-    cn_lexer_next_token(lexer);
 
-    if (!cn_lexer_expect(lexer, CN_TOKEN_SQR_BRACES_CLOSE)) {
-        cn_diagnostic_src(CN_DIAGNOSTIC_ERROR, &cn_lexer_token(lexer).loc, &cn_lexer_token(lexer).src, CN_DC_EXPECTED_TOKEN, "Expected ']' token in GNU attribute specifier.");
-        goto error;
-    }
-    cn_lexer_next_token(lexer);
+    if (!cn_parse_expect(lexer, CN_TOKEN_SQR_BRACES_CLOSE)) goto error;
+    if (!cn_parse_expect(lexer, CN_TOKEN_SQR_BRACES_CLOSE)) goto error;
 
     Cn_Ast_Idx parent = cn_ast_node_list_append(node);
     cn_ast_linked_list_set_parent(parent, &node.attribute_specifier.attribute_list);
@@ -10964,18 +11205,12 @@ CNDEF Cn_Ast_Idx cn_ast_parse_attribute(Cn_Lexer *lexer) {
     if (identifier_idx == CN_AST_NIL_IDX) goto error;
     node.attribute.identifier_idx = identifier_idx;
 
-    if (cn_lexer_expect(lexer, CN_TOKEN_PARAN_OPEN)) {
-        cn_lexer_next_token(lexer);
-
+    if (cn_parse_optional(lexer, CN_TOKEN_PARAN_OPEN)) {
         bool ok;
         node.attribute.argument_list = cn_ast_parse_argument_list(lexer, &ok);
         if (!ok) goto error;
 
-        if (!cn_lexer_expect(lexer, CN_TOKEN_PARAN_CLOSE)) {
-            cn_diagnostic_src(CN_DIAGNOSTIC_ERROR, &cn_lexer_token(lexer).loc, &cn_lexer_token(lexer).src, CN_DC_EXPECTED_TOKEN, "Expected ')' token in attribute.");
-            goto error;
-        }
-        cn_lexer_next_token(lexer);
+        if (!cn_parse_expect(lexer, CN_TOKEN_PARAN_CLOSE)) goto error;
     }
 
     Cn_Ast_Idx parent = cn_ast_node_list_append(node);
@@ -11017,41 +11252,18 @@ CNDEF Cn_Ast_Idx cn_ast_parse_gnu_attribute_specifier(Cn_Lexer *lexer) {
 
     Cn_Ast_Node node = { .kind = CN_AST_NODE_GNU_ATTRIBUTE_SPECIFIER, .loc = cn_lexer_token(lexer).loc, .src = cn_lexer_token(lexer).src };
     
-    if (!cn_lexer_expect(lexer, CN_TOKEN_GNU_ATTRIBUTE)) {
-        cn_diagnostic_src(CN_DIAGNOSTIC_ERROR, &cn_lexer_token(lexer).loc, &cn_lexer_token(lexer).src, CN_DC_EXPECTED_TOKEN, "Expected '__attribute__' token in GNU attribute specifier.");
-        goto error;
-    }
-    cn_lexer_next_token(lexer);
-
-    if (!cn_lexer_expect(lexer, CN_TOKEN_PARAN_OPEN)) {
-        cn_diagnostic_src(CN_DIAGNOSTIC_ERROR, &cn_lexer_token(lexer).loc, &cn_lexer_token(lexer).src, CN_DC_EXPECTED_TOKEN, "Expected '(' token in GNU attribute specifier.");
-        goto error;
-    }
-    cn_lexer_next_token(lexer);
-
-    if (!cn_lexer_expect(lexer, CN_TOKEN_PARAN_OPEN)) {
-        cn_diagnostic_src(CN_DIAGNOSTIC_ERROR, &cn_lexer_token(lexer).loc, &cn_lexer_token(lexer).src, CN_DC_EXPECTED_TOKEN, "Expected '(' token in GNU attribute specifier.");
-        goto error;
-    }
-    cn_lexer_next_token(lexer);
+    if (!cn_parse_expect(lexer, CN_TOKEN_GNU_ATTRIBUTE)) goto error;
+    if (!cn_parse_expect(lexer, CN_TOKEN_PARAN_OPEN)) goto error;
+    if (!cn_parse_expect(lexer, CN_TOKEN_PARAN_OPEN)) goto error;
 
     if (!cn_lexer_expect(lexer, CN_TOKEN_PARAN_CLOSE)) {
         bool ok;
         node.gnu_attribute_specifier.gnu_attribute_list = cn_ast_parse_gnu_attribute_list(lexer, &ok); 
         if (!ok) goto error;
-
-        if (!cn_lexer_expect(lexer, CN_TOKEN_PARAN_CLOSE)) {
-            cn_diagnostic_src(CN_DIAGNOSTIC_ERROR, &cn_lexer_token(lexer).loc, &cn_lexer_token(lexer).src, CN_DC_EXPECTED_TOKEN, "Expected ')' token in GNU attribute specifier.");
-            goto error;
-        }
     }
-    cn_lexer_next_token(lexer);
 
-    if (!cn_lexer_expect(lexer, CN_TOKEN_PARAN_CLOSE)) {
-        cn_diagnostic_src(CN_DIAGNOSTIC_ERROR, &cn_lexer_token(lexer).loc, &cn_lexer_token(lexer).src, CN_DC_EXPECTED_TOKEN, "Expected ')' token in GNU attribute specifier.");
-        goto error;
-    }
-    cn_lexer_next_token(lexer);
+    if (!cn_parse_expect(lexer, CN_TOKEN_PARAN_CLOSE)) goto error;
+    if (!cn_parse_expect(lexer, CN_TOKEN_PARAN_CLOSE)) goto error;
 
     Cn_Ast_Idx parent = cn_ast_node_list_append(node);
     cn_ast_linked_list_set_parent(parent, &node.gnu_attribute_specifier.gnu_attribute_list);
@@ -11097,18 +11309,12 @@ CNDEF Cn_Ast_Idx cn_ast_parse_gnu_attribute(Cn_Lexer *lexer) {
     if (identifier_idx == CN_AST_NIL_IDX) goto error;
     node.gnu_attribute.identifier_idx = identifier_idx;
 
-    if (cn_lexer_expect(lexer, CN_TOKEN_PARAN_OPEN)) {
-        cn_lexer_next_token(lexer);
-
+    if (cn_parse_optional(lexer, CN_TOKEN_PARAN_OPEN)) {
         bool ok;
         node.gnu_attribute.argument_list = cn_ast_parse_argument_list(lexer, &ok);
         if (!ok) goto error;
 
-        if (!cn_lexer_expect(lexer, CN_TOKEN_PARAN_CLOSE)) {
-            cn_diagnostic_src(CN_DIAGNOSTIC_ERROR, &cn_lexer_token(lexer).loc, &cn_lexer_token(lexer).src, CN_DC_EXPECTED_TOKEN, "Expected ')' token in GNU attribute.");
-            goto error;
-        }
-        cn_lexer_next_token(lexer);
+        if (!cn_parse_expect(lexer, CN_TOKEN_PARAN_CLOSE)) goto error;
     }
 
     Cn_Ast_Idx parent = cn_ast_node_list_append(node);
@@ -11126,17 +11332,8 @@ CNDEF Cn_Ast_Idx cn_ast_parse_gnu_asm_label(Cn_Lexer *lexer) {
 
     Cn_Ast_Node node = { .kind = CN_AST_NODE_GNU_ASM_LABEL, .loc = cn_lexer_token(lexer).loc, .src = cn_lexer_token(lexer).src };
 
-    if (!cn_lexer_expect(lexer, CN_TOKEN_ASM)) {
-        cn_diagnostic_src(CN_DIAGNOSTIC_ERROR, &cn_lexer_token(lexer).loc, &cn_lexer_token(lexer).src, CN_DC_EXPECTED_TOKEN, "Expected 'asm' token in GNU asm label.");
-        goto error;
-    }
-    cn_lexer_next_token(lexer);
-
-    if (!cn_lexer_expect(lexer, CN_TOKEN_PARAN_OPEN)) {
-        cn_diagnostic_src(CN_DIAGNOSTIC_ERROR, &cn_lexer_token(lexer).loc, &cn_lexer_token(lexer).src, CN_DC_EXPECTED_TOKEN, "Expected '(' token in GNU asm label.");
-        goto error;
-    }
-    cn_lexer_next_token(lexer);
+    if (!cn_parse_expect(lexer, CN_TOKEN_ASM)) goto error;
+    if (!cn_parse_expect(lexer, CN_TOKEN_PARAN_OPEN)) goto error;
 
     if (cn_lexer_expect(lexer, CN_TOKEN_STRING)) {
         Cn_Ast_Idx string_idx = cn_ast_parse_string(lexer);
@@ -11144,11 +11341,7 @@ CNDEF Cn_Ast_Idx cn_ast_parse_gnu_asm_label(Cn_Lexer *lexer) {
         node.gnu_asm_label.string_idx = string_idx;
     }
 
-    if (!cn_lexer_expect(lexer, CN_TOKEN_PARAN_CLOSE)) {
-        cn_diagnostic_src(CN_DIAGNOSTIC_ERROR, &cn_lexer_token(lexer).loc, &cn_lexer_token(lexer).src, CN_DC_EXPECTED_TOKEN, "Expected ')' token in GNU asm label.");
-        goto error;
-    }
-    cn_lexer_next_token(lexer);
+    if (!cn_parse_expect(lexer, CN_TOKEN_PARAN_CLOSE)) goto error;
 
     Cn_Ast_Idx parent = cn_ast_node_list_append(node);
     cn_ast_node_set_parent(parent, node.gnu_asm_label.string_idx);
@@ -11402,6 +11595,20 @@ CNDEF Cn_Type *cn_ast_to_type(Cn_Qualifier_Flags flags, Cn_Ast_Idx type_specifie
                 }
 
                 result = binding->type;
+            }
+            break;
+        case CN_AST_TYPE_ENUM:
+            {
+                CN_TODO("CN_AST_TYPE_ENUM to type.");
+                Cn_Ast_Node *enum_specifier = cn_ast_node_get(ts->type_specifier.enum_idx);
+                Cn_String tag = cn_ast_node_get(enum_specifier->enum_specifier.identifier_idx)->identifier.name;
+
+                if (enum_specifier->kind == CN_AST_NODE_ENUM_SPECIFIER) {
+                    Cn_Ast_Binding_Idx binding_idx = cn_ast_tag_binding_declare(tag, CN_ENUM);
+                    if (binding_idx == CN_AST_NIL_BINDING_IDX) return NULL;
+                    Cn_Ast_Binding *binding = cn_ast_binding_get(binding_idx);
+
+                }
             }
             break;
         case CN_AST_TYPE_TYPEDEF:
