@@ -531,78 +531,6 @@ int msg_handler(Cn_Message_Kind kind, void *message) {
                 Cn_Message_Parsed_Function_Definition *m = message;
                 
 
-                Cn_Ast_Node *node = cn_ast_node_get(m->node_idx);
-                Cn_String file_name_main = CN_CSTR("main.c");
-                if (cn_str_equals(&node->loc.file, &file_name_main)) {
-
-                    Cn_Ast_Idx attr_idx = cn_get_attribute(&node->function_definition.attribute_specifier_sequence, CN_STR_LIT("hello"));
-                    if (attr_idx != CN_AST_NIL_IDX) {\
-
-                        // Getting argument passed to hello.
-                        {
-                            if (cn_ast_node_get(attr_idx)->attribute.argument_list.length != 1) {
-                                cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, attr_idx, CN_DC_EXPECTED_AST_NODE, "Expected only 1 argument passed to 'hello' attribute, but got %ld argument(s).", cn_ast_node_get(attr_idx)->attribute.argument_list.length);
-                                return 0;
-                            } 
-
-                            if (cn_ast_node_get(cn_ast_node_get(attr_idx)->attribute.argument_list.first_idx)->kind != CN_AST_NODE_PRIMARY_EXPRESSION || cn_ast_node_get(cn_ast_node_get(cn_ast_node_get(attr_idx)->attribute.argument_list.first_idx)->primary_expression.literal_idx)->kind != CN_AST_NODE_STRING) {
-                                cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, cn_ast_node_get(cn_ast_node_get(attr_idx)->attribute.argument_list.first_idx)->primary_expression.literal_idx, CN_DC_EXPECTED_AST_NODE, "Expected argument to be string literal.");
-                                return 0;
-                            }
-                        }
-                        
-                        Cn_String meta_data = cn_ast_node_get(cn_ast_node_get(cn_ast_node_get(attr_idx)->attribute.argument_list.first_idx)->primary_expression.literal_idx)->string.str;
-                    
-                        // Getting function name from function definition.
-                        Cn_Ast_Idx identifier_idx;
-                        cn_get_declarator_info(node->function_definition.declarator_idx, &identifier_idx);
-                        Cn_String function_name = cn_ast_node_get(identifier_idx)->identifier.name;
-
-                        Cn_Ast_Idx expr1 = cn_build_expr_statement(
-                                cn_build_func_call(
-                                    cn_build_identifier(CN_CSTR("printf")), 
-                                    cn_build_linked_list(
-                                        cn_build_string(CN_CSTR("Hello from cnotes! in '%s' function! '%s'\\n")),
-                                        cn_build_string(function_name, .alloc = true),
-                                        cn_build_string(meta_data)
-                                        )
-                                    )
-                                );
-                        cn_linked_list_insert(
-                                &cn_ast_node_get(node->function_definition.compound_statement_idx)->compound_statement.statement_or_declaration_list.first_idx,
-                                expr1,
-                                node->function_definition.compound_statement_idx
-                                );
-
-                        return 1;
-                    }
-                    
-                    
-
-                    // Cn_Ast_Idx number = cn_build_integer(CN_CSTR("7"));
-                    // Cn_Ast_Idx expr = cn_build_expr_statement(
-                    //             cn_build_binary(
-                    //                 CN_BINARY_OP_ADDITION, 
-                    //                 cn_build_integer(CN_CSTR("6")), 
-                    //                 number
-                    //                 )
-                    //         );
-
-                    //             
-                    // cn_replace(
-                    //         &cn_ast_node_get(node->function_definition.compound_statement_idx)->compound_statement.statement_or_declaration_list.first_idx, 
-                    //         expr,
-                    //         node->function_definition.compound_statement_idx
-                    //         );
-
-                    // 
-                    // cn_diagnostic_node(CN_DIAGNOSTIC_INFO, number, CN_DC_ZERO, "Diagnostic info.");
-                    // cn_ast_linked_list_foreach_idx(i, &cn_ast_node_get(node->function_definition.compound_statement_idx)->compound_statement.statement_or_declaration_list) {
-                    //     cn_diagnostic_node(CN_DIAGNOSTIC_WARNING, i, CN_DC_ZERO, "Diagnostic info.");
-                    // }
-
-                }
-                            
                 return 0;
             }
         default: 
@@ -637,8 +565,8 @@ int cn_command(int *argc, char ***argv) {
     cn_message_handler = msg_handler;
     Cn_Translation_Unit tu = cn_tu_make("main.i");
     
-    // if (cn_tu_process(&tu, CN_PRINT_BINDINGS | CN_PRINT_TYPES | CN_PRINT_AST) == -1) {
-    if (cn_tu_process(&tu, 0) == -1) {
+    if (cn_tu_process(&tu, CN_PRINT_BINDINGS | CN_PRINT_TYPES | CN_PRINT_AST) == -1) {
+    // if (cn_tu_process(&tu, 0) == -1) {
         cn_tu_free(&tu);
         return 1;
     }

@@ -18,39 +18,39 @@ int main(void) {
     {
         Cn_Type ptr_int = cn_type_make_pointer(&CN_TYPE_INT);
         CN_ASSERT(ptr_int.kind == CN_POINTER);
-        CN_ASSERT(cn_type_equals(ptr_int.t_pointer.ptr_to, &CN_TYPE_INT));
+        CN_ASSERT(cn_type_equals(ptr_int.pointer.ptr_to, &CN_TYPE_INT));
 
         Cn_Type ptr_char = cn_type_make_pointer(&CN_TYPE_CHAR);
         CN_ASSERT(ptr_char.kind == CN_POINTER);
-        CN_ASSERT(cn_type_equals(ptr_char.t_pointer.ptr_to, &CN_TYPE_CHAR));
+        CN_ASSERT(cn_type_equals(ptr_char.pointer.ptr_to, &CN_TYPE_CHAR));
 
         // Pointer to pointer
         Cn_Type ptr_ptr_int = cn_type_make_pointer(&ptr_int);
         CN_ASSERT(ptr_ptr_int.kind == CN_POINTER);
-        CN_ASSERT(ptr_ptr_int.t_pointer.ptr_to->kind == CN_POINTER);
+        CN_ASSERT(ptr_ptr_int.pointer.ptr_to->kind == CN_POINTER);
     }
 
     // Test cn_type_make_qualified
     {
-        Cn_Type const_int = cn_type_make_qualified(CN_TYPE_CONSTANT, &CN_TYPE_INT);
+        Cn_Type const_int = cn_type_make_qualified(CN_TYPE_QUALIFIED_CONSTANT, &CN_TYPE_INT);
         CN_ASSERT(const_int.kind == CN_QUALIFIED);
-        CN_ASSERT(const_int.t_qualified.flags & CN_TYPE_CONSTANT);
+        CN_ASSERT(const_int.flags & CN_TYPE_QUALIFIED_CONSTANT);
 
-        Cn_Type volatile_int = cn_type_make_qualified(CN_TYPE_VOLATILE, &CN_TYPE_INT);
+        Cn_Type volatile_int = cn_type_make_qualified(CN_TYPE_QUALIFIED_VOLATILE, &CN_TYPE_INT);
         CN_ASSERT(volatile_int.kind == CN_QUALIFIED);
-        CN_ASSERT(volatile_int.t_qualified.flags & CN_TYPE_VOLATILE);
+        CN_ASSERT(volatile_int.flags & CN_TYPE_QUALIFIED_VOLATILE);
     }
 
     // Test cn_type_is_constant
     {
-        Cn_Type const_int = cn_type_make_qualified(CN_TYPE_CONSTANT, &CN_TYPE_INT);
+        Cn_Type const_int = cn_type_make_qualified(CN_TYPE_QUALIFIED_CONSTANT, &CN_TYPE_INT);
         CN_ASSERT(cn_type_is_constant(&const_int) == true);
         CN_ASSERT(cn_type_is_constant(&CN_TYPE_INT) == false);
     }
 
     // Test cn_type_unqualified
     {
-        Cn_Type const_int = cn_type_make_qualified(CN_TYPE_CONSTANT, &CN_TYPE_INT);
+        Cn_Type const_int = cn_type_make_qualified(CN_TYPE_QUALIFIED_CONSTANT, &CN_TYPE_INT);
         Cn_Type *unqual = cn_type_unqualified(&const_int);
         CN_ASSERT(cn_type_equals(unqual, &CN_TYPE_INT));
 
