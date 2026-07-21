@@ -11,6 +11,7 @@ const Cn_String src = CN_STR_BUFFER(
     "    int x = 5;\n"
     "    int y = 5;\n"
     "    int arr[2] = { 1, [0] = 2, 3 };\n"
+    "    int *pi = (int[3]){1, 2, 3};\n"
     "    Vec3 v = { .y = 3, 4, .x = 0 };\n"
     "    return v.x + v.y + v.z;\n"
     "}\n"
