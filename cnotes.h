@@ -1,7 +1,7 @@
 /*  cnotes - v0.1.0 - MIT License - https://github.com/dmarshaq/cnotes.h
 
     A header-only library for building C meta programs, static analysis tools, 
-    and source transformation pipelines — operating directly on pre-processed .i files.
+    and source transformation pipelines - operating directly on pre-processed .i files.
 
     # Macro Interface
 
@@ -28,6 +28,49 @@
       - CN_AST_NODE_LIST_INITIAL_CAP        Redefine initial capacity of array list that holds ast nodes.
       - CN_BUILD_OPT_DEFAULT_ALLOC          Redefine default value of alloc optional in cn_build_* functios.
                                             See Cn_Build_Opt for more information.
+
+    # API Conventions & Navigation
+
+        The rules below ensure a stable, well documented API across all public releases. 
+        Since this library grew larger than expected, it's split into multiple sections, 
+        each following its own convention and grouping related functions into manageable, 
+        easy to understand units.
+
+    ## Conventions
+        
+      - All user facing interface is prefixed with `cn_`, `Cn_`, or `CN_` respectivly depending on the use case.
+      - Internal functionality is prefixed with `cn__`, `Cn__`, or `CN__` - double underscore, depending on the use case.
+        Such functionality is not recommended for the user to work with as it can backward incompatible in any releases,
+        and is considered unstable, therefor is labeled as internal.
+      - Functions ending with `_opt` denote ability to accept optional parameters through respective `_Opt` ending struct.
+        Usually are internal and are coupled with user facing macros.
+
+    ## Navigation
+        
+        Below are prefixes that appear after initial `cn_` or `cn__` prefix that denote which section the function is coming from.
+        Entries marked with CAUTION:, indicate that specific user interface is activily being changed and developed, 
+        and is to be used with caution.
+        
+        `log_`                          Responsible for libraries logging interface, with separate log handler idea from nob.h.
+        `hash_`                         Used for various hashing operations by the library.
+        `str_`                          Interface for Cn_String operations.
+        `sb_`                           Interface for Cn_String_Builder operations.
+        `chained_arena_`                Interface for Cn_Chained_Arena operations.
+        `array_list_`                   Interface to operate on dynamically allocated array list.
+        `hash_table_`                   Interface to operate on dynamically allocated hash table.
+        `hash_set_`                     Interface to operate on dynamically allocated hash set.
+        `source_`                       Small interface for Cn_Source basic operations
+        `lexer_`                        Interface for Cn_Lexer operations, is coupled with `token_` functionality.
+        `type_`                         Interface for type operations and introspection, inspired by Jai Programming Language Type_Info.
+        `any_`                          Interface to operate on coupled type and data, idea also inspired by Jai.
+        `ast_`                 CAUTION: Interface for majority of Abstract Syntax Tree analysis and parsing functionality.
+        `ast_parse_`           CAUTION: Interface for parsing tokens into Abstract Syntax Tree.
+        `ast_reparse_`         CAUTION: Interface for validating and reanalyzing already existing Abstract Syntax Tree.
+        `ast_binding_`         CAUTION: Interface for operating on various C bindings that come from analyzed Abstract Syntax Tree.
+        `emit_`                         Interface for C code emittion from Abstract Syntax Tree.
+        `tu_`                           Interface to manage Translation Unit parsing, analysis, code modification, and emittion from start to finish.
+        `build_`                        Interface for user friendly construction of Abstract Syntax Tree, to be used in code transformations.
+
 */
  
 

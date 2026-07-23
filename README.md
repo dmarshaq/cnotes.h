@@ -13,6 +13,8 @@
 
 The library is influenced by the design philosophy of [`stb`](https://github.com/nothings/stb) and [`nob`](https://github.com/tsoding/nob.h): easy integration with no dependencies, no giant build systems, just one file.
 
+The library core meta programming ideas are also inspired by Jai Programming Language.
+
 ---
 
 ## Features & Scope
