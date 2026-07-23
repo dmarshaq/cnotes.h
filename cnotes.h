@@ -15,7 +15,6 @@
       - CN_IMPLEMENTATION                   Enable definitions of the functions. By default only declarations are included.
                                             See https://github.com/nothings/stb/blob/f58f558c120e9b32c217290b80bad1a0729fbb2c/docs/stb_howto.txt
                                             for more information.
-
       - CN_ANSI_NO_COLOR                    Sets all CN_ANSI_* macros to empty string, disabling any colored output.
 
     ## Redefinable Macros
@@ -23,15 +22,10 @@
         Redefine default behaviors of nob.h.
 
       - CNDEF                               Appends additional things to function declarations.
-
       - CN_ASSERT(condition)                Redefine which assert() cnotes.h shall use.
-
       - CN_REALLOC(oldptr, size)            Redefine which realloc() cnotes.h shall use.
-
       - CN_FREE(ptr)                        Redefine which free() cnotes.h shall use.
-
       - CN_AST_NODE_LIST_INITIAL_CAP        Redefine initial capacity of array list that holds ast nodes.
-
       - CN_BUILD_OPT_DEFAULT_ALLOC          Redefine default value of alloc optional in cn_build_* functios.
                                             See Cn_Build_Opt for more information.
 */
