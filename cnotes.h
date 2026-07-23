@@ -1,3 +1,42 @@
+/*  cnotes - v0.1.0 - MIT License - https://github.com/dmarshaq/cnotes.h
+
+    A header-only library for building C meta programs, static analysis tools, 
+    and source transformation pipelines — operating directly on pre-processed .i files.
+
+    # Macro Interface
+
+        All these macros are `#define`d by the user before including cnotes.h,
+        in a similar fashion nob.h and other stb signle header libraries operate.
+
+    ## Flags
+
+        Enable or disable certain aspects of cnotes.h
+
+      - CN_IMPLEMENTATION                   Enable definitions of the functions. By default only declarations are included.
+                                            See https://github.com/nothings/stb/blob/f58f558c120e9b32c217290b80bad1a0729fbb2c/docs/stb_howto.txt
+                                            for more information.
+
+      - CN_ANSI_NO_COLOR                    Sets all CN_ANSI_* macros to empty string, disabling any colored output.
+
+    ## Redefinable Macros
+
+        Redefine default behaviors of nob.h.
+
+      - CNDEF                               Appends additional things to function declarations.
+
+      - CN_ASSERT(condition)                Redefine which assert() cnotes.h shall use.
+
+      - CN_REALLOC(oldptr, size)            Redefine which realloc() cnotes.h shall use.
+
+      - CN_FREE(ptr)                        Redefine which free() cnotes.h shall use.
+
+      - CN_AST_NODE_LIST_INITIAL_CAP        Redefine initial capacity of array list that holds ast nodes.
+
+      - CN_BUILD_OPT_DEFAULT_ALLOC          Redefine default value of alloc optional in cn_build_* functios.
+                                            See Cn_Build_Opt for more information.
+*/
+ 
+
 #ifndef CN_H_
 #define CN_H_
 
@@ -1888,20 +1927,12 @@ typedef union {
 } Cn_Ast_Node;
 
 #ifndef CN_AST_NODE_LIST_INITIAL_CAP
-#   define CN_AST_NODE_LIST_INITIAL_CAP 32
+#   define CN_AST_NODE_LIST_INITIAL_CAP 64
 #endif // CN_AST_NODE_LIST_INITIAL_CAP
 
-#ifndef CN_AST_TYPE_ARENA_BLOCK_CAP
-#   define CN_AST_TYPE_ARENA_BLOCK_CAP (sizeof(Cn_Type) * 64)
-#endif // CN_AST_TYPE_ARENA_BLOCK_CAP
-
-#ifndef CN_AST_TYPE_PTR_SET_INITIAL_CAP
-#   define CN_AST_TYPE_PTR_SET_INITIAL_CAP 32
-#endif // CN_AST_TYPE_PTR_SET_INITIAL_CAP
-
-#ifndef CN_AST_TYPE_CHILDREN_ARENA_BLOCK_CAP
-#   define CN_AST_TYPE_CHILDREN_ARENA_BLOCK_CAP 4096
-#endif // CN_AST_TYPE_CHILDREN_ARENA_BLOCK_CAP
+#define CN_AST_TYPE_ARENA_BLOCK_CAP             (sizeof(Cn_Type) * 64)
+#define CN_AST_TYPE_PTR_SET_INITIAL_CAP         32
+#define CN_AST_TYPE_CHILDREN_ARENA_BLOCK_CAP    4096
 
 typedef uint32_t Cn_Ast_Binding_Idx;
 
@@ -1974,25 +2005,12 @@ typedef struct {
 
 } Cn_Ast_Binding;
 
-#ifndef CN_AST_BINDING_LIST_INITIAL_CAP
-#   define CN_AST_BINDING_LIST_INITIAL_CAP 64
-#endif // CN_AST_BINDING_LIST_INITIAL_CAP
+#define CN_AST_BINDING_LIST_INITIAL_CAP             64
+#define CN_AST_TAG_BINDING_TABLE_INITIAL_CAP        32
+#define CN_AST_SYMBOL_BINDING_TABLE_INITIAL_CAP     32
 
-#ifndef CN_AST_TAG_BINDING_TABLE_INITIAL_CAP
-#   define CN_AST_TAG_BINDING_TABLE_INITIAL_CAP 16
-#endif // CN_AST_TAG_BINDING_TABLE_INITIAL_CAP
-
-#ifndef CN_AST_SYMBOL_BINDING_TABLE_INITIAL_CAP
-#   define CN_AST_SYMBOL_BINDING_TABLE_INITIAL_CAP 16
-#endif // CN_AST_SYMBOL_BINDING_TABLE_INITIAL_CAP
-
-#ifndef CN_AST_SCOPED_STRINGS_ARENA_BLOCK_CAP
-#   define CN_AST_SCOPED_STRINGS_ARENA_BLOCK_CAP 4096
-#endif // CN_AST_SCOPED_STRINGS_ARENA_BLOCK_CAP
-
-#ifndef CN_AST_PERMANENT_STRINGS_ARENA_BLOCK_CAP
-#   define CN_AST_PERMANENT_STRINGS_ARENA_BLOCK_CAP 4096
-#endif // CN_AST_PERMANENT_STRINGS_ARENA_BLOCK_CAP
+#define CN_AST_SCOPED_STRINGS_ARENA_BLOCK_CAP       4096
+#define CN_AST_PERMANENT_STRINGS_ARENA_BLOCK_CAP    4096
 
 /**
  * This struct simply contains information that each scope will have.
@@ -2018,13 +2036,8 @@ typedef struct {
     bool    is_checkpoint_locked;
 } Cn_Ast_Scope;
 
-#ifndef CN_AST_SCOPE_STACK_INITIAL_CAP
-#   define CN_AST_SCOPE_STACK_INITIAL_CAP 64
-#endif // CN_AST_SCOPE_STACK_INITIAL_CAP
-
-#ifndef CN_AST_IDX_STACK_INITIAL_CAP
-#   define CN_AST_IDX_STACK_INITIAL_CAP 128
-#endif // CN_AST_IDX_STACK_INITIAL_CAP
+#define CN_AST_SCOPE_STACK_INITIAL_CAP 32
+#define CN_AST_IDX_STACK_INITIAL_CAP   128
 
 typedef struct {
     /**
@@ -8702,6 +8715,7 @@ CNDEF bool cn_parse_optional(Cn_Lexer *lexer, Cn_Token_Type type) {
     return false;
 }
 
+#define CN__TRACE_ERROR
 #ifndef CN__TRACE_ERROR
 #   define CN__TRACE_ERROR   fprintf(stderr, "   error from '%s()'\n", __FUNCTION__);
 #endif // CN__TRACE_ERROR
@@ -15292,4 +15306,45 @@ CNDEF Cn_Ast_Idx cn__build_expr_statement(Cn_Ast_Idx expression, Cn_Build_Opt op
 #endif // CN_IMPLEMENTATION
 
 
+/* 
+    Revision history:
+        
+        v0.1.0 (2026-07-24) Initial development release.
+*/
 
+/*
+    Version conventions:
+
+        Following MAJOR.MINOR.PATCH format described in https://semver.org/ Semantic Versioning 2.0.0:
+            
+      - Comments modification don't update the version.
+      - Major version is incremented when any backward incompatible changes are made to the public API.
+      - Minor version is incremented when backward compatible changes are made to the public API.
+      - Patch version is incremented if only backward compatible bug fixes are made without changing public API.
+      - Major version '0.y.z' is for intial development. Anything may change at any time. 
+        Public API is not stable.
+*/
+
+/*
+    MIT License
+    
+    Copyright (c) 2026 Daniil Yarmalovich
+    
+    Permission is hereby granted, free of charge, to any person obtaining a copy
+    of this software and associated documentation files (the "Software"), to deal
+    in the Software without restriction, including without limitation the rights
+    to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+    copies of the Software, and to permit persons to whom the Software is
+    furnished to do so, subject to the following conditions:
+    
+    The above copyright notice and this permission notice shall be included in all
+    copies or substantial portions of the Software.
+    
+    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+    AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+    LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+    OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+    SOFTWARE.
+*/

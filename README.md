@@ -114,9 +114,3 @@ gcc -o meta meta.c
 # Compiling meta-processed my_main.i
 gcc -o my_main my_main.i
 ```
- 
----
-
-## License
-
-MIT — see the `LICENSE` file or the header of `cnotes.h`.
