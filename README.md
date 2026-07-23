@@ -17,7 +17,7 @@ The library is influenced by the design philosophy of [`stb`](https://github.com
 
 ## Features & Scope
 
-`cnotes.h` end goal is to provide integration with major C compilers like, `GCC`, `Clang` and `MSVC` as well as be able to understand their various syntactical features and details. As well as be compatible with `C99` standard.
+`cnotes.h` end goal is to provide integration with major C compilers like, `GCC`, `Clang` and `MSVC` as well as be able to understand their various syntactical features and details. And be compatible with `C99` standard.
 
 **As of right:** The library keeps up only with `GCC` and some of the `GNU` extension respectively, it is **NOT** fully completed to satisfy outlined goals *yet...* That is due to sheer complexity and alterations different compilers and their extensions introduce, which will be supported as library progresses.
 
