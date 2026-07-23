@@ -31,7 +31,7 @@ Following is the list of features that are still not implemented, but will be in
  -  **_Complex types.**
  -  **HEX float literals.**
  -  **FAM, Flexible Array Member.**
- -  **MSVC Specific compiler extensions support.**
+ -  **MSVC Specific compiler extensions.**
 
 Note that this list might NOT include every feature that was not implemented, and can be added to as they are discovered or suggested.
 
@@ -49,7 +49,7 @@ Translation Units               *.i
 |
 |       cnotes.h processing:
 |       Messaging loop where meta programs can be hooked.
-|       Abstract Syntax Tree modifications or introspections occur here.
+|       Abstract Syntax Tree modifications and introspections occur here.
 |
 Modified Translation Units      *.i
 |
@@ -80,8 +80,8 @@ In **exactly one** translation unit define `CN_IMPLEMENTATION` before the includ
 You want to have two `.c` files, one for meta program code *that defines and uses cnotes.h* and main file that  meta program will process.
 
 ```c
-// meta.c  — the one file that holds the implementation of cnotes.h
-// sets everything up and perfoms operations on the main .c file.
+// meta.c — the one file that holds the implementation of cnotes.h
+// sets everything up and perfoms operations on the main.c file.
 #define CN_IMPLEMENTATION
 #include "cnotes.h"
 
