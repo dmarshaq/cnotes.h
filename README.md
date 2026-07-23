@@ -27,8 +27,8 @@ Following is the list of features that are still not implemented, but will be in
  -  **Struct and Union empty member declarations.**
  -  **ASM definitions.**
  -  **K&R-style function definitions.**
- -  **Atomic specifiers.**
- -  **Complex types.**
+ -  **_Atomic specifiers.**
+ -  **_Complex types.**
  -  **HEX float literals.**
  -  **FAM, Flexible Array Member.**
  -  **MSVC Specific compiler extensions support.**
