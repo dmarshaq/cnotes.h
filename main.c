@@ -11,11 +11,13 @@ int foo() {
 }
 
 struct vec2 {
-    int x, y;
+    int ;
 };
 
 int main() {
-    int arr[10] = { [0] = 2 };
+    int arr[10] = {0};
+
+    struct vec2 a = {0};
 
     printf("Hello world!\n");
 
