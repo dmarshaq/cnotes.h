@@ -1558,6 +1558,8 @@ CNDEF Cn_Postfix_Operator_Kind cn_ast_is_postfix_operator(Cn_Lexer *lexer);
     /* X(LABEL,                         Label,                              label)           TODO */        \
     X(GOTO,                             Goto,                               goto_statement)                 \
     X(RETURN,                           Return,                             return_statement)               \
+    X(BREAK,                            Break,                              break_statement)                \
+    X(CONTINUE,                         Continue,                           continue_statement)             \
     X(EXPRESSION_STATEMENT,             Expression_Statement,               expression_statement)           \
     /* --- expressions ---------------------------------------------------- */                              \
     X(BINARY,                           Binary,                             binary)                         \
@@ -1576,7 +1578,7 @@ CNDEF Cn_Postfix_Operator_Kind cn_ast_is_postfix_operator(Cn_Lexer *lexer);
     X(INTEGER,                          Integer,                            integer)                        \
     X(FLOAT,                            Float,                              flt)                            \
     X(STRING,                           String,                             string)                         \
-    /* --- declarator machinery ------------------------------------------- */                              \
+    /* --- declarator and declaration machinary --------------------------- */                              \
     X(INIT_DECLARATOR,                  Init_Declarator,                    init_declarator)                \
     X(INITIALIZER,                      Initializer,                        initializer)                    \
     X(DESIGNATION,                      Designation,                        designation)                    \
@@ -1606,23 +1608,12 @@ CNDEF Cn_Postfix_Operator_Kind cn_ast_is_postfix_operator(Cn_Lexer *lexer);
     X(GNU_ATTRIBUTE_SPECIFIER,          Gnu_Attribute_Specifier,            gnu_attribute_specifier)        \
     X(GNU_ATTRIBUTE,                    Gnu_Attribute,                      gnu_attribute)                  \
     X(GNU_ASM_LABEL,                    Gnu_Asm_Label,                      gnu_asm_label)
- 
-/**
- * Kinds that carry no payload beyond the base node. No struct, no cast —
- * just an enum value and a debug name.
- */
-#define CN_AST_GEN_TAG_LIST(X) \
-    X(BREAK)                   \
-    X(CONTINUE)
 
 typedef enum : uint8_t {
     CN_AST_UNKNOWN = 0,
     CN_AST_ERROR   = 1,
 #define X(K, T, m) CN_AST_##K,
     CN_AST_GEN_LIST(X)
-#undef X
-#define X(K) CN_AST_##K,
-    CN_AST_GEN_TAG_LIST(X)
 #undef X
 } Cn_Ast_Kind;
 
@@ -1690,44 +1681,63 @@ typedef struct { CN_AST_BASE;
 } Cn_Ast_Function;
 
 typedef struct { CN_AST_BASE;
+    Cn_Ast_List attribute_specifiers;
     Cn_Ast_List statements; // Statements or declarations in order.
 } Cn_Ast_Block;
 
 typedef struct { CN_AST_BASE;
+    Cn_Ast_List attribute_specifiers;
     Cn_Ast_Idx condition_idx;
     Cn_Ast_Idx then_idx;
     Cn_Ast_Idx else_idx; // Can be NIL.
 } Cn_Ast_If;
  
 typedef struct { CN_AST_BASE;
+    Cn_Ast_List attribute_specifiers;
     Cn_Ast_Idx condition_idx;
     Cn_Ast_Idx body_idx;
 } Cn_Ast_Switch;
 
 typedef struct { CN_AST_BASE;
-    Cn_Ast_Idx condition_idx;
-    Cn_Ast_Idx body_idx;
+    Cn_Ast_List attribute_specifiers;
+    Cn_Ast_Idx condition_idx; // Expression.
+    Cn_Ast_Idx body_idx; // Statement.
 } Cn_Ast_While;
 
 typedef struct { CN_AST_BASE;
-    Cn_Ast_Idx condition_idx;
-    Cn_Ast_Idx body_idx;
+    Cn_Ast_List attribute_specifiers;
+    Cn_Ast_Idx condition_idx; // Expression.
+    Cn_Ast_Idx body_idx; // Statement.
 } Cn_Ast_Do_While;
 
 typedef struct { CN_AST_BASE;
-    Cn_Ast_Idx condition_idx;
-    Cn_Ast_Idx body_idx;
+    Cn_Ast_List attribute_specifiers;
+    Cn_Ast_Idx initialization_idx; // Declaration or expression.
+    Cn_Ast_Idx condition_idx; // Expression.
+    Cn_Ast_Idx update_idx; // Expression.
+    Cn_Ast_Idx body_idx; // Statement.
 } Cn_Ast_For;
 
 typedef struct { CN_AST_BASE;
-    Cn_Ast_Idx identifier_idx; // Label.
+    Cn_Ast_List attribute_specifiers;
+    Cn_Ast_Idx identifier_idx; // Name of the label.
 } Cn_Ast_Goto;
  
 typedef struct { CN_AST_BASE;
+    Cn_Ast_List attribute_specifiers;
     Cn_Ast_Idx expression_idx; // Can be NIL.
 } Cn_Ast_Return;
 
 typedef struct { CN_AST_BASE;
+    Cn_Ast_List attribute_specifiers;
+} Cn_Ast_Break;
+
+typedef struct { CN_AST_BASE;
+    Cn_Ast_List attribute_specifiers;
+} Cn_Ast_Continue;
+
+typedef struct { CN_AST_BASE;
+    Cn_Ast_List attribute_specifiers;
     Cn_Ast_Idx expression_idx;
 } Cn_Ast_Expression_Statement;
 
@@ -2585,16 +2595,32 @@ CNDEF bool cn_ast_starts_type(Cn_Lexer *lexer);
  * when calling this function to parse statement it returns on of the following types of nodes.
  *
  *  statement
- *          : compound_statement
+ *          : block
  *          | selection_statement
  *          | iteration_statement
  *          | jump_statement
  *          | labeled_statement
  *          | expression_statement
- *          | TODO: asm_statement
  *          ;
  */
 CNDEF Cn_Ast_Idx cn_ast_parse_statement(Cn_Lexer *lexer);
+
+/**
+ * Parses code starting of with lexer current token as statement.
+ *
+ * IMPORTANT: CN_AST_NODE_STATEMENT doesn't exist by itself instead there are nodes variation, 
+ * when calling this function to parse statement it returns on of the following types of nodes.
+ *
+ *  statement
+ *          : block
+ *          | selection_statement
+ *          | iteration_statement
+ *          | jump_statement
+ *          | labeled_statement
+ *          | expression_statement
+ *          ;
+ */
+CNDEF Cn_Ast_Idx cn_ast_continue_statement(Cn_Lexer *lexer, Cn_Ast_List attribute_specifiers);
 
 /**
  * Parses code starting of with lexer current token as block.
@@ -2617,7 +2643,7 @@ CNDEF Cn_Ast_Idx cn_ast_parse_block(Cn_Lexer *lexer, bool use_current_scope);
  *          : 'if' '(' expression ')' statement ('else' statement)?
  *          ;
  */
-CNDEF Cn_Ast_Idx cn_ast_parse_if(Cn_Lexer *lexer);
+CNDEF Cn_Ast_Idx cn_ast_parse_if_statement(Cn_Lexer *lexer);
 
 /**
  * Parses code starting of with lexer current token as switch statement.
@@ -2626,7 +2652,7 @@ CNDEF Cn_Ast_Idx cn_ast_parse_if(Cn_Lexer *lexer);
  *          : 'switch' '(' expression ')' statement
  *          ;
  */
-CNDEF Cn_Ast_Idx cn_ast_parse_switch(Cn_Lexer *lexer);
+CNDEF Cn_Ast_Idx cn_ast_parse_switch_statement(Cn_Lexer *lexer);
 
 /**
  * Parses code starting of with lexer current token as while statement.
@@ -2650,37 +2676,56 @@ CNDEF Cn_Ast_Idx cn_ast_parse_do_while(Cn_Lexer *lexer);
  * Parses code starting of with lexer current token as for statement.
  *
  *  for_statement
- *          : 'for' '(' (for_declaration | expression)? ';' ';' ')' statement
+ *          : 'for' '(' (declaration | expression)? ';' expression? ';' expression? ')' statement
  *          ;
  */
-CNDEF Cn_Ast_Idx cn_ast_parse_while_statement(Cn_Lexer *lexer);
-
+CNDEF Cn_Ast_Idx cn_ast_parse_for_statement(Cn_Lexer *lexer);
 
 /**
- * Parses 'goto' identifier ';'
+ * Parses code starting of with lexer current token as goto statement.
+ *
+ *  goto_statement
+ *          : 'goto' identifier ';'
+ *          ;
  */
-CNDEF Cn_Ast_Idx cn_ast_parse_goto(Cn_Lexer *lexer);
+CNDEF Cn_Ast_Idx cn_ast_parse_goto_statement(Cn_Lexer *lexer);
 
 /**
- * Parses 'return' expression? ';'
+ * Parses code starting of with lexer current token as return statement.
+ *
+ *  return_statement
+ *          : 'return' expression? ';'
+ *          ;
  */
-CNDEF Cn_Ast_Idx cn_ast_parse_return(Cn_Lexer *lexer);
+CNDEF Cn_Ast_Idx cn_ast_parse_return_statement(Cn_Lexer *lexer);
 
 /**
- * Parses 'break' ';'
+ * Parses code starting of with lexer current token as break statement.
+ *
+ *  break_statement
+ *          : 'break' ';'
+ *          ;
  */
-CNDEF Cn_Ast_Idx cn_ast_parse_break(Cn_Lexer *lexer);
+CNDEF Cn_Ast_Idx cn_ast_parse_break_statement(Cn_Lexer *lexer);
 
 /**
- * Parses 'continue' ';'
+ * Parses code starting of with lexer current token as continue statement.
+ *
+ *  continue_statement
+ *          : 'continue' ';'
+ *          ;
  */
-CNDEF Cn_Ast_Idx cn_ast_parse_continue(Cn_Lexer *lexer);
+CNDEF Cn_Ast_Idx cn_ast_parse_continue_statement(Cn_Lexer *lexer);
 
 /**
- * Parses code starting of with lexer current token as labeled statement.
+ * Parses code starting of with lexer current token as label.
+ *
+ * NOTE: Instead of making separate nodes, the label can be all three types.
+ * the usual identifier label, case label, or default. And to know which one is it
+ * flags will be used, also depending on the type of label some fields will be nil.
  *
  *  label
- *          : TODO: Labeled statement
+ *          : (identifier | ('case' expression) | 'default') ':' statement
  *          ;
  */
 CNDEF Cn_Ast_Idx cn_ast_parse_label(Cn_Lexer *lexer);
@@ -3767,6 +3812,7 @@ typedef enum {
     CN_DC_FROM,
     CN_DC_EXPECTED_AST_NODE,
     CN_DC_UNEXPECTED_FUNCTION,
+    CN_DC_ILLEGAL_ATTRIBUTE,
     CN__DC_COUNT,
 } Cn_Diagnostic_Code;
 
@@ -6919,30 +6965,53 @@ CNDEF void cn_ast_print(Cn_Ast_Idx idx, int depth) {
             ADD_IDX(&node->function.block_idx);
             break;
         case CN_AST_BLOCK:
+            ADD_LIST(&node->block.attribute_specifiers, "attribute_specifiers");
             ADD_LIST(&node->block.statements, "statements");
             break;
         case CN_AST_IF:
+            ADD_LIST(&node->if_statement.attribute_specifiers, "attribute_specifiers");
             ADD_IDX(&node->if_statement.condition_idx);
             ADD_IDX(&node->if_statement.then_idx);
             ADD_IDX(&node->if_statement.else_idx);
             break;
         case CN_AST_SWITCH:
+            ADD_LIST(&node->switch_statement.attribute_specifiers, "attribute_specifiers");
             ADD_IDX(&node->switch_statement.condition_idx);
             ADD_IDX(&node->switch_statement.body_idx);
             break;
         case CN_AST_WHILE:
+            ADD_LIST(&node->while_statement.attribute_specifiers, "attribute_specifiers");
+            ADD_IDX(&node->while_statement.condition_idx);
+            ADD_IDX(&node->while_statement.body_idx);
             break;
         case CN_AST_DO_WHILE:
+            ADD_LIST(&node->do_while.attribute_specifiers, "attribute_specifiers");
+            ADD_IDX(&node->do_while.body_idx);
+            ADD_IDX(&node->do_while.condition_idx);
             break;
         case CN_AST_FOR:
+            ADD_LIST(&node->for_statement.attribute_specifiers, "attribute_specifiers");
+            ADD_IDX(&node->for_statement.initialization_idx);
+            ADD_IDX(&node->for_statement.condition_idx);
+            ADD_IDX(&node->for_statement.update_idx);
+            ADD_IDX(&node->for_statement.body_idx);
             break;
         case CN_AST_GOTO:
+            ADD_LIST(&node->goto_statement.attribute_specifiers, "attribute_specifiers");
             ADD_IDX(&node->goto_statement.identifier_idx);
             break;
         case CN_AST_RETURN:
+            ADD_LIST(&node->return_statement.attribute_specifiers, "attribute_specifiers");
             ADD_IDX(&node->return_statement.expression_idx);
             break;
+        case CN_AST_BREAK:
+            ADD_LIST(&node->break_statement.attribute_specifiers, "attribute_specifiers");
+            break;
+        case CN_AST_CONTINUE:
+            ADD_LIST(&node->continue_statement.attribute_specifiers, "attribute_specifiers");
+            break;
         case CN_AST_EXPRESSION_STATEMENT:
+            ADD_LIST(&node->expression_statement.attribute_specifiers, "attribute_specifiers");
             ADD_IDX(&node->expression_statement.expression_idx);
             break;
         case CN_AST_BINARY:
@@ -7154,9 +7223,6 @@ CNDEF void cn_ast_print(Cn_Ast_Idx idx, int depth) {
         case CN_AST_GNU_ASM_LABEL:
             ADD_IDX(&node->gnu_asm_label.string_idx);
             break;
-        case CN_AST_BREAK:
-        case CN_AST_CONTINUE:
-            return;
     }
 
 #undef ADD_IDX
@@ -7189,9 +7255,6 @@ CNDEF const char *cn_ast_node_kind_name(Cn_Ast_Kind kind) {
         case CN_AST_ERROR:      return "ERROR";
 #define X(K, T, m) case CN_AST_##K: return #K;
     CN_AST_GEN_LIST(X)
-#undef X
-#define X(K) case CN_AST_##K: return #K;
-    CN_AST_GEN_TAG_LIST(X)
 #undef X
     }
     return "<invalid kind>";
@@ -8310,8 +8373,6 @@ CNDEF int cn__emit_opt(Cn_Ast_Idx node_idx, Cn_Emit_Write *func, Cn_Emit_Opt *op
 #define X(K, T, m) case CN_AST_##K: ok = cn__emit_##m(node_idx, func, opt); break;
     CN_AST_GEN_LIST(X)
 #undef X
-        case CN_AST_BREAK:    ok = cn__emit_break_statement(node_idx, func, opt); break;
-        case CN_AST_CONTINUE: ok = cn__emit_continue_statement(node_idx, func, opt); break;
         default:
             // For unhandled node types, try to emit source location if available.
             {
@@ -9338,43 +9399,125 @@ CNDEF bool cn_ast_starts_type(Cn_Lexer *lexer) {
 }
 
 CNDEF Cn_Ast_Idx cn_ast_parse_statement(Cn_Lexer *lexer) {
-    if (cn_lexer_token(lexer).type == CN_TOKEN_CURLY_OPEN) {
-        return cn_ast_parse_block(lexer, false);
-    }
+    Cn_Lexer original_state = *lexer;
 
-    if (cn_lexer_expect(lexer, CN_TOKEN_IF)) {
-        return cn_ast_parse_if(lexer);
-    }
+    bool ok;
+    Cn_Ast_List attribute_specifiers = cn_ast_parse_attribute_specifiers(lexer, &ok);
+    if (!ok) goto error;
 
-    if (cn_lexer_expect(lexer, CN_TOKEN_SWITCH)) {
-        return cn_ast_parse_switch(lexer);
-    }
+    return cn_ast_continue_statement(lexer, attribute_specifiers);
 
-    if (cn_lexer_expect(lexer, CN_TOKEN_WHILE) || cn_lexer_expect(lexer, CN_TOKEN_DO) || cn_lexer_expect(lexer, CN_TOKEN_FOR)) {
-        CN_TODO("Iteration statements wrangling.");
-    }
+error:
+    CN__TRACE_ERROR
+    *lexer = original_state;
+    return CN_AST_NIL_IDX;
+}
 
-    if (cn_lexer_expect(lexer, CN_TOKEN_GOTO)) {
-        return cn_ast_parse_goto(lexer);
-    }
-
-    if (cn_lexer_expect(lexer, CN_TOKEN_RETURN)) {
-        return cn_ast_parse_return(lexer);
-    }
-
-    if (cn_lexer_expect(lexer, CN_TOKEN_BREAK)) {
-        return cn_ast_parse_break(lexer);
-    }
-
-    if (cn_lexer_expect(lexer, CN_TOKEN_CONTINUE)) {
-        return cn_ast_parse_continue(lexer);
-    }
+CNDEF Cn_Ast_Idx cn_ast_continue_statement(Cn_Lexer *lexer, Cn_Ast_List attribute_specifiers) {
+    Cn_Ast_Idx statement_idx;
 
     if (cn_lexer_peek(lexer, 1).type == CN_TOKEN_COLON) {
-        return cn_ast_parse_label(lexer);
+        statement_idx = cn_ast_parse_label(lexer);
+        if (statement_idx == CN_AST_NIL_IDX) goto error;
+
+        // cn_ast_get_as_node(statement_idx)->label.attribute_specifiers = attribute_specifiers;
+
+        return statement_idx;
     }
-    
-    return cn_ast_parse_expression_statement(lexer);
+
+    switch (cn_lexer_token(lexer).type) {
+        case CN_TOKEN_CURLY_OPEN:
+            statement_idx = cn_ast_parse_block(lexer, false);
+            if (statement_idx == CN_AST_NIL_IDX) goto error;
+
+            cn_ast_get_as_node(statement_idx)->block.attribute_specifiers = attribute_specifiers;
+
+            return statement_idx;
+
+        case CN_TOKEN_IF:
+            statement_idx = cn_ast_parse_if_statement(lexer);
+            if (statement_idx == CN_AST_NIL_IDX) goto error;
+
+            cn_ast_get_as_node(statement_idx)->if_statement.attribute_specifiers = attribute_specifiers;
+
+            return statement_idx;
+
+        case CN_TOKEN_SWITCH:
+            statement_idx = cn_ast_parse_switch_statement(lexer);
+            if (statement_idx == CN_AST_NIL_IDX) goto error;
+
+            cn_ast_get_as_node(statement_idx)->switch_statement.attribute_specifiers = attribute_specifiers;
+
+            return statement_idx;
+
+        case CN_TOKEN_WHILE:
+            statement_idx = cn_ast_parse_while_statement(lexer);
+            if (statement_idx == CN_AST_NIL_IDX) goto error;
+
+            cn_ast_get_as_node(statement_idx)->while_statement.attribute_specifiers = attribute_specifiers;
+
+            return statement_idx;
+
+        case CN_TOKEN_DO:
+            statement_idx = cn_ast_parse_do_while(lexer);
+            if (statement_idx == CN_AST_NIL_IDX) goto error;
+
+            cn_ast_get_as_node(statement_idx)->do_while.attribute_specifiers = attribute_specifiers;
+
+            return statement_idx;
+
+        case CN_TOKEN_FOR:
+            statement_idx = cn_ast_parse_for_statement(lexer);
+            if (statement_idx == CN_AST_NIL_IDX) goto error;
+
+            cn_ast_get_as_node(statement_idx)->for_statement.attribute_specifiers = attribute_specifiers;
+
+            return statement_idx;
+
+        case CN_TOKEN_GOTO:
+            statement_idx = cn_ast_parse_goto_statement(lexer);
+            if (statement_idx == CN_AST_NIL_IDX) goto error;
+
+            cn_ast_get_as_node(statement_idx)->goto_statement.attribute_specifiers = attribute_specifiers;
+
+            return statement_idx;
+
+        case CN_TOKEN_RETURN:
+            statement_idx = cn_ast_parse_return_statement(lexer);
+            if (statement_idx == CN_AST_NIL_IDX) goto error;
+
+            cn_ast_get_as_node(statement_idx)->return_statement.attribute_specifiers = attribute_specifiers;
+
+            return statement_idx;
+
+        case CN_TOKEN_BREAK:
+            statement_idx = cn_ast_parse_break_statement(lexer);
+            if (statement_idx == CN_AST_NIL_IDX) goto error;
+
+            cn_ast_get_as_node(statement_idx)->break_statement.attribute_specifiers = attribute_specifiers;
+
+            return statement_idx;
+
+        case CN_TOKEN_CONTINUE:
+            statement_idx = cn_ast_parse_continue_statement(lexer);
+            if (statement_idx == CN_AST_NIL_IDX) goto error;
+
+            cn_ast_get_as_node(statement_idx)->continue_statement.attribute_specifiers = attribute_specifiers;
+
+            return statement_idx;
+
+        default:
+            statement_idx = cn_ast_parse_expression_statement(lexer);
+            if (statement_idx == CN_AST_NIL_IDX) goto error;
+
+            cn_ast_get_as_node(statement_idx)->expression_statement.attribute_specifiers = attribute_specifiers;
+
+            return statement_idx;
+    }
+
+error:
+    CN__TRACE_ERROR
+    return CN_AST_NIL_IDX;
 }
 
 CNDEF Cn_Ast_Idx cn_ast_parse_block(Cn_Lexer *lexer, bool use_current_scope) {
@@ -9404,7 +9547,7 @@ CNDEF Cn_Ast_Idx cn_ast_parse_block(Cn_Lexer *lexer, bool use_current_scope) {
         Cn_Ast_Idx child_idx;
 
         // Parsing attribute specifiers here in order to get to the tokens that would 
-        // disambiguate delcaration vs statement.
+        // disambiguate delcaration vs statement situation.
         bool ok;
         Cn_Ast_List attribute_specifiers = cn_ast_parse_attribute_specifiers(lexer, &ok);
         if (!ok) goto error;
@@ -9413,14 +9556,12 @@ CNDEF Cn_Ast_Idx cn_ast_parse_block(Cn_Lexer *lexer, bool use_current_scope) {
             child_idx = cn_ast_continue_declaration(lexer, attribute_specifiers);
             if (!cn_parse_expect(lexer, CN_TOKEN_SEMICOLON)) goto error;
         } else {
-            // TODO: Replace cn_ast_parse_statement with cn_ast_continue_statement in order to pass 
-            // attribute_specifiers.
-            child_idx = cn_ast_parse_statement(lexer);
+            child_idx = cn_ast_continue_statement(lexer, attribute_specifiers);
         }
 
         if (child_idx == CN_AST_NIL_IDX) goto error;
 
-        if (((Cn_Ast_Node *)cn_ast_get(child_idx))->kind == CN_AST_FUNCTION) {
+        if (cn_ast_get_as_node(child_idx)->kind == CN_AST_FUNCTION) {
             cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, child_idx, CN_DC_UNEXPECTED_FUNCTION, "Function definition is not allowed inside a block.");
             goto error;
         }
@@ -9434,7 +9575,7 @@ error:
     return CN_AST_NIL_IDX;
 }
 
-CNDEF Cn_Ast_Idx cn_ast_parse_if(Cn_Lexer *lexer) {
+CNDEF Cn_Ast_Idx cn_ast_parse_if_statement(Cn_Lexer *lexer) {
     Cn_Lexer original_state = *lexer;
 
     Cn_Ast_Node node = { .kind = CN_AST_IF, .loc = cn_lexer_token(lexer).loc, .src = cn_lexer_token(lexer).src };
@@ -9477,7 +9618,7 @@ error:
     return CN_AST_NIL_IDX;
 }
 
-CNDEF Cn_Ast_Idx cn_ast_parse_switch(Cn_Lexer *lexer) {
+CNDEF Cn_Ast_Idx cn_ast_parse_switch_statement(Cn_Lexer *lexer) {
     Cn_Lexer original_state = *lexer;
 
     Cn_Ast_Node node = { .kind = CN_AST_SWITCH, .loc = cn_lexer_token(lexer).loc, .src = cn_lexer_token(lexer).src };
@@ -9515,21 +9656,142 @@ error:
 }
 
 CNDEF Cn_Ast_Idx cn_ast_parse_while_statement(Cn_Lexer *lexer) {
-    CN_UNUSED(lexer);
-    CN_TODO("Parse while statement.");
+    Cn_Lexer original_state = *lexer;
+
+    Cn_Ast_Node node = { .kind = CN_AST_WHILE, .loc = cn_lexer_token(lexer).loc, .src = cn_lexer_token(lexer).src };
+
+    if (!cn_parse_expect(lexer, CN_TOKEN_WHILE)) goto error;
+
+    if (!cn_parse_expect(lexer, CN_TOKEN_PARAN_OPEN)) goto error;
+
+    Cn_Ast_Idx expression_idx = cn_ast_parse_expression(lexer, -1, 0);
+    if (expression_idx == CN_AST_NIL_IDX) goto error;
+    node.while_statement.condition_idx = expression_idx;
+
+    if (!cn_parse_expect(lexer, CN_TOKEN_PARAN_CLOSE)) goto error;
+
+    Cn_Ast_Idx statement_idx = cn_ast_parse_statement(lexer);
+    if (statement_idx == CN_AST_NIL_IDX) goto error;
+    node.while_statement.body_idx = statement_idx;
+
+    Cn_Ast_Idx parent = cn_ast_node_list_append(node);
+    cn_ast_node_set_parent(parent, node.while_statement.condition_idx, node.while_statement.body_idx);
+    return parent;
+
+error:
+    CN__TRACE_ERROR
+    *lexer = original_state;
+    return CN_AST_NIL_IDX;
 }
 
-CNDEF Cn_Ast_Idx cn_ast_parse_do_while_statement(Cn_Lexer *lexer) {
-    CN_UNUSED(lexer);
-    CN_TODO("Parse do while statement.");
+CNDEF Cn_Ast_Idx cn_ast_parse_do_while(Cn_Lexer *lexer) {
+    Cn_Lexer original_state = *lexer;
+
+    Cn_Ast_Node node = { .kind = CN_AST_DO_WHILE, .loc = cn_lexer_token(lexer).loc, .src = cn_lexer_token(lexer).src };
+
+    if (!cn_parse_expect(lexer, CN_TOKEN_DO)) goto error;
+
+    Cn_Ast_Idx statement_idx = cn_ast_parse_statement(lexer);
+    if (statement_idx == CN_AST_NIL_IDX) goto error;
+    node.do_while.body_idx = statement_idx;
+
+    if (!cn_parse_expect(lexer, CN_TOKEN_WHILE)) goto error;
+
+    if (!cn_parse_expect(lexer, CN_TOKEN_PARAN_OPEN)) goto error;
+
+    Cn_Ast_Idx expression_idx = cn_ast_parse_expression(lexer, -1, 0);
+    if (expression_idx == CN_AST_NIL_IDX) goto error;
+    node.do_while.condition_idx = expression_idx;
+
+    if (!cn_parse_expect(lexer, CN_TOKEN_PARAN_CLOSE)) goto error;
+
+    if (!cn_parse_expect(lexer, CN_TOKEN_SEMICOLON)) goto error;
+
+    Cn_Ast_Idx parent = cn_ast_node_list_append(node);
+    cn_ast_node_set_parent(parent, node.do_while.condition_idx, node.do_while.body_idx);
+    return parent;
+
+error:
+    CN__TRACE_ERROR
+    *lexer = original_state;
+    return CN_AST_NIL_IDX;
 }
 
 CNDEF Cn_Ast_Idx cn_ast_parse_for_statement(Cn_Lexer *lexer) {
-    CN_UNUSED(lexer);
-    CN_TODO("Parse for statement.");
+    Cn_Lexer original_state = *lexer;
+
+    Cn_Ast_Node node = { .kind = CN_AST_FOR, .loc = cn_lexer_token(lexer).loc, .src = cn_lexer_token(lexer).src };
+
+    if (!cn_parse_expect(lexer, CN_TOKEN_FOR)) goto error;
+
+    if (!cn_parse_expect(lexer, CN_TOKEN_PARAN_OPEN)) goto error;
+
+    // For statement introduces new scope.
+    // for its initialization declaration to live in the scope till for loop dies.
+    cn_ast_scope_stack_push();
+    
+    if (!cn_parse_optional(lexer, CN_TOKEN_SEMICOLON)) {
+        bool ok;
+        Cn_Ast_List attribute_specifiers = cn_ast_parse_attribute_specifiers(lexer, &ok);
+        if (!ok) goto error;
+
+        Cn_Ast_Idx declaration_or_expression_idx;
+        if (cn_ast_starts_declaration(lexer)) {
+            declaration_or_expression_idx = cn_ast_continue_declaration(lexer, attribute_specifiers);
+        } else {
+            if (attribute_specifiers.length > 0) {
+                cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, attribute_specifiers.idxs[0], CN_DC_ILLEGAL_ATTRIBUTE, "Attribute can't appear in here.");
+                goto error;
+            }
+
+            declaration_or_expression_idx = cn_ast_parse_expression(lexer, -1, 0);
+        }
+
+        if (declaration_or_expression_idx == CN_AST_NIL_IDX) goto error;
+        node.for_statement.initialization_idx = declaration_or_expression_idx;
+
+        if (!cn_parse_expect(lexer, CN_TOKEN_SEMICOLON)) goto error;
+    }
+
+    if (!cn_parse_optional(lexer, CN_TOKEN_SEMICOLON)) {
+        Cn_Ast_Idx expression_idx = cn_ast_parse_expression(lexer, -1, 0);
+        if (expression_idx == CN_AST_NIL_IDX) goto error;
+        node.for_statement.condition_idx = expression_idx;
+
+        if (!cn_parse_expect(lexer, CN_TOKEN_SEMICOLON)) goto error;
+    }
+
+    if (!cn_parse_optional(lexer, CN_TOKEN_PARAN_CLOSE)) {
+        Cn_Ast_Idx expression_idx = cn_ast_parse_expression(lexer, -1, 0);
+        if (expression_idx == CN_AST_NIL_IDX) goto error;
+        node.for_statement.update_idx = expression_idx;
+
+        if (!cn_parse_expect(lexer, CN_TOKEN_PARAN_CLOSE)) goto error;
+    }
+
+    Cn_Ast_Idx statement_idx = cn_ast_parse_statement(lexer);
+    if (statement_idx == CN_AST_NIL_IDX) goto error;
+    node.for_statement.update_idx = statement_idx;
+    
+    cn_ast_scope_stack_pop();
+
+    Cn_Ast_Idx parent = cn_ast_node_list_append(node);
+    cn_ast_node_set_parent(parent, 
+            node.for_statement.initialization_idx, 
+            node.for_statement.condition_idx,
+            node.for_statement.update_idx,
+            node.for_statement.body_idx
+            );
+
+    return parent;
+
+error:
+    CN__TRACE_ERROR
+    *lexer = original_state;
+    return CN_AST_NIL_IDX;
 }
 
-CNDEF Cn_Ast_Idx cn_ast_parse_goto(Cn_Lexer *lexer) {
+CNDEF Cn_Ast_Idx cn_ast_parse_goto_statement(Cn_Lexer *lexer) {
     Cn_Lexer original_state = *lexer;
 
     Cn_Ast_Node node = { .kind = CN_AST_GOTO, .loc = cn_lexer_token(lexer).loc, .src = cn_lexer_token(lexer).src };
@@ -9555,7 +9817,7 @@ error:
     return CN_AST_NIL_IDX;
 }
 
-CNDEF Cn_Ast_Idx cn_ast_parse_return(Cn_Lexer *lexer) {
+CNDEF Cn_Ast_Idx cn_ast_parse_return_statement(Cn_Lexer *lexer) {
     Cn_Lexer original_state = *lexer;
 
     Cn_Ast_Node node = { .kind = CN_AST_RETURN, .loc = cn_lexer_token(lexer).loc, .src = cn_lexer_token(lexer).src };
@@ -9567,7 +9829,7 @@ CNDEF Cn_Ast_Idx cn_ast_parse_return(Cn_Lexer *lexer) {
     cn_lexer_next_token(lexer);
 
     if (!cn_lexer_expect(lexer, CN_TOKEN_SEMICOLON)) {
-        node.return_statement.expression_idx = cn_ast_parse_expression(lexer, 0, 0);
+        node.return_statement.expression_idx = cn_ast_parse_expression(lexer, -1, 0);
         if (node.return_statement.expression_idx == CN_AST_NIL_IDX) goto error;
 
         // Typechecking return expression.
@@ -9586,7 +9848,7 @@ error:
     return CN_AST_NIL_IDX;
 }
 
-CNDEF Cn_Ast_Idx cn_ast_parse_break(Cn_Lexer *lexer) {
+CNDEF Cn_Ast_Idx cn_ast_parse_break_statement(Cn_Lexer *lexer) {
     Cn_Lexer original_state = *lexer;
 
     Cn_Ast_Node node = { .kind = CN_AST_BREAK, .loc = cn_lexer_token(lexer).loc, .src = cn_lexer_token(lexer).src };
@@ -9607,7 +9869,7 @@ error:
     return CN_AST_NIL_IDX;
 }
 
-CNDEF Cn_Ast_Idx cn_ast_parse_continue(Cn_Lexer *lexer) {
+CNDEF Cn_Ast_Idx cn_ast_parse_continue_statement(Cn_Lexer *lexer) {
     Cn_Lexer original_state = *lexer;
 
     Cn_Ast_Node node = { .kind = CN_AST_CONTINUE, .loc = cn_lexer_token(lexer).loc, .src = cn_lexer_token(lexer).src };
@@ -14714,6 +14976,7 @@ const Cn_String CN_DIAGNOSTIC_CODES[CN__DC_COUNT] = {
     [CN_DC_FROM]                            = CN_STR_BUFFER("Comming from"),
     [CN_DC_EXPECTED_AST_NODE]               = CN_STR_BUFFER("Expected ast node"),
     [CN_DC_UNEXPECTED_FUNCTION]             = CN_STR_BUFFER("Unexpected function definition"),
+    [CN_DC_ILLEGAL_ATTRIBUTE]               = CN_STR_BUFFER("Illegal attribute"),
 };
 
 Cn_Diagnostic_Level cn_min_diagnostic_level = CN_DIAGNOSTIC_INFO;
