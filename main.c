@@ -54,6 +54,9 @@ int test(int x) {
         if (i == 2) break;
     }
 
+    goto early_return;
+
+    [[my_cool_note]] early_return:
     // return statement
     return x;
 }

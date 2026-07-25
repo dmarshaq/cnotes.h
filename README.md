@@ -31,9 +31,13 @@ Following is the list of features that are still not implemented, but will be in
  -  **K&R-style function definitions.**
  -  **_Atomic specifiers.**
  -  **_Complex types.**
+ -  **long double support.**
  -  **HEX float literals.**
+ -  **Label + goto correctness checking.**
  -  **FAM, Flexible Array Member.**
  -  **MSVC Specific compiler extensions.**
+ -  **Code modification via any string insertion and parsing.**
+ -  **Full Type Table serialization into .i file for Cn_Type introspection.**
 
 Note that this list might NOT include every feature that was not implemented, and can be added to as they are discovered or suggested.
 
