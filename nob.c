@@ -617,6 +617,7 @@ int main(int argc, char **argv) {
         nob_log(NOB_ERROR, "unknown command: '%s'.", command_name);
         commands_list();
 continue_outer:
+        ;
     }   
 
     return 0;

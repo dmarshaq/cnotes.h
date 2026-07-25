@@ -1628,7 +1628,8 @@ typedef enum {
     CN_AST_ACCESS_IS_POINTER                      = 0x100,
     CN_AST_DIRECT_DECLARATOR_FUNCTION_IS_VARIADIC = 0x100,
     CN_AST_ENUM_HAS_DEFINITION                    = 0x100,
-    CN_AST_STRUCT_OR_UNION_HAS_DEFINITION         = 0x100,
+    CN_AST_UNION_HAS_DEFINITION                   = 0x100,
+    CN_AST_STRUCT_HAS_DEFINITION                  = 0x100,
     CN_AST_DECLARATION_IS_EMPTY                   = 0x100,
 } Cn_Ast_Flags;
 
@@ -11620,9 +11621,14 @@ CNDEF Cn_Ast_Idx cn_ast_parse_struct_or_union_specifier(Cn_Lexer *lexer) {
         Cn_Ast_Idx identifier_idx = cn_ast_parse_identifier(lexer); 
         node.kind == CN_AST_STRUCT_SPECIFIER ? (node.struct_specifier.identifier_idx = identifier_idx) : (node.union_specifier.identifier_idx = identifier_idx);
     } else {
-        // Generating unique tag name for anonymous struct.
+        // Generating unique tag name for anonymous struct or union.
         Cn_String_Builder sb = cn_sb_make(CN_SB_STACK_STORAGE_CAP);
-        cn_sb_append_format(&sb, "cn__struct_%lu", cn_ast_counter_next());
+
+        if (node.kind == CN_AST_STRUCT_SPECIFIER)
+            cn_sb_append_format(&sb, "cn__struct_%lu", cn_ast_counter_next());
+        else 
+            cn_sb_append_format(&sb, "cn__union_%lu", cn_ast_counter_next());
+
         Cn_String tag = cn_sb_to_str(&sb);
 
         void *data = cn_chained_arena_alloc(&cn__ast_data->permanent_strings_arena, tag.length);
@@ -11657,6 +11663,10 @@ CNDEF Cn_Ast_Idx cn_ast_parse_struct_or_union_specifier(Cn_Lexer *lexer) {
         node.kind == CN_AST_STRUCT_SPECIFIER ? 
             (node.struct_specifier.member_declarations = cn_ast_idx_stack_finalize(mark)) : 
             (node.union_specifier.member_declarations = cn_ast_idx_stack_finalize(mark));
+
+        node.kind == CN_AST_STRUCT_SPECIFIER ? 
+            (node.struct_specifier.flags |= CN_AST_STRUCT_HAS_DEFINITION) : 
+            (node.union_specifier.flags |= CN_AST_UNION_HAS_DEFINITION);
     }
 
     Cn_Ast_Idx parent = cn_ast_node_list_append(node);
@@ -11779,10 +11789,34 @@ CNDEF Cn_Ast_Idx cn_ast_parse_enum_specifier(Cn_Lexer *lexer) {
     node.enum_specifier.gnu_attribute_specifiers = cn_ast_parse_gnu_attribute_specifiers(lexer, &ok);
     if (!ok) goto error;
 
+    bool is_enum_definition_optional;
     if (cn_lexer_expect(lexer, CN_TOKEN_IDENTIFIER)) {
         Cn_Ast_Idx identifier_idx = cn_ast_parse_identifier(lexer);
         if (identifier_idx == CN_AST_NIL_IDX) goto error;
         node.enum_specifier.identifier_idx = identifier_idx;
+    } else {
+         is_enum_definition_optional = true;
+
+         // Generating unique tag name for anonymous enum.
+         Cn_String_Builder sb = cn_sb_make(CN_SB_STACK_STORAGE_CAP);
+
+         cn_sb_append_format(&sb, "cn__enum_%lu", cn_ast_counter_next());
+
+         Cn_String tag = cn_sb_to_str(&sb);
+
+         void *data = cn_chained_arena_alloc(&cn__ast_data->permanent_strings_arena, tag.length);
+         cn_str_copy_to(tag, data);
+         tag.data = data;
+
+         Cn_Ast_Idx identifier_idx = cn_ast_node_list_append((Cn_Ast_Node) {
+                 .identifier.kind = CN_AST_IDENTIFIER,
+                 .identifier.loc = cn_lexer_token(lexer).loc,
+                 .identifier.name = tag,
+                 });
+
+         node.enum_specifier.identifier_idx = identifier_idx;
+
+         cn_sb_free(&sb);
     }
 
     if (cn_parse_optional(lexer, CN_TOKEN_COLON)) {
@@ -11791,7 +11825,6 @@ CNDEF Cn_Ast_Idx cn_ast_parse_enum_specifier(Cn_Lexer *lexer) {
         node.enum_specifier.specifier_qualifier_idx = specifier_qualifier_idx;
     }
 
-    bool is_enum_definition_optional = node.enum_specifier.identifier_idx != CN_AST_NIL_IDX;
 
     if (cn_parse_optional(lexer, CN_TOKEN_CURLY_OPEN)) {
         
@@ -12377,6 +12410,91 @@ CNDEF Cn_Type *cn__ast_type_from_union(Cn_Ast_Idx ts_idx) {
         binding->type->flags |= CN_TYPE_COMPLETE;
         binding->type->size = max_size;
         binding->type->align = max_align;
+    }
+ 
+    return binding->type;
+ 
+error:
+    CN__TRACE_ERROR
+    return NULL;
+}
+
+/**
+ * Declares/completes the enum tag and builds its type: binding every enum constant 
+ * that appears in enum defintion as a member.
+ *
+ * RETURNS: The (possibly newly completed) enum type, or NULL on error.
+ */
+CNDEF Cn_Type *cn__ast_type_from_enum(Cn_Ast_Idx ts_idx) {
+    Cn_Ast_Enum_Specifier *enum_spec = cn_ast_get(ts_idx);
+    Cn_String tag = cn_ast_get_as_node(enum_spec->identifier_idx)->identifier.name;
+
+    Cn_Ast_Binding_Idx binding_idx = cn_ast_tag_binding_declare(tag, CN_ENUM);
+    if (binding_idx == CN_AST_NIL_BINDING_IDX) goto error;
+ 
+    Cn_Ast_Binding *binding = cn_ast_binding_get(binding_idx);
+ 
+    if (enum_spec->flags & CN_AST_ENUM_HAS_DEFINITION) {
+        if ((binding->type->flags & CN_TYPE_COMPLETE) && binding->scope_idx == CN_AST_SCOPE_STACK_CURRENT_IDX) {
+            cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, ts_idx, CN_DC_REDEFINITION, "Redefinition of 'enum %.*s' is not allowed within the same scope.", CN_UNPACK(tag));
+            goto error;
+        }
+ 
+        Cn_Type_Enum *enum_type = (Cn_Type_Enum *)binding->type;
+ 
+        enum_type->members_length = enum_spec->enumerators.length;
+        enum_type->members = cn_chained_arena_alloc(&cn__ast_data->type_children_arena, enum_type->members_length * sizeof(Cn_Type_Enum_Member));
+ 
+        Cn_Type *enum_base_type;
+        if (enum_spec->specifier_qualifier_idx != CN_AST_NIL_IDX) {
+            Cn_Ast_Specifier_Qualifier *sq = cn_ast_get(enum_spec->specifier_qualifier_idx);
+            enum_base_type = cn_ast_to_type(sq->qualifiers, sq->type_specifier_idx, CN_AST_NIL_IDX);
+
+            if (enum_base_type == NULL) goto error;
+
+            if (enum_base_type->kind != CN_INTEGER && enum_base_type->kind != CN_OPAQUE) {
+                cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, ts_idx, CN_DC_ILLEGAL_TYPE, "Enum base type cannot be non-integer type.");
+                goto error;
+            }
+        } else {
+            enum_base_type = cn__ast_add_type_if_not((Cn_Type *)&CN_TYPE_INT);
+        }
+        enum_type->member_type = enum_base_type;
+
+        int64_t enum_counter = 0;
+        for (int64_t e = 0; e < enum_spec->enumerators.length; e++) {
+            Cn_Ast_Enumerator *enumerator = cn_ast_get(enum_spec->enumerators.idxs[e]);
+
+            // Reset counter, by evaluating expression_idx...
+            if (enumerator->expression_idx != CN_AST_NIL_IDX) {
+                uint8_t buffer[CN_TYPE_SCALAR_MAX_SIZE];
+                
+                Cn_Type *type = cn_ast_expression_typecheck(enumerator->expression_idx);
+                if (type == NULL) goto error;
+
+                if (type->kind != CN_INTEGER) {
+                    cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, enumerator->expression_idx, CN_DC_INVALID_CONSTANT_EXPRESSION, "Expected integer result from constant expression in enumerator.");
+                    goto error;
+                } 
+
+                Cn_Any result = cn_ast_expression_evaluate(enumerator->expression_idx, buffer);
+
+                enum_counter = cn_any_read_int(result);
+            }
+
+            Cn_String enumerator_name = cn_ast_get_as_node(enumerator->identifier_idx)->identifier.name;
+
+            Cn_Ast_Binding_Idx enum_constant_idx = cn_ast_enum_constant_binding_declare(enumerator_name, enum_spec->enumerators.idxs[e], enum_base_type, enum_counter);
+            if (enum_constant_idx == CN_AST_NIL_BINDING_IDX) goto error;
+
+            // Use name allocated from permanent arena cause binding saves name in temporary arena.
+            enum_type->members[e].name = cn__ast_permanent_save_string(enumerator_name);
+            enum_type->members[e].value = enum_counter;
+
+            enum_counter++;
+        }
+ 
+        binding->type->flags |= CN_TYPE_COMPLETE;
     }
  
     return binding->type;
@@ -14126,7 +14244,19 @@ CNDEF Cn_Any cn__ast_primary_expression_evaluate(Cn_Ast_Node *node, void *buffer
             }
         case CN_AST_IDENTIFIER:
             {   
-                return (Cn_Any) {0};
+                Cn_Ast_Binding_Idx idx = cn_ast_binding_table_get(literal->identifier.name, &cn__ast_data->symbol_binding_table);
+                if (idx == CN_AST_NIL_BINDING_IDX) {
+                    cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, cn_ast_idx_get(literal), CN_DC_INVALID_SYMBOL, "Primary expression identifier is not a known symbol.");
+                    return (Cn_Any) {0};
+                }
+
+                Cn_Ast_Binding *binding = cn_ast_binding_get(idx);
+                if (binding->kind != CN_BINDING_ENUM_CONSTANT) {
+                    return (Cn_Any) {0};
+                }
+
+                any = cn_any_write_int(any, binding->b_enum_constant.value);
+                break;
             }
         default:
             {
