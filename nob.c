@@ -1,5 +1,6 @@
 #define nob_cc_flags(cmd) nob_cmd_append(cmd, "-g", "-Wall", "-Wextra", "-std=c99")
 
+
 #define NOB_IMPLEMENTATION
 #include "nob.h"
 
@@ -10,6 +11,8 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <stdio.h>
+
+
 
 // Drop in arena implementation.
 typedef struct arena {
@@ -57,6 +60,223 @@ void arena_free(Arena *arena) {
 
     *arena = (Arena) {0};
 }
+
+
+
+// Async proc test setup to detect timeout and report.
+#ifdef _WIN32
+#  define WIN32_LEAN_AND_MEAN
+#  include <windows.h>
+#else
+// Needed for monotonic clock in -std=c99
+#  define _POSIX_C_SOURCE 199309L
+#  include <errno.h>
+#  include <signal.h>
+#  include <string.h>
+#  include <sys/wait.h>
+#  include <time.h>
+#  include <unistd.h>
+#  include <signal.h>
+#endif // _WIN32
+
+#define TEST_TIMEOUT_MS 2000
+
+typedef struct {
+#ifdef _WIN32
+    HANDLE proc;
+    HANDLE job;
+#else
+    pid_t pid;   // doubles as the process group id
+#endif // _WIN32
+} Test_Proc;
+
+typedef enum { PROC_OK, PROC_FAIL, PROC_TIMEOUT } Proc_Result;
+
+bool        test_proc_spawn(Test_Proc *p, Nob_Cmd *cmd, const char *stdout_path);
+Proc_Result test_proc_wait(Test_Proc *p, unsigned timeout_ms);
+
+#ifdef _WIN32
+bool test_proc_spawn(Test_Proc *p, Nob_Cmd *cmd, const char *stdout_path)
+{
+    if (cmd->count < 1) {
+        nob_log(NOB_ERROR, "could not run empty command");
+        return false;
+    }
+
+    Nob_Fd fdout = nob_fd_open_for_write(stdout_path);
+    if (fdout == NOB_INVALID_FD) return false;
+
+    HANDLE job = CreateJobObjectA(NULL, NULL);
+    if (job == NULL) {
+        nob_log(NOB_ERROR, "could not create job object: %lu", GetLastError());
+        nob_fd_close(fdout);
+        return false;
+    }
+
+    JOBOBJECT_EXTENDED_LIMIT_INFORMATION jeli = {0};
+    jeli.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
+    if (!SetInformationJobObject(job, JobObjectExtendedLimitInformation, &jeli, sizeof(jeli))) {
+        nob_log(NOB_ERROR, "could not configure job object: %lu", GetLastError());
+        CloseHandle(job);
+        nob_fd_close(fdout);
+        return false;
+    }
+
+    STARTUPINFOA si = {0};
+    si.cb = sizeof(si);
+    si.dwFlags |= STARTF_USESTDHANDLES;
+    si.hStdInput  = GetStdHandle(STD_INPUT_HANDLE);
+    si.hStdOutput = fdout;
+    si.hStdError  = GetStdHandle(STD_ERROR_HANDLE);
+
+    Nob_String_Builder sb = {0};
+    nob_cmd_render(*cmd, &sb);
+    nob_sb_append_null(&sb);
+    nob_log(NOB_INFO, "CMD: %s", sb.items);
+
+    PROCESS_INFORMATION pi = {0};
+    BOOL ok = CreateProcessA(NULL, sb.items, NULL, NULL, TRUE,
+                             CREATE_SUSPENDED, NULL, NULL, &si, &pi);
+    nob_sb_free(sb);
+    nob_fd_close(fdout);
+    cmd->count = 0;
+
+    if (!ok) {
+        nob_log(NOB_ERROR, "could not create child process: %lu", GetLastError());
+        CloseHandle(job);
+        return false;
+    }
+
+    if (!AssignProcessToJobObject(job, pi.hProcess)) {
+        nob_log(NOB_ERROR, "could not assign process to job: %lu", GetLastError());
+        TerminateProcess(pi.hProcess, 1);
+        CloseHandle(pi.hThread);
+        CloseHandle(pi.hProcess);
+        CloseHandle(job);
+        return false;
+    }
+
+    ResumeThread(pi.hThread);
+    CloseHandle(pi.hThread);
+
+    p->proc = pi.hProcess;
+    p->job  = job;
+    return true;
+}
+
+Proc_Result test_proc_wait(Test_Proc *p, unsigned timeout_ms)
+{
+    Proc_Result result;
+
+    DWORD w = WaitForSingleObject(p->proc, (DWORD)timeout_ms);
+    if (w == WAIT_TIMEOUT) {
+        TerminateJobObject(p->job, 1);
+        WaitForSingleObject(p->proc, INFINITE);
+        result = PROC_TIMEOUT;
+    } else if (w == WAIT_OBJECT_0) {
+        DWORD code = 0;
+        if (!GetExitCodeProcess(p->proc, &code)) {
+            nob_log(NOB_ERROR, "could not get process exit code: %lu", GetLastError());
+            result = PROC_FAIL;
+        } else if (code != 0) {
+            nob_log(NOB_ERROR, "test: exited with code %lu", code);
+            result = PROC_FAIL;
+        } else {
+            result = PROC_OK;
+        }
+    } else {
+        nob_log(NOB_ERROR, "could not wait on child process: %lu", GetLastError());
+        result = PROC_FAIL;
+    }
+
+    CloseHandle(p->proc);
+    CloseHandle(p->job);   // KILL_ON_JOB_CLOSE reaps any stragglers
+    return result;
+}
+#else 
+bool test_proc_spawn(Test_Proc *p, Nob_Cmd *cmd, const char *stdout_path) {
+    if (cmd->count < 1) {
+        nob_log(NOB_ERROR, "could not run empty command");
+        return false;
+    }
+
+    Nob_String_Builder sb = {0};
+    nob_cmd_render(*cmd, &sb);
+    nob_sb_append_null(&sb);
+    nob_log(NOB_INFO, "CMD: %s", sb.items);
+    nob_sb_free(sb);
+
+    Nob_Fd fdout = nob_fd_open_for_write(stdout_path);
+    if (fdout == NOB_INVALID_FD) return false;
+
+    nob_da_append(cmd, NULL);   // argv terminator, allocated before the fork
+
+    pid_t pid = fork();
+    if (pid < 0) {
+        nob_log(NOB_ERROR, "could not fork: %s", strerror(errno));
+        nob_fd_close(fdout);
+        cmd->count = 0;
+        return false;
+    }
+
+    if (pid == 0) {
+        setpgid(0, 0);
+        if (dup2(fdout, STDOUT_FILENO) < 0) _exit(127);
+        close(fdout);
+        execvp(cmd->items[0], (char * const *) cmd->items);
+        _exit(127);
+    }
+
+    setpgid(pid, pid);          // see note below
+    nob_fd_close(fdout);
+    cmd->count = 0;             // match nob_cmd_run's reset behaviour
+    p->pid = pid;
+    return true;
+}
+
+#include <time.h>
+
+Proc_Result test_proc_wait(Test_Proc *p, unsigned timeout_ms) {
+    struct timespec start;
+    clock_gettime(CLOCK_MONOTONIC, &start);
+
+    for (;;) {
+        int wstatus = 0;
+        pid_t w = waitpid(p->pid, &wstatus, WNOHANG);
+        if (w < 0) {
+            nob_log(NOB_ERROR, "could not wait on pid %d: %s", p->pid, strerror(errno));
+            return PROC_FAIL;
+        }
+        if (w > 0) {
+            kill(-p->pid, SIGKILL);   // sweep up grandchildren the test left running
+            if (WIFEXITED(wstatus)) {
+                int code = WEXITSTATUS(wstatus);
+                if (code != 0) {
+                    nob_log(NOB_ERROR, "test: exited with code %d", code);
+                    return PROC_FAIL;
+                }
+                return PROC_OK;
+            }
+            nob_log(NOB_ERROR, "test: killed by signal %d", WTERMSIG(wstatus));
+            return PROC_FAIL;
+        }
+
+        struct timespec now;
+        clock_gettime(CLOCK_MONOTONIC, &now);
+        double elapsed = (now.tv_sec - start.tv_sec)*1000.0
+                       + (now.tv_nsec - start.tv_nsec)/1e6;
+        if (elapsed >= (double)timeout_ms) break;
+
+        nanosleep(&(struct timespec){ .tv_nsec = 5*1000*1000 }, NULL);
+    }
+
+    kill(-p->pid, SIGKILL);
+    waitpid(p->pid, NULL, 0);
+    return PROC_TIMEOUT;
+}
+#endif // _WIN32
+
+
 
 
 bool confirm(const char *prompt) {
@@ -138,6 +358,7 @@ typedef enum : uint8_t {
     BUILD_FAIL,
     RUNTIME_FAIL,
     UNEXPECTED_OUTPUT,
+    TIMEOUT,
     SUCCESS,
 } Test_Status;
 
@@ -257,8 +478,10 @@ void test_execute(Test_Record *r, Nob_Cmd *cmd) {
     int output_path_length;
 
     output_path_length = snprintf(output_path_buffer, sizeof(output_path_buffer), BUILD_DIR"/%s", r->path);
-    if (output_path_length < 0 && output_path_length >= sizeof(output_path_buffer)) {
+    if (output_path_length < 0 || output_path_length >= sizeof(output_path_buffer)) {
         nob_log(NOB_ERROR, "test: test path is too long exceeds %lu buffer size.", sizeof(output_path_buffer));
+        r->status = BUILD_FAIL;
+        return;
     }
     output_path_buffer[output_path_length - 2] = '\0';
 
@@ -285,10 +508,29 @@ void test_execute(Test_Record *r, Nob_Cmd *cmd) {
     strcat(stdout_path, STDOUT_TXT_FILE_EXTENSION);
 
 
-    if (!nob_cmd_run(cmd, .stdout_path = stdout_path)) {
+    Test_Proc proc = {0};
+    if (!test_proc_spawn(&proc, cmd, stdout_path)) {
         r->status = RUNTIME_FAIL;
         return;
     }
+
+    switch (test_proc_wait(&proc, TEST_TIMEOUT_MS)) {
+    case PROC_TIMEOUT:
+        nob_log(NOB_ERROR, "test: '%s' timed out after %d ms",
+                output_path_buffer, TEST_TIMEOUT_MS);
+        r->status = TIMEOUT;
+        return;
+    case PROC_FAIL:
+        r->status = RUNTIME_FAIL;
+        return;
+    case PROC_OK:
+        break;
+    }
+
+    // if (!nob_cmd_run(cmd, .stdout_path = stdout_path)) {
+    //     r->status = RUNTIME_FAIL;
+    //     return;
+    // }
 
 
     char expected_stdout_path[strlen(r->path) - 2 + strlen(STDOUT_TXT_FILE_EXTENSION) + 1];
@@ -447,6 +689,10 @@ int test_command(int *argc, char ***argv) {
 
             case UNEXPECTED_OUTPUT:
                 fprintf(stderr, "\033[31mUNEXPECTED OUTPUT\033[0m    ");
+                break;
+
+            case TIMEOUT:
+                fprintf(stderr, "\033[31mTIMEOUT\033[0m    ");
                 break;
         
             case SUCCESS:

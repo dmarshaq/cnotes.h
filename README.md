@@ -33,6 +33,7 @@ Following is the list of features that are still not implemented, but will be in
  -  **_Complex types.**
  -  **long double support.**
  -  **HEX float literals.**
+ -  **Binary integer literals.**
  -  **Label + goto correctness checking.**
  -  **FAM, Flexible Array Member.**
  -  **MSVC Specific compiler extensions.**
