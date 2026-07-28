@@ -4063,15 +4063,15 @@ CNDEF void cn_diagnostic_node(Cn_Diagnostic_Level level, Cn_Ast_Idx idx, Cn_Diag
 // PRE-PROCESSING SECTION
 
 typedef enum {
-    CN_MESSAGE_PARSED_FUNCTION_DEFINITION
+    CN_MESSAGE_PARSED_FUNCTION
 } Cn_Message_Kind;
 
 typedef struct {
     Cn_Ast_Idx node_idx;
-} Cn_Message_Parsed_Function_Definition;
+} Cn_Message_Parsed_Function;
 
 typedef union {
-    Cn_Message_Parsed_Function_Definition parsed_function_definition;
+    Cn_Message_Parsed_Function parsed_function;
 } Cn_Message;
 
 typedef int (Cn_Message_Handler)(Cn_Message_Kind kind, void *message);
@@ -4160,6 +4160,14 @@ CNDEF void cn_tu_free(Cn_Translation_Unit *tu);
 CNDEF void cn_replace(Cn_Ast_Idx *original, Cn_Ast_Idx new, Cn_Ast_Idx parent_idx);
 
 /**
+ * RETURNS: NIL if couldn't find attribute specific attribute on the node, or valid attribute idx
+ * if found it.
+ *
+ * IMPORTNAT: If the are multiple attributes with the same name, finds the first one.
+ */
+CNDEF Cn_Ast_Idx cn_get_attribute(Cn_Ast_Idx node, Cn_String attribute_name);
+
+/**
  * Optional values that can be set for any cn_build_* function.
  */
 typedef struct {
@@ -4243,6 +4251,16 @@ CNDEF Cn_Ast_Idx cn__build_string(Cn_String str, Cn_Build_Opt opt);
 CNDEF Cn_Ast_Idx cn__build_binary(Cn_Binary_Operator_Kind op, Cn_Ast_Idx left, Cn_Ast_Idx right, Cn_Build_Opt opt);
 
 /**
+ * Builds assign expression, left and right params must be 
+ * valid built node idx's.
+ * 
+ * RETURNS: Built assignment expression.
+ */
+#define cn_build_assign(op, left, right, ...) cn__build_assign(op, left, right, (Cn_Build_Opt) { .file = __FILE__, .line =__LINE__, __VA_ARGS__ })
+
+CNDEF Cn_Ast_Idx cn__build_assign(Cn_Assignment_Operator_Kind op, Cn_Ast_Idx left, Cn_Ast_Idx right, Cn_Build_Opt opt);
+
+/**
  * Builds unary expression, expression must be 
  * valid built node idx.
  * 
@@ -4273,6 +4291,45 @@ CNDEF Cn_Ast_Idx cn__build_func_call(Cn_Ast_Idx callee, Cn_Ast_List arguments, C
 
 CNDEF Cn_Ast_Idx cn__build_expr_statement(Cn_Ast_Idx expression, Cn_Build_Opt opt);
 
+/**
+ * Builds goto statement, identifier must be 
+ * valid built node idx.
+ * 
+ * RETURNS: Built goto statement.
+ */
+#define cn_build_goto_statement(identifier, ...) cn__build_goto_statement(identifier, (Cn_Build_Opt) { .file = __FILE__, .line =__LINE__, __VA_ARGS__ })
+
+CNDEF Cn_Ast_Idx cn__build_goto_statement(Cn_Ast_Idx identifier, Cn_Build_Opt opt);
+
+/**
+ * Builds return statement, expression must be 
+ * valid built node idx.
+ * 
+ * RETURNS: Built return statement.
+ */
+#define cn_build_return_statement(expression, ...) cn__build_return_statement(expression, (Cn_Build_Opt) { .file = __FILE__, .line =__LINE__, __VA_ARGS__ })
+
+CNDEF Cn_Ast_Idx cn__build_return_statement(Cn_Ast_Idx expression, Cn_Build_Opt opt);
+
+/**
+ * Builds label, identifier and statement must be 
+ * valid built node idxs.
+ * 
+ * RETURNS: Built label.
+ */
+#define cn_build_label(identifier, statement, ...) cn__build_label(identifier, statement, (Cn_Build_Opt) { .file = __FILE__, .line =__LINE__, __VA_ARGS__ })
+
+CNDEF Cn_Ast_Idx cn__build_label(Cn_Ast_Idx identifier, Cn_Ast_Idx statement, Cn_Build_Opt opt);
+
+/**
+ * Builds block item, child must be 
+ * valid built node idx.
+ * 
+ * RETURNS: Built block item.
+ */
+#define cn_build_block_item(declaration_or_statement, ...) cn__build_block_item(declaration_or_statement, (Cn_Build_Opt) { .file = __FILE__, .line =__LINE__, __VA_ARGS__ })
+
+CNDEF Cn_Ast_Idx cn__build_block_item(Cn_Ast_Idx declaration_or_statement, Cn_Build_Opt opt);
 
 
 #endif // CN_H_
@@ -9476,8 +9533,8 @@ CNDEF Cn_Ast_Idx cn_ast_parse_external_declaration(Cn_Lexer *lexer) {
         cn_ast_idx_from_message = child_idx;
 
         if (((Cn_Ast_Function *)cn_ast_get(child_idx))->kind == CN_AST_FUNCTION) {
-            bool modified = cn_send_message(CN_MESSAGE_PARSED_FUNCTION_DEFINITION, (Cn_Message) {
-                        .parsed_function_definition = {
+            bool modified = cn_send_message(CN_MESSAGE_PARSED_FUNCTION, (Cn_Message) {
+                        .parsed_function = {
                             .node_idx = cn_ast_idx_from_message,
                         }
                     });
@@ -16942,6 +16999,100 @@ CNDEF void cn_replace(Cn_Ast_Idx *original, Cn_Ast_Idx new, Cn_Ast_Idx parent_id
     *original = new;
 }
 
+CNDEF Cn_Ast_Idx cn_get_attribute(Cn_Ast_Idx node, Cn_String attribute_name) {
+    if (node == CN_AST_NIL_IDX) return CN_AST_NIL_IDX;
+
+    Cn_Ast_List attribute_specifiers;
+
+    switch (cn_ast_get_as_node(node)->kind) {
+        case CN_AST_DECLARATION:
+            attribute_specifiers = cn_ast_get_as_node(node)->declaration.attribute_specifiers;
+            break;
+        case CN_AST_FUNCTION:
+            attribute_specifiers = cn_ast_get_as_node(node)->function.attribute_specifiers;
+            break;
+        case CN_AST_BLOCK:
+            attribute_specifiers = cn_ast_get_as_node(node)->block.attribute_specifiers;
+            break;
+        case CN_AST_IF:
+            attribute_specifiers = cn_ast_get_as_node(node)->if_statement.attribute_specifiers;
+            break;
+        case CN_AST_SWITCH:
+            attribute_specifiers = cn_ast_get_as_node(node)->switch_statement.attribute_specifiers;
+            break;
+        case CN_AST_WHILE:
+            attribute_specifiers = cn_ast_get_as_node(node)->while_statement.attribute_specifiers;
+            break;
+        case CN_AST_DO_WHILE:
+            attribute_specifiers = cn_ast_get_as_node(node)->do_while.attribute_specifiers;
+            break;
+        case CN_AST_FOR:
+            attribute_specifiers = cn_ast_get_as_node(node)->for_statement.attribute_specifiers;
+            break;
+        case CN_AST_LABEL:
+            attribute_specifiers = cn_ast_get_as_node(node)->label.attribute_specifiers;
+            break;
+        case CN_AST_GOTO:
+            attribute_specifiers = cn_ast_get_as_node(node)->goto_statement.attribute_specifiers;
+            break;
+        case CN_AST_RETURN:
+            attribute_specifiers = cn_ast_get_as_node(node)->return_statement.attribute_specifiers;
+            break;
+        case CN_AST_BREAK:
+            attribute_specifiers = cn_ast_get_as_node(node)->break_statement.attribute_specifiers;
+            break;
+        case CN_AST_CONTINUE:
+            attribute_specifiers = cn_ast_get_as_node(node)->continue_statement.attribute_specifiers;
+            break;
+        case CN_AST_EXPRESSION_STATEMENT:
+            attribute_specifiers = cn_ast_get_as_node(node)->expression_statement.attribute_specifiers;
+            break;
+        // case CN_AST_PARAMETER_DECLARATION:
+        case CN_AST_STRUCT_SPECIFIER:
+            attribute_specifiers = cn_ast_get_as_node(node)->struct_specifier.attribute_specifiers;
+            break;
+        case CN_AST_UNION_SPECIFIER:
+            attribute_specifiers = cn_ast_get_as_node(node)->union_specifier.attribute_specifiers;
+            break;
+        case CN_AST_MEMBER_DECLARATION:
+            attribute_specifiers = cn_ast_get_as_node(node)->member_declaration.attribute_specifiers;
+            break;
+        case CN_AST_ENUM_SPECIFIER:
+            attribute_specifiers = cn_ast_get_as_node(node)->enum_specifier.attribute_specifiers;
+            break;
+        case CN_AST_ENUMERATOR:
+            attribute_specifiers = cn_ast_get_as_node(node)->enumerator.attribute_specifiers;
+            break;
+            
+        case CN_AST_ATTRIBUTE_SPECIFIER: 
+            {
+                Cn_Ast_Attribute_Specifier *attribute_specifier = cn_ast_get(node);
+                for (int64_t j = 0; j < attribute_specifier->attributes.length; j++) {
+                    Cn_Ast_Attribute *attribute = cn_ast_get(attribute_specifier->attributes.idxs[j]);
+                    if (cn_str_equals(&cn_ast_get_as_node(attribute->identifier_idx)->identifier.name, &attribute_name)) {
+                        return attribute_specifier->attributes.idxs[j];
+                    }
+                }
+
+                return CN_AST_NIL_IDX;
+            }
+        default:
+            return CN_AST_NIL_IDX;
+    }
+
+    for (int64_t i = 0; i < attribute_specifiers.length; i++) {
+        Cn_Ast_Attribute_Specifier *attribute_specifier = cn_ast_get(attribute_specifiers.idxs[i]);
+        for (int64_t j = 0; j < attribute_specifier->attributes.length; j++) {
+            Cn_Ast_Attribute *attribute = cn_ast_get(attribute_specifier->attributes.idxs[j]);
+            if (cn_str_equals(&cn_ast_get_as_node(attribute->identifier_idx)->identifier.name, &attribute_name)) {
+                return attribute_specifier->attributes.idxs[j];
+            }
+        }
+    }
+
+    return CN_AST_NIL_IDX;
+}
+
 CNDEF Cn_Ast_Idx cn__build_wrap_if_primary(Cn_Ast_Idx idx) {
     if (cn_ast_is_primary(idx)) {
         Cn_Ast_Node *node = cn_ast_get(idx);
@@ -17051,6 +17202,25 @@ CNDEF Cn_Ast_Idx cn__build_binary(Cn_Binary_Operator_Kind op, Cn_Ast_Idx left, C
     return parent;
 }
 
+CNDEF Cn_Ast_Idx cn__build_assign(Cn_Assignment_Operator_Kind op, Cn_Ast_Idx left, Cn_Ast_Idx right, Cn_Build_Opt opt) {
+    Cn_Ast_Node node = {
+        .kind = CN_AST_ASSIGN,
+        .flags = CN_AST_SYNTHETIC,
+        .loc.file = cn__build_make_location(__FUNCTION__, opt.file, opt.line),
+    };
+
+    node.assign.operator = op;
+    node.assign.left_idx = cn__build_wrap_if_primary(left);
+    node.assign.right_idx = cn__build_wrap_if_primary(right);
+
+    Cn_Ast_Idx parent = cn_ast_node_list_append(node);
+    cn_ast_node_set_parent(parent, 
+            node.assign.left_idx,
+            node.assign.right_idx,
+            );
+    return parent;
+}
+
 CNDEF Cn_Ast_Idx cn__build_unary(Cn_Unary_Operator_Kind op, Cn_Ast_Idx expression, Cn_Build_Opt opt) {
     Cn_Ast_Node node = {
         .kind = CN_AST_UNARY,
@@ -17100,6 +17270,63 @@ CNDEF Cn_Ast_Idx cn__build_expr_statement(Cn_Ast_Idx expression, Cn_Build_Opt op
 
     Cn_Ast_Idx parent = cn_ast_node_list_append(node);
     cn_ast_node_set_parent(parent, node.expression_statement.expression_idx);
+    return parent;
+}
+
+CNDEF Cn_Ast_Idx cn__build_goto_statement(Cn_Ast_Idx identifier, Cn_Build_Opt opt) {
+    Cn_Ast_Node node = {
+        .kind = CN_AST_GOTO,
+        .flags = CN_AST_SYNTHETIC,
+        .loc.file = cn__build_make_location(__FUNCTION__, opt.file, opt.line),
+    };
+
+    node.goto_statement.identifier_idx = identifier;
+
+    Cn_Ast_Idx parent = cn_ast_node_list_append(node);
+    cn_ast_node_set_parent(parent, node.goto_statement.identifier_idx);
+    return parent;
+}
+
+CNDEF Cn_Ast_Idx cn__build_return_statement(Cn_Ast_Idx expression, Cn_Build_Opt opt) {
+    Cn_Ast_Node node = {
+        .kind = CN_AST_RETURN,
+        .flags = CN_AST_SYNTHETIC,
+        .loc.file = cn__build_make_location(__FUNCTION__, opt.file, opt.line),
+    };
+
+    node.return_statement.expression_idx = cn__build_wrap_if_primary(expression);
+
+    Cn_Ast_Idx parent = cn_ast_node_list_append(node);
+    cn_ast_node_set_parent(parent, node.return_statement.expression_idx);
+    return parent;
+}
+
+CNDEF Cn_Ast_Idx cn__build_label(Cn_Ast_Idx identifier, Cn_Ast_Idx statement, Cn_Build_Opt opt) {
+    Cn_Ast_Node node = {
+        .kind = CN_AST_LABEL,
+        .flags = CN_AST_SYNTHETIC,
+        .loc.file = cn__build_make_location(__FUNCTION__, opt.file, opt.line),
+    };
+
+    node.label.identifier_idx = identifier;
+    node.label.statement_idx = statement;
+
+    Cn_Ast_Idx parent = cn_ast_node_list_append(node);
+    cn_ast_node_set_parent(parent, node.label.identifier_idx, node.label.statement_idx);
+    return parent;
+}
+
+CNDEF Cn_Ast_Idx cn__build_block_item(Cn_Ast_Idx declaration_or_statement, Cn_Build_Opt opt) {
+    Cn_Ast_Node node = {
+        .kind = CN_AST_BLOCK_ITEM,
+        .flags = CN_AST_SYNTHETIC,
+        .loc.file = cn__build_make_location(__FUNCTION__, opt.file, opt.line),
+    };
+
+    node.block_item.declaration_or_statement_idx = declaration_or_statement;
+
+    Cn_Ast_Idx parent = cn_ast_node_list_append(node);
+    cn_ast_node_set_parent(parent, node.block_item.declaration_or_statement_idx);
     return parent;
 }
 

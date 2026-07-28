@@ -111,7 +111,7 @@ int handler(Cn_Message_Kind kind, void *message) {
 
     // Reporting modification on every parsed function definition,
     // it rolls back to the checkpoint and makes parser take the reparse path.
-    return kind == CN_MESSAGE_PARSED_FUNCTION_DEFINITION;
+    return kind == CN_MESSAGE_PARSED_FUNCTION;
 }
 
 int main(void) {
