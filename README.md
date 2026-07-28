@@ -27,6 +27,7 @@ Following is the list of features that are still not implemented, but will be in
 
  -  **VLA, variable length arrays support.**
  -  **Struct and Union empty member declarations.**
+ -  **Tag type same name proper shadowing.**
  -  **ASM definitions.**
  -  **K&R-style function definitions.**
  -  **_Atomic specifiers.**

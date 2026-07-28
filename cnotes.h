@@ -2101,6 +2101,7 @@ typedef struct {
     int64_t saved_strings_length;
     int64_t binding_idx;
     int64_t label_binding_idx;
+    int64_t binding_defined_idx;
 
     /**
      * If set to true, means that there is checkpoint set in this scope.
@@ -2187,6 +2188,33 @@ typedef struct {
      */
     Cn_Ast_Binding_Idx *label_binding_table;
     /**
+     * This array list does one job to prevent a really annoying binding related issue,
+     * that comes up during reparsing (specifacly checkpoint loading) after user executed hook.
+     *
+     * To understand this, first understand that in C most of the bindings are allowed to be redeclared and 
+     * some even redefined. For example tag types (struct, enum and union) are allowed to be redeclared
+     * as many times as you want, and eventually defined (therefor completing previously declared tag type).
+     * And C variables are allowed to be redefined under certain scope conditions too.
+     *
+     * That said, cannonicaly this works under the mechanism which simply ignores duplicate redeclarations and 
+     * merges them into previous declarations, and if declaration completes a type (for example in tag type case),
+     * the type that was PREVIOUSLY created gets filled with values and completed (defined).
+     *
+     * But that brings an issue if used with checkpoint/rollback system that this tool provides.
+     * Since if rollback occurs, by the rules: all state is reverted to the checkpoint in order to reparse ast tree.
+     * This includes deleting all types, bindings that were created AFTER checkpoint was set.
+     * And thats the problem, since a binding with definition can occur AFTER checkpoint is set and it can complete (define)
+     * the type that was PREVIOUSLY created by older declaration. So when rollback occurs the ast tree that made definition is erased,
+     * but the definition is still saved in the type, since it was first declared before the checkpoint, and therefor is not reverted 
+     * to previous undefined state.
+     *
+     * Solution is then NOT to destroy exisitng binding structure (because it would likely only overcomplicate and possibly break some C grammar rules), 
+     * but rather to track binding idx in growing list. Each time the binding is defined, it's idx is added to this list. 
+     * Then its simple, because checkpoint will place marker and every idx added after that marker will be taken out and undefined. 
+     * This list is also scoped, so bindings that were removed on its own get their idx's removed from here as well.
+     */
+    Cn_Ast_Binding_Idx *binding_defined_idx_list;
+    /**
      * Scoped strings arena is used to store every scoped string data.
      * Pointers to the data remain the same throughout the execution.
      * since chained arena gurantees that memory once allocated is not moved.
@@ -2245,6 +2273,7 @@ typedef struct {
     uint64_t                saved_type_children_length;
     int64_t                 saved_binding_length;
     int64_t                 saved_label_binding_length;
+    int64_t                 saved_binding_defined_idx_length;
     uint64_t                saved_scoped_strings_length;
     uint64_t                saved_permanent_strings_length;
     int64_t                 saved_scope_length;
@@ -3683,6 +3712,13 @@ CNDEF bool cn_ast_initializer_typecheck(Cn_Ast_Idx initializer_idx, Cn_Type *typ
  *  Scope management for compound statements and functions.
  *  Constant evaluation if needed.
  *
+ * Every cn_ast_reparse_* function mirrors cn_ast_parse_* function of the same name,
+ * performing everything it performs, except of consuming tokens,
+ * already built ast nodes are reused instead.
+ *
+ * Functions that mirror cn_ast_parse_* returning Cn_Ast_List, take that list and
+ * blame_idx, ast node that is blamed in diagnostics if list holds NIL ast node.
+ *
  * Expecting clear ast tree.
  */
 CNDEF bool cn_ast_reparse_translation_unit(Cn_Ast_Idx node_idx);
@@ -3713,31 +3749,64 @@ CNDEF bool cn_ast_reparse_asm_definition(Cn_Ast_Idx node_idx);
 CNDEF bool cn_ast_reparse_statement(Cn_Ast_Idx node_idx);
 
 /**
- * Reparse given ast node as compound statement.
+ * Reparse given ast node as block.
  */
 CNDEF bool cn_ast_reparse_block(Cn_Ast_Idx node_idx, bool use_current_scope);
 
 /**
- * Reparse given ast node as selection statement.
+ * Reparse given ast node as block item.
  */
-CNDEF bool cn_ast_reparse_if(Cn_Ast_Idx node_idx);
-CNDEF bool cn_ast_reparse_switch(Cn_Ast_Idx node_idx);
+CNDEF bool cn_ast_reparse_block_item(Cn_Ast_Idx node_idx);
 
 /**
- * Reparse given ast node as iteration statement.
+ * Reparse given ast node as if statement.
  */
-CNDEF bool cn_ast_reparse_iteration_statement(Cn_Ast_Idx node_idx);
+CNDEF bool cn_ast_reparse_if_statement(Cn_Ast_Idx node_idx);
 
 /**
- * Reparse given ast node as jump statement.
+ * Reparse given ast node as switch statement.
  */
-CNDEF bool cn_ast_reparse_goto(Cn_Ast_Idx node_idx);
-CNDEF bool cn_ast_reparse_return(Cn_Ast_Idx node_idx);
+CNDEF bool cn_ast_reparse_switch_statement(Cn_Ast_Idx node_idx);
 
 /**
- * Reparse given ast node as labeled statement.
+ * Reparse given ast node as while statement.
  */
-CNDEF bool cn_ast_reparse_labeled_statement(Cn_Ast_Idx node_idx);
+CNDEF bool cn_ast_reparse_while_statement(Cn_Ast_Idx node_idx);
+
+/**
+ * Reparse given ast node as do while.
+ */
+CNDEF bool cn_ast_reparse_do_while(Cn_Ast_Idx node_idx);
+
+/**
+ * Reparse given ast node as for statement.
+ */
+CNDEF bool cn_ast_reparse_for_statement(Cn_Ast_Idx node_idx);
+
+/**
+ * Reparse given ast node as goto statement.
+ */
+CNDEF bool cn_ast_reparse_goto_statement(Cn_Ast_Idx node_idx);
+
+/**
+ * Reparse given ast node as return statement.
+ */
+CNDEF bool cn_ast_reparse_return_statement(Cn_Ast_Idx node_idx);
+
+/**
+ * Reparse given ast node as break statement.
+ */
+CNDEF bool cn_ast_reparse_break_statement(Cn_Ast_Idx node_idx);
+
+/**
+ * Reparse given ast node as continue statement.
+ */
+CNDEF bool cn_ast_reparse_continue_statement(Cn_Ast_Idx node_idx);
+
+/**
+ * Reparse given ast node as label.
+ */
+CNDEF bool cn_ast_reparse_label(Cn_Ast_Idx node_idx);
 
 /**
  * Reparse given ast node as expression statement.
@@ -3745,9 +3814,9 @@ CNDEF bool cn_ast_reparse_labeled_statement(Cn_Ast_Idx node_idx);
 CNDEF bool cn_ast_reparse_expression_statement(Cn_Ast_Idx node_idx);
 
 /**
- * Reparse given ast node as argument list.
+ * Reparse given ast list as arguments.
  */
-CNDEF bool cn_ast_reparse_argument_list(Cn_Ast_Idx node_idx);
+CNDEF bool cn_ast_reparse_arguments(Cn_Ast_List arguments, Cn_Ast_Idx blame_idx);
 
 /**
  * Reparse given ast node as expression.
@@ -3755,9 +3824,9 @@ CNDEF bool cn_ast_reparse_argument_list(Cn_Ast_Idx node_idx);
 CNDEF bool cn_ast_reparse_expression(Cn_Ast_Idx node_idx);
 
 /**
- * Reparse given ast node as init declarators.
+ * Reparse given ast list as init declarators.
  */
-CNDEF bool cn_ast_reparse_init_declarators(Cn_Ast_Idx node_idx);
+CNDEF bool cn_ast_reparse_init_declarators(Cn_Ast_List init_declarators, Cn_Ast_Idx blame_idx);
 
 /**
  * Reparse given ast node as init declarator.
@@ -3770,12 +3839,27 @@ CNDEF bool cn_ast_reparse_init_declarator(Cn_Ast_Idx node_idx);
 CNDEF bool cn_ast_reparse_initializer(Cn_Ast_Idx node_idx);
 
 /**
- * Reparse given ast node as declarator.
+ * Reparse given ast list as designations.
  */
-CNDEF bool cn_ast_reparse_abstract_declarator(Cn_Ast_Idx node_idx);
+CNDEF bool cn_ast_reparse_designations(Cn_Ast_List designations, Cn_Ast_Idx blame_idx);
 
 /**
- * Reparse given ast node as declarator.
+ * Reparse given ast node as designation.
+ */
+CNDEF bool cn_ast_reparse_designation(Cn_Ast_Idx node_idx);
+
+/**
+ * Reparse given ast list as designators.
+ */
+CNDEF bool cn_ast_reparse_designators(Cn_Ast_List designators, Cn_Ast_Idx blame_idx);
+
+/**
+ * Reparse given ast node as designator.
+ */
+CNDEF bool cn_ast_reparse_designator(Cn_Ast_Idx node_idx);
+
+/**
+ * Reparse given ast node as declarator, abstract declarator is valid too.
  */
 CNDEF bool cn_ast_reparse_declarator(Cn_Ast_Idx node_idx);
 
@@ -3790,6 +3874,26 @@ CNDEF bool cn_ast_reparse_pointer(Cn_Ast_Idx node_idx);
 CNDEF bool cn_ast_reparse_direct_declarator(Cn_Ast_Idx node_idx);
 
 /**
+ * Reparse given ast node as identifier.
+ */
+CNDEF bool cn_ast_reparse_identifier(Cn_Ast_Idx node_idx);
+
+/**
+ * Reparse given ast node as integer.
+ */
+CNDEF bool cn_ast_reparse_integer(Cn_Ast_Idx node_idx);
+
+/**
+ * Reparse given ast node as float.
+ */
+CNDEF bool cn_ast_reparse_float(Cn_Ast_Idx node_idx);
+
+/**
+ * Reparse given ast node as string.
+ */
+CNDEF bool cn_ast_reparse_string(Cn_Ast_Idx node_idx);
+
+/**
  * Reparse given ast node as declaration specifiers.
  */
 CNDEF bool cn_ast_reparse_declaration_specifiers(Cn_Ast_Idx node_idx);
@@ -3800,9 +3904,9 @@ CNDEF bool cn_ast_reparse_declaration_specifiers(Cn_Ast_Idx node_idx);
 CNDEF bool cn_ast_reparse_type_specifier(Cn_Ast_Idx node_idx);
 
 /**
- * Reparse given ast node as GNU typeof specifier.
+ * Reparse given ast node as GNU typeof.
  */
-CNDEF bool cn_ast_reparse_gnu_typeof_specifier(Cn_Ast_Idx node_idx);
+CNDEF bool cn_ast_reparse_gnu_typeof(Cn_Ast_Idx node_idx);
 
 /**
  * Reparse given ast node as type name.
@@ -3815,8 +3919,9 @@ CNDEF bool cn_ast_reparse_type_name(Cn_Ast_Idx node_idx);
 CNDEF bool cn_ast_reparse_specifier_qualifier(Cn_Ast_Idx node_idx);
 
 /**
- * Reparse given ast node as parameter type list.
+ * Reparse given ast list as parameter declarations.
  */
+CNDEF bool cn_ast_reparse_parameter_declarations(Cn_Ast_List parameter_declarations, Cn_Ast_Idx blame_idx);
 
 /**
  * Reparse given ast node as parameter declaration.
@@ -3834,24 +3939,14 @@ CNDEF bool cn_ast_reparse_struct_or_union_specifier(Cn_Ast_Idx node_idx);
 CNDEF bool cn_ast_reparse_member_declaration(Cn_Ast_Idx node_idx);
 
 /**
+ * Reparse given ast list as member declarators.
+ */
+CNDEF bool cn_ast_reparse_member_declarators(Cn_Ast_List member_declarators, Cn_Ast_Idx blame_idx);
+
+/**
  * Reparse given ast node as member declarator.
  */
 CNDEF bool cn_ast_reparse_member_declarator(Cn_Ast_Idx node_idx);
-
-/**
- * Reparse given ast node as gnu attribute specifier.
- */
-CNDEF bool cn_ast_reparse_gnu_attribute_specifier(Cn_Ast_Idx node_idx);
-
-/**
- * Reparse given ast node as gnu attribute.
- */
-CNDEF bool cn_ast_reparse_gnu_attribute(Cn_Ast_Idx node_idx);
-
-/**
- * Reparse given ast node as gnu asm label.
- */
-CNDEF bool cn_ast_reparse_gnu_asm_label(Cn_Ast_Idx node_idx);
 
 /**
  * Reparse given ast node as enum specifier.
@@ -3862,6 +3957,51 @@ CNDEF bool cn_ast_reparse_enum_specifier(Cn_Ast_Idx node_idx);
  * Reparse given ast node as enumerator.
  */
 CNDEF bool cn_ast_reparse_enumerator(Cn_Ast_Idx node_idx);
+
+/**
+ * Reparse given ast list as attribute specifiers.
+ */
+CNDEF bool cn_ast_reparse_attribute_specifiers(Cn_Ast_List attribute_specifiers, Cn_Ast_Idx blame_idx);
+
+/**
+ * Reparse given ast node as attribute specifier.
+ */
+CNDEF bool cn_ast_reparse_attribute_specifier(Cn_Ast_Idx node_idx);
+
+/**
+ * Reparse given ast list as attributes.
+ */
+CNDEF bool cn_ast_reparse_attributes(Cn_Ast_List attributes, Cn_Ast_Idx blame_idx);
+
+/**
+ * Reparse given ast node as attribute.
+ */
+CNDEF bool cn_ast_reparse_attribute(Cn_Ast_Idx node_idx);
+
+/**
+ * Reparse given ast list as gnu attribute specifiers.
+ */
+CNDEF bool cn_ast_reparse_gnu_attribute_specifiers(Cn_Ast_List gnu_attribute_specifiers, Cn_Ast_Idx blame_idx);
+
+/**
+ * Reparse given ast node as gnu attribute specifier.
+ */
+CNDEF bool cn_ast_reparse_gnu_attribute_specifier(Cn_Ast_Idx node_idx);
+
+/**
+ * Reparse given ast list as gnu attributes.
+ */
+CNDEF bool cn_ast_reparse_gnu_attributes(Cn_Ast_List gnu_attributes, Cn_Ast_Idx blame_idx);
+
+/**
+ * Reparse given ast node as gnu attribute.
+ */
+CNDEF bool cn_ast_reparse_gnu_attribute(Cn_Ast_Idx node_idx);
+
+/**
+ * Reparse given ast node as gnu asm label.
+ */
+CNDEF bool cn_ast_reparse_gnu_asm_label(Cn_Ast_Idx node_idx);
 
 // DIAGNOSTIC SECTION
 
@@ -6758,6 +6898,7 @@ CNDEF void cn__ast_checkpoint_save(Cn_Ast_Checkpoint *checkpoint, Cn_Ast_Data *d
     checkpoint->saved_type_children_length = cn_chained_arena_allocated(&data->type_children_arena);
     checkpoint->saved_binding_length = cn_array_list_length(&data->binding_list);
     checkpoint->saved_label_binding_length = cn_array_list_length(&data->label_binding_list);
+    checkpoint->saved_binding_defined_idx_length = cn_array_list_length(&data->binding_defined_idx_list);
     checkpoint->saved_scoped_strings_length = cn_chained_arena_allocated(&data->scoped_strings_arena);
     // checkpoint->saved_permanent_strings_length = cn_chained_arena_allocated(&data->permanent_strings_arena);
     checkpoint->saved_scope_length = cn_array_list_length(&data->scope_stack);
@@ -6833,6 +6974,47 @@ CNDEF void cn_ast_checkpoint_load(Cn_Ast_Checkpoint *checkpoint) {
     }
     cn_array_list_pop_multiple(&d->label_binding_list, cn_array_list_length(&d->label_binding_list) - checkpoint->saved_label_binding_length);
 
+    // Undefining all bindings that contain definition that was made after checkpoint was set,
+    // but that were declared before checkpint was set.
+    for (int64_t i = checkpoint->saved_binding_defined_idx_length; i < cn_array_list_length(&cn__ast_data->binding_defined_idx_list); i++) {
+        if (cn__ast_data->binding_defined_idx_list[i] < checkpoint->saved_binding_length) {
+            Cn_Ast_Binding *binding = cn_ast_binding_get(cn__ast_data->binding_defined_idx_list[i]);
+            
+            // Should only be tag binding.
+            CN_ASSERT(binding->kind == CN_BINDING_TAG);
+            
+            // Undefining binding.
+            switch (binding->type->kind) {
+                case CN_STRUCT:
+                    binding->type->struct_t.flags          = 0;
+                    binding->type->struct_t.members_length = 0;
+                    binding->type->struct_t.members        = NULL;
+                    binding->type->struct_t.align          = 0;
+                    binding->type->struct_t.size           = 0;
+                    break;
+                case CN_UNION:
+                    binding->type->union_t.flags          = 0;
+                    binding->type->union_t.members_length = 0;
+                    binding->type->union_t.members        = NULL;
+                    binding->type->union_t.align          = 0;
+                    binding->type->union_t.size           = 0;
+                    break;
+                case CN_ENUM:
+                    binding->type->enum_t.flags          = 0;
+                    binding->type->enum_t.member_type    = NULL;
+                    binding->type->enum_t.members_length = 0;
+                    binding->type->enum_t.members        = NULL;
+                    binding->type->enum_t.align          = 0;
+                    binding->type->enum_t.size           = 0;
+                    break;
+                default:
+                    break;
+            }
+        }
+    }
+
+    cn_array_list_pop_multiple(&d->binding_defined_idx_list, cn_array_list_length(&d->binding_defined_idx_list) - checkpoint->saved_binding_defined_idx_length);
+
     cn_chained_arena_dealloc(&d->scoped_strings_arena, cn_chained_arena_allocated(&d->scoped_strings_arena) - checkpoint->saved_scoped_strings_length);
 
     // cn_chained_arena_dealloc(&d->permanent_strings_arena, cn_chained_arena_allocated(&d->permanent_strings_arena) - checkpoint->saved_permanent_strings_length);
@@ -6897,6 +7079,8 @@ CNDEF int cn_ast_init(Cn_Ast_Data *data) {
 
     data->label_binding_table = cn_hash_table_make(Cn_String, Cn_Ast_Idx, CN_AST_LABEL_BINDING_TABLE_INITIAL_CAP,(Cn_Hash_Function *)cn_str_hash, (Cn_Equals_Function *)cn_str_equals);
 
+    data->binding_defined_idx_list = cn_array_list_make(Cn_Ast_Binding_Idx, 16);
+
     data->scoped_strings_arena = cn_chained_arena_make(CN_AST_SCOPED_STRINGS_ARENA_BLOCK_CAP);
 
     data->permanent_strings_arena = cn_chained_arena_make(CN_AST_PERMANENT_STRINGS_ARENA_BLOCK_CAP);
@@ -6922,11 +7106,17 @@ CNDEF void cn_ast_free(Cn_Ast_Data *data) {
 
     cn_chained_arena_free(&data->scoped_strings_arena);
 
-    cn_hash_table_free(&data->symbol_binding_table);
-
     cn_hash_table_free(&data->tag_binding_table);
 
+    cn_hash_table_free(&data->symbol_binding_table);
+
     cn_array_list_free(&data->binding_list);
+
+    cn_array_list_free(&data->label_binding_list);
+
+    cn_hash_table_free(&data->label_binding_table);
+
+    cn_array_list_free(&data->binding_defined_idx_list);
 
     cn_chained_arena_free(&data->type_children_arena);
 
@@ -8768,6 +8958,7 @@ CNDEF void cn_ast_scope_stack_push() {
                 .saved_strings_length = 0,
                 .binding_idx = cn_array_list_length(&cn__ast_data->binding_list),
                 .label_binding_idx = cn_array_list_length(&cn__ast_data->label_binding_list),
+                .binding_defined_idx = cn_array_list_length(&cn__ast_data->binding_defined_idx_list),
                 .is_checkpoint_locked = false,
                 } ));
 }
@@ -8816,7 +9007,10 @@ CNDEF void cn_ast_scope_stack_pop() {
         cn__ast_data->function_scope_idx = 0;
     }
 
+    cn_array_list_pop_multiple(&cn__ast_data->binding_defined_idx_list, cn_array_list_length(&cn__ast_data->binding_defined_idx_list) - scope->binding_defined_idx);
+
     cn_chained_arena_dealloc(&cn__ast_data->scoped_strings_arena, scope->saved_strings_length);
+
     cn_array_list_pop(&cn__ast_data->scope_stack);
 }
 
@@ -8898,6 +9092,32 @@ CNDEF Cn_Ast_Binding_Idx cn_ast_function_binding_declare(Cn_String name, Cn_Ast_
     binding.b_function.function_flags   = function_flags;
     binding.b_function.is_definition    = is_definition;
 
+    // Getting currently visible binding with the same name if such exists.
+    Cn_Ast_Binding_Idx current_idx = cn_ast_binding_table_get(name, &cn__ast_data->symbol_binding_table);
+    if (current_idx != CN_AST_NIL_BINDING_IDX) {
+        Cn_Ast_Binding *current = cn_ast_binding_get(current_idx);
+        binding.name = current->name;
+
+        // Handling redeclaration, redifinition.
+        if (current->scope_idx == CN_AST_SCOPE_STACK_CURRENT_IDX) {
+            // If bindings conflict in general, based on type or kind.
+            if (cn__ast_bindings_conflict(current, &binding)) return CN_AST_NIL_BINDING_IDX;
+
+            // Checking if it is redefinition.
+            if (current->b_function.is_definition && binding.b_function.is_definition) {
+                cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, source_idx, CN_DC_ILLEGAL_BINDING, "'%.*s' function redifinition.", CN_UNPACK(name));
+                return CN_AST_NIL_BINDING_IDX;
+            }
+
+            // If newer binding is redeclaration, merge binding to definition, if not leave as it is.
+            if (current->b_function.is_definition) {
+                return current_idx;
+            }
+        }
+    } else {
+        binding.name = cn__ast_scope_stack_save_string(name);
+    }
+
     // Storing param names on the function binding.
     if (parameter_declarations != NULL && parameter_declarations->length > 0) {
         binding.b_function.parameter_names = cn_chained_arena_alloc(&cn__ast_data->scoped_strings_arena, sizeof(Cn_String) * parameter_declarations->length);
@@ -8914,33 +9134,6 @@ CNDEF Cn_Ast_Binding_Idx cn_ast_function_binding_declare(Cn_String name, Cn_Ast_
         }
     }
     
-    // Getting currently visible binding with the same name if such exists.
-    Cn_Ast_Binding_Idx current_idx = cn_ast_binding_table_get(name, &cn__ast_data->symbol_binding_table);
-    if (current_idx != CN_AST_NIL_BINDING_IDX) {
-        Cn_Ast_Binding *current = cn_ast_binding_get(current_idx);
-        binding.name = current->name;
-
-        // Handling redeclaration, redifinition.
-        if (current->scope_idx == CN_AST_SCOPE_STACK_CURRENT_IDX) {
-            // If bindings conflict in general, based on type or kind.
-            if (cn__ast_bindings_conflict(current, &binding)) return CN_AST_NIL_BINDING_IDX;
-
-            if (current->b_function.is_definition && binding.b_function.is_definition) {
-                cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, source_idx, CN_DC_ILLEGAL_BINDING, "'%.*s' function redifinition.", CN_UNPACK(name));
-                return CN_AST_NIL_BINDING_IDX;
-            }
-
-            // If newer binding is definition merge bindings, if not leave as it is.
-            if (binding.b_function.is_definition) {
-                current->src = binding.src;
-                current->b_function = binding.b_function;
-            }
-
-            return current_idx;
-        }
-    } else {
-        binding.name = cn__ast_scope_stack_save_string(name);
-    }
 
     binding.next_idx = current_idx;
     return cn_ast_binding_table_put(binding, &cn__ast_data->symbol_binding_table);
@@ -8986,13 +9179,10 @@ CNDEF Cn_Ast_Binding_Idx cn_ast_variable_binding_declare(Cn_String name, Cn_Ast_
                 return CN_AST_NIL_BINDING_IDX;
             }
 
-            // If newer binding is definition merge bindings, if not leave as it is.
-            if (binding.b_variable.is_definition) {
-                current->src = binding.src;
-                current->b_variable = binding.b_variable;
+            // If newer binding is redeclaration, merge binding to definition, if not leave as it is.
+            if (current->b_variable.is_definition) {
+                return current_idx;
             }
-
-            return current_idx;
         }
     } else {
         binding.name = cn__ast_scope_stack_save_string(name);
@@ -14918,101 +15108,125 @@ CNDEF bool cn_ast_initializer_typecheck(Cn_Ast_Idx initializer_idx, Cn_Type *typ
 }
 
 #define cn_ast_is_nil(idx) ((idx) == CN_AST_NIL_IDX)
-#define cn_ast_is(idx, k) (((Cn_Ast_Node *)cn_ast_get(idx))->kind == (k))
 
 CNDEF bool cn_ast_expect(Cn_Ast_Idx idx, Cn_Ast_Kind kind) {
-    if (!cn_ast_is(idx, kind)) { 
+    CN_ASSERT(idx != CN_AST_NIL_IDX);
+    if (cn_ast_get_as_node(idx)->kind != kind) { 
         cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, idx, CN_DC_EXPECTED_AST_NODE, "Expected %s ast node, but received %s node.", cn_ast_node_kind_name(kind), cn_ast_node_kind_name(((Cn_Ast_Node *)cn_ast_get(idx))->kind)); 
         return false;
     }
     return true;
 }
 
+CNDEF bool cn_ast_expect_not_nil(Cn_Ast_Idx idx, Cn_Ast_Idx blame_idx) {
+    if (idx == CN_AST_NIL_IDX) { 
+        cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, blame_idx, CN_DC_EXPECTED_AST_NODE, "Expected valid ast node, but received NIL."); 
+        return false;
+    }
+    return true;
+}
+
 CNDEF bool cn_ast_reparse_translation_unit(Cn_Ast_Idx node_idx) {
-    if (!cn_ast_expect(node_idx, CN_AST_TRANSLATION_UNIT)) return false;
+    if (!cn_ast_expect(node_idx, CN_AST_TRANSLATION_UNIT)) goto error;
 
     Cn_Ast_Translation_Unit *node = cn_ast_get(node_idx);
 
     for (int64_t i = 0; i < node->external_declarations.length; i++) {
-        if (!cn_ast_reparse_external_declaration(node->external_declarations.idxs[i])) return false;
+        if (!cn_ast_expect_not_nil(node->external_declarations.idxs[i], node_idx)) goto error;
+        if (!cn_ast_reparse_external_declaration(node->external_declarations.idxs[i])) goto error;
     }
 
     return true;
+
+error:
+    CN__TRACE_ERROR;
+    return false;
 }
 
 CNDEF bool cn_ast_reparse_external_declaration(Cn_Ast_Idx node_idx) {
-    if (!cn_ast_expect(node_idx, CN_AST_EXTERNAL_DECLARATION)) return false;
+    if (!cn_ast_expect(node_idx, CN_AST_EXTERNAL_DECLARATION)) goto error;
 
     Cn_Ast_External_Declaration *node = cn_ast_get(node_idx);
 
     // Stray ';' case.
     if (cn_ast_is_nil(node->child_idx)) return true;
 
-    Cn_Ast_Node *child = cn_ast_get(node->child_idx);
-    switch (child->kind) {
-        case CN_AST_FUNCTION:
-            if (!cn_ast_reparse_function_definition(node->child_idx)) return false;
-            break;
-        default:
-            if (!cn_ast_reparse_declaration(node->child_idx)) return false;
-            break;
+    if (cn_ast_get_as_node(node->child_idx)->kind == CN_AST_FUNCTION) {
+        if (!cn_ast_reparse_function_definition(node->child_idx)) goto error;
+    } else {
+        if (!cn_ast_reparse_declaration(node->child_idx)) goto error;
     }
 
     return true;
+
+error:
+    CN__TRACE_ERROR;
+    return false;
 }
 
 CNDEF bool cn_ast_reparse_declaration(Cn_Ast_Idx node_idx) {
-    if (!cn_ast_expect(node_idx, CN_AST_DECLARATION)) return false;
+    if (!cn_ast_expect(node_idx, CN_AST_DECLARATION)) goto error;
 
     Cn_Ast_Declaration *node = cn_ast_get(node_idx);
 
-    if (!cn_ast_reparse_declaration_specifiers(node->declaration_specifiers_idx)) return false;
+    if (!cn_ast_reparse_attribute_specifiers(node->attribute_specifiers, node_idx)) goto error;
 
-    for (int64_t i = 0; i < node->init_declarators.length; i++) {
-        if (!cn_ast_reparse_init_declarator(node->init_declarators.idxs[i])) return false;
-    }
+    if (!cn_ast_expect_not_nil(node->declaration_specifiers_idx, node_idx)) goto error;
+    if (!cn_ast_reparse_declaration_specifiers(node->declaration_specifiers_idx)) goto error;
+
+    if (!cn_ast_reparse_init_declarators(node->init_declarators, node_idx)) goto error;
 
     // Rebuild types and bindings, exactly like the parse path does.
-    if (node->init_declarators.length > 0) {
-        if (!cn_ast_analyze_declaration(node->declaration_specifiers_idx, node->init_declarators)) return false;
-    }
+    // Empty declaration is analyzed too, since new types can be made in it.
+    if (!cn_ast_analyze_declaration(node->declaration_specifiers_idx, node->init_declarators)) goto error;
 
     return true;
+
+error:
+    CN__TRACE_ERROR;
+    return false;
 }
 
 CNDEF bool cn_ast_reparse_function_definition(Cn_Ast_Idx node_idx) {
-    if (!cn_ast_expect(node_idx, CN_AST_FUNCTION)) return false;
+    if (!cn_ast_expect(node_idx, CN_AST_FUNCTION)) goto error;
 
     Cn_Ast_Function *node = cn_ast_get(node_idx);
 
-    if (!cn_ast_reparse_declaration_specifiers(node->declaration_specifiers_idx)) return false;
+    if (!cn_ast_reparse_attribute_specifiers(node->attribute_specifiers, node_idx)) goto error;
 
-    if (!cn_ast_reparse_declarator(node->declarator_idx)) return false;
+    if (!cn_ast_expect_not_nil(node->declaration_specifiers_idx, node_idx)) goto error;
+    if (!cn_ast_reparse_declaration_specifiers(node->declaration_specifiers_idx)) goto error;
 
-    // Function definition type and bindings resolution.
+    if (!cn_ast_expect_not_nil(node->declarator_idx, node_idx)) goto error;
+    if (!cn_ast_reparse_declarator(node->declarator_idx)) goto error;
+
+    if (cn_ast_get_as_node(node->declarator_idx)->flags & CN_AST_DECLARATOR_IS_ABSTRACT) {
+        cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, node->declarator_idx, CN_DC_INVALID_DECLARATOR, "Expected non-abstract declarator in function definition.");
+        goto error;
+    }
+
+    // Adding function type and binding.
     Cn_Ast_Binding_Idx function_binding_idx;
+    if (!cn_ast_analyze_function(node->declaration_specifiers_idx, node->declarator_idx, &function_binding_idx)) goto error;
 
-    bool ok = cn_ast_analyze_function(
-            node->declaration_specifiers_idx,
-            node->declarator_idx,
-            &function_binding_idx
-            );
-
-    if (!ok) return false;
-
-    // Push function scope for parameters and body.
+    // Making new function scope to store parameters + compound statement symbols.
     cn_ast_scope_stack_push();
+    cn__ast_data->function_scope_idx = CN_AST_SCOPE_STACK_CURRENT_IDX;
 
-    // Bind function parameters.
-    ok = cn_ast_bind_function_params(function_binding_idx);
-    if (!ok) return false;
+    // Binding non-abstract function parameters as variables from definition.
+    if (!cn_ast_bind_function_params(function_binding_idx)) goto error;
 
-    // Analyze compound statement contents using current scope, parameters already bound.
-    if (!cn_ast_reparse_block(node->block_idx, true)) return false;
+    // Reparsing block contents using current scope, parameters are already bound.
+    if (!cn_ast_expect_not_nil(node->block_idx, node_idx)) goto error;
+    if (!cn_ast_reparse_block(node->block_idx, true)) goto error;
 
     cn_ast_scope_stack_pop();
 
     return true;
+
+error:
+    CN__TRACE_ERROR;
+    return false;
 }
 
 CNDEF bool cn_ast_reparse_asm_definition(Cn_Ast_Idx node_idx) {
@@ -15021,538 +15235,1225 @@ CNDEF bool cn_ast_reparse_asm_definition(Cn_Ast_Idx node_idx) {
 }
 
 CNDEF bool cn_ast_reparse_statement(Cn_Ast_Idx node_idx) {
-    if (cn_ast_is_nil(node_idx)) return true;
+    CN_ASSERT(node_idx != CN_AST_NIL_IDX);
 
-    Cn_Ast_Node *node = cn_ast_get(node_idx);
-
-    switch (node->kind) {
+    switch (cn_ast_get_as_node(node_idx)->kind) {
+        case CN_AST_LABEL:
+            return cn_ast_reparse_label(node_idx);
         case CN_AST_BLOCK:
             return cn_ast_reparse_block(node_idx, false);
         case CN_AST_IF:
-            return cn_ast_reparse_if(node_idx);
+            return cn_ast_reparse_if_statement(node_idx);
         case CN_AST_SWITCH:
-            return cn_ast_reparse_switch(node_idx);
-        // TODO: case CN_AST_WHILE:
-        // TODO: case CN_AST_DO_WHILE:
-        // TODO: case CN_AST_FOR:
-        //     return cn_ast_reparse_iteration_statement(node_idx);
+            return cn_ast_reparse_switch_statement(node_idx);
+        case CN_AST_WHILE:
+            return cn_ast_reparse_while_statement(node_idx);
+        case CN_AST_DO_WHILE:
+            return cn_ast_reparse_do_while(node_idx);
+        case CN_AST_FOR:
+            return cn_ast_reparse_for_statement(node_idx);
         case CN_AST_GOTO:
-            return cn_ast_reparse_goto(node_idx);
+            return cn_ast_reparse_goto_statement(node_idx);
         case CN_AST_RETURN:
-            return cn_ast_reparse_return(node_idx);
+            return cn_ast_reparse_return_statement(node_idx);
         case CN_AST_BREAK:
+            return cn_ast_reparse_break_statement(node_idx);
         case CN_AST_CONTINUE:
-            return true; // No children to reparse.
-        // TODO: case CN_AST_LABEL:
-        //     return cn_ast_reparse_labeled_statement(node_idx);
+            return cn_ast_reparse_continue_statement(node_idx);
         case CN_AST_EXPRESSION_STATEMENT:
             return cn_ast_reparse_expression_statement(node_idx);
         default:
-            cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, node_idx, CN_DC_EXPECTED_AST_NODE, "Unexpected statement kind in reparse.");
-            return false;
+            cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, node_idx, CN_DC_EXPECTED_AST_NODE, "Expected statement ast node, but received %s node.", cn_ast_node_kind_name(cn_ast_get_as_node(node_idx)->kind));
+            goto error;
     }
+
+error:
+    CN__TRACE_ERROR;
+    return false;
 }
 
 CNDEF bool cn_ast_reparse_block(Cn_Ast_Idx node_idx, bool use_current_scope) {
-    if (!cn_ast_expect(node_idx, CN_AST_BLOCK)) return false;
+    if (!cn_ast_expect(node_idx, CN_AST_BLOCK)) goto error;
 
     Cn_Ast_Block *node = cn_ast_get(node_idx);
 
+    if (!cn_ast_reparse_attribute_specifiers(node->attribute_specifiers, node_idx)) goto error;
+
+    // Stepping into scope.
     if (!use_current_scope) cn_ast_scope_stack_push();
 
-    // TODO: Fix that.
     for (int64_t i = 0; i < node->block_items.length; i++) {
-        Cn_Ast_Idx stmt_idx = node->block_items.idxs[i];
-        if (cn_ast_is(stmt_idx, CN_AST_DECLARATION)) {
-            if (!cn_ast_reparse_declaration(stmt_idx)) {
-                if (!use_current_scope) cn_ast_scope_stack_pop();
-                return false;
-            }
-        } else {
-            if (!cn_ast_reparse_statement(stmt_idx)) {
-                if (!use_current_scope) cn_ast_scope_stack_pop();
-                return false;
-            }
-        }
+        if (!cn_ast_expect_not_nil(node->block_items.idxs[i], node_idx)) goto error;
+        if (!cn_ast_reparse_block_item(node->block_items.idxs[i])) goto error;
     }
 
     if (!use_current_scope) cn_ast_scope_stack_pop();
 
     return true;
+
+error:
+    CN__TRACE_ERROR;
+    return false;
 }
 
-CNDEF bool cn_ast_reparse_if(Cn_Ast_Idx node_idx) {
-    if (!cn_ast_expect(node_idx, CN_AST_IF)) return false;
+CNDEF bool cn_ast_reparse_block_item(Cn_Ast_Idx node_idx) {
+    if (!cn_ast_expect(node_idx, CN_AST_BLOCK_ITEM)) goto error;
+
+    Cn_Ast_Block_Item *node = cn_ast_get(node_idx);
+
+    if (!cn_ast_expect_not_nil(node->declaration_or_statement_idx, node_idx)) goto error;
+
+    // Attribute specifiers are stored inside declaration or statement itself.
+    if (cn_ast_get_as_node(node->declaration_or_statement_idx)->kind == CN_AST_DECLARATION) {
+        if (!cn_ast_reparse_declaration(node->declaration_or_statement_idx)) goto error;
+    } else {
+        if (!cn_ast_reparse_statement(node->declaration_or_statement_idx)) goto error;
+    }
+
+    return true;
+
+error:
+    CN__TRACE_ERROR;
+    return false;
+}
+
+CNDEF bool cn_ast_reparse_if_statement(Cn_Ast_Idx node_idx) {
+    if (!cn_ast_expect(node_idx, CN_AST_IF)) goto error;
 
     Cn_Ast_If *node = cn_ast_get(node_idx);
 
-    // Type check condition expression.
-    if (cn_ast_expression_typecheck(node->condition_idx) == NULL) return false;
+    if (!cn_ast_reparse_attribute_specifiers(node->attribute_specifiers, node_idx)) goto error;
 
-    // Analyze then statement.
-    if (!cn_ast_reparse_statement(node->then_idx)) return false;
+    if (!cn_ast_expect_not_nil(node->condition_idx, node_idx)) goto error;
+    if (!cn_ast_reparse_expression(node->condition_idx)) goto error;
 
-    // Analyze else statement if present.
+    if (!cn_ast_expect_not_nil(node->then_idx, node_idx)) goto error;
+    if (!cn_ast_reparse_statement(node->then_idx)) goto error;
+
+    // Else statement is optional.
     if (!cn_ast_is_nil(node->else_idx)) {
-        if (!cn_ast_reparse_statement(node->else_idx)) return false;
+        if (!cn_ast_reparse_statement(node->else_idx)) goto error;
     }
 
     return true;
+
+error:
+    CN__TRACE_ERROR;
+    return false;
 }
 
-CNDEF bool cn_ast_reparse_switch(Cn_Ast_Idx node_idx) {
-    if (!cn_ast_expect(node_idx, CN_AST_SWITCH)) return false;
+CNDEF bool cn_ast_reparse_switch_statement(Cn_Ast_Idx node_idx) {
+    if (!cn_ast_expect(node_idx, CN_AST_SWITCH)) goto error;
 
     Cn_Ast_Switch *node = cn_ast_get(node_idx);
 
-    // Type check condition expression.
-    if (cn_ast_expression_typecheck(node->condition_idx) == NULL) return false;
+    if (!cn_ast_reparse_attribute_specifiers(node->attribute_specifiers, node_idx)) goto error;
 
-    // Analyze body statement.
-    if (!cn_ast_reparse_statement(node->body_idx)) return false;
+    if (!cn_ast_expect_not_nil(node->condition_idx, node_idx)) goto error;
+    if (!cn_ast_reparse_expression(node->condition_idx)) goto error;
+
+    if (!cn_ast_expect_not_nil(node->body_idx, node_idx)) goto error;
+    if (!cn_ast_reparse_statement(node->body_idx)) goto error;
 
     return true;
+
+error:
+    CN__TRACE_ERROR;
+    return false;
 }
 
-CNDEF bool cn_ast_reparse_iteration_statement(Cn_Ast_Idx node_idx) {
-    CN_UNUSED(node_idx);
-    CN_TODO("cn_ast_reparse_iteration_statement");
-}
+CNDEF bool cn_ast_reparse_while_statement(Cn_Ast_Idx node_idx) {
+    if (!cn_ast_expect(node_idx, CN_AST_WHILE)) goto error;
 
-CNDEF bool cn_ast_reparse_goto(Cn_Ast_Idx node_idx) {
-    if (!cn_ast_expect(node_idx, CN_AST_GOTO)) return false;
-    // Goto label resolution would happen here if needed.
+    Cn_Ast_While *node = cn_ast_get(node_idx);
+
+    if (!cn_ast_reparse_attribute_specifiers(node->attribute_specifiers, node_idx)) goto error;
+
+    if (!cn_ast_expect_not_nil(node->condition_idx, node_idx)) goto error;
+    if (!cn_ast_reparse_expression(node->condition_idx)) goto error;
+
+    if (!cn_ast_expect_not_nil(node->body_idx, node_idx)) goto error;
+    if (!cn_ast_reparse_statement(node->body_idx)) goto error;
+
     return true;
+
+error:
+    CN__TRACE_ERROR;
+    return false;
 }
 
-CNDEF bool cn_ast_reparse_return(Cn_Ast_Idx node_idx) {
-    if (!cn_ast_expect(node_idx, CN_AST_RETURN)) return false;
+CNDEF bool cn_ast_reparse_do_while(Cn_Ast_Idx node_idx) {
+    if (!cn_ast_expect(node_idx, CN_AST_DO_WHILE)) goto error;
+
+    Cn_Ast_Do_While *node = cn_ast_get(node_idx);
+
+    if (!cn_ast_reparse_attribute_specifiers(node->attribute_specifiers, node_idx)) goto error;
+
+    if (!cn_ast_expect_not_nil(node->body_idx, node_idx)) goto error;
+    if (!cn_ast_reparse_statement(node->body_idx)) goto error;
+
+    if (!cn_ast_expect_not_nil(node->condition_idx, node_idx)) goto error;
+    if (!cn_ast_reparse_expression(node->condition_idx)) goto error;
+
+    return true;
+
+error:
+    CN__TRACE_ERROR;
+    return false;
+}
+
+CNDEF bool cn_ast_reparse_for_statement(Cn_Ast_Idx node_idx) {
+    if (!cn_ast_expect(node_idx, CN_AST_FOR)) goto error;
+
+    Cn_Ast_For *node = cn_ast_get(node_idx);
+
+    if (!cn_ast_reparse_attribute_specifiers(node->attribute_specifiers, node_idx)) goto error;
+
+    // For statement introduces new scope.
+    // for its initialization declaration to live in the scope till for loop dies.
+    cn_ast_scope_stack_push();
+
+    // Initialization is optional and can be declaration or expression.
+    if (!cn_ast_is_nil(node->initialization_idx)) {
+        if (cn_ast_get_as_node(node->initialization_idx)->kind == CN_AST_DECLARATION) {
+            if (!cn_ast_reparse_declaration(node->initialization_idx)) goto error;
+        } else {
+            if (!cn_ast_reparse_expression(node->initialization_idx)) goto error;
+        }
+    }
+
+    // Condition is optional.
+    if (!cn_ast_is_nil(node->condition_idx)) {
+        if (!cn_ast_reparse_expression(node->condition_idx)) goto error;
+    }
+
+    // Update is optional.
+    if (!cn_ast_is_nil(node->update_idx)) {
+        if (!cn_ast_reparse_expression(node->update_idx)) goto error;
+    }
+
+    if (!cn_ast_expect_not_nil(node->body_idx, node_idx)) goto error;
+    if (!cn_ast_reparse_statement(node->body_idx)) goto error;
+
+    cn_ast_scope_stack_pop();
+
+    return true;
+
+error:
+    CN__TRACE_ERROR;
+    return false;
+}
+
+CNDEF bool cn_ast_reparse_goto_statement(Cn_Ast_Idx node_idx) {
+    if (!cn_ast_expect(node_idx, CN_AST_GOTO)) goto error;
+
+    Cn_Ast_Goto *node = cn_ast_get(node_idx);
+
+    if (!cn_ast_reparse_attribute_specifiers(node->attribute_specifiers, node_idx)) goto error;
+
+    if (!cn_ast_expect_not_nil(node->identifier_idx, node_idx)) goto error;
+    if (!cn_ast_reparse_identifier(node->identifier_idx)) goto error;
+
+    return true;
+
+error:
+    CN__TRACE_ERROR;
+    return false;
+}
+
+CNDEF bool cn_ast_reparse_return_statement(Cn_Ast_Idx node_idx) {
+    if (!cn_ast_expect(node_idx, CN_AST_RETURN)) goto error;
 
     Cn_Ast_Return *node = cn_ast_get(node_idx);
 
-    // Type check return expression if present.
+    if (!cn_ast_reparse_attribute_specifiers(node->attribute_specifiers, node_idx)) goto error;
+
+    // Return expression is optional.
     if (!cn_ast_is_nil(node->expression_idx)) {
-        if (cn_ast_expression_typecheck(node->expression_idx) == NULL) return false;
+        if (!cn_ast_reparse_expression(node->expression_idx)) goto error;
+
+        // Typechecking return expression.
+        cn_ast_expression_clear_types(node->expression_idx);
+        if (cn_ast_expression_typecheck(node->expression_idx) == NULL) goto error;
     }
 
     return true;
+
+error:
+    CN__TRACE_ERROR;
+    return false;
 }
 
-CNDEF bool cn_ast_reparse_labeled_statement(Cn_Ast_Idx node_idx) {
-    CN_UNUSED(node_idx);
-    CN_TODO("cn_ast_reparse_labeled_statement");
+CNDEF bool cn_ast_reparse_break_statement(Cn_Ast_Idx node_idx) {
+    if (!cn_ast_expect(node_idx, CN_AST_BREAK)) goto error;
+
+    Cn_Ast_Break *node = cn_ast_get(node_idx);
+
+    if (!cn_ast_reparse_attribute_specifiers(node->attribute_specifiers, node_idx)) goto error;
+
+    return true;
+
+error:
+    CN__TRACE_ERROR;
+    return false;
+}
+
+CNDEF bool cn_ast_reparse_continue_statement(Cn_Ast_Idx node_idx) {
+    if (!cn_ast_expect(node_idx, CN_AST_CONTINUE)) goto error;
+
+    Cn_Ast_Continue *node = cn_ast_get(node_idx);
+
+    if (!cn_ast_reparse_attribute_specifiers(node->attribute_specifiers, node_idx)) goto error;
+
+    return true;
+
+error:
+    CN__TRACE_ERROR;
+    return false;
+}
+
+CNDEF bool cn_ast_reparse_label(Cn_Ast_Idx node_idx) {
+    if (!cn_ast_expect(node_idx, CN_AST_LABEL)) goto error;
+
+    Cn_Ast_Label *node = cn_ast_get(node_idx);
+
+    if (!cn_ast_reparse_attribute_specifiers(node->attribute_specifiers, node_idx)) goto error;
+
+    if (node->flags & CN_AST_LABEL_IS_CASE) {
+        if (!cn_ast_expect_not_nil(node->expression_idx, node_idx)) goto error;
+        if (!cn_ast_reparse_expression(node->expression_idx)) goto error;
+
+    } else if (!(node->flags & CN_AST_LABEL_IS_DEFAULT)) {
+        if (!cn_ast_expect_not_nil(node->identifier_idx, node_idx)) goto error;
+        if (!cn_ast_reparse_identifier(node->identifier_idx)) goto error;
+
+        // Binding new label.
+        if (cn_ast_label_binding_declare(cn_ast_get_as_node(node->identifier_idx)->identifier.name, node->identifier_idx) == CN_AST_NIL_BINDING_IDX)
+            goto error;
+    }
+
+    if (!cn_ast_expect_not_nil(node->statement_idx, node_idx)) goto error;
+    if (!cn_ast_reparse_statement(node->statement_idx)) goto error;
+
+    return true;
+
+error:
+    CN__TRACE_ERROR;
+    return false;
 }
 
 CNDEF bool cn_ast_reparse_expression_statement(Cn_Ast_Idx node_idx) {
-    if (!cn_ast_expect(node_idx, CN_AST_EXPRESSION_STATEMENT)) return false;
+    if (!cn_ast_expect(node_idx, CN_AST_EXPRESSION_STATEMENT)) goto error;
 
     Cn_Ast_Expression_Statement *node = cn_ast_get(node_idx);
 
+    if (!cn_ast_reparse_attribute_specifiers(node->attribute_specifiers, node_idx)) goto error;
+
+    // Empty ';' statement case.
     if (!cn_ast_is_nil(node->expression_idx)) {
-        if (cn_ast_expression_typecheck(node->expression_idx) == NULL) return false;
+        if (!cn_ast_reparse_expression(node->expression_idx)) goto error;
+
+        // Typechecking expression.
+        cn_ast_expression_clear_types(node->expression_idx);
+        if (cn_ast_expression_typecheck(node->expression_idx) == NULL) goto error;
     }
 
     return true;
+
+error:
+    CN__TRACE_ERROR;
+    return false;
 }
 
-CNDEF bool cn_ast_reparse_argument_list(Cn_Ast_Idx node_idx) {
-    CN_UNUSED(node_idx);
-    CN_TODO("cn_ast_reparse_argument_list");
+CNDEF bool cn_ast_reparse_arguments(Cn_Ast_List arguments, Cn_Ast_Idx blame_idx) {
+    for (int64_t i = 0; i < arguments.length; i++) {
+        if (!cn_ast_expect_not_nil(arguments.idxs[i], blame_idx)) goto error;
+        if (!cn_ast_reparse_expression(arguments.idxs[i])) goto error;
+    }
+
+    return true;
+
+error:
+    CN__TRACE_ERROR;
+    return false;
 }
 
 CNDEF bool cn_ast_reparse_expression(Cn_Ast_Idx node_idx) {
-    if (cn_ast_is_nil(node_idx)) return true;
+    CN_ASSERT(node_idx != CN_AST_NIL_IDX);
 
     Cn_Ast_Node *node = cn_ast_get(node_idx);
 
+    // NOTE: Every visited expression node has its type reset,
+    // exactly like cn_ast_expression_clear_types does it,
+    // so typechecking can be rerun on a clean expression.
     switch (node->kind) {
         case CN_AST_BINARY:
             node->binary.type = NULL;
-            if (!cn_ast_reparse_expression(node->binary.left_idx)) return false;
-            if (!cn_ast_reparse_expression(node->binary.right_idx)) return false;
+
+            if (!cn_ast_expect_not_nil(node->binary.left_idx, node_idx)) goto error;
+            if (!cn_ast_reparse_expression(node->binary.left_idx)) goto error;
+
+            if (!cn_ast_expect_not_nil(node->binary.right_idx, node_idx)) goto error;
+            if (!cn_ast_reparse_expression(node->binary.right_idx)) goto error;
             break;
+
         case CN_AST_ACCESS:
             node->access.type = NULL;
-            if (!cn_ast_reparse_expression(node->access.expression_idx)) return false;
+
+            if (!cn_ast_expect_not_nil(node->access.expression_idx, node_idx)) goto error;
+            if (!cn_ast_reparse_expression(node->access.expression_idx)) goto error;
+
+            if (!cn_ast_expect_not_nil(node->access.member_idx, node_idx)) goto error;
+            if (!cn_ast_reparse_identifier(node->access.member_idx)) goto error;
             break;
+
         case CN_AST_CALL:
             node->call.type = NULL;
-            if (!cn_ast_reparse_expression(node->call.expression_idx)) return false;
-            for (int64_t i = 0; i < node->call.arguments.length; i++) {
-                if (!cn_ast_reparse_expression(node->call.arguments.idxs[i])) return false;
-            }
+
+            if (!cn_ast_expect_not_nil(node->call.expression_idx, node_idx)) goto error;
+            if (!cn_ast_reparse_expression(node->call.expression_idx)) goto error;
+
+            if (!cn_ast_reparse_arguments(node->call.arguments, node_idx)) goto error;
             break;
+
         case CN_AST_UNARY:
             node->unary.type = NULL;
-            if (!cn_ast_reparse_expression(node->unary.expression_idx)) return false;
+
+            if (!cn_ast_expect_not_nil(node->unary.expression_idx, node_idx)) goto error;
+            if (!cn_ast_reparse_expression(node->unary.expression_idx)) goto error;
             break;
+
         case CN_AST_CAST:
             node->cast.type = NULL;
-            if (!cn_ast_reparse_type_name(node->cast.type_name_idx)) return false;
-            if (!cn_ast_reparse_expression(node->cast.expression_idx)) return false;
+
+            if (!cn_ast_expect_not_nil(node->cast.type_name_idx, node_idx)) goto error;
+            if (!cn_ast_reparse_type_name(node->cast.type_name_idx)) goto error;
+
+            if (!cn_ast_expect_not_nil(node->cast.expression_idx, node_idx)) goto error;
+            if (!cn_ast_reparse_expression(node->cast.expression_idx)) goto error;
             break;
+
+        case CN_AST_COMPOUND:
+            node->compound.type = NULL;
+
+            if (!cn_ast_expect_not_nil(node->compound.type_name_idx, node_idx)) goto error;
+            if (!cn_ast_reparse_type_name(node->compound.type_name_idx)) goto error;
+
+            if (!cn_ast_reparse_designations(node->compound.designations, node_idx)) goto error;
+            break;
+
         case CN_AST_SIZEOF:
             node->sizeof_expression.type = NULL;
-            if (!cn_ast_is_nil(node->sizeof_expression.target_idx)) {
-                Cn_Ast_Node *child = cn_ast_get(node->sizeof_expression.target_idx);
-                if (child->kind == CN_AST_TYPE_NAME) {
-                    if (!cn_ast_reparse_type_name(node->sizeof_expression.target_idx)) return false;
-                } else {
-                    if (!cn_ast_reparse_expression(node->sizeof_expression.target_idx)) return false;
-                }
+
+            // Target is either type name or expression.
+            if (!cn_ast_expect_not_nil(node->sizeof_expression.target_idx, node_idx)) goto error;
+
+            if (cn_ast_get_as_node(node->sizeof_expression.target_idx)->kind == CN_AST_TYPE_NAME) {
+                if (!cn_ast_reparse_type_name(node->sizeof_expression.target_idx)) goto error;
+            } else {
+                if (!cn_ast_reparse_expression(node->sizeof_expression.target_idx)) goto error;
             }
             break;
+
         case CN_AST_TERNARY:
             node->ternary.type = NULL;
-            if (!cn_ast_reparse_expression(node->ternary.condition_idx)) return false;
-            if (!cn_ast_reparse_expression(node->ternary.true_idx)) return false;
-            if (!cn_ast_reparse_expression(node->ternary.false_idx)) return false;
+
+            if (!cn_ast_expect_not_nil(node->ternary.condition_idx, node_idx)) goto error;
+            if (!cn_ast_reparse_expression(node->ternary.condition_idx)) goto error;
+
+            if (!cn_ast_expect_not_nil(node->ternary.true_idx, node_idx)) goto error;
+            if (!cn_ast_reparse_expression(node->ternary.true_idx)) goto error;
+
+            if (!cn_ast_expect_not_nil(node->ternary.false_idx, node_idx)) goto error;
+            if (!cn_ast_reparse_expression(node->ternary.false_idx)) goto error;
             break;
+
         case CN_AST_ASSIGN:
             node->assign.type = NULL;
-            if (!cn_ast_reparse_expression(node->assign.left_idx)) return false;
-            if (!cn_ast_reparse_expression(node->assign.right_idx)) return false;
+
+            if (!cn_ast_expect_not_nil(node->assign.left_idx, node_idx)) goto error;
+            if (!cn_ast_reparse_expression(node->assign.left_idx)) goto error;
+
+            if (!cn_ast_expect_not_nil(node->assign.right_idx, node_idx)) goto error;
+            if (!cn_ast_reparse_expression(node->assign.right_idx)) goto error;
             break;
+
         case CN_AST_POSTFIX:
             node->postfix.type = NULL;
-            if (!cn_ast_reparse_expression(node->postfix.expression_idx)) return false;
+
+            if (!cn_ast_expect_not_nil(node->postfix.expression_idx, node_idx)) goto error;
+            if (!cn_ast_reparse_expression(node->postfix.expression_idx)) goto error;
             break;
+
         case CN_AST_PRIMARY:
             node->primary.type = NULL;
+
+            if (!cn_ast_expect_not_nil(node->primary.literal_idx, node_idx)) goto error;
+
+            switch (cn_ast_get_as_node(node->primary.literal_idx)->kind) {
+                case CN_AST_IDENTIFIER:
+                    if (!cn_ast_reparse_identifier(node->primary.literal_idx)) goto error;
+                    break;
+                case CN_AST_INTEGER:
+                    if (!cn_ast_reparse_integer(node->primary.literal_idx)) goto error;
+                    break;
+                case CN_AST_FLOAT:
+                    if (!cn_ast_reparse_float(node->primary.literal_idx)) goto error;
+                    break;
+                case CN_AST_STRING:
+                    if (!cn_ast_reparse_string(node->primary.literal_idx)) goto error;
+                    break;
+                default:
+                    cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, node->primary.literal_idx, CN_DC_EXPECTED_AST_NODE, "Expected identifier, integer, float or string ast node in primary expression.");
+                    goto error;
+            }
             break;
+
         default:
-            break;
+            cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, node_idx, CN_DC_EXPECTED_EXPRESSION, "Expected expression ast node, but received %s node.", cn_ast_node_kind_name(node->kind));
+            goto error;
     }
 
     return true;
+
+error:
+    CN__TRACE_ERROR;
+    return false;
+}
+
+CNDEF bool cn_ast_reparse_init_declarators(Cn_Ast_List init_declarators, Cn_Ast_Idx blame_idx) {
+    for (int64_t i = 0; i < init_declarators.length; i++) {
+        if (!cn_ast_expect_not_nil(init_declarators.idxs[i], blame_idx)) goto error;
+        if (!cn_ast_reparse_init_declarator(init_declarators.idxs[i])) goto error;
+    }
+
+    return true;
+
+error:
+    CN__TRACE_ERROR;
+    return false;
 }
 
 CNDEF bool cn_ast_reparse_init_declarator(Cn_Ast_Idx node_idx) {
-    if (!cn_ast_expect(node_idx, CN_AST_INIT_DECLARATOR)) return false;
+    if (!cn_ast_expect(node_idx, CN_AST_INIT_DECLARATOR)) goto error;
 
     Cn_Ast_Init_Declarator *node = cn_ast_get(node_idx);
 
-    if (!cn_ast_reparse_declarator(node->declarator_idx)) return false;
+    if (!cn_ast_expect_not_nil(node->declarator_idx, node_idx)) goto error;
+    if (!cn_ast_reparse_declarator(node->declarator_idx)) goto error;
 
-    if (!cn_ast_is_nil(node->initializer_idx)) {
-        if (!cn_ast_reparse_initializer(node->initializer_idx)) return false;
+    if (cn_ast_get_as_node(node->declarator_idx)->flags & CN_AST_DECLARATOR_IS_ABSTRACT) {
+        cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, node->declarator_idx, CN_DC_INVALID_DECLARATOR, "Expected non-abstract declarator inside init declarator.");
+        goto error;
     }
 
+    // Gnu asm label is optional.
     if (!cn_ast_is_nil(node->gnu_asm_label_idx)) {
-        if (!cn_ast_reparse_gnu_asm_label(node->gnu_asm_label_idx)) return false;
+        if (!cn_ast_reparse_gnu_asm_label(node->gnu_asm_label_idx)) goto error;
+    }
+
+    if (!cn_ast_reparse_gnu_attribute_specifiers(node->gnu_attribute_specifiers, node_idx)) goto error;
+
+    // Initializer is optional.
+    if (!cn_ast_is_nil(node->initializer_idx)) {
+        if (!cn_ast_reparse_initializer(node->initializer_idx)) goto error;
     }
 
     return true;
+
+error:
+    CN__TRACE_ERROR;
+    return false;
 }
 
 CNDEF bool cn_ast_reparse_initializer(Cn_Ast_Idx node_idx) {
-    if (!cn_ast_expect(node_idx, CN_AST_INITIALIZER)) return false;
+    if (!cn_ast_expect(node_idx, CN_AST_INITIALIZER)) goto error;
 
     Cn_Ast_Initializer *node = cn_ast_get(node_idx);
 
+    // Initializer holds either single expression or compound '{' '}' designations.
+    // NOTE: Initializer expressions are typechecked against declared type later,
+    // by cn_ast_analyze_declaration, exactly like in the parse path.
     if (!cn_ast_is_nil(node->expression_idx)) {
-        if (!cn_ast_reparse_expression(node->expression_idx)) return false;
+        if (!cn_ast_reparse_expression(node->expression_idx)) goto error;
+        return true;
     }
 
-    // TODO: Initializer list.
+    if (!cn_ast_reparse_designations(node->designations, node_idx)) goto error;
 
     return true;
+
+error:
+    CN__TRACE_ERROR;
+    return false;
 }
 
-CNDEF bool cn_ast_reparse_abstract_declarator(Cn_Ast_Idx node_idx) {
-    if (!cn_ast_expect(node_idx, CN_AST_DECLARATOR)) return false;
-
-    Cn_Ast_Declarator *node = cn_ast_get(node_idx);
-
-    if (!cn_ast_is_nil(node->pointer_idx)) {
-        if (!cn_ast_reparse_pointer(node->pointer_idx)) return false;
-    }
-
-    if (!cn_ast_is_nil(node->direct_declarator_idx)) {
-        if (!cn_ast_reparse_direct_declarator(node->direct_declarator_idx)) return false;
+CNDEF bool cn_ast_reparse_designations(Cn_Ast_List designations, Cn_Ast_Idx blame_idx) {
+    for (int64_t i = 0; i < designations.length; i++) {
+        if (!cn_ast_expect_not_nil(designations.idxs[i], blame_idx)) goto error;
+        if (!cn_ast_reparse_designation(designations.idxs[i])) goto error;
     }
 
     return true;
+
+error:
+    CN__TRACE_ERROR;
+    return false;
+}
+
+CNDEF bool cn_ast_reparse_designation(Cn_Ast_Idx node_idx) {
+    if (!cn_ast_expect(node_idx, CN_AST_DESIGNATION)) goto error;
+
+    Cn_Ast_Designation *node = cn_ast_get(node_idx);
+
+    // Designators are optional, positional designation case.
+    if (!cn_ast_reparse_designators(node->designators, node_idx)) goto error;
+
+    if (!cn_ast_expect_not_nil(node->initializer_idx, node_idx)) goto error;
+    if (!cn_ast_reparse_initializer(node->initializer_idx)) goto error;
+
+    return true;
+
+error:
+    CN__TRACE_ERROR;
+    return false;
+}
+
+CNDEF bool cn_ast_reparse_designators(Cn_Ast_List designators, Cn_Ast_Idx blame_idx) {
+    for (int64_t i = 0; i < designators.length; i++) {
+        if (!cn_ast_expect_not_nil(designators.idxs[i], blame_idx)) goto error;
+        if (!cn_ast_reparse_designator(designators.idxs[i])) goto error;
+    }
+
+    return true;
+
+error:
+    CN__TRACE_ERROR;
+    return false;
+}
+
+CNDEF bool cn_ast_reparse_designator(Cn_Ast_Idx node_idx) {
+    if (!cn_ast_expect(node_idx, CN_AST_DESIGNATOR)) goto error;
+
+    Cn_Ast_Designator *node = cn_ast_get(node_idx);
+
+    // Member '.' designator case.
+    if (!cn_ast_is_nil(node->identifier_idx)) {
+        if (!cn_ast_reparse_identifier(node->identifier_idx)) goto error;
+        return true;
+    }
+
+    // Array '[' ']' designator case.
+    if (!cn_ast_expect_not_nil(node->expression_idx, node_idx)) goto error;
+    if (!cn_ast_reparse_expression(node->expression_idx)) goto error;
+
+    // Range '...' end is optional.
+    if (!cn_ast_is_nil(node->expression_range_end_idx)) {
+        if (!cn_ast_reparse_expression(node->expression_range_end_idx)) goto error;
+    }
+
+    return true;
+
+error:
+    CN__TRACE_ERROR;
+    return false;
 }
 
 CNDEF bool cn_ast_reparse_declarator(Cn_Ast_Idx node_idx) {
-    if (!cn_ast_expect(node_idx, CN_AST_DECLARATOR)) return false;
+    if (!cn_ast_expect(node_idx, CN_AST_DECLARATOR)) goto error;
 
     Cn_Ast_Declarator *node = cn_ast_get(node_idx);
 
+    // Pointer is optional.
     if (!cn_ast_is_nil(node->pointer_idx)) {
-        if (!cn_ast_reparse_pointer(node->pointer_idx)) return false;
+        if (!cn_ast_reparse_pointer(node->pointer_idx)) goto error;
     }
 
-    if (!cn_ast_is_nil(node->direct_declarator_idx)) {
-        if (!cn_ast_reparse_direct_declarator(node->direct_declarator_idx)) return false;
+    // Direct declarator can be NIL only in abstract declarator.
+    if (cn_ast_is_nil(node->direct_declarator_idx)) {
+        if (!(node->flags & CN_AST_DECLARATOR_IS_ABSTRACT)) {
+            cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, node_idx, CN_DC_INVALID_DECLARATOR, "Expected direct declarator in non-abstract declarator.");
+            goto error;
+        }
+
+        return true;
     }
+
+    if (!cn_ast_reparse_direct_declarator(node->direct_declarator_idx)) goto error;
 
     return true;
+
+error:
+    CN__TRACE_ERROR;
+    return false;
 }
 
 CNDEF bool cn_ast_reparse_pointer(Cn_Ast_Idx node_idx) {
-    if (!cn_ast_expect(node_idx, CN_AST_POINTER)) return false;
+    if (!cn_ast_expect(node_idx, CN_AST_POINTER)) goto error;
 
     Cn_Ast_Pointer *node = cn_ast_get(node_idx);
 
+    // Pointer to pointer is optional.
     if (!cn_ast_is_nil(node->pointer_idx)) {
-        if (!cn_ast_reparse_pointer(node->pointer_idx)) return false;
+        if (!cn_ast_reparse_pointer(node->pointer_idx)) goto error;
     }
 
     return true;
+
+error:
+    CN__TRACE_ERROR;
+    return false;
 }
 
 CNDEF bool cn_ast_reparse_direct_declarator(Cn_Ast_Idx node_idx) {
-    if (cn_ast_is_nil(node_idx)) return true;
+    CN_ASSERT(node_idx != CN_AST_NIL_IDX);
 
     Cn_Ast_Node *node = cn_ast_get(node_idx);
 
     switch (node->kind) {
         case CN_AST_IDENTIFIER:
-            return true;
-        case CN_AST_DIRECT_DECLARATOR_GROUPED: {
-            Cn_Ast_Direct_Declarator_Grouped *grouped = cn_ast_get(node_idx);
-            if (!cn_ast_reparse_declarator(grouped->declarator_idx)) return false;
+            return cn_ast_reparse_identifier(node_idx);
+
+        case CN_AST_DIRECT_DECLARATOR_GROUPED:
+            if (!cn_ast_expect_not_nil(node->direct_declarator_grouped.declarator_idx, node_idx)) goto error;
+            if (!cn_ast_reparse_declarator(node->direct_declarator_grouped.declarator_idx)) goto error;
             break;
-        }
-        case CN_AST_DIRECT_DECLARATOR_ARRAY: {
-            Cn_Ast_Direct_Declarator_Array *arr = cn_ast_get(node_idx);
-            if (!cn_ast_is_nil(arr->direct_declarator_idx)) {
-                if (!cn_ast_reparse_direct_declarator(arr->direct_declarator_idx)) return false;
+
+        case CN_AST_DIRECT_DECLARATOR_ARRAY:
+            // Direct declarator is NIL if array declarator is abstract.
+            if (!cn_ast_is_nil(node->direct_declarator_array.direct_declarator_idx)) {
+                if (!cn_ast_reparse_direct_declarator(node->direct_declarator_array.direct_declarator_idx)) goto error;
             }
-            if (!cn_ast_is_nil(arr->expression_idx)) {
-                if (!cn_ast_reparse_expression(arr->expression_idx)) return false;
-            }
-            break;
-        }
-        case CN_AST_DIRECT_DECLARATOR_FUNCTION: {
-            Cn_Ast_Direct_Declarator_Function *fn = cn_ast_get(node_idx);
-            if (!cn_ast_is_nil(fn->direct_declarator_idx)) {
-                if (!cn_ast_reparse_direct_declarator(fn->direct_declarator_idx)) return false;
-            }
-            for (int64_t i = 0; i < fn->parameter_declarations.length; i++) {
-                if (!cn_ast_reparse_parameter_declaration(fn->parameter_declarations.idxs[i])) return false;
+
+            // Array size expression is optional.
+            if (!cn_ast_is_nil(node->direct_declarator_array.expression_idx)) {
+                if (!cn_ast_reparse_expression(node->direct_declarator_array.expression_idx)) goto error;
+
+                // Typechecking array size expression.
+                cn_ast_expression_clear_types(node->direct_declarator_array.expression_idx);
+                if (cn_ast_expression_typecheck(node->direct_declarator_array.expression_idx) == NULL) goto error;
             }
             break;
-        }
+
+        case CN_AST_DIRECT_DECLARATOR_FUNCTION:
+            // Direct declarator is NIL if function declarator is abstract.
+            if (!cn_ast_is_nil(node->direct_declarator_function.direct_declarator_idx)) {
+                if (!cn_ast_reparse_direct_declarator(node->direct_declarator_function.direct_declarator_idx)) goto error;
+            }
+
+            if (!cn_ast_reparse_parameter_declarations(node->direct_declarator_function.parameter_declarations, node_idx)) goto error;
+            break;
+
         default:
-            return false;
+            cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, node_idx, CN_DC_EXPECTED_AST_NODE, "Expected direct declarator ast node, but received %s node.", cn_ast_node_kind_name(node->kind));
+            goto error;
     }
 
     return true;
+
+error:
+    CN__TRACE_ERROR;
+    return false;
+}
+
+CNDEF bool cn_ast_reparse_identifier(Cn_Ast_Idx node_idx) {
+    if (!cn_ast_expect(node_idx, CN_AST_IDENTIFIER)) goto error;
+
+    // Identifier name is stored in the ast node itself.
+
+    return true;
+
+error:
+    CN__TRACE_ERROR;
+    return false;
+}
+
+CNDEF bool cn_ast_reparse_integer(Cn_Ast_Idx node_idx) {
+    if (!cn_ast_expect(node_idx, CN_AST_INTEGER)) goto error;
+
+    // Integer value is stored in the ast node itself.
+
+    return true;
+
+error:
+    CN__TRACE_ERROR;
+    return false;
+}
+
+CNDEF bool cn_ast_reparse_float(Cn_Ast_Idx node_idx) {
+    if (!cn_ast_expect(node_idx, CN_AST_FLOAT)) goto error;
+
+    // Float value is stored in the ast node itself.
+
+    return true;
+
+error:
+    CN__TRACE_ERROR;
+    return false;
+}
+
+CNDEF bool cn_ast_reparse_string(Cn_Ast_Idx node_idx) {
+    if (!cn_ast_expect(node_idx, CN_AST_STRING)) goto error;
+
+    // String is already concatenated and stored in permanent strings arena.
+
+    return true;
+
+error:
+    CN__TRACE_ERROR;
+    return false;
 }
 
 CNDEF bool cn_ast_reparse_declaration_specifiers(Cn_Ast_Idx node_idx) {
-    if (!cn_ast_expect(node_idx, CN_AST_DECLARATION_SPECIFIERS)) return false;
+    if (!cn_ast_expect(node_idx, CN_AST_DECLARATION_SPECIFIERS)) goto error;
 
     Cn_Ast_Declaration_Specifiers *node = cn_ast_get(node_idx);
 
-    if (!cn_ast_is_nil(node->type_specifier_idx)) {
-        if (!cn_ast_reparse_type_specifier(node->type_specifier_idx)) return false;
-    }
+    if (!cn_ast_reparse_gnu_attribute_specifiers(node->gnu_attribute_specifiers, node_idx)) goto error;
 
-    for (int64_t i = 0; i < node->gnu_attribute_specifiers.length; i++) {
-        if (!cn_ast_reparse_gnu_attribute_specifier(node->gnu_attribute_specifiers.idxs[i])) return false;
+    // Type specifier is optional, storage, qualifier and function specifiers
+    // are stored in the ast node itself.
+    if (!cn_ast_is_nil(node->type_specifier_idx)) {
+        if (!cn_ast_reparse_type_specifier(node->type_specifier_idx)) goto error;
     }
 
     return true;
+
+error:
+    CN__TRACE_ERROR;
+    return false;
 }
 
 CNDEF bool cn_ast_reparse_type_specifier(Cn_Ast_Idx node_idx) {
-    if (cn_ast_is_nil(node_idx)) return true;
+    CN_ASSERT(node_idx != CN_AST_NIL_IDX);
 
     Cn_Ast_Node *node = cn_ast_get(node_idx);
 
     switch (node->kind) {
         case CN_AST_TYPE_SPECIFIER_PRIMITIVE:
-            // Nothing to reparse for primitive types.
+            // Primitive type info is stored in the ast node itself.
             return true;
-        case CN_AST_TYPE_SPECIFIER_TYPEDEF: {
-            Cn_Ast_Type_Specifier_Typedef *tdef = cn_ast_get(node_idx);
-            Cn_Ast_Binding_Idx idx = cn_ast_binding_table_get(tdef->typedef_name, &cn__ast_data->symbol_binding_table);
 
-            if (idx == CN_AST_NIL_BINDING_IDX || cn_ast_binding_get(idx)->kind != CN_BINDING_TYPEDEF) {
-                cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, node_idx, CN_DC_EXPECTED_TOKEN, "Expected valid typedef identifier in typedef type specifier.");
-                return false;
+        case CN_AST_TYPE_SPECIFIER_TYPEDEF: {
+            // Typedef name must still resolve to a typedef binding.
+            Cn_Ast_Binding_Idx binding_idx = cn_ast_binding_table_get(node->type_specifier_typedef.typedef_name, &cn__ast_data->symbol_binding_table);
+
+            if (binding_idx == CN_AST_NIL_BINDING_IDX || cn_ast_binding_get(binding_idx)->kind != CN_BINDING_TYPEDEF) {
+                cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, node_idx, CN_DC_INVALID_SYMBOL, "Expected valid typedef identifier in typedef type specifier.");
+                goto error;
             }
+
             return true;
         }
+
         case CN_AST_STRUCT_SPECIFIER:
         case CN_AST_UNION_SPECIFIER:
             return cn_ast_reparse_struct_or_union_specifier(node_idx);
+
         case CN_AST_ENUM_SPECIFIER:
             return cn_ast_reparse_enum_specifier(node_idx);
+
         case CN_AST_GNU_TYPEOF:
-            return cn_ast_reparse_gnu_typeof_specifier(node_idx);
+            return cn_ast_reparse_gnu_typeof(node_idx);
+
         default:
-            return true;
+            cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, node_idx, CN_DC_INVALID_TYPE_SPECIFIER, "Expected type specifier ast node, but received %s node.", cn_ast_node_kind_name(node->kind));
+            goto error;
     }
+
+error:
+    CN__TRACE_ERROR;
+    return false;
 }
 
-CNDEF bool cn_ast_reparse_gnu_typeof_specifier(Cn_Ast_Idx node_idx) {
-    if (!cn_ast_expect(node_idx, CN_AST_GNU_TYPEOF)) return false;
+CNDEF bool cn_ast_reparse_gnu_typeof(Cn_Ast_Idx node_idx) {
+    if (!cn_ast_expect(node_idx, CN_AST_GNU_TYPEOF)) goto error;
 
     Cn_Ast_Gnu_Typeof *node = cn_ast_get(node_idx);
 
-    if (!cn_ast_is_nil(node->target_idx)) {
-        Cn_Ast_Node *child = cn_ast_get(node->target_idx);
-        if (child->kind == CN_AST_TYPE_NAME) {
-            if (!cn_ast_reparse_type_name(node->target_idx)) return false;
-        } else {
-            if (!cn_ast_reparse_expression(node->target_idx)) return false;
-        }
+    // Target is either type name or expression.
+    if (!cn_ast_expect_not_nil(node->target_idx, node_idx)) goto error;
+
+    if (cn_ast_get_as_node(node->target_idx)->kind == CN_AST_TYPE_NAME) {
+        if (!cn_ast_reparse_type_name(node->target_idx)) goto error;
+    } else {
+        if (!cn_ast_reparse_expression(node->target_idx)) goto error;
+
+        // Typechecking expression, its type is used to resolve typeof.
+        cn_ast_expression_clear_types(node->target_idx);
+        if (cn_ast_expression_typecheck(node->target_idx) == NULL) goto error;
     }
 
     return true;
+
+error:
+    CN__TRACE_ERROR;
+    return false;
 }
 
 CNDEF bool cn_ast_reparse_type_name(Cn_Ast_Idx node_idx) {
-    if (!cn_ast_expect(node_idx, CN_AST_TYPE_NAME)) return false;
+    if (!cn_ast_expect(node_idx, CN_AST_TYPE_NAME)) goto error;
 
     Cn_Ast_Type_Name *node = cn_ast_get(node_idx);
 
-    if (!cn_ast_reparse_specifier_qualifier(node->specifier_qualifier_idx)) return false;
+    if (!cn_ast_expect_not_nil(node->specifier_qualifier_idx, node_idx)) goto error;
+    if (!cn_ast_reparse_specifier_qualifier(node->specifier_qualifier_idx)) goto error;
 
+    // Abstract declarator is optional.
     if (!cn_ast_is_nil(node->abstract_declarator_idx)) {
-        if (!cn_ast_reparse_abstract_declarator(node->abstract_declarator_idx)) return false;
-    }
+        if (!cn_ast_reparse_declarator(node->abstract_declarator_idx)) goto error;
 
-    return true;
-}
-
-CNDEF bool cn_ast_reparse_specifier_qualifier(Cn_Ast_Idx node_idx) {
-    if (!cn_ast_expect(node_idx, CN_AST_SPECIFIER_QUALIFIER)) return false;
-
-    Cn_Ast_Specifier_Qualifier *node = cn_ast_get(node_idx);
-
-    if (!cn_ast_is_nil(node->type_specifier_idx)) {
-        if (!cn_ast_reparse_type_specifier(node->type_specifier_idx)) return false;
-    }
-
-    return true;
-}
-
-CNDEF bool cn_ast_reparse_parameter_declaration(Cn_Ast_Idx node_idx) {
-    if (!cn_ast_expect(node_idx, CN_AST_PARAMETER_DECLARATION)) return false;
-
-    Cn_Ast_Parameter_Declaration *node = cn_ast_get(node_idx);
-
-    if (!cn_ast_reparse_declaration_specifiers(node->declaration_specifiers_idx)) return false;
-
-    if (!cn_ast_is_nil(node->declarator_idx)) {
-        Cn_Ast_Node *decl = cn_ast_get(node->declarator_idx);
-        if (decl->kind == CN_AST_DECLARATOR && (decl->flags & CN_AST_DECLARATOR_IS_ABSTRACT)) {
-            if (!cn_ast_reparse_abstract_declarator(node->declarator_idx)) return false;
-        } else {
-            if (!cn_ast_reparse_declarator(node->declarator_idx)) return false;
+        if (!(cn_ast_get_as_node(node->abstract_declarator_idx)->flags & CN_AST_DECLARATOR_IS_ABSTRACT)) {
+            cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, node->abstract_declarator_idx, CN_DC_INVALID_TYPE_NAME, "Only abstract declarator is allowed in type name.");
+            goto error;
         }
     }
 
     return true;
+
+error:
+    CN__TRACE_ERROR;
+    return false;
+}
+
+CNDEF bool cn_ast_reparse_specifier_qualifier(Cn_Ast_Idx node_idx) {
+    if (!cn_ast_expect(node_idx, CN_AST_SPECIFIER_QUALIFIER)) goto error;
+
+    Cn_Ast_Specifier_Qualifier *node = cn_ast_get(node_idx);
+
+    // Type specifier is optional, qualifiers are stored in the ast node itself.
+    if (!cn_ast_is_nil(node->type_specifier_idx)) {
+        if (!cn_ast_reparse_type_specifier(node->type_specifier_idx)) goto error;
+    }
+
+    return true;
+
+error:
+    CN__TRACE_ERROR;
+    return false;
+}
+
+CNDEF bool cn_ast_reparse_parameter_declarations(Cn_Ast_List parameter_declarations, Cn_Ast_Idx blame_idx) {
+    for (int64_t i = 0; i < parameter_declarations.length; i++) {
+        if (!cn_ast_expect_not_nil(parameter_declarations.idxs[i], blame_idx)) goto error;
+        if (!cn_ast_reparse_parameter_declaration(parameter_declarations.idxs[i])) goto error;
+    }
+
+    return true;
+
+error:
+    CN__TRACE_ERROR;
+    return false;
+}
+
+CNDEF bool cn_ast_reparse_parameter_declaration(Cn_Ast_Idx node_idx) {
+    if (!cn_ast_expect(node_idx, CN_AST_PARAMETER_DECLARATION)) goto error;
+
+    Cn_Ast_Parameter_Declaration *node = cn_ast_get(node_idx);
+
+    if (!cn_ast_expect_not_nil(node->declaration_specifiers_idx, node_idx)) goto error;
+    if (!cn_ast_reparse_declaration_specifiers(node->declaration_specifiers_idx)) goto error;
+
+    // Declarator is optional and can be abstract.
+    if (!cn_ast_is_nil(node->declarator_idx)) {
+        if (!cn_ast_reparse_declarator(node->declarator_idx)) goto error;
+    }
+
+    return true;
+
+error:
+    CN__TRACE_ERROR;
+    return false;
 }
 
 CNDEF bool cn_ast_reparse_struct_or_union_specifier(Cn_Ast_Idx node_idx) {
+    CN_ASSERT(node_idx != CN_AST_NIL_IDX);
+
     Cn_Ast_Node *node = cn_ast_get(node_idx);
 
     if (node->kind != CN_AST_STRUCT_SPECIFIER && node->kind != CN_AST_UNION_SPECIFIER) {
-        cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, node_idx, CN_DC_EXPECTED_AST_NODE, "Expected struct or union specifier node.");
-        return false;
+        cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, node_idx, CN_DC_EXPECTED_AST_NODE, "Expected struct or union specifier ast node, but received %s node.", cn_ast_node_kind_name(node->kind));
+        goto error;
     }
 
-    // Both struct and union specifiers have member_declarations at the same offset.
-    Cn_Ast_Struct_Specifier *struct_node = cn_ast_get(node_idx);
-    for (int64_t i = 0; i < struct_node->member_declarations.length; i++) {
-        if (!cn_ast_reparse_member_declaration(struct_node->member_declarations.idxs[i])) return false;
+    // Both struct and union specifiers have identical layout.
+    Cn_Ast_Struct_Specifier *specifier = cn_ast_get(node_idx);
+
+    if (!cn_ast_reparse_attribute_specifiers(specifier->attribute_specifiers, node_idx)) goto error;
+    if (!cn_ast_reparse_gnu_attribute_specifiers(specifier->gnu_attribute_specifiers, node_idx)) goto error;
+
+    // Tag identifier is always present, it is generated for anonymous struct or union.
+    if (!cn_ast_expect_not_nil(specifier->identifier_idx, node_idx)) goto error;
+    if (!cn_ast_reparse_identifier(specifier->identifier_idx)) goto error;
+
+    // Member declarations are empty if struct or union has no definition.
+    for (int64_t i = 0; i < specifier->member_declarations.length; i++) {
+        if (!cn_ast_expect_not_nil(specifier->member_declarations.idxs[i], node_idx)) goto error;
+        if (!cn_ast_reparse_member_declaration(specifier->member_declarations.idxs[i])) goto error;
     }
 
     return true;
+
+error:
+    CN__TRACE_ERROR;
+    return false;
 }
 
 CNDEF bool cn_ast_reparse_member_declaration(Cn_Ast_Idx node_idx) {
-    if (!cn_ast_expect(node_idx, CN_AST_MEMBER_DECLARATION)) return false;
+    if (!cn_ast_expect(node_idx, CN_AST_MEMBER_DECLARATION)) goto error;
 
     Cn_Ast_Member_Declaration *node = cn_ast_get(node_idx);
 
-    if (!cn_ast_reparse_specifier_qualifier(node->specifier_qualifier_idx)) return false;
+    if (!cn_ast_reparse_attribute_specifiers(node->attribute_specifiers, node_idx)) goto error;
 
-    for (int64_t i = 0; i < node->member_declarators.length; i++) {
-        if (!cn_ast_reparse_member_declarator(node->member_declarators.idxs[i])) return false;
+    if (!cn_ast_expect_not_nil(node->specifier_qualifier_idx, node_idx)) goto error;
+    if (!cn_ast_reparse_specifier_qualifier(node->specifier_qualifier_idx)) goto error;
+
+    if (!cn_ast_reparse_member_declarators(node->member_declarators, node_idx)) goto error;
+
+    return true;
+
+error:
+    CN__TRACE_ERROR;
+    return false;
+}
+
+CNDEF bool cn_ast_reparse_member_declarators(Cn_Ast_List member_declarators, Cn_Ast_Idx blame_idx) {
+    for (int64_t i = 0; i < member_declarators.length; i++) {
+        if (!cn_ast_expect_not_nil(member_declarators.idxs[i], blame_idx)) goto error;
+        if (!cn_ast_reparse_member_declarator(member_declarators.idxs[i])) goto error;
     }
 
     return true;
+
+error:
+    CN__TRACE_ERROR;
+    return false;
 }
 
 CNDEF bool cn_ast_reparse_member_declarator(Cn_Ast_Idx node_idx) {
-    if (!cn_ast_expect(node_idx, CN_AST_MEMBER_DECLARATOR)) return false;
+    if (!cn_ast_expect(node_idx, CN_AST_MEMBER_DECLARATOR)) goto error;
 
     Cn_Ast_Member_Declarator *node = cn_ast_get(node_idx);
 
+    // Declarator is NIL in anonymous bitfield case.
     if (!cn_ast_is_nil(node->declarator_idx)) {
-        if (!cn_ast_reparse_declarator(node->declarator_idx)) return false;
+        if (!cn_ast_reparse_declarator(node->declarator_idx)) goto error;
+
+        if (cn_ast_get_as_node(node->declarator_idx)->flags & CN_AST_DECLARATOR_IS_ABSTRACT) {
+            cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, node->declarator_idx, CN_DC_INVALID_DECLARATOR, "Expected non-abstract declarator inside member declarator.");
+            goto error;
+        }
     }
 
+    // Bitfield expression is optional.
     if (!cn_ast_is_nil(node->bitfield_idx)) {
-        if (!cn_ast_reparse_expression(node->bitfield_idx)) return false;
+        if (!cn_ast_reparse_expression(node->bitfield_idx)) goto error;
     }
 
-    return true;
-}
-
-CNDEF bool cn_ast_reparse_gnu_attribute_specifier(Cn_Ast_Idx node_idx) {
-    if (!cn_ast_expect(node_idx, CN_AST_GNU_ATTRIBUTE_SPECIFIER)) return false;
-
-    Cn_Ast_Gnu_Attribute_Specifier *node = cn_ast_get(node_idx);
-
-    for (int64_t i = 0; i < node->gnu_attributes.length; i++) {
-        if (!cn_ast_reparse_gnu_attribute(node->gnu_attributes.idxs[i])) return false;
-    }
+    if (!cn_ast_reparse_gnu_attribute_specifiers(node->gnu_attribute_specifiers, node_idx)) goto error;
 
     return true;
-}
 
-CNDEF bool cn_ast_reparse_gnu_attribute(Cn_Ast_Idx node_idx) {
-    if (!cn_ast_expect(node_idx, CN_AST_GNU_ATTRIBUTE)) return false;
-
-    Cn_Ast_Gnu_Attribute *node = cn_ast_get(node_idx);
-
-    for (int64_t i = 0; i < node->arguments.length; i++) {
-        if (!cn_ast_reparse_expression(node->arguments.idxs[i])) return false;
-    }
-
-    return true;
-}
-
-CNDEF bool cn_ast_reparse_gnu_asm_label(Cn_Ast_Idx node_idx) {
-    if (!cn_ast_expect(node_idx, CN_AST_GNU_ASM_LABEL)) return false;
-
-    // String child doesn't need reparsing.
-
-    return true;
+error:
+    CN__TRACE_ERROR;
+    return false;
 }
 
 CNDEF bool cn_ast_reparse_enum_specifier(Cn_Ast_Idx node_idx) {
-    if (!cn_ast_expect(node_idx, CN_AST_ENUM_SPECIFIER)) return false;
+    if (!cn_ast_expect(node_idx, CN_AST_ENUM_SPECIFIER)) goto error;
 
     Cn_Ast_Enum_Specifier *node = cn_ast_get(node_idx);
 
+    if (!cn_ast_reparse_attribute_specifiers(node->attribute_specifiers, node_idx)) goto error;
+    if (!cn_ast_reparse_gnu_attribute_specifiers(node->gnu_attribute_specifiers, node_idx)) goto error;
+
+    // Tag identifier is always present, it is generated for anonymous enum.
+    if (!cn_ast_expect_not_nil(node->identifier_idx, node_idx)) goto error;
+    if (!cn_ast_reparse_identifier(node->identifier_idx)) goto error;
+
+    // Fixed underlying type is optional.
+    if (!cn_ast_is_nil(node->specifier_qualifier_idx)) {
+        if (!cn_ast_reparse_specifier_qualifier(node->specifier_qualifier_idx)) goto error;
+    }
+
+    // Enumerators are empty if enum has no definition.
     for (int64_t i = 0; i < node->enumerators.length; i++) {
-        if (!cn_ast_reparse_enumerator(node->enumerators.idxs[i])) return false;
+        if (!cn_ast_expect_not_nil(node->enumerators.idxs[i], node_idx)) goto error;
+        if (!cn_ast_reparse_enumerator(node->enumerators.idxs[i])) goto error;
     }
 
     return true;
+
+error:
+    CN__TRACE_ERROR;
+    return false;
 }
 
 CNDEF bool cn_ast_reparse_enumerator(Cn_Ast_Idx node_idx) {
-    if (!cn_ast_expect(node_idx, CN_AST_ENUMERATOR)) return false;
+    if (!cn_ast_expect(node_idx, CN_AST_ENUMERATOR)) goto error;
 
     Cn_Ast_Enumerator *node = cn_ast_get(node_idx);
 
+    if (!cn_ast_is_nil(node->identifier_idx)) {
+        if (!cn_ast_reparse_identifier(node->identifier_idx)) goto error;
+    }
+
+    if (!cn_ast_reparse_attribute_specifiers(node->attribute_specifiers, node_idx)) goto error;
+    if (!cn_ast_reparse_gnu_attribute_specifiers(node->gnu_attribute_specifiers, node_idx)) goto error;
+
+    // Enumerator value expression is optional.
+    // NOTE: It is typechecked and evaluated later by cn_ast_to_type,
+    // exactly like in the parse path.
     if (!cn_ast_is_nil(node->expression_idx)) {
-        if (!cn_ast_reparse_expression(node->expression_idx)) return false;
+        if (!cn_ast_reparse_expression(node->expression_idx)) goto error;
     }
 
     return true;
+
+error:
+    CN__TRACE_ERROR;
+    return false;
+}
+
+CNDEF bool cn_ast_reparse_attribute_specifiers(Cn_Ast_List attribute_specifiers, Cn_Ast_Idx blame_idx) {
+    for (int64_t i = 0; i < attribute_specifiers.length; i++) {
+        if (!cn_ast_expect_not_nil(attribute_specifiers.idxs[i], blame_idx)) goto error;
+        if (!cn_ast_reparse_attribute_specifier(attribute_specifiers.idxs[i])) goto error;
+    }
+
+    return true;
+
+error:
+    CN__TRACE_ERROR;
+    return false;
+}
+
+CNDEF bool cn_ast_reparse_attribute_specifier(Cn_Ast_Idx node_idx) {
+    if (!cn_ast_expect(node_idx, CN_AST_ATTRIBUTE_SPECIFIER)) goto error;
+
+    Cn_Ast_Attribute_Specifier *node = cn_ast_get(node_idx);
+
+    // Attributes are empty in '[[' ']]' case.
+    if (!cn_ast_reparse_attributes(node->attributes, node_idx)) goto error;
+
+    return true;
+
+error:
+    CN__TRACE_ERROR;
+    return false;
+}
+
+CNDEF bool cn_ast_reparse_attributes(Cn_Ast_List attributes, Cn_Ast_Idx blame_idx) {
+    for (int64_t i = 0; i < attributes.length; i++) {
+        if (!cn_ast_expect_not_nil(attributes.idxs[i], blame_idx)) goto error;
+        if (!cn_ast_reparse_attribute(attributes.idxs[i])) goto error;
+    }
+
+    return true;
+
+error:
+    CN__TRACE_ERROR;
+    return false;
+}
+
+CNDEF bool cn_ast_reparse_attribute(Cn_Ast_Idx node_idx) {
+    if (!cn_ast_expect(node_idx, CN_AST_ATTRIBUTE)) goto error;
+
+    Cn_Ast_Attribute *node = cn_ast_get(node_idx);
+
+    // Vendor identifier is optional.
+    if (!cn_ast_is_nil(node->vendor_identifier_idx)) {
+        if (!cn_ast_reparse_identifier(node->vendor_identifier_idx)) goto error;
+    }
+
+    if (!cn_ast_expect_not_nil(node->identifier_idx, node_idx)) goto error;
+    if (!cn_ast_reparse_identifier(node->identifier_idx)) goto error;
+
+    // Arguments are empty if attribute has no '(' ')'.
+    if (!cn_ast_reparse_arguments(node->arguments, node_idx)) goto error;
+
+    return true;
+
+error:
+    CN__TRACE_ERROR;
+    return false;
+}
+
+CNDEF bool cn_ast_reparse_gnu_attribute_specifiers(Cn_Ast_List gnu_attribute_specifiers, Cn_Ast_Idx blame_idx) {
+    for (int64_t i = 0; i < gnu_attribute_specifiers.length; i++) {
+        if (!cn_ast_expect_not_nil(gnu_attribute_specifiers.idxs[i], blame_idx)) goto error;
+        if (!cn_ast_reparse_gnu_attribute_specifier(gnu_attribute_specifiers.idxs[i])) goto error;
+    }
+
+    return true;
+
+error:
+    CN__TRACE_ERROR;
+    return false;
+}
+
+CNDEF bool cn_ast_reparse_gnu_attribute_specifier(Cn_Ast_Idx node_idx) {
+    if (!cn_ast_expect(node_idx, CN_AST_GNU_ATTRIBUTE_SPECIFIER)) goto error;
+
+    Cn_Ast_Gnu_Attribute_Specifier *node = cn_ast_get(node_idx);
+
+    // Gnu attributes are empty in '__attribute__' '(' '(' ')' ')' case.
+    if (!cn_ast_reparse_gnu_attributes(node->gnu_attributes, node_idx)) goto error;
+
+    return true;
+
+error:
+    CN__TRACE_ERROR;
+    return false;
+}
+
+CNDEF bool cn_ast_reparse_gnu_attributes(Cn_Ast_List gnu_attributes, Cn_Ast_Idx blame_idx) {
+    for (int64_t i = 0; i < gnu_attributes.length; i++) {
+        if (!cn_ast_expect_not_nil(gnu_attributes.idxs[i], blame_idx)) goto error;
+        if (!cn_ast_reparse_gnu_attribute(gnu_attributes.idxs[i])) goto error;
+    }
+
+    return true;
+
+error:
+    CN__TRACE_ERROR;
+    return false;
+}
+
+CNDEF bool cn_ast_reparse_gnu_attribute(Cn_Ast_Idx node_idx) {
+    if (!cn_ast_expect(node_idx, CN_AST_GNU_ATTRIBUTE)) goto error;
+
+    Cn_Ast_Gnu_Attribute *node = cn_ast_get(node_idx);
+
+    if (!cn_ast_expect_not_nil(node->identifier_idx, node_idx)) goto error;
+    if (!cn_ast_reparse_identifier(node->identifier_idx)) goto error;
+
+    // Arguments are empty if gnu attribute has no '(' ')'.
+    if (!cn_ast_reparse_arguments(node->arguments, node_idx)) goto error;
+
+    return true;
+
+error:
+    CN__TRACE_ERROR;
+    return false;
+}
+
+CNDEF bool cn_ast_reparse_gnu_asm_label(Cn_Ast_Idx node_idx) {
+    if (!cn_ast_expect(node_idx, CN_AST_GNU_ASM_LABEL)) goto error;
+
+    Cn_Ast_Gnu_Asm_Label *node = cn_ast_get(node_idx);
+
+    // String is optional in 'asm' '(' ')' case.
+    if (!cn_ast_is_nil(node->string_idx)) {
+        if (!cn_ast_reparse_string(node->string_idx)) goto error;
+    }
+
+    return true;
+
+error:
+    CN__TRACE_ERROR;
+    return false;
 }
 
 // DIAGNOSTIC SECTION
@@ -16209,7 +17110,6 @@ CNDEF Cn_Ast_Idx cn__build_expr_statement(Cn_Ast_Idx expression, Cn_Build_Opt op
 /* 
     Revision history:
         
-        v0.1.0 (2026-07-25) Initial development release.
 */
 
 /*
