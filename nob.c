@@ -783,44 +783,42 @@ int msg_handler(Cn_Message_Kind kind, void *message) {
 
                 Cn_Message_Parsed_Function *m = message;
 
-                Cn_Ast_Function *function = cn_ast_get(m->node_idx);
-                Cn_Ast_Block *block = cn_ast_get(function->block_idx);
+                Cn_Ast_Idx block_idx = cn_ast_get_as_node(m->node_idx)->function.block_idx;
                 
                 // Using libraries idx stack to construct new block items list.
                 int64_t mark = cn_ast_idx_stack_mark();
 
-                for (int64_t i = 0; i < block->block_items.length; i++) {
-                    Cn_Ast_Block_Item *item = cn_ast_get(block->block_items.idxs[i]);
+                for (int64_t i = 0; i < cn_ast_get_as_node(block_idx)->block.block_items.length; i++) {
+                    Cn_Ast_Idx item_idx = cn_ast_get_as_node(block_idx)->block.block_items.idxs[i];
 
-                    Cn_Ast_Idx attribute_idx = cn_get_attribute(item->declaration_or_statement_idx, CN_STR_LIT("defer"));
+                    Cn_Ast_Idx attribute_idx = cn_get_attribute(cn_ast_get_as_node(item_idx)->block_item.declaration_or_statement_idx, CN_STR_LIT("defer"));
                     if (attribute_idx != CN_AST_NIL_IDX) {
-                        Cn_Ast_Attribute *attribute = cn_ast_get(attribute_idx);
                         
-                        switch (cn_ast_get_as_node(item->declaration_or_statement_idx)->kind) {
+                        switch (cn_ast_get_as_node(cn_ast_get_as_node(item_idx)->block_item.declaration_or_statement_idx)->kind) {
                             case CN_AST_DECLARATION:
                             case CN_AST_EXPRESSION_STATEMENT:
                             case CN_AST_BLOCK:
                                 break;
                             default: 
-                                cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, item->declaration_or_statement_idx, CN_DC_EXPECTED_AST_NODE, "Expected 'defer' attribute on declaration, expression statement or block.");
+                                cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, cn_ast_get_as_node(item_idx)->block_item.declaration_or_statement_idx, CN_DC_EXPECTED_AST_NODE, "Expected 'defer' attribute on declaration, expression statement or block.");
                                 return 0;
                         }
 
                         // Since its annoying to handle deletion of whole attribute, 
                         // we can just replace it's identifier to soemthing else.
-                        cn_replace(&attribute->identifier_idx, cn_build_identifier(ignore_me), attribute_idx);
+                        cn_replace(&cn_ast_get_as_node(attribute_idx)->attribute.identifier_idx, cn_build_identifier(ignore_me));
 
                         // Pushing to the stack idx, and continuing.
-                        cn_array_list_append(&deffered_stack, item->declaration_or_statement_idx);
+                        cn_array_list_append(&deffered_stack, cn_ast_get_as_node(item_idx)->block_item.declaration_or_statement_idx);
 
                         modified = 1;
                     } 
-                    else if (cn_ast_get_as_node(item->declaration_or_statement_idx)->kind == CN_AST_RETURN && cn_array_list_length(&deffered_stack) > 0) {
+                    else if (cn_ast_get_as_node(cn_ast_get_as_node(item_idx)->block_item.declaration_or_statement_idx)->kind == CN_AST_RETURN && cn_array_list_length(&deffered_stack) > 0) {
                         // Replacing return with rvalue set and goto statement.
                         Cn_Ast_Idx rvalue_set = cn_build_block_item(cn_build_expr_statement(
                                 cn_build_assign(CN_ASSIGNMENT_OP_ASSIGN, 
                                     cn_build_identifier(cn__defer_rvalue),
-                                    cn_ast_get_as_node(item->declaration_or_statement_idx)->return_statement.expression_idx,
+                                    cn_ast_get_as_node(cn_ast_get_as_node(item_idx)->block_item.declaration_or_statement_idx)->return_statement.expression_idx,
                                     ),
                                 ));
 
@@ -829,23 +827,32 @@ int msg_handler(Cn_Message_Kind kind, void *message) {
 
                         Cn_Ast_Idx goto_stmt = cn_build_block_item(cn_build_goto_statement(cn_build_identifier(str, .alloc = true)));
 
-                        // Making them marked as replaced, and since their replaced_idx default to 0.
-                        // It would be interpreted as purely created nodes.
-                        cn_ast_get_as_node(rvalue_set)->flags |= CN_AST_IS_REPLACED;
-                        cn_ast_get_as_node(goto_stmt)->flags |= CN_AST_IS_REPLACED;
-
-                        // Setting their parent properly as well.
-                        cn_ast_node_set_parent(function->block_idx, rvalue_set, goto_stmt);
-
                         cn_ast_idx_stack_push(rvalue_set);
                         cn_ast_idx_stack_push(goto_stmt);
                     } 
                     else {
-                        cn_ast_idx_stack_push(block->block_items.idxs[i]);
+                        cn_ast_idx_stack_push(cn_ast_get_as_node(block_idx)->block.block_items.idxs[i]);
                     }
                 }
 
                 if (modified == 1) {
+                    Cn_Ast_Idx rvalue_decl = cn_build_block_item(
+                                cn_build_declaration(
+                                    cn_copy(cn_ast_get_as_node(m->node_idx)->function.declaration_specifiers_idx),
+                                    cn_build_list(
+                                        cn_build_init_declarator(
+                                            cn_build_declarator(
+                                                CN_AST_NIL_IDX,
+                                                cn_build_identifier(cn__defer_rvalue),
+                                                ),
+                                            CN_AST_NIL_IDX,
+                                            )
+                                        ),
+                                ),
+                            );
+
+                    cn_ast_idx_stack_prepend(rvalue_decl, mark);
+
                     while (cn_array_list_length(&deffered_stack) > 0) {
                         Cn_Ast_Idx idx = deffered_stack[cn_array_list_length(&deffered_stack) - 1];
                         cn_array_list_pop(&deffered_stack);
@@ -859,12 +866,6 @@ int msg_handler(Cn_Message_Kind kind, void *message) {
                                         ),
                                 );
 
-                        // Making them marked as replaced.
-                        cn_ast_get_as_node(label)->flags |= CN_AST_IS_REPLACED;
-
-                        // Setting parent.
-                        cn_ast_node_set_parent(function->block_idx, label); 
-
                         cn_ast_idx_stack_push(label);
                     }
 
@@ -873,16 +874,16 @@ int msg_handler(Cn_Message_Kind kind, void *message) {
                                             cn_build_identifier(cn__defer_rvalue),
                                         ),
                                 );
-                    cn_ast_get_as_node(return_stmt)->flags |= CN_AST_IS_REPLACED;
-                    cn_ast_node_set_parent(function->block_idx, return_stmt); 
 
                     cn_ast_idx_stack_push(return_stmt);
 
-                    block->block_items = cn_ast_idx_stack_finalize(mark);
+                    cn_replace_list(&cn_ast_get_as_node(block_idx)->block.block_items, cn_ast_idx_stack_finalize(mark));
+                } else {
+                    cn_ast_idx_stack_discard(mark);
                 }
 
                 cn_array_list_free(&deffered_stack);
-                
+
                 return modified;
             }
         default: 
@@ -892,13 +893,60 @@ int msg_handler(Cn_Message_Kind kind, void *message) {
     return 0;
 }
 
-int cn_command(int *argc, char ***argv) {
+int all_command(int *argc, char ***argv) {
     int    argc_ = 0;
     char **argv_ = NULL;
 
     clean_command(&argc_, &argv_);
     if (lib_command(&argc_, &argv_) != 0) return 1;
     if (test_command(&argc_, &argv_) != 0) return 1;
+
+    Nob_Cmd cmd = {0};
+
+    // Compiling main.i
+    nob_cc(&cmd);
+    nob_cc_flags(&cmd);
+    nob_cmd_append(&cmd, "-E");
+    nob_cc_inputs(&cmd, "main.c");
+    nob_cc_output(&cmd, "main.i");
+
+    if (!nob_cmd_run(&cmd)) {
+        nob_log(NOB_ERROR, "couldn't compile main intermediate file.");
+    }
+
+    // Library pre-processing.
+    cn_message_handler = msg_handler;
+    Cn_Translation_Unit tu = cn_tu_make("main.i");
+
+    if (cn_tu_process(&tu, CN_PRINT_BINDINGS | CN_PRINT_TYPES | CN_PRINT_AST) == -1) {
+    // if (cn_tu_process(&tu, CN_PRINT_AST) == -1) {
+    // if (cn_tu_process(&tu, 0) == -1) {
+        cn_tu_free(&tu);
+        return 1;
+    }
+
+    cn_tu_free(&tu);
+
+    // Compiling main executable.
+    nob_cc(&cmd);
+    nob_cc_flags(&cmd);
+    nob_cc_inputs(&cmd, "main.i");
+    nob_cc_output(&cmd, "main");
+
+    if (!nob_cmd_run(&cmd)) {
+        nob_log(NOB_ERROR, "couldn't produce main executable.");
+    }
+
+    NOB_FREE(cmd.items);
+
+    return 0;
+}
+
+int cn_command(int *argc, char ***argv) {
+    int    argc_ = 0;
+    char **argv_ = NULL;
+
+    clean_command(&argc_, &argv_);
 
     Nob_Cmd cmd = {0};
 
@@ -951,7 +999,7 @@ int main(int argc, char **argv) {
     const char *program_name = shift(argv, argc);
 
     if (argc == 0) {
-        return cn_command(&argc, &argv);
+        return all_command(&argc, &argv);
     }
 
     const char *command_name;

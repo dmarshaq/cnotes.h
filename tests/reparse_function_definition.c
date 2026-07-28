@@ -119,6 +119,6 @@ int main(void) {
     cn_message_handler = &handler;
 
     Cn_Translation_Unit tu = cn_tu_make("input.i", .source = src);
-    cn_tu_process(&tu, CN_NO_CODE_OUTPUT | CN_PRINT_BINDINGS | CN_PRINT_TYPES);
+    cn_tu_process(&tu, CN_NO_CODE_OUTPUT);
     return 0;
 }
