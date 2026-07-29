@@ -1,7 +1,6 @@
 CompileFlags:
   Add: 
     - -xc
-    - -std=c99
     - -DCN_IMPLEMENTATION
     - -Wno-missing-prototypes
     - -Wno-unknown-attributes

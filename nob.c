@@ -1,18 +1,12 @@
 #define nob_cc_flags(cmd) nob_cmd_append(cmd, "-g", "-Wall", "-Wextra", "-std=c99")
 
-
 #define NOB_IMPLEMENTATION
 #include "nob.h"
-
-#define CN_IMPLEMENTATION
-#include "cnotes.h"
 
 #include <string.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <stdio.h>
-
-
 
 // Drop in arena implementation.
 typedef struct arena {
@@ -61,15 +55,11 @@ void arena_free(Arena *arena) {
     *arena = (Arena) {0};
 }
 
-
-
 // Async proc test setup to detect timeout and report.
 #ifdef _WIN32
 #  define WIN32_LEAN_AND_MEAN
 #  include <windows.h>
 #else
-// Needed for monotonic clock in -std=c99
-#  define _POSIX_C_SOURCE 199309L
 #  include <errno.h>
 #  include <signal.h>
 #  include <string.h>
@@ -88,27 +78,33 @@ typedef struct {
 #else
     pid_t pid;   // doubles as the process group id
 #endif // _WIN32
-} Test_Proc;
+} Build_Proc;
 
-typedef enum { PROC_OK, PROC_FAIL, PROC_TIMEOUT } Proc_Result;
+typedef enum { 
+    PROC_OK, 
+    PROC_FAIL, 
+    PROC_TIMEOUT 
+} Proc_Result;
 
-bool        test_proc_spawn(Test_Proc *p, Nob_Cmd *cmd, const char *stdout_path);
-Proc_Result test_proc_wait(Test_Proc *p, unsigned timeout_ms);
+bool        build_proc_spawn(Build_Proc *p, Nob_Cmd *cmd, const char *stdout_path);
+Proc_Result build_proc_wait(Build_Proc *p, unsigned timeout_ms);
 
 #ifdef _WIN32
-bool test_proc_spawn(Test_Proc *p, Nob_Cmd *cmd, const char *stdout_path)
-{
+bool build_proc_spawn(Build_Proc *p, Nob_Cmd *cmd, const char *stdout_path) {
     if (cmd->count < 1) {
-        nob_log(NOB_ERROR, "could not run empty command");
+        nob_log(NOB_ERROR, "build proc: could not run empty command");
         return false;
     }
 
-    Nob_Fd fdout = nob_fd_open_for_write(stdout_path);
-    if (fdout == NOB_INVALID_FD) return false;
+    Nob_Fd fdout = 1;
+    if (stdout_path != NULL) {
+        fdout = nob_fd_open_for_write(stdout_path);
+        if (fdout == NOB_INVALID_FD) return false;
+    }
 
     HANDLE job = CreateJobObjectA(NULL, NULL);
     if (job == NULL) {
-        nob_log(NOB_ERROR, "could not create job object: %lu", GetLastError());
+        nob_log(NOB_ERROR, "build proc: could not create job object: %lu", GetLastError());
         nob_fd_close(fdout);
         return false;
     }
@@ -116,7 +112,7 @@ bool test_proc_spawn(Test_Proc *p, Nob_Cmd *cmd, const char *stdout_path)
     JOBOBJECT_EXTENDED_LIMIT_INFORMATION jeli = {0};
     jeli.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
     if (!SetInformationJobObject(job, JobObjectExtendedLimitInformation, &jeli, sizeof(jeli))) {
-        nob_log(NOB_ERROR, "could not configure job object: %lu", GetLastError());
+        nob_log(NOB_ERROR, "build proc: could not configure job object: %lu", GetLastError());
         CloseHandle(job);
         nob_fd_close(fdout);
         return false;
@@ -135,20 +131,19 @@ bool test_proc_spawn(Test_Proc *p, Nob_Cmd *cmd, const char *stdout_path)
     nob_log(NOB_INFO, "CMD: %s", sb.items);
 
     PROCESS_INFORMATION pi = {0};
-    BOOL ok = CreateProcessA(NULL, sb.items, NULL, NULL, TRUE,
-                             CREATE_SUSPENDED, NULL, NULL, &si, &pi);
+    BOOL ok = CreateProcessA(NULL, sb.items, NULL, NULL, TRUE, CREATE_SUSPENDED, NULL, NULL, &si, &pi);
     nob_sb_free(sb);
     nob_fd_close(fdout);
     cmd->count = 0;
 
     if (!ok) {
-        nob_log(NOB_ERROR, "could not create child process: %lu", GetLastError());
+        nob_log(NOB_ERROR, "build proc: could not create child process: %lu", GetLastError());
         CloseHandle(job);
         return false;
     }
 
     if (!AssignProcessToJobObject(job, pi.hProcess)) {
-        nob_log(NOB_ERROR, "could not assign process to job: %lu", GetLastError());
+        nob_log(NOB_ERROR, "build proc: could not assign process to job: %lu", GetLastError());
         TerminateProcess(pi.hProcess, 1);
         CloseHandle(pi.hThread);
         CloseHandle(pi.hProcess);
@@ -164,8 +159,7 @@ bool test_proc_spawn(Test_Proc *p, Nob_Cmd *cmd, const char *stdout_path)
     return true;
 }
 
-Proc_Result test_proc_wait(Test_Proc *p, unsigned timeout_ms)
-{
+Proc_Result build_proc_wait(Test_Proc *p, unsigned timeout_ms) {
     Proc_Result result;
 
     DWORD w = WaitForSingleObject(p->proc, (DWORD)timeout_ms);
@@ -176,16 +170,16 @@ Proc_Result test_proc_wait(Test_Proc *p, unsigned timeout_ms)
     } else if (w == WAIT_OBJECT_0) {
         DWORD code = 0;
         if (!GetExitCodeProcess(p->proc, &code)) {
-            nob_log(NOB_ERROR, "could not get process exit code: %lu", GetLastError());
+            nob_log(NOB_ERROR, "build proc: could not get process exit code: %lu", GetLastError());
             result = PROC_FAIL;
         } else if (code != 0) {
-            nob_log(NOB_ERROR, "test: exited with code %lu", code);
+            nob_log(NOB_ERROR, "build proc: exited with code %lu", code);
             result = PROC_FAIL;
         } else {
             result = PROC_OK;
         }
     } else {
-        nob_log(NOB_ERROR, "could not wait on child process: %lu", GetLastError());
+        nob_log(NOB_ERROR, "build proc: could not wait on child process: %lu", GetLastError());
         result = PROC_FAIL;
     }
 
@@ -194,9 +188,9 @@ Proc_Result test_proc_wait(Test_Proc *p, unsigned timeout_ms)
     return result;
 }
 #else 
-bool test_proc_spawn(Test_Proc *p, Nob_Cmd *cmd, const char *stdout_path) {
+bool build_proc_spawn(Build_Proc *p, Nob_Cmd *cmd, const char *stdout_path) {
     if (cmd->count < 1) {
-        nob_log(NOB_ERROR, "could not run empty command");
+        nob_log(NOB_ERROR, "build proc: could not run empty command");
         return false;
     }
 
@@ -206,14 +200,17 @@ bool test_proc_spawn(Test_Proc *p, Nob_Cmd *cmd, const char *stdout_path) {
     nob_log(NOB_INFO, "CMD: %s", sb.items);
     nob_sb_free(sb);
 
-    Nob_Fd fdout = nob_fd_open_for_write(stdout_path);
-    if (fdout == NOB_INVALID_FD) return false;
+    Nob_Fd fdout = 1;
+    if (stdout_path != NULL) {
+        fdout = nob_fd_open_for_write(stdout_path);
+        if (fdout == NOB_INVALID_FD) return false;
+    }
 
     nob_da_append(cmd, NULL);   // argv terminator, allocated before the fork
 
     pid_t pid = fork();
     if (pid < 0) {
-        nob_log(NOB_ERROR, "could not fork: %s", strerror(errno));
+        nob_log(NOB_ERROR, "build proc: could not fork: %s", strerror(errno));
         nob_fd_close(fdout);
         cmd->count = 0;
         return false;
@@ -234,9 +231,7 @@ bool test_proc_spawn(Test_Proc *p, Nob_Cmd *cmd, const char *stdout_path) {
     return true;
 }
 
-#include <time.h>
-
-Proc_Result test_proc_wait(Test_Proc *p, unsigned timeout_ms) {
+Proc_Result build_proc_wait(Build_Proc *p, unsigned timeout_ms) {
     struct timespec start;
     clock_gettime(CLOCK_MONOTONIC, &start);
 
@@ -244,7 +239,7 @@ Proc_Result test_proc_wait(Test_Proc *p, unsigned timeout_ms) {
         int wstatus = 0;
         pid_t w = waitpid(p->pid, &wstatus, WNOHANG);
         if (w < 0) {
-            nob_log(NOB_ERROR, "could not wait on pid %d: %s", p->pid, strerror(errno));
+            nob_log(NOB_ERROR, "build proc: could not wait on pid %d: %s", p->pid, strerror(errno));
             return PROC_FAIL;
         }
         if (w > 0) {
@@ -252,12 +247,12 @@ Proc_Result test_proc_wait(Test_Proc *p, unsigned timeout_ms) {
             if (WIFEXITED(wstatus)) {
                 int code = WEXITSTATUS(wstatus);
                 if (code != 0) {
-                    nob_log(NOB_ERROR, "test: exited with code %d", code);
+                    nob_log(NOB_ERROR, "build proc: exited with code %d", code);
                     return PROC_FAIL;
                 }
                 return PROC_OK;
             }
-            nob_log(NOB_ERROR, "test: killed by signal %d", WTERMSIG(wstatus));
+            nob_log(NOB_ERROR, "build proc: killed by signal %d", WTERMSIG(wstatus));
             return PROC_FAIL;
         }
 
@@ -304,11 +299,12 @@ bool confirm(const char *prompt) {
 
 #define STDOUT_TXT_FILE_EXTENSION   ".stdout.txt"
 
-#define BUILD_DIR   "build"
-#define OBJ_DIR     "obj"
-#define BIN_DIR     "bin"
-#define SRC_DIR     "src"
-#define TESTS_DIR   "tests"
+#define BUILD_DIR       "build"
+#define OBJ_DIR         "obj"
+#define BIN_DIR         "bin"
+#define SRC_DIR         "src"
+#define TESTS_DIR       "tests"
+#define HOW_TO_DIR      "how_to"
 
 /**
  * Executes compiler commands to produce .a file.
@@ -508,13 +504,13 @@ void test_execute(Test_Record *r, Nob_Cmd *cmd) {
     strcat(stdout_path, STDOUT_TXT_FILE_EXTENSION);
 
 
-    Test_Proc proc = {0};
-    if (!test_proc_spawn(&proc, cmd, stdout_path)) {
+    Build_Proc proc = {0};
+    if (!build_proc_spawn(&proc, cmd, stdout_path)) {
         r->status = RUNTIME_FAIL;
         return;
     }
 
-    switch (test_proc_wait(&proc, TEST_TIMEOUT_MS)) {
+    switch (build_proc_wait(&proc, TEST_TIMEOUT_MS)) {
     case PROC_TIMEOUT:
         nob_log(NOB_ERROR, "test: '%s' timed out after %d ms",
                 output_path_buffer, TEST_TIMEOUT_MS);
@@ -526,12 +522,6 @@ void test_execute(Test_Record *r, Nob_Cmd *cmd) {
     case PROC_OK:
         break;
     }
-
-    // if (!nob_cmd_run(cmd, .stdout_path = stdout_path)) {
-    //     r->status = RUNTIME_FAIL;
-    //     return;
-    // }
-
 
     char expected_stdout_path[strlen(r->path) - 2 + strlen(STDOUT_TXT_FILE_EXTENSION) + 1];
     expected_stdout_path[0] = '\0';
@@ -569,6 +559,39 @@ void test_execute(Test_Record *r, Nob_Cmd *cmd) {
     r->status = SUCCESS;
 }
 
+Proc_Result how_to_execute(char *path, Nob_Cmd *cmd) {
+    nob_log(NOB_INFO, "how_to: running '%s' how_to.", path);
+    nob_cmd_append(cmd, "make", "-C", path);
+
+    Build_Proc proc = {0};
+    if (!build_proc_spawn(&proc, cmd, NULL))
+        return PROC_FAIL;
+
+    switch (build_proc_wait(&proc, TEST_TIMEOUT_MS)) {
+        case PROC_TIMEOUT:
+            nob_log(NOB_ERROR, "how_to: '%s' timed out after %d ms", path, TEST_TIMEOUT_MS);
+            return PROC_TIMEOUT;
+        case PROC_FAIL: return PROC_FAIL;
+        case PROC_OK:   return PROC_OK;
+    }
+}
+
+bool how_to_execute_entry(Nob_Walk_Entry entry) {
+    // Skip walk examlples dir, is always the first dir entry.
+    if (strcmp(entry.path, HOW_TO_DIR) == 0) return true;
+
+    Cmd *cmd = (Cmd *)entry.data;
+    *entry.action = NOB_WALK_SKIP;
+    if (entry.type == FILE_DIRECTORY) {
+        Proc_Result result = how_to_execute((char *)entry.path, cmd);
+        if (result != PROC_OK) return false;
+    }
+
+    return true;
+}
+
+
+
 
 typedef int (Command_Func)(int *argc, char ***argv);
 
@@ -584,7 +607,7 @@ int test_command(int *argc, char ***argv);
 int record_command(int *argc, char ***argv);
 int clean_command(int *argc, char ***argv);
 int lib_command(int *argc, char ***argv);
-int cn_command(int *argc, char ***argv);
+int all_command(int *argc, char ***argv);
 
 const static Command commands[] = {
     { "help",       "",             "List all available commands.", help_command },
@@ -592,7 +615,7 @@ const static Command commands[] = {
     { "record",     "[FILE...]",    "Record file as a test and generate it's expected output.", record_command },
     { "clean",      "",             "Recursivly deletes "BUILD_DIR"/ and "BIN_DIR"/ directories.", clean_command },
     { "lib",        "",             "Will compile whole library into .o file and then produce static library.", lib_command },
-    { "cn",         "",             "Cleans, compiles library, runs tests, and uses library with compiler to pre-process and compile main.c file.", cn_command },
+    { "all",        "",             "Cleans, compiles library, runs tests, and uses library with compiler to run all examples.", all_command },
 };
 
 void commands_list(void) {
@@ -744,6 +767,21 @@ int record_command(int *argc, char ***argv) {
     return 0;
 }
 
+int how_to_command(int *argc, char ***argv) {
+    arena_strings = arena_make(1024);
+    Test_Records records = {0};
+
+    int failed = 0;
+
+    // Executing tests
+    Nob_Cmd cmd = {0};
+
+    // Find all available how to and execute the,.
+    if (!nob_walk_dir(HOW_TO_DIR, how_to_execute_entry, .data = &cmd)) return 1;
+    
+    return 0;
+}
+
 int clean_command(int *argc, char ***argv) {
     Nob_Cmd cmd = {0};
 
@@ -770,129 +808,6 @@ int lib_command(int *argc, char ***argv) {
     return 0;
 }
 
-const Cn_String ignore_me = CN_STR_BUFFER("ignore_me");
-const Cn_String cn__defer_rvalue = CN_STR_BUFFER("cn__defer_rvalue");
-
-int msg_handler(Cn_Message_Kind kind, void *message) {
-    switch (kind) {
-        case CN_MESSAGE_PARSED_FUNCTION:
-            {   
-                int modified = 0;
-
-                Cn_Ast_Idx *deffered_stack = cn_array_list_make(Cn_Ast_Idx, 4);
-
-                Cn_Message_Parsed_Function *m = message;
-
-                Cn_Ast_Idx block_idx = cn_ast_get_as_node(m->node_idx)->function.block_idx;
-                
-                // Using libraries idx stack to construct new block items list.
-                int64_t mark = cn_ast_idx_stack_mark();
-
-                for (int64_t i = 0; i < cn_ast_get_as_node(block_idx)->block.block_items.length; i++) {
-                    Cn_Ast_Idx item_idx = cn_ast_get_as_node(block_idx)->block.block_items.idxs[i];
-
-                    Cn_Ast_Idx attribute_idx = cn_get_attribute(cn_ast_get_as_node(item_idx)->block_item.declaration_or_statement_idx, CN_STR_LIT("defer"));
-                    if (attribute_idx != CN_AST_NIL_IDX) {
-                        
-                        switch (cn_ast_get_as_node(cn_ast_get_as_node(item_idx)->block_item.declaration_or_statement_idx)->kind) {
-                            case CN_AST_DECLARATION:
-                            case CN_AST_EXPRESSION_STATEMENT:
-                            case CN_AST_BLOCK:
-                                break;
-                            default: 
-                                cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, cn_ast_get_as_node(item_idx)->block_item.declaration_or_statement_idx, CN_DC_EXPECTED_AST_NODE, "Expected 'defer' attribute on declaration, expression statement or block.");
-                                return 0;
-                        }
-
-                        // Since its annoying to handle deletion of whole attribute, 
-                        // we can just replace it's identifier to soemthing else.
-                        cn_replace(&cn_ast_get_as_node(attribute_idx)->attribute.identifier_idx, cn_build_identifier(ignore_me));
-
-                        // Pushing to the stack idx, and continuing.
-                        cn_array_list_append(&deffered_stack, cn_ast_get_as_node(item_idx)->block_item.declaration_or_statement_idx);
-
-                        modified = 1;
-                    } 
-                    else if (cn_ast_get_as_node(cn_ast_get_as_node(item_idx)->block_item.declaration_or_statement_idx)->kind == CN_AST_RETURN && cn_array_list_length(&deffered_stack) > 0) {
-                        // Replacing return with rvalue set and goto statement.
-                        Cn_Ast_Idx rvalue_set = cn_build_block_item(cn_build_expr_statement(
-                                cn_build_assign(CN_ASSIGNMENT_OP_ASSIGN, 
-                                    cn_build_identifier(cn__defer_rvalue),
-                                    cn_ast_get_as_node(cn_ast_get_as_node(item_idx)->block_item.declaration_or_statement_idx)->return_statement.expression_idx,
-                                    ),
-                                ));
-
-                        Cn_String str = CN_STR_BUFFER_EMPTY(128);
-                        str = cn_str_format(str, "cn__defer%ld", cn_array_list_length(&deffered_stack) - 1);
-
-                        Cn_Ast_Idx goto_stmt = cn_build_block_item(cn_build_goto_statement(cn_build_identifier(str, .alloc = true)));
-
-                        cn_ast_idx_stack_push(rvalue_set);
-                        cn_ast_idx_stack_push(goto_stmt);
-                    } 
-                    else {
-                        cn_ast_idx_stack_push(cn_ast_get_as_node(block_idx)->block.block_items.idxs[i]);
-                    }
-                }
-
-                if (modified == 1) {
-                    Cn_Ast_Idx rvalue_decl = cn_build_block_item(
-                                cn_build_declaration(
-                                    cn_copy(cn_ast_get_as_node(m->node_idx)->function.declaration_specifiers_idx),
-                                    cn_build_list(
-                                        cn_build_init_declarator(
-                                            cn_build_declarator(
-                                                CN_AST_NIL_IDX,
-                                                cn_build_identifier(cn__defer_rvalue),
-                                                ),
-                                            CN_AST_NIL_IDX,
-                                            )
-                                        ),
-                                ),
-                            );
-
-                    cn_ast_idx_stack_prepend(rvalue_decl, mark);
-
-                    while (cn_array_list_length(&deffered_stack) > 0) {
-                        Cn_Ast_Idx idx = deffered_stack[cn_array_list_length(&deffered_stack) - 1];
-                        cn_array_list_pop(&deffered_stack);
-
-                        Cn_String str = CN_STR_BUFFER_EMPTY(128);
-                        str = cn_str_format(str, "cn__defer%ld", cn_array_list_length(&deffered_stack));
-                        Cn_Ast_Idx label = cn_build_block_item(
-                                    cn_build_label(
-                                            cn_build_identifier(str, .alloc = true),
-                                            idx,
-                                        ),
-                                );
-
-                        cn_ast_idx_stack_push(label);
-                    }
-
-                    Cn_Ast_Idx return_stmt = cn_build_block_item(
-                                    cn_build_return_statement(
-                                            cn_build_identifier(cn__defer_rvalue),
-                                        ),
-                                );
-
-                    cn_ast_idx_stack_push(return_stmt);
-
-                    cn_replace_list(&cn_ast_get_as_node(block_idx)->block.block_items, cn_ast_idx_stack_finalize(mark));
-                } else {
-                    cn_ast_idx_stack_discard(mark);
-                }
-
-                cn_array_list_free(&deffered_stack);
-
-                return modified;
-            }
-        default: 
-            return 0;
-    }
-
-    return 0;
-}
-
 int all_command(int *argc, char ***argv) {
     int    argc_ = 0;
     char **argv_ = NULL;
@@ -900,91 +815,7 @@ int all_command(int *argc, char ***argv) {
     clean_command(&argc_, &argv_);
     if (lib_command(&argc_, &argv_) != 0) return 1;
     if (test_command(&argc_, &argv_) != 0) return 1;
-
-    Nob_Cmd cmd = {0};
-
-    // Compiling main.i
-    nob_cc(&cmd);
-    nob_cc_flags(&cmd);
-    nob_cmd_append(&cmd, "-E");
-    nob_cc_inputs(&cmd, "main.c");
-    nob_cc_output(&cmd, "main.i");
-
-    if (!nob_cmd_run(&cmd)) {
-        nob_log(NOB_ERROR, "couldn't compile main intermediate file.");
-    }
-
-    // Library pre-processing.
-    cn_message_handler = msg_handler;
-    Cn_Translation_Unit tu = cn_tu_make("main.i");
-
-    if (cn_tu_process(&tu, CN_PRINT_BINDINGS | CN_PRINT_TYPES | CN_PRINT_AST) == -1) {
-    // if (cn_tu_process(&tu, CN_PRINT_AST) == -1) {
-    // if (cn_tu_process(&tu, 0) == -1) {
-        cn_tu_free(&tu);
-        return 1;
-    }
-
-    cn_tu_free(&tu);
-
-    // Compiling main executable.
-    nob_cc(&cmd);
-    nob_cc_flags(&cmd);
-    nob_cc_inputs(&cmd, "main.i");
-    nob_cc_output(&cmd, "main");
-
-    if (!nob_cmd_run(&cmd)) {
-        nob_log(NOB_ERROR, "couldn't produce main executable.");
-    }
-
-    NOB_FREE(cmd.items);
-
-    return 0;
-}
-
-int cn_command(int *argc, char ***argv) {
-    int    argc_ = 0;
-    char **argv_ = NULL;
-
-    clean_command(&argc_, &argv_);
-
-    Nob_Cmd cmd = {0};
-
-    // Compiling main.i
-    nob_cc(&cmd);
-    nob_cc_flags(&cmd);
-    nob_cmd_append(&cmd, "-E");
-    nob_cc_inputs(&cmd, "main.c");
-    nob_cc_output(&cmd, "main.i");
-
-    if (!nob_cmd_run(&cmd)) {
-        nob_log(NOB_ERROR, "couldn't compile main intermediate file.");
-    }
-
-    // Library pre-processing.
-    cn_message_handler = msg_handler;
-    Cn_Translation_Unit tu = cn_tu_make("main.i");
-
-    // if (cn_tu_process(&tu, CN_PRINT_BINDINGS | CN_PRINT_TYPES | CN_PRINT_AST) == -1) {
-    // if (cn_tu_process(&tu, CN_PRINT_AST) == -1) {
-    if (cn_tu_process(&tu, 0) == -1) {
-        cn_tu_free(&tu);
-        return 1;
-    }
-
-    cn_tu_free(&tu);
-
-    // Compiling main executable.
-    nob_cc(&cmd);
-    nob_cc_flags(&cmd);
-    nob_cc_inputs(&cmd, "main.i");
-    nob_cc_output(&cmd, "main");
-
-    if (!nob_cmd_run(&cmd)) {
-        nob_log(NOB_ERROR, "couldn't produce main executable.");
-    }
-
-    NOB_FREE(cmd.items);
+    if (how_to_command(&argc_, &argv_) != 0) return 1;
 
     return 0;
 }

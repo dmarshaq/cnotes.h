@@ -26,8 +26,6 @@
       - CN_REALLOC(oldptr, size)            Redefine which realloc() cnotes.h shall use.
       - CN_FREE(ptr)                        Redefine which free() cnotes.h shall use.
       - CN_AST_NODE_LIST_INITIAL_CAP        Redefine initial capacity of array list that holds ast nodes.
-      - CN_BUILD_OPT_DEFAULT_ALLOC          Redefine default value of alloc optional in cn_build_* functios.
-                                            See Cn_Build_Opt for more information.
 
     # API Conventions & Navigation
 
@@ -4235,10 +4233,6 @@ typedef struct {
     int64_t line;
 } Cn_Build_Opt;
 
-#ifndef CN_BUILD_OPT_DEFAULT_ALLOC
-#   define CN_BUILD_OPT_DEFAULT_ALLOC false
-#endif // CN_BUILD_OPT_DEFAULT_ALLOC
-
 /**
  * Builds list out of supplied nodes.
  * Accepts variadic array of nodes in order.
@@ -4254,7 +4248,7 @@ CNDEF Cn_Ast_List cn__build_list(Cn_Ast_Idx idxs[], int64_t length);
  * 
  * RETURNS: Built identifier.
  */
-#define cn_build_identifier(name, ...) cn__build_identifier(name, (Cn_Build_Opt) { .alloc = CN_BUILD_OPT_DEFAULT_ALLOC, .file = __FILE__, .line =__LINE__, __VA_ARGS__ })
+#define cn_build_identifier(name, ...) cn__build_identifier(name, (Cn_Build_Opt) { .file = __FILE__, .line =__LINE__, __VA_ARGS__ })
 
 CNDEF Cn_Ast_Idx cn__build_identifier(Cn_String name, Cn_Build_Opt opt);
 
@@ -4263,7 +4257,7 @@ CNDEF Cn_Ast_Idx cn__build_identifier(Cn_String name, Cn_Build_Opt opt);
  *
  * RETURNS: Built integer.
  */
-#define cn_build_integer(value, ...) cn__build_integer(value, (Cn_Build_Opt) { .alloc = CN_BUILD_OPT_DEFAULT_ALLOC, .file = __FILE__, .line =__LINE__, __VA_ARGS__ })
+#define cn_build_integer(value, ...) cn__build_integer(value, (Cn_Build_Opt) { .file = __FILE__, .line =__LINE__, __VA_ARGS__ })
 
 CNDEF Cn_Ast_Idx cn__build_integer(Cn_String value, Cn_Build_Opt opt);
 
@@ -4272,7 +4266,7 @@ CNDEF Cn_Ast_Idx cn__build_integer(Cn_String value, Cn_Build_Opt opt);
  * 
  * RETURNS: Built float.
  */
-#define cn_build_float(value, ...) cn__build_float(value, (Cn_Build_Opt) { .alloc = CN_BUILD_OPT_DEFAULT_ALLOC, .file = __FILE__, .line =__LINE__, __VA_ARGS__ })
+#define cn_build_float(value, ...) cn__build_float(value, (Cn_Build_Opt) { .file = __FILE__, .line =__LINE__, __VA_ARGS__ })
 
 CNDEF Cn_Ast_Idx cn__build_float(Cn_String value, Cn_Build_Opt opt);
 
@@ -4281,7 +4275,7 @@ CNDEF Cn_Ast_Idx cn__build_float(Cn_String value, Cn_Build_Opt opt);
  * 
  * RETURNS: Built string.
  */
-#define cn_build_string(str, ...) cn__build_string(str, (Cn_Build_Opt) { .alloc = CN_BUILD_OPT_DEFAULT_ALLOC, .file = __FILE__, .line =__LINE__, __VA_ARGS__ })
+#define cn_build_string(str, ...) cn__build_string(str, (Cn_Build_Opt) { .file = __FILE__, .line =__LINE__, __VA_ARGS__ })
 
 CNDEF Cn_Ast_Idx cn__build_string(Cn_String str, Cn_Build_Opt opt);
 
@@ -17151,7 +17145,7 @@ CNDEF bool cn_send_message(Cn_Message_Kind kind, Cn_Message message) {
 
 CNDEF void cn_log_types() {
     if (CN_INFO >= cn_min_log_level) {
-        cn_log(CN_INFO, "Type universe main.i:" CN_ANSI_BLUE);
+        cn_log(CN_INFO, "Type universe:" CN_ANSI_BLUE);
 
         void *block = cn__ast_data->type_arena.block;
         Cn_Chained_Arena_Block_Header *h;
@@ -17173,7 +17167,7 @@ CNDEF void cn_log_types() {
 CNDEF void cn_log_bindings() {
     if (CN_INFO >= cn_min_log_level) {
         // First binding is NIL, so skip index 0.
-        cn_log(CN_INFO, "Bindings main.i:" CN_ANSI_BRIGHT_YELLOW);
+        cn_log(CN_INFO, "Bindings:" CN_ANSI_BRIGHT_YELLOW);
         for (int i = 1; i < cn_array_list_length(&cn__ast_data->binding_list); i++) {
             switch (cn__ast_data->binding_list[i].kind) {
                 case CN_BINDING_VARIABLE:
@@ -17266,7 +17260,7 @@ CNDEF int cn_tu_process(Cn_Translation_Unit *tu, Cn_Flags flags) {
 
     // Printing source.
     if (flags & CN_PRINT_SOURCE) {
-        cn_log(CN_INFO, "Received main.i:\n" CN_ANSI_BRIGHT_BLACK "%.*s" CN_ANSI_RESET, CN_UNPACK(tu->content));
+        cn_log(CN_INFO, "Received:\n" CN_ANSI_BRIGHT_BLACK "%.*s" CN_ANSI_RESET, CN_UNPACK(tu->content));
     }
 
     // Setting up lexer.
@@ -17275,7 +17269,7 @@ CNDEF int cn_tu_process(Cn_Translation_Unit *tu, Cn_Flags flags) {
     // Printing tokens.
     if (flags & CN_PRINT_TOKENS) {
         cn_lexer_init(&lexer, tu->content, cn_default_blacklist);
-        cn_log(CN_INFO, "Tokenized main.i:" CN_ANSI_CYAN);
+        cn_log(CN_INFO, "Tokenized:" CN_ANSI_CYAN);
         do {
             Cn_String str = cn_source_to_str(&cn_lexer_token(&lexer).src);
             fprintf(stderr, "TOKEN:     %.*s\n", CN_UNPACK(str));
@@ -17294,7 +17288,7 @@ CNDEF int cn_tu_process(Cn_Translation_Unit *tu, Cn_Flags flags) {
 
     // Printing AST.
     if (flags & CN_PRINT_AST) {
-        cn_log(CN_INFO, "Parsed main.i:");
+        cn_log(CN_INFO, "Parsed:");
         cn_ast_print(idx, 0);
         fputc('\n', stderr);
     }
@@ -17630,6 +17624,8 @@ CNDEF Cn_Ast_Idx cn_copy(Cn_Ast_Idx idx) {
 
 #undef COPY_LIST
 #undef COPY_IDX
+
+    return CN_AST_NIL_IDX;
 }
 
 CNDEF Cn_Ast_Idx cn_get_attribute(Cn_Ast_Idx node, Cn_String attribute_name) {
