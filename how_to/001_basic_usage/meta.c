@@ -32,7 +32,6 @@ int main(int argc, char **argv) {
     return 0;
 }
 
-const Cn_String ignore_me = CN_STR_BUFFER("ignore_me");
 const Cn_String cn__defer_rvalue = CN_STR_BUFFER("cn__defer_rvalue");
 
 int msg_handler(Cn_Message_Kind kind, void *message) {
@@ -66,9 +65,8 @@ int msg_handler(Cn_Message_Kind kind, void *message) {
                                 return 0;
                         }
 
-                        // Since its annoying to handle deletion of whole attribute, 
-                        // we can just replace it's identifier to soemthing else.
-                        cn_replace(&cn_ast_get_as_node(attribute_idx)->attribute.identifier_idx, cn_build_identifier(ignore_me));
+                        // Remove `defer` attribute.
+                        cn_remove_attribute(attribute_idx);
 
                         // Pushing to the stack idx, and continuing.
                         cn_array_list_append(&deffered_stack, cn_ast_get_as_node(item_idx)->block_item.declaration_or_statement_idx);

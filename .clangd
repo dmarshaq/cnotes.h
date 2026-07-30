@@ -4,6 +4,7 @@ CompileFlags:
     - -DCN_IMPLEMENTATION
     - -Wno-missing-prototypes
     - -Wno-unknown-attributes
+    - -Wno-macro-redefined
   
 Diagnostics:
   ClangTidy:

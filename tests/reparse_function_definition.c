@@ -23,11 +23,11 @@ const Cn_String src = CN_STR_BUFFER(
     "int helper(int a, int b);\n"
     "int variadic(const char *fmt, ...);\n"
     "\n"
-    "__attribute__((unused)) int helper(int a, int b) {\n"
+    "[[reparse]] __attribute__((unused)) int helper(int a, int b) {\n"
     "    return a + b;\n"
     "}\n"
     "\n"
-    "[[my::note(\"text\", 1)]] int driver(int n, Point *p, int (*fn)(int, int)) {\n"
+    "[[reparse]] [[my::note(\"text\", 1)]] int driver(int n, Point *p, int (*fn)(int, int)) {\n"
     "    int local = n;\n"
     "    Size size = sizeof(struct Wrapper);\n"
     "    typedef int Alias;\n"
@@ -87,7 +87,7 @@ const Cn_String src = CN_STR_BUFFER(
     "    return local;\n"
     "}\n"
     "\n"
-    "int recursive(int n) {\n"
+    "[[reparse]] int recursive(int n) {\n"
     "    struct Local { int a; enum Inner { ONE = 1 } e; } l = { 1, ONE };\n"
     "    typedef int (*Callback)(int, int);\n"
     "    Callback cb = &helper;\n"
@@ -107,11 +107,18 @@ const Cn_String src = CN_STR_BUFFER(
 );
 
 int handler(Cn_Message_Kind kind, void *message) {
-    CN_UNUSED(message);
-
     // Reporting modification on every parsed function definition,
     // it rolls back to the checkpoint and makes parser take the reparse path.
-    return kind == CN_MESSAGE_PARSED_FUNCTION;
+    if (kind == CN_MESSAGE_PARSED_FUNCTION) {
+        Cn_Message_Parsed_Function *msg = message;
+        Cn_Ast_Idx attribute_idx = cn_get_attribute(msg->node_idx, CN_STR_LIT("reparse"));
+        if (attribute_idx != CN_AST_NIL_IDX) {
+            cn_remove_attribute(attribute_idx);
+            return 1;
+        }
+    }
+
+    return 0;
 }
 
 int main(void) {

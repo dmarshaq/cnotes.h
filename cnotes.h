@@ -4185,6 +4185,12 @@ CNDEF void cn_replace(Cn_Ast_Idx *original, Cn_Ast_Idx new);
 CNDEF void cn_replace_list(Cn_Ast_List *original, Cn_Ast_List new);
 
 /**
+ * Orderly removes entry from the list completely, 
+ * forever decreasing list's length.
+ */
+CNDEF Cn_Ast_Idx cn_remove_from_list(Cn_Ast_List *list, int64_t index);
+
+/**
  * Deep copies list, allocating memory for the every node branch.
  * Use with caution, copying giant branches like translation unit is not recommended.
  * Returned idx's won't have it's parent set, and all ast nodes will have SYNTHETIC flag.
@@ -4206,7 +4212,12 @@ CNDEF Cn_Ast_Idx cn_copy(Cn_Ast_Idx idx);
  *
  * IMPORTNAT: If the are multiple attributes with the same name, finds the first one.
  */
-CNDEF Cn_Ast_Idx cn_get_attribute(Cn_Ast_Idx node, Cn_String attribute_name);
+CNDEF Cn_Ast_Idx cn_get_attribute(Cn_Ast_Idx idx, Cn_String attribute_name);
+
+/**
+ * Removes attribute from the attribute list.
+ */
+CNDEF void cn_remove_attribute(Cn_Ast_Idx attribute_idx);
 
 /**
  * Optional values that can be set for any cn_build_* function.
@@ -7837,6 +7848,9 @@ CNDEF int cn__emit_declaration(Cn_Ast_Idx node_idx, Cn_Emit_Write *func, Cn_Emit
     CN_ASSERT(node->kind == CN_AST_DECLARATION);
 
     int ok;
+    ok = cn__emit_attribute_specifiers(node->attribute_specifiers, func, opt);
+    if (ok != 0) return ok;
+
     ok = cn__emit_opt(node->declaration_specifiers_idx, func, opt);
     if (ok != 0) return ok;
 
@@ -7857,6 +7871,9 @@ CNDEF int cn__emit_function(Cn_Ast_Idx node_idx, Cn_Emit_Write *func, Cn_Emit_Op
 
     int ok;
     cn__emit_indent(func, opt);
+    ok = cn__emit_attribute_specifiers(node->attribute_specifiers, func, opt);
+    if (ok != 0) return ok;
+
     ok = cn__emit_opt(node->declaration_specifiers_idx, func, opt);
     if (ok != 0) return ok;
     cn__emit_str(CN_STR_LIT(" "), func, opt);
@@ -7872,6 +7889,10 @@ CNDEF int cn__emit_block(Cn_Ast_Idx node_idx, Cn_Emit_Write *func, Cn_Emit_Opt *
     CN_ASSERT(node->kind == CN_AST_BLOCK);
 
     int ok;
+
+    ok = cn__emit_attribute_specifiers(node->attribute_specifiers, func, opt);
+    if (ok != 0) return ok;
+
     cn__emit_str(CN_STR_LIT("{"), func, opt);
 
     opt->indent++;
@@ -7921,6 +7942,9 @@ CNDEF int cn__emit_if_statement(Cn_Ast_Idx node_idx, Cn_Emit_Write *func, Cn_Emi
     CN_ASSERT(node->kind == CN_AST_IF);
 
     int ok;
+    ok = cn__emit_attribute_specifiers(node->attribute_specifiers, func, opt);
+    if (ok != 0) return ok;
+
     cn__emit_str(CN_STR_LIT("if ("), func, opt);
     ok = cn__emit_opt(node->condition_idx, func, opt);
     if (ok != 0) return ok;
@@ -7971,9 +7995,12 @@ CNDEF int cn__emit_switch_statement(Cn_Ast_Idx node_idx, Cn_Emit_Write *func, Cn
     Cn_Ast_Switch *node = cn_ast_get(node_idx);
     CN_ASSERT(node->kind == CN_AST_SWITCH);
 
+    int ok;
+    ok = cn__emit_attribute_specifiers(node->attribute_specifiers, func, opt);
+    if (ok != 0) return ok;
+
     cn__emit_str(CN_STR_LIT("switch ("), func, opt);
 
-    int ok;
     ok = cn__emit_opt(node->condition_idx, func, opt);
     if (ok != 0) return ok;
     cn__emit_str(CN_STR_LIT(") "), func, opt);
@@ -8002,9 +8029,12 @@ CNDEF int cn__emit_while_statement(Cn_Ast_Idx node_idx, Cn_Emit_Write *func, Cn_
     Cn_Ast_While *node = cn_ast_get(node_idx);
     CN_ASSERT(node->kind == CN_AST_WHILE);
 
+    int ok;
+    ok = cn__emit_attribute_specifiers(node->attribute_specifiers, func, opt);
+    if (ok != 0) return ok;
+
     cn__emit_str(CN_STR_LIT("while ("), func, opt);
 
-    int ok;
     ok = cn__emit_opt(node->condition_idx, func, opt);
     if (ok != 0) return ok;
     cn__emit_str(CN_STR_LIT(") "), func, opt);
@@ -8034,9 +8064,12 @@ CNDEF int cn__emit_do_while(Cn_Ast_Idx node_idx, Cn_Emit_Write *func, Cn_Emit_Op
     Cn_Ast_Do_While *node = cn_ast_get(node_idx);
     CN_ASSERT(node->kind == CN_AST_DO_WHILE);
 
-    cn__emit_str(CN_STR_LIT("do "), func, opt);
 
     int ok;
+    ok = cn__emit_attribute_specifiers(node->attribute_specifiers, func, opt);
+    if (ok != 0) return ok;
+
+    cn__emit_str(CN_STR_LIT("do "), func, opt);
 
     Cn_Ast_Node *body = cn_ast_get(node->body_idx);
     if (body->kind == CN_AST_BLOCK) {
@@ -8060,9 +8093,12 @@ CNDEF int cn__emit_for_statement(Cn_Ast_Idx node_idx, Cn_Emit_Write *func, Cn_Em
     Cn_Ast_For *node = cn_ast_get(node_idx);
     CN_ASSERT(node->kind == CN_AST_FOR);
 
-    cn__emit_str(CN_STR_LIT("for ("), func, opt);
-
     int ok;
+
+    ok = cn__emit_attribute_specifiers(node->attribute_specifiers, func, opt);
+    if (ok != 0) return ok;
+
+    cn__emit_str(CN_STR_LIT("for ("), func, opt);
 
     ok = cn__emit_opt(node->initialization_idx, func, opt);
     if (ok != 0) return ok;
@@ -8108,6 +8144,9 @@ CNDEF int cn__emit_label(Cn_Ast_Idx node_idx, Cn_Emit_Write *func, Cn_Emit_Opt *
     CN_ASSERT(node->kind == CN_AST_LABEL);
 
     int ok;
+    ok = cn__emit_attribute_specifiers(node->attribute_specifiers, func, opt);
+    if (ok != 0) return ok;
+
 
     if (node->flags & CN_AST_LABEL_IS_CASE) {
         cn__emit_str(CN_STR_LIT("case "), func, opt);
@@ -8144,10 +8183,13 @@ CNDEF int cn__emit_label(Cn_Ast_Idx node_idx, Cn_Emit_Write *func, Cn_Emit_Opt *
 
 CNDEF int cn__emit_goto_statement(Cn_Ast_Idx node_idx, Cn_Emit_Write *func, Cn_Emit_Opt *opt) {
     if (node_idx == CN_AST_NIL_IDX) return 0;
-    Cn_Ast_Goto *node = (Cn_Ast_Goto *)cn_ast_get(node_idx);
+    Cn_Ast_Goto *node = cn_ast_get(node_idx);
     CN_ASSERT(node->kind == CN_AST_GOTO);
 
     int ok;
+    ok = cn__emit_attribute_specifiers(node->attribute_specifiers, func, opt);
+    if (ok != 0) return ok;
+
     cn__emit_str(CN_STR_LIT("goto "), func, opt);
     ok = cn__emit_opt(node->identifier_idx, func, opt);
     if (ok != 0) return ok;
@@ -8157,10 +8199,13 @@ CNDEF int cn__emit_goto_statement(Cn_Ast_Idx node_idx, Cn_Emit_Write *func, Cn_E
 
 CNDEF int cn__emit_return_statement(Cn_Ast_Idx node_idx, Cn_Emit_Write *func, Cn_Emit_Opt *opt) {
     if (node_idx == CN_AST_NIL_IDX) return 0;
-    Cn_Ast_Return *node = (Cn_Ast_Return *)cn_ast_get(node_idx);
+    Cn_Ast_Return *node = cn_ast_get(node_idx);
     CN_ASSERT(node->kind == CN_AST_RETURN);
 
     int ok;
+    ok = cn__emit_attribute_specifiers(node->attribute_specifiers, func, opt);
+    if (ok != 0) return ok;
+
     cn__emit_str(CN_STR_LIT("return"), func, opt);
     if (node->expression_idx != CN_AST_NIL_IDX) {
         cn__emit_str(CN_STR_LIT(" "), func, opt);
@@ -8173,8 +8218,12 @@ CNDEF int cn__emit_return_statement(Cn_Ast_Idx node_idx, Cn_Emit_Write *func, Cn
 
 CNDEF int cn__emit_break_statement(Cn_Ast_Idx node_idx, Cn_Emit_Write *func, Cn_Emit_Opt *opt) {
     if (node_idx == CN_AST_NIL_IDX) return 0;
-    Cn_Ast_Node *node = cn_ast_get(node_idx);
+    Cn_Ast_Break *node = cn_ast_get(node_idx);
     CN_ASSERT(node->kind == CN_AST_BREAK);
+
+    int ok;
+    ok = cn__emit_attribute_specifiers(node->attribute_specifiers, func, opt);
+    if (ok != 0) return ok;
 
     cn__emit_str(CN_STR_LIT("break;"), func, opt);
     return 0;
@@ -8182,8 +8231,12 @@ CNDEF int cn__emit_break_statement(Cn_Ast_Idx node_idx, Cn_Emit_Write *func, Cn_
 
 CNDEF int cn__emit_continue_statement(Cn_Ast_Idx node_idx, Cn_Emit_Write *func, Cn_Emit_Opt *opt) {
     if (node_idx == CN_AST_NIL_IDX) return 0;
-    Cn_Ast_Node *node = cn_ast_get(node_idx);
+    Cn_Ast_Continue *node = cn_ast_get(node_idx);
     CN_ASSERT(node->kind == CN_AST_CONTINUE);
+
+    int ok;
+    ok = cn__emit_attribute_specifiers(node->attribute_specifiers, func, opt);
+    if (ok != 0) return ok;
 
     cn__emit_str(CN_STR_LIT("continue;"), func, opt);
     return 0;
@@ -8191,10 +8244,13 @@ CNDEF int cn__emit_continue_statement(Cn_Ast_Idx node_idx, Cn_Emit_Write *func, 
 
 CNDEF int cn__emit_expression_statement(Cn_Ast_Idx node_idx, Cn_Emit_Write *func, Cn_Emit_Opt *opt) {
     if (node_idx == CN_AST_NIL_IDX) return 0;
-    Cn_Ast_Expression_Statement *node = (Cn_Ast_Expression_Statement *)cn_ast_get(node_idx);
+    Cn_Ast_Expression_Statement *node = cn_ast_get(node_idx);
     CN_ASSERT(node->kind == CN_AST_EXPRESSION_STATEMENT);
 
     int ok;
+    ok = cn__emit_attribute_specifiers(node->attribute_specifiers, func, opt);
+    if (ok != 0) return ok;
+
     if (node->expression_idx != CN_AST_NIL_IDX) {
         ok = cn__emit_opt(node->expression_idx, func, opt);
         if (ok != 0) return ok;
@@ -9011,17 +9067,20 @@ CNDEF int cn__emit_enumerator(Cn_Ast_Idx node_idx, Cn_Emit_Write *func, Cn_Emit_
 CNDEF int cn__emit_attribute_specifiers(Cn_Ast_List specifiers, Cn_Emit_Write *func, Cn_Emit_Opt *opt) {
     int ok;
     for (int64_t i = 0; i < specifiers.length; i++) {
-        cn__emit_str(CN_STR_LIT(" "), func, opt);
         ok = cn__emit_opt(specifiers.idxs[i], func, opt);
         if (ok != 0) return ok;
+        cn__emit_str(CN_STR_LIT(" "), func, opt);
     }
     return 0;
 }
 
 CNDEF int cn__emit_attribute_specifier(Cn_Ast_Idx node_idx, Cn_Emit_Write *func, Cn_Emit_Opt *opt) {
     if (node_idx == CN_AST_NIL_IDX) return 0;
-    Cn_Ast_Attribute_Specifier *node = (Cn_Ast_Attribute_Specifier *)cn_ast_get(node_idx);
+    Cn_Ast_Attribute_Specifier *node = cn_ast_get(node_idx);
     CN_ASSERT(node->kind == CN_AST_ATTRIBUTE_SPECIFIER);
+
+    // Skipping empty attribute specifiers entirely.
+    if (node->attributes.length == 0) return 0;
 
     int ok;
     cn__emit_str(CN_STR_LIT("[["), func, opt);
@@ -9650,40 +9709,37 @@ CNDEF Cn_Ast_Idx cn_ast_parse_external_declaration(Cn_Lexer *lexer) {
         return cn_ast_node_list_append(node);
     }
 
-    // TODO: Parse asm definition here.
-    // ...
-
-    Cn_Ast_Idx idx = cn_ast_node_list_append(node);
+    Cn_Ast_Idx parent_idx = cn_ast_node_list_append(node);
+    Cn_Ast_Idx child_idx;
 
     // Last possible case function definition or declaration.
     // Setting checkpoint.
     if (!cn_ast_checkpoint_set(&cn_ast_checkpoint_message, cn__ast_data, CN_AST_CHECKPOINT_IGNORE_AST_NODES)) {
-        Cn_Ast_Idx child_idx = cn_ast_parse_function_or_declaration(lexer);
+        child_idx = cn_ast_parse_function_or_declaration(lexer);
         if (child_idx == CN_AST_NIL_IDX) goto error;
-        ((Cn_Ast_External_Declaration *)cn_ast_get(idx))->child_idx = child_idx;
-        cn_ast_node_set_parent(idx, child_idx);
+        cn_ast_get_as_node(parent_idx)->external_declaration.child_idx = child_idx;
 
-        // Messaging function definition.
-        cn_ast_idx_from_message = child_idx;
-
-        if (((Cn_Ast_Function *)cn_ast_get(child_idx))->kind == CN_AST_FUNCTION) {
-            bool modified = cn_send_message(CN_MESSAGE_PARSED_FUNCTION, (Cn_Message) {
-                        .parsed_function = {
-                            .node_idx = cn_ast_idx_from_message,
-                        }
-                    });
-
-            if (modified) cn_ast_checkpoint_load(&cn_ast_checkpoint_message);
-        }
+        cn_ast_node_set_parent(parent_idx, child_idx);
     } else {
-        if (!cn_ast_reparse_function_definition(cn_ast_idx_from_message)) goto error;
-        ((Cn_Ast_External_Declaration *)cn_ast_get(idx))->child_idx = cn_ast_idx_from_message;
-        cn_ast_node_set_parent(idx, cn_ast_idx_from_message);
+        child_idx = cn_ast_get_as_node(parent_idx)->external_declaration.child_idx;
+        if (!cn_ast_reparse_function_definition(child_idx)) goto error;
+    }
+    
+    // Messaging function definition.
+    if (cn_ast_get_as_node(child_idx)->kind == CN_AST_FUNCTION) {
+        Cn_Message_Parsed_Function payload = {
+            .node_idx = child_idx,
+        };
+        bool modified = cn_send_message(CN_MESSAGE_PARSED_FUNCTION, (Cn_Message) {
+                .parsed_function = payload,
+                });
+
+        if (modified) cn_ast_checkpoint_load(&cn_ast_checkpoint_message);
     }
 
     cn_ast_checkpoint_remove(&cn_ast_checkpoint_message);
 
-    return idx;
+    return parent_idx;
 
 error:
     CN__TRACE_ERROR
@@ -17343,6 +17399,13 @@ CNDEF void cn_replace_list(Cn_Ast_List *original, Cn_Ast_List new) {
     *original = new;
 }
 
+CNDEF Cn_Ast_Idx cn_remove_from_list(Cn_Ast_List *list, int64_t index) {
+    Cn_Ast_Idx removed = list->idxs[index];
+    memmove(list->idxs + index, list->idxs + index + 1, list->length - index - 1);
+    list->length--;
+    return removed;
+}
+
 CNDEF Cn_Ast_List cn_copy_list(Cn_Ast_List list) {
     int64_t mark = cn_ast_idx_stack_mark();
 
@@ -17720,6 +17783,23 @@ CNDEF Cn_Ast_Idx cn_get_attribute(Cn_Ast_Idx node, Cn_String attribute_name) {
     }
 
     return CN_AST_NIL_IDX;
+}
+
+CNDEF void cn_remove_attribute(Cn_Ast_Idx attribute_idx) {
+    Cn_Ast_Attribute *attribute = cn_ast_get(attribute_idx);
+    Cn_Ast_Attribute_Specifier *attribute_specifier = cn_ast_get(attribute->parent_idx);
+    
+    int64_t index = -1;
+    for (int64_t i = 0; i < attribute_specifier->attributes.length; i++) {
+        if (attribute_specifier->attributes.idxs[i] == attribute_idx) {
+            index = i;
+            break;
+        }
+    }
+
+    CN_ASSERT(index != -1);
+
+    cn_remove_from_list(&attribute_specifier->attributes, index);
 }
 
 CNDEF Cn_Ast_Idx cn__build_wrap_if_primary(Cn_Ast_Idx idx) {
