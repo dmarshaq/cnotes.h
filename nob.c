@@ -96,7 +96,7 @@ bool build_proc_spawn(Build_Proc *p, Nob_Cmd *cmd, const char *stdout_path) {
         return false;
     }
 
-    Nob_Fd fdout = 1;
+    Nob_Fd fdout = NOB_INVALID_FD;
     if (stdout_path != NULL) {
         fdout = nob_fd_open_for_write(stdout_path);
         if (fdout == NOB_INVALID_FD) return false;
@@ -105,7 +105,7 @@ bool build_proc_spawn(Build_Proc *p, Nob_Cmd *cmd, const char *stdout_path) {
     HANDLE job = CreateJobObjectA(NULL, NULL);
     if (job == NULL) {
         nob_log(NOB_ERROR, "build proc: could not create job object: %lu", GetLastError());
-        nob_fd_close(fdout);
+        if (fdout != NOB_INVALID_FD) nob_fd_close(fdout);
         return false;
     }
 
@@ -114,7 +114,7 @@ bool build_proc_spawn(Build_Proc *p, Nob_Cmd *cmd, const char *stdout_path) {
     if (!SetInformationJobObject(job, JobObjectExtendedLimitInformation, &jeli, sizeof(jeli))) {
         nob_log(NOB_ERROR, "build proc: could not configure job object: %lu", GetLastError());
         CloseHandle(job);
-        nob_fd_close(fdout);
+        if (fdout != NOB_INVALID_FD) nob_fd_close(fdout);
         return false;
     }
 
@@ -122,7 +122,7 @@ bool build_proc_spawn(Build_Proc *p, Nob_Cmd *cmd, const char *stdout_path) {
     si.cb = sizeof(si);
     si.dwFlags |= STARTF_USESTDHANDLES;
     si.hStdInput  = GetStdHandle(STD_INPUT_HANDLE);
-    si.hStdOutput = fdout;
+    si.hStdOutput = (fdout != NOB_INVALID_FD) ? fdout : GetStdHandle(STD_OUTPUT_HANDLE);
     si.hStdError  = GetStdHandle(STD_ERROR_HANDLE);
 
     Nob_String_Builder sb = {0};
@@ -133,7 +133,7 @@ bool build_proc_spawn(Build_Proc *p, Nob_Cmd *cmd, const char *stdout_path) {
     PROCESS_INFORMATION pi = {0};
     BOOL ok = CreateProcessA(NULL, sb.items, NULL, NULL, TRUE, CREATE_SUSPENDED, NULL, NULL, &si, &pi);
     nob_sb_free(sb);
-    nob_fd_close(fdout);
+    if (fdout != NOB_INVALID_FD) nob_fd_close(fdout);
     cmd->count = 0;
 
     if (!ok) {
@@ -159,7 +159,7 @@ bool build_proc_spawn(Build_Proc *p, Nob_Cmd *cmd, const char *stdout_path) {
     return true;
 }
 
-Proc_Result build_proc_wait(Test_Proc *p, unsigned timeout_ms) {
+Proc_Result build_proc_wait(Build_Proc *p, unsigned timeout_ms) {
     Proc_Result result;
 
     DWORD w = WaitForSingleObject(p->proc, (DWORD)timeout_ms);
@@ -187,7 +187,7 @@ Proc_Result build_proc_wait(Test_Proc *p, unsigned timeout_ms) {
     CloseHandle(p->job);   // KILL_ON_JOB_CLOSE reaps any stragglers
     return result;
 }
-#else 
+#else
 bool build_proc_spawn(Build_Proc *p, Nob_Cmd *cmd, const char *stdout_path) {
     if (cmd->count < 1) {
         nob_log(NOB_ERROR, "build proc: could not run empty command");
@@ -200,33 +200,35 @@ bool build_proc_spawn(Build_Proc *p, Nob_Cmd *cmd, const char *stdout_path) {
     nob_log(NOB_INFO, "CMD: %s", sb.items);
     nob_sb_free(sb);
 
-    Nob_Fd fdout = 1;
+    Nob_Fd fdout = NOB_INVALID_FD;
     if (stdout_path != NULL) {
         fdout = nob_fd_open_for_write(stdout_path);
         if (fdout == NOB_INVALID_FD) return false;
     }
 
-    nob_da_append(cmd, NULL);   // argv terminator, allocated before the fork
+    nob_da_append(cmd, NULL);
 
     pid_t pid = fork();
     if (pid < 0) {
         nob_log(NOB_ERROR, "build proc: could not fork: %s", strerror(errno));
-        nob_fd_close(fdout);
+        if (fdout != NOB_INVALID_FD) nob_fd_close(fdout);
         cmd->count = 0;
         return false;
     }
 
     if (pid == 0) {
         setpgid(0, 0);
-        if (dup2(fdout, STDOUT_FILENO) < 0) _exit(127);
-        close(fdout);
+        if (fdout != NOB_INVALID_FD) {
+            if (dup2(fdout, STDOUT_FILENO) < 0) _exit(127);
+            close(fdout);
+        }
         execvp(cmd->items[0], (char * const *) cmd->items);
         _exit(127);
     }
 
-    setpgid(pid, pid);          // see note below
-    nob_fd_close(fdout);
-    cmd->count = 0;             // match nob_cmd_run's reset behaviour
+    setpgid(pid, pid);
+    if (fdout != NOB_INVALID_FD) nob_fd_close(fdout);
+    cmd->count = 0;
     p->pid = pid;
     return true;
 }

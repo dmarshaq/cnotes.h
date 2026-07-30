@@ -4079,6 +4079,8 @@ CNDEF void cn_diagnostic_node(Cn_Diagnostic_Level level, Cn_Ast_Idx idx, Cn_Diag
 
 // PRE-PROCESSING SECTION
 
+extern const Cn_Lexer_Blacklist cn_default_blacklist;
+
 typedef enum {
     CN_MESSAGE_PARSED_FUNCTION
 } Cn_Message_Kind;
@@ -4091,18 +4093,21 @@ typedef union {
     Cn_Message_Parsed_Function parsed_function;
 } Cn_Message;
 
-typedef int (Cn_Message_Handler)(Cn_Message_Kind kind, void *message);
+typedef enum {
+    CN_RESULT_NONE,
+    CN_RESULT_MODIFIED,
+    CN_RESULT_MODIFIED_NO_REPEAT,
+} Cn_Result;
+
+typedef Cn_Result (Cn_Message_Handler)(Cn_Message_Kind kind, void *message);
 
 extern Cn_Message_Handler *cn_message_handler;
 
 /**
  * Simple wrapper that checks if message handler not NULL, 
  * if so it sends specified message to the user.
- *
- * RETURNS: True if reload to last checkpoit required, 
- * false if no modifications occured.
  */
-CNDEF bool cn_send_message(Cn_Message_Kind kind, Cn_Message message);
+CNDEF Cn_Result cn__send_message(Cn_Message_Kind kind, Cn_Message message);
 
 CNDEF void cn_log_types();
 
@@ -4220,7 +4225,7 @@ CNDEF Cn_Ast_Idx cn_get_attribute(Cn_Ast_Idx idx, Cn_String attribute_name);
 CNDEF void cn_remove_attribute(Cn_Ast_Idx attribute_idx);
 
 /**
- * Optional values that can be set for any cn_build_* function.
+ * Optional values that can be set for most of the cn_build_* function.
  */
 typedef struct {
     /**
@@ -4243,6 +4248,17 @@ typedef struct {
     const char *file;
     int64_t line;
 } Cn_Build_Opt;
+
+/**
+ * Builds code ast node, that containes formated text.
+ * Once reparsed the node is expanded and parsed 
+ * into actual ast nodes.
+ *
+ * RETURNS: Built code node.
+ */
+#define cn_build_format(...) cn__build_format(__FILE__, __LINE__, __VA_ARGS__)
+
+CNDEF Cn_Ast_Idx cn__build_format(const char *file, int64_t line, const char *format, ...);
 
 /**
  * Builds list out of supplied nodes.
@@ -6967,8 +6983,8 @@ CNDEF bool cn_any_is_empty(Cn_Any any) {
 
 // AST SECTION
 
-Cn_Ast_Checkpoint cn_ast_checkpoint_message = {0};
-Cn_Ast_Idx        cn_ast_idx_from_message   = CN_AST_NIL_IDX;
+Cn_Ast_Checkpoint cn__ast_checkpoint_message = {0};
+Cn_Result         cn__message_result         = CN_RESULT_NONE;
 
 CNDEF Cn_Type_Flags cn_ast_qualifier_flags_to_type(Cn_Qualifier_Flags flags) {
     Cn_Type_Flags f = 0;
@@ -9135,8 +9151,12 @@ CNDEF int cn__emit_gnu_asm_label(Cn_Ast_Idx node_idx, Cn_Emit_Write *func, Cn_Em
 }
 
 CNDEF int cn__emit_code(Cn_Ast_Idx node_idx, Cn_Emit_Write *func, Cn_Emit_Opt *opt) {
-    (void)node_idx; (void)func; (void)opt;
-    // Code nodes are special and should be unwrapped during reparse, not emitted directly.
+    if (node_idx == CN_AST_NIL_IDX) return 0;
+    Cn_Ast_Code *node = cn_ast_get(node_idx);
+    CN_ASSERT(node->kind == CN_AST_CODE);
+
+    cn__emit_str(node->text, func, opt);
+
     return 0;
 }
 
@@ -9714,7 +9734,7 @@ CNDEF Cn_Ast_Idx cn_ast_parse_external_declaration(Cn_Lexer *lexer) {
 
     // Last possible case function definition or declaration.
     // Setting checkpoint.
-    if (!cn_ast_checkpoint_set(&cn_ast_checkpoint_message, cn__ast_data, CN_AST_CHECKPOINT_IGNORE_AST_NODES)) {
+    if (!cn_ast_checkpoint_set(&cn__ast_checkpoint_message, cn__ast_data, CN_AST_CHECKPOINT_IGNORE_AST_NODES)) {
         child_idx = cn_ast_parse_function_or_declaration(lexer);
         if (child_idx == CN_AST_NIL_IDX) goto error;
         cn_ast_get_as_node(parent_idx)->external_declaration.child_idx = child_idx;
@@ -9726,18 +9746,21 @@ CNDEF Cn_Ast_Idx cn_ast_parse_external_declaration(Cn_Lexer *lexer) {
     }
     
     // Messaging function definition.
-    if (cn_ast_get_as_node(child_idx)->kind == CN_AST_FUNCTION) {
-        Cn_Message_Parsed_Function payload = {
-            .node_idx = child_idx,
-        };
-        bool modified = cn_send_message(CN_MESSAGE_PARSED_FUNCTION, (Cn_Message) {
-                .parsed_function = payload,
-                });
+    if (cn__message_result != CN_RESULT_MODIFIED_NO_REPEAT) {
+        if (cn_ast_get_as_node(child_idx)->kind == CN_AST_FUNCTION) {
+            Cn_Message_Parsed_Function payload = {
+                .node_idx = child_idx,
+            };
+            cn__message_result = cn__send_message(CN_MESSAGE_PARSED_FUNCTION, (Cn_Message) {
+                    .parsed_function = payload,
+                    });
 
-        if (modified) cn_ast_checkpoint_load(&cn_ast_checkpoint_message);
+            if (cn__message_result != CN_RESULT_NONE) cn_ast_checkpoint_load(&cn__ast_checkpoint_message);
+        }
     }
 
-    cn_ast_checkpoint_remove(&cn_ast_checkpoint_message);
+    cn_ast_checkpoint_remove(&cn__ast_checkpoint_message);
+    cn__message_result = CN_RESULT_NONE;
 
     return parent_idx;
 
@@ -15376,7 +15399,96 @@ CNDEF bool cn_ast_expect_not_nil(Cn_Ast_Idx idx, Cn_Ast_Idx blame_idx) {
     return true;
 }
 
+CNDEF bool cn_ast_reparse_expand_if_code(Cn_Ast_Idx code_idx, Cn_Ast_Kind kind) {
+    Cn_Lexer lexer = {0};
+    cn_lexer_init(&lexer, cn_ast_get_as_node(code_idx)->code.text, cn_default_blacklist);
+    switch (kind) {
+        case CN_AST_TRANSLATION_UNIT:
+            {
+                Cn_Ast_Idx idx = cn_ast_parse_translation_unit(&lexer);
+                if (idx == CN_AST_NIL_IDX) goto error;
+
+                // Merging node at idx with node at code_idx that involves rewiring parent relationship in children too, 
+                // since they reference old idx.
+                
+                
+                break;
+            }
+        case CN_AST_EXTERNAL_DECLARATION:
+        case CN_AST_DECLARATION:
+        case CN_AST_FUNCTION:
+        case CN_AST_BLOCK:
+        case CN_AST_BLOCK_ITEM:
+        case CN_AST_IF:
+        case CN_AST_SWITCH:
+        case CN_AST_WHILE:
+        case CN_AST_DO_WHILE:
+        case CN_AST_FOR:
+        case CN_AST_LABEL:
+        case CN_AST_GOTO:
+        case CN_AST_RETURN:
+        case CN_AST_BREAK:
+        case CN_AST_CONTINUE:
+        case CN_AST_EXPRESSION_STATEMENT:
+        case CN_AST_BINARY:
+        case CN_AST_ACCESS:
+        case CN_AST_CALL:
+        case CN_AST_UNARY:
+        case CN_AST_CAST:
+        case CN_AST_COMPOUND:
+        case CN_AST_SIZEOF:
+        case CN_AST_TERNARY:
+        case CN_AST_ASSIGN:
+        case CN_AST_POSTFIX:
+        case CN_AST_PRIMARY:
+        case CN_AST_IDENTIFIER:
+        case CN_AST_INTEGER:
+        case CN_AST_FLOAT:
+        case CN_AST_STRING:
+        case CN_AST_INIT_DECLARATOR:
+        case CN_AST_INITIALIZER:
+        case CN_AST_DESIGNATION:
+        case CN_AST_DESIGNATOR:
+        case CN_AST_DECLARATOR:
+        case CN_AST_POINTER:
+        case CN_AST_DIRECT_DECLARATOR_GROUPED:
+        case CN_AST_DIRECT_DECLARATOR_ARRAY:
+        case CN_AST_DIRECT_DECLARATOR_FUNCTION:
+        case CN_AST_DECLARATION_SPECIFIERS:
+        case CN_AST_GNU_TYPEOF:
+        case CN_AST_TYPE_SPECIFIER_PRIMITIVE:
+        case CN_AST_TYPE_SPECIFIER_TYPEDEF:
+        case CN_AST_TYPE_NAME:
+        case CN_AST_SPECIFIER_QUALIFIER:
+        case CN_AST_PARAMETER_DECLARATION:
+        case CN_AST_STRUCT_SPECIFIER:
+        case CN_AST_UNION_SPECIFIER:
+        case CN_AST_MEMBER_DECLARATION:
+        case CN_AST_MEMBER_DECLARATOR:
+        case CN_AST_ENUM_SPECIFIER:
+        case CN_AST_ENUMERATOR:
+        case CN_AST_ATTRIBUTE_SPECIFIER:
+        case CN_AST_ATTRIBUTE:
+        case CN_AST_GNU_ATTRIBUTE_SPECIFIER:
+        case CN_AST_GNU_ATTRIBUTE:
+        case CN_AST_GNU_ASM_LABEL:
+            break;
+        case CN_AST_UNKNOWN:
+        case CN_AST_ERROR:
+        case CN_AST_CODE:
+            break;
+    }
+
+    return true;
+
+error:
+    CN__TRACE_ERROR;
+    return false;
+}
+
 CNDEF bool cn_ast_reparse_translation_unit(Cn_Ast_Idx node_idx) {
+    cn_ast_reparse_expand_if_code(node_idx, CN_AST_TRANSLATION_UNIT);
+
     if (!cn_ast_expect(node_idx, CN_AST_TRANSLATION_UNIT)) goto error;
 
     Cn_Ast_Translation_Unit *node = cn_ast_get(node_idx);
@@ -17193,10 +17305,10 @@ CNDEF void cn_diagnostic_node(Cn_Diagnostic_Level level, Cn_Ast_Idx idx, Cn_Diag
 
 Cn_Message_Handler *cn_message_handler = NULL;
 
-CNDEF bool cn_send_message(Cn_Message_Kind kind, Cn_Message message) {
+CNDEF Cn_Result cn__send_message(Cn_Message_Kind kind, Cn_Message message) {
     if (cn_message_handler == NULL) return false;
 
-    return cn_message_handler(kind, &message) != 0;
+    return cn_message_handler(kind, &message);
 }
 
 CNDEF void cn_log_types() {
@@ -17826,6 +17938,37 @@ CNDEF Cn_String cn__build_make_location(const char *func, const char *file, int6
     Cn_String loc = cn__ast_permanent_save_string(cn_sb_to_str(&sb));
     cn_sb_free(&sb);
     return loc;
+}
+
+CNDEF Cn_Ast_Idx cn__build_format(const char *file, int64_t line, const char *format, ...) {
+    Cn_Ast_Node node = {
+        .kind = CN_AST_CODE,
+        .flags = CN_AST_SYNTHETIC,
+        .loc.file = cn__build_make_location(__FUNCTION__, file, line),
+    };
+
+    va_list args;
+    va_start(args, format);
+
+    va_list args_copy;
+    va_copy(args_copy, args);
+    int needed = vsnprintf(NULL, 0, format, args_copy);
+    va_end(args_copy);
+
+    if (needed < 0) {
+        cn_log(CN_ERROR, "Couldn't figure out needed length of build format string.");
+        va_end(args);
+        return CN_AST_NIL_IDX;
+    }
+
+    void *data = cn_chained_arena_alloc(&cn__ast_data->permanent_strings_arena, needed + 1);
+    vsnprintf(data, needed + 1, format, args);
+    va_end(args);
+
+    node.code.text.data = data;
+    node.code.text.length = needed;
+
+    return cn_ast_node_list_append(node);
 }
 
 CNDEF Cn_Ast_List cn__build_list(Cn_Ast_Idx idxs[], int64_t length) {
