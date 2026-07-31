@@ -65,9 +65,6 @@ Cn_Result msg_handler(Cn_Message_Kind kind, void *message) {
                                 return 0;
                         }
 
-                        // Remove `defer` attribute.
-                        cn_remove_attribute(attribute_idx);
-
                         // Pushing to the stack idx, and continuing.
                         cn_array_list_append(&deffered_stack, cn_ast_get_as_node(item_idx)->block_item.declaration_or_statement_idx);
 

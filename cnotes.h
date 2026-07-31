@@ -23,7 +23,6 @@
 
       - CNDEF                               Appends additional things to function declarations.
       - CN_ASSERT(condition)                Redefine which assert() cnotes.h shall use.
-      - CN_AST_NODE_LIST_INITIAL_CAP        Redefine initial capacity of array list that holds ast nodes.
 
     # API Conventions & Navigation
 
@@ -1601,15 +1600,6 @@ CNDEF bool cn_any_is_empty(Cn_Any any);
  * SECTION: Abstract Syntax Tree
  * ============================================
  */
-typedef uint32_t Cn_Ast_Idx;
-
-#define CN_AST_NIL_IDX      0
-#define CN_AST_ERROR_IDX    1
-
-typedef struct {
-    Cn_Ast_Idx *idxs;
-    int64_t     length;
-} Cn_Ast_List;
 
 typedef enum : uint8_t {
     CN_AST_TYPE_QUALIFIER_CONST         = 0x01,
@@ -1941,18 +1931,22 @@ typedef enum {
     Cn_Ast_Kind     kind;           \
     Cn_Ast_Flags    flags;          \
     Cn_Location     loc;            \
-    Cn_Source       src;            \
-    Cn_Ast_Idx      parent_idx;
+    Cn_Source       src;            
 
 typedef struct {
     CN_AST_BASE_MEMBERS
-} Cn_Ast_Base;
+} Cn_Ast_Node;
 
 #define CN_AST_BASE                         \
     union {                                 \
-        Cn_Ast_Base base;                   \
+        Cn_Ast_Node base;                   \
         struct { CN_AST_BASE_MEMBERS };     \
     }
+
+typedef struct {
+    Cn_Ast_Node *ptrs;
+    int64_t      length;
+} Cn_Ast_List;
 
 typedef struct { CN_AST_BASE;
     Cn_String text;
@@ -2283,17 +2277,6 @@ typedef struct { CN_AST_BASE;
     Cn_Ast_Idx string_idx;
 } Cn_Ast_Gnu_Asm_Label;
 
-typedef union {
-    CN_AST_BASE;
-#define X(K, T, m) Cn_Ast_##T m;
-    CN_AST_GEN_LIST(X)
-#undef X
-} Cn_Ast_Node;
-
-#ifndef CN_AST_NODE_LIST_INITIAL_CAP
-#   define CN_AST_NODE_LIST_INITIAL_CAP 64
-#endif // CN_AST_NODE_LIST_INITIAL_CAP
-
 #define CN_AST_TYPE_ARENA_BLOCK_CAP             (sizeof(Cn_Type) * 64)
 #define CN_AST_TYPE_PTR_SET_INITIAL_CAP         32
 #define CN_AST_TYPE_CHILDREN_ARENA_BLOCK_CAP    4096
@@ -2419,14 +2402,9 @@ typedef struct {
      */
     Cn_Chained_Arena output_arena;
     /**
-     * Stores all nodes in growing array list.
-     *
-     * IMPORTANT: Access elements by indicies, 
-     * so there are no unsafe situations occuring.
-     * First element is considered NIL element, 
-     * it is reserved to identify illegal references.
+     * Arena which stores all nodes data.
      */
-    Cn_Ast_Node *node_list;
+    Cn_Chained_Arena ast_arena;
     /**
      * Type arena used, to store type structs.
      * So that pointers to types never change.
@@ -2551,15 +2529,10 @@ typedef struct {
 
 extern Cn_Ast_Data *cn__ast_data;
 
-typedef enum {
-    CN_AST_CHECKPOINT_IGNORE_AST_NODES = 0x1,
-} Cn_Ast_Checkpoint_Flags;
-
 typedef struct {
-    Cn_Ast_Checkpoint_Flags flags;
     jmp_buf                 jmpbuf;
     uint64_t                saved_output_length;
-    int64_t                 saved_node_length;
+    uint64_t                saved_ast_length;
     uint64_t                saved_type_length;
     uint64_t                saved_type_children_length;
     int64_t                 saved_binding_length;
@@ -2583,9 +2556,9 @@ typedef struct {
  * RETURNS: True if program jumped to this code point. 
  * False if checkpoint set and no jumping or loading occured.
  */
-#define cn_ast_checkpoint_set(checkpoint_ptr, data_ptr, flags) (cn__ast_checkpoint_save(checkpoint_ptr, data_ptr, flags), setjmp((checkpoint_ptr)->jmpbuf) != 0)
+#define cn_ast_checkpoint_set(checkpoint_ptr, data_ptr) (cn__ast_checkpoint_save(checkpoint_ptr, data_ptr), setjmp((checkpoint_ptr)->jmpbuf) != 0)
 
-CNDEF void cn__ast_checkpoint_save(Cn_Ast_Checkpoint *checkpoint, Cn_Ast_Data *data, Cn_Ast_Checkpoint_Flags flags);
+CNDEF void cn__ast_checkpoint_save(Cn_Ast_Checkpoint *checkpoint, Cn_Ast_Data *data);
 
 /**
  * Loads state saved in checkpoint and long jumps to the 
@@ -2619,55 +2592,33 @@ CNDEF int cn_ast_init(Cn_Ast_Data *data);
 CNDEF void cn_ast_free(Cn_Ast_Data *data);
 
 /**
- * Function to get ast node based on its idx.
- * IMPORTANT: If flags USE_REPLACED set, it will return replaced node.
+ * Returns current ptr_stack length, used to mark start of a list.
  */
-CNDEF void *cn_ast_get(Cn_Ast_Idx idx);
-
-#define cn_ast_get_as_node(idx) ((Cn_Ast_Node *)cn_ast_get(idx))
+#define cn_ast_stack_mark() cn_array_list_length(&cn__ast_data->ptr_stack)
 
 /**
- * Simple macro to get ast idx based on pointer to the node.
+ * Pushes an ptr onto the ptr_stack.
  */
-#define cn_ast_idx_get(node)    ((Cn_Ast_Node *)(node) - cn__ast_data->node_list)
+#define cn_ast_stack_push(ptr) cn_array_list_append(&cn__ast_data->ptr_stack, (ptr))
 
 /**
- * Returns current idx_stack length, used to mark start of a list.
+ * Prepends an ptr to the ptr_stack at mark.
  */
-#define cn_ast_idx_stack_mark() cn_array_list_length(&cn__ast_data->idx_stack)
+#define cn_ast_stack_prepend(ptr, mark) cn_array_list_add(&cn__ast_data->ptr_stack, (mark), (ptr))
 
 /**
- * Pushes an idx onto the idx_stack.
+ * Discards any added ptr's by returning to the mark.
  */
-#define cn_ast_idx_stack_push(idx) cn_array_list_append(&cn__ast_data->idx_stack, (idx))
-
-/**
- * Prepends an idx to the idx_stack at mark.
- */
-#define cn_ast_idx_stack_prepend(idx, mark) cn_array_list_add(&cn__ast_data->idx_stack, (mark), (idx))
-
-/**
- * Discards any added idx's by returning to the mark.
- */
-#define cn_ast_idx_stack_discard(mark) cn_array_list_pop_multiple(&cn__ast_data->idx_stack, cn_array_list_length(&cn__ast_data->idx_stack) - (mark))
+#define cn_ast_stack_discard(mark) cn_array_list_pop_multiple(&cn__ast_data->ptr_stack, cn_array_list_length(&cn__ast_data->ptr_stack) - (mark))
 
 /**
  * Finalizes a range of the idx_stack (from mark to end) into a Cn_Ast_List.
  * Pops the finalized indices from the stack.
  */
-CNDEF Cn_Ast_List cn_ast_idx_stack_finalize(int64_t mark);
+CNDEF Cn_Ast_List cn_ast_stack_finalize(int64_t mark);
 
-/**
- * Sets parent of all idx's in the list to parent_idx.
- */
-CNDEF void cn_ast_list_set_parent(Cn_Ast_Idx parent_idx, Cn_Ast_List *list);
-
-/**
- * Sets parent of all idx's supplied to parent_idx.
- */
-#define cn_ast_node_set_parent(parent_idx, ...) cn__ast_node_set_parent(parent_idx, (Cn_Ast_Idx []) { __VA_ARGS__ }, sizeof((Cn_Ast_Idx []) { __VA_ARGS__ }) / sizeof(Cn_Ast_Idx))
-
-CNDEF void cn__ast_node_set_parent(Cn_Ast_Idx parent_idx, Cn_Ast_Idx idxs[], size_t length);
+#define cn_ast_new(node) cn__ast_new(&(node.base), sizeof(node))
+CNDEF Cn_Ast_Node *cn__ast_new(Cn_Ast_Node *node, size_t size);
 
 /**
  * Recursivly prints ast tree to stdout.
@@ -7459,16 +7410,13 @@ CNDEF void cn_ast_consume_till(Cn_Lexer *lexer, Cn_Token_Type type) {
 
 Cn_Ast_Data *cn__ast_data = NULL;
 
-CNDEF void cn__ast_checkpoint_save(Cn_Ast_Checkpoint *checkpoint, Cn_Ast_Data *data, Cn_Ast_Checkpoint_Flags flags) {
+CNDEF void cn__ast_checkpoint_save(Cn_Ast_Checkpoint *checkpoint, Cn_Ast_Data *data) {
     CN_ASSERT(cn_array_list_length(&data->scope_stack) > 0);
     // Locking scope stack.
     data->scope_stack[cn_array_list_length(&data->scope_stack) - 1].is_checkpoint_locked = true;
 
-    checkpoint->flags = flags;
     checkpoint->saved_output_length = cn_chained_arena_allocated(&data->output_arena);
-    if (!(checkpoint->flags & CN_AST_CHECKPOINT_IGNORE_AST_NODES)) {
-        checkpoint->saved_node_length = cn_array_list_length(&data->node_list);
-    }
+    checkpoint->saved_ast_length = cn_chained_arena_allocated(&data->output_arena);
     checkpoint->saved_type_length = cn_chained_arena_allocated(&data->type_arena);
     checkpoint->saved_type_children_length = cn_chained_arena_allocated(&data->type_children_arena);
     checkpoint->saved_binding_length = cn_array_list_length(&data->binding_list);
@@ -7490,9 +7438,7 @@ CNDEF void cn_ast_checkpoint_load(Cn_Ast_Checkpoint *checkpoint) {
 
     cn_chained_arena_dealloc(&d->output_arena, cn_chained_arena_allocated(&d->output_arena) - checkpoint->saved_output_length);
 
-    if (!(checkpoint->flags & CN_AST_CHECKPOINT_IGNORE_AST_NODES)) {
-        cn_array_list_pop_multiple(&d->node_list, cn_array_list_length(&d->node_list) - checkpoint->saved_node_length);
-    }
+    cn_chained_arena_dealloc(&d->ast_arena, cn_chained_arena_allocated(&d->ast_arena) - checkpoint->saved_ast_length);
 
     // Removing types from hash jset entries.
     int64_t types_count = (cn_chained_arena_allocated(&d->type_arena) - checkpoint->saved_type_length) / sizeof(Cn_Type);
@@ -7619,22 +7565,10 @@ CNDEF void cn_ast_checkpoint_remove(Cn_Ast_Checkpoint *checkpoint) {
 }
 
 CNDEF int cn_ast_init(Cn_Ast_Data *data) {
-    data->node_list = cn_array_list_make(Cn_Ast_Node, CN_AST_NODE_LIST_INITIAL_CAP);
+    data->ast_arena = cn_chained_arena_make(4096);
 
     data->output_arena = cn_chained_arena_make(4096);
     cn__emitter_sb = cn_sb_make(4096);
-
-    // Inserting first element as NIL.
-    {
-        Cn_Ast_Node nil = {0};
-        cn_array_list_append(&data->node_list, nil);
-        if (data->node_list == NULL) return -1;
-
-        Cn_Ast_Node err = { .kind = CN_AST_ERROR };
-
-        cn_array_list_append(&data->node_list, err);
-        if (data->node_list == NULL) return -1;
-    }
 
     data->type_arena = cn_chained_arena_make(CN_AST_TYPE_ARENA_BLOCK_CAP);
 
@@ -7704,23 +7638,11 @@ CNDEF void cn_ast_free(Cn_Ast_Data *data) {
 
     cn_chained_arena_destroy(&data->type_arena);
 
-    cn_array_list_free(&data->node_list);
+    cn_chained_arena_destroy(&data->ast_arena);
 
     cn_chained_arena_destroy(&data->output_arena);
 
     *data = (Cn_Ast_Data) {0};
-}
-
-CNDEF void *cn_ast_get(Cn_Ast_Idx idx) {
-    CN_ASSERT(idx != CN_AST_NIL_IDX);
-    return cn__ast_data->node_list + (idx);
-}
-
-CNDEF void cn__ast_node_set_parent(Cn_Ast_Idx parent_idx, Cn_Ast_Idx idxs[], size_t length) {
-    // Ignores alternate routing that cn_ast_node_get gurantees on replace.
-    for (size_t i = 0; i < length; i++)
-        if (idxs[i] != CN_AST_NIL_IDX)
-            (cn__ast_data->node_list + idxs[i])->base.parent_idx = parent_idx;
 }
 
 CNDEF Cn_Ast_List cn_ast_idx_stack_finalize(int64_t mark) {
@@ -7742,18 +7664,12 @@ CNDEF Cn_Ast_List cn_ast_idx_stack_finalize(int64_t mark) {
     return (Cn_Ast_List) { .idxs = idxs, .length = count };
 }
 
-CNDEF void cn_ast_list_set_parent(Cn_Ast_Idx parent_idx, Cn_Ast_List *list) {
-    for (int64_t i = 0; i < list->length; i++) {
-        if (list->idxs[i] != CN_AST_NIL_IDX) {
-            (cn__ast_data->node_list + list->idxs[i])->base.parent_idx = parent_idx;
-        }
-    }
+CNDEF Cn_Ast_Node *cn__ast_new(Cn_Ast_Node *node, size_t size) {
+    void *data = cn_chained_arena_alloc(&cn__ast_data->ast_arena, size);
+    memcpy(data, node, size);
+    return data;
 }
 
-CNDEF Cn_Ast_Idx cn_ast_node_list_append(Cn_Ast_Node node) {
-    cn_array_list_append(&cn__ast_data->node_list, node);
-    return cn_array_list_length(&cn__ast_data->node_list) - 1;
-}
 
 const char *cn_ast_print_prefixes[64] = {0};
 
@@ -9860,7 +9776,6 @@ CNDEF Cn_Ast_Idx cn_ast_parse_translation_unit(Cn_Lexer *lexer) {
     node.translation_unit.external_declarations = cn_ast_idx_stack_finalize(mark);
 
     Cn_Ast_Idx idx = cn_ast_node_list_append(node);
-    cn_ast_list_set_parent(idx, &node.translation_unit.external_declarations);
     return idx;
 
 error:
@@ -9898,8 +9813,6 @@ CNDEF Cn_Ast_Idx cn_ast_parse_external_declaration(Cn_Lexer *lexer) {
         child_idx = cn_ast_parse_function_or_declaration(lexer);
         if (child_idx == CN_AST_NIL_IDX) goto error;
         cn_ast_get_as_node(parent_idx)->external_declaration.child_idx = child_idx;
-
-        cn_ast_node_set_parent(parent_idx, child_idx);
     } else {
         child_idx = cn_ast_get_as_node(parent_idx)->external_declaration.child_idx;
 
@@ -9924,8 +9837,6 @@ CNDEF Cn_Ast_Idx cn_ast_parse_external_declaration(Cn_Lexer *lexer) {
         child_idx = cn_ast_parse_function_or_declaration(&l);
         if (child_idx == CN_AST_NIL_IDX) goto error;
         cn_ast_get_as_node(parent_idx)->external_declaration.child_idx = child_idx;
-
-        cn_ast_node_set_parent(parent_idx, child_idx);
     }
     
     // Messaging function definition.
@@ -10074,15 +9985,12 @@ CNDEF Cn_Ast_Idx cn_ast_parse_function_or_declaration(Cn_Lexer *lexer) {
         node.declaration.declaration_specifiers_idx = declaration_specifiers_idx;
 
         Cn_Ast_Idx idx = cn_ast_node_list_append(node);
-        cn_ast_list_set_parent(idx, &node.declaration.attribute_specifiers);
         
         // New types can be made, even in empty declaration.
         ok = cn_ast_analyze_declaration(node.declaration.declaration_specifiers_idx, (Cn_Ast_List) {0});
         if (!ok) goto error;
 
         Cn_Ast_Idx parent = cn_ast_node_list_append(node);
-        cn_ast_list_set_parent(parent, &node.declaration.attribute_specifiers);
-        cn_ast_node_set_parent(parent, node.declaration.declaration_specifiers_idx);
         return parent;
     }
     
@@ -10127,12 +10035,6 @@ CNDEF Cn_Ast_Idx cn_ast_parse_function_or_declaration(Cn_Lexer *lexer) {
         cn_ast_scope_stack_pop();
 
         Cn_Ast_Idx idx = cn_ast_node_list_append(node);
-        cn_ast_list_set_parent(idx, &node.function.attribute_specifiers);
-        cn_ast_node_set_parent(idx,
-                node.function.declaration_specifiers_idx,
-                node.function.declarator_idx,
-                node.function.block_idx
-                );
         return idx;
 
     } else {
@@ -10155,9 +10057,6 @@ CNDEF Cn_Ast_Idx cn_ast_parse_function_or_declaration(Cn_Lexer *lexer) {
         if (!ok) goto error;
 
         Cn_Ast_Idx idx = cn_ast_node_list_append(node);
-        cn_ast_list_set_parent(idx, &node.declaration.attribute_specifiers);
-        cn_ast_list_set_parent(idx, &node.declaration.init_declarators);
-        cn_ast_node_set_parent(idx, node.declaration.declaration_specifiers_idx);
         return idx;
     }
 
@@ -10203,8 +10102,6 @@ CNDEF Cn_Ast_Idx cn_ast_continue_declaration(Cn_Lexer *lexer, Cn_Ast_List attrib
         if (!ok) goto error;
 
         Cn_Ast_Idx parent = cn_ast_node_list_append(node);
-        cn_ast_list_set_parent(parent, &node.declaration.attribute_specifiers);
-        cn_ast_node_set_parent(parent, node.declaration.declaration_specifiers_idx);
         return parent;
     }
     
@@ -10222,9 +10119,6 @@ CNDEF Cn_Ast_Idx cn_ast_continue_declaration(Cn_Lexer *lexer, Cn_Ast_List attrib
     if (!ok) goto error;
 
     Cn_Ast_Idx parent = cn_ast_node_list_append(node);
-    cn_ast_list_set_parent(parent, &node.declaration.attribute_specifiers);
-    cn_ast_list_set_parent(parent, &node.declaration.init_declarators);
-    cn_ast_node_set_parent(parent, node.declaration.declaration_specifiers_idx);
     return parent;
 
 error:
@@ -10537,7 +10431,6 @@ CNDEF Cn_Ast_Idx cn_ast_continue_statement(Cn_Lexer *lexer, Cn_Ast_List attribut
         }
     }
 
-    cn_ast_list_set_parent(statement_idx, &attribute_specifiers);
     return statement_idx;
 
 error:
@@ -10568,7 +10461,6 @@ CNDEF Cn_Ast_Idx cn_ast_parse_block(Cn_Lexer *lexer, bool use_current_scope) {
     if (!use_current_scope) cn_ast_scope_stack_pop();
 
     Cn_Ast_Idx parent = cn_ast_node_list_append(node);
-    cn_ast_list_set_parent(parent, &node.block.block_items);
     return parent;
 
 error:
@@ -10601,7 +10493,6 @@ CNDEF Cn_Ast_Idx cn_ast_parse_block_item(Cn_Lexer *lexer) {
     node.block_item.declaration_or_statement_idx = declaration_or_statement_idx;
     
     Cn_Ast_Idx parent = cn_ast_node_list_append(node);
-    cn_ast_node_set_parent(parent, node.block_item.declaration_or_statement_idx);
     return parent;
     
 error:
@@ -10644,7 +10535,6 @@ CNDEF Cn_Ast_Idx cn_ast_parse_if_statement(Cn_Lexer *lexer) {
     }
 
     Cn_Ast_Idx parent = cn_ast_node_list_append(node);
-    cn_ast_node_set_parent(parent, node.if_statement.condition_idx, node.if_statement.then_idx, node.if_statement.else_idx);
     return parent;
 
 error:
@@ -10681,7 +10571,6 @@ CNDEF Cn_Ast_Idx cn_ast_parse_switch_statement(Cn_Lexer *lexer) {
     if (node.switch_statement.body_idx == CN_AST_NIL_IDX) goto error;
 
     Cn_Ast_Idx parent = cn_ast_node_list_append(node);
-    cn_ast_node_set_parent(parent, node.switch_statement.condition_idx, node.switch_statement.body_idx);
     return parent;
 
 error:
@@ -10710,7 +10599,6 @@ CNDEF Cn_Ast_Idx cn_ast_parse_while_statement(Cn_Lexer *lexer) {
     node.while_statement.body_idx = statement_idx;
 
     Cn_Ast_Idx parent = cn_ast_node_list_append(node);
-    cn_ast_node_set_parent(parent, node.while_statement.condition_idx, node.while_statement.body_idx);
     return parent;
 
 error:
@@ -10743,7 +10631,6 @@ CNDEF Cn_Ast_Idx cn_ast_parse_do_while(Cn_Lexer *lexer) {
     if (!cn_parse_expect(lexer, CN_TOKEN_SEMICOLON)) goto error;
 
     Cn_Ast_Idx parent = cn_ast_node_list_append(node);
-    cn_ast_node_set_parent(parent, node.do_while.condition_idx, node.do_while.body_idx);
     return parent;
 
 error:
@@ -10811,13 +10698,6 @@ CNDEF Cn_Ast_Idx cn_ast_parse_for_statement(Cn_Lexer *lexer) {
     cn_ast_scope_stack_pop();
 
     Cn_Ast_Idx parent = cn_ast_node_list_append(node);
-    cn_ast_node_set_parent(parent, 
-            node.for_statement.initialization_idx, 
-            node.for_statement.condition_idx,
-            node.for_statement.update_idx,
-            node.for_statement.body_idx
-            );
-
     return parent;
 
 error:
@@ -10843,7 +10723,6 @@ CNDEF Cn_Ast_Idx cn_ast_parse_goto_statement(Cn_Lexer *lexer) {
     if (!cn_parse_expect(lexer, CN_TOKEN_SEMICOLON)) goto error;
 
     Cn_Ast_Idx parent = cn_ast_node_list_append(*(Cn_Ast_Node *)&node);
-    cn_ast_node_set_parent(parent, node.goto_statement.identifier_idx);
     return parent;
 
 error:
@@ -10874,7 +10753,6 @@ CNDEF Cn_Ast_Idx cn_ast_parse_return_statement(Cn_Lexer *lexer) {
     if (!cn_parse_expect(lexer, CN_TOKEN_SEMICOLON)) goto error;
 
     Cn_Ast_Idx parent = cn_ast_node_list_append(node);
-    cn_ast_node_set_parent(parent, node.return_statement.expression_idx);
     return parent;
 
 error:
@@ -10954,11 +10832,6 @@ CNDEF Cn_Ast_Idx cn_ast_parse_label(Cn_Lexer *lexer) {
     node.label.statement_idx = statement_idx;
 
     Cn_Ast_Idx parent = cn_ast_node_list_append(node);
-    cn_ast_node_set_parent(parent, 
-            node.label.identifier_idx,
-            node.label.expression_idx,
-            node.label.statement_idx,
-            );
     return parent;
 
 error:
@@ -10988,7 +10861,6 @@ CNDEF Cn_Ast_Idx cn_ast_parse_expression_statement(Cn_Lexer *lexer) {
     node.src.length = cn_source_dist(&node.src, &cn_lexer_token(lexer).src);
 
     Cn_Ast_Idx parent = cn_ast_node_list_append(node);
-    cn_ast_node_set_parent(parent, node.expression_statement.expression_idx);
     return parent;
 
 error:
@@ -11049,11 +10921,6 @@ CNDEF Cn_Ast_Idx cn_ast_parse_expression_increasing_precedence(Cn_Lexer *lexer, 
         node.ternary.false_idx = child_idx;
 
         Cn_Ast_Idx parent = cn_ast_node_list_append(node);
-        cn_ast_node_set_parent(parent, 
-                node.ternary.condition_idx,
-                node.ternary.true_idx,
-                node.ternary.false_idx,
-                );
         return parent;
     }
 
@@ -11089,8 +10956,6 @@ CNDEF Cn_Ast_Idx cn_ast_parse_expression_increasing_precedence(Cn_Lexer *lexer, 
             if (!cn_parse_expect(lexer, CN_TOKEN_PARAN_CLOSE)) goto error;
 
             Cn_Ast_Idx parent = cn_ast_node_list_append(node);
-            cn_ast_node_set_parent(parent, node.call.expression_idx);
-            cn_ast_list_set_parent(parent, &node.call.arguments);
             return parent;
         } 
 
@@ -11108,10 +10973,6 @@ CNDEF Cn_Ast_Idx cn_ast_parse_expression_increasing_precedence(Cn_Lexer *lexer, 
             node.access.member_idx = identifier_idx;
 
             Cn_Ast_Idx parent = cn_ast_node_list_append(node);
-            cn_ast_node_set_parent(parent, 
-                    node.access.expression_idx,
-                    node.access.member_idx
-                    );
             return parent;
         }
 
@@ -11129,10 +10990,6 @@ CNDEF Cn_Ast_Idx cn_ast_parse_expression_increasing_precedence(Cn_Lexer *lexer, 
             node.binary.right_idx = right_idx;
 
             Cn_Ast_Idx parent = cn_ast_node_list_append(node);
-            cn_ast_node_set_parent(parent, 
-                    node.binary.left_idx,
-                    node.binary.right_idx
-                    );
             return parent;
         } 
 
@@ -11147,11 +11004,6 @@ CNDEF Cn_Ast_Idx cn_ast_parse_expression_increasing_precedence(Cn_Lexer *lexer, 
         node.binary.right_idx = right_idx;
 
         Cn_Ast_Idx parent = cn_ast_node_list_append(node);
-        cn_ast_node_set_parent(parent, 
-                node.binary.left_idx,
-                node.binary.right_idx
-                );
-
         return parent;
     }
 
@@ -11175,10 +11027,6 @@ CNDEF Cn_Ast_Idx cn_ast_parse_expression_increasing_precedence(Cn_Lexer *lexer, 
         node.assign.right_idx = right_idx;
 
         Cn_Ast_Idx parent = cn_ast_node_list_append(node);
-        cn_ast_node_set_parent(parent, 
-                node.assign.left_idx,
-                node.assign.right_idx
-                );
         return parent;
     }
 
@@ -11198,9 +11046,6 @@ CNDEF Cn_Ast_Idx cn_ast_parse_expression_increasing_precedence(Cn_Lexer *lexer, 
         node.postfix.operator = op_kind;
 
         Cn_Ast_Idx parent = cn_ast_node_list_append(node);
-        cn_ast_node_set_parent(parent, 
-                node.postfix.expression_idx,
-                );
         return parent;
     }
 
@@ -11266,8 +11111,6 @@ CNDEF Cn_Ast_Idx cn_ast_parse_expression_leaf(Cn_Lexer *lexer, Cn_Expression_Par
                 if (!ok) goto error;
 
                 Cn_Ast_Idx parent = cn_ast_node_list_append(node);
-                cn_ast_node_set_parent(parent, node.compound.type_name_idx);
-                cn_ast_list_set_parent(parent, &node.compound.designations);
                 return parent;
             }
 
@@ -11278,10 +11121,6 @@ CNDEF Cn_Ast_Idx cn_ast_parse_expression_leaf(Cn_Lexer *lexer, Cn_Expression_Par
             node.cast.expression_idx = expression_idx;
 
             Cn_Ast_Idx parent = cn_ast_node_list_append(node);
-            cn_ast_node_set_parent(parent, 
-                    node.cast.type_name_idx,
-                    node.cast.expression_idx
-                    );
             return parent;
         }
         
@@ -11315,7 +11154,6 @@ CNDEF Cn_Ast_Idx cn_ast_parse_expression_leaf(Cn_Lexer *lexer, Cn_Expression_Par
                 node.sizeof_expression.target_idx = type_name_idx;
 
                 Cn_Ast_Idx parent = cn_ast_node_list_append(node);
-                cn_ast_node_set_parent(parent, node.sizeof_expression.target_idx);
                 return parent;
             }
         }
@@ -11326,7 +11164,6 @@ CNDEF Cn_Ast_Idx cn_ast_parse_expression_leaf(Cn_Lexer *lexer, Cn_Expression_Par
         node.sizeof_expression.target_idx = expression_idx;
 
         Cn_Ast_Idx parent = cn_ast_node_list_append(node);
-        cn_ast_node_set_parent(parent, node.sizeof_expression.target_idx);
         return parent;
     }
 
@@ -11343,7 +11180,6 @@ CNDEF Cn_Ast_Idx cn_ast_parse_expression_leaf(Cn_Lexer *lexer, Cn_Expression_Par
         node.unary.expression_idx = expression_idx;
 
         Cn_Ast_Idx parent = cn_ast_node_list_append(node);
-        cn_ast_node_set_parent(parent, node.unary.expression_idx);
         return parent;
     }
     
@@ -11373,8 +11209,6 @@ CNDEF Cn_Ast_Idx cn_ast_parse_expression_leaf(Cn_Lexer *lexer, Cn_Expression_Par
     node.primary.literal_idx = literal_idx;
 
     Cn_Ast_Idx parent = cn_ast_node_list_append(node);
-    cn_ast_node_set_parent(parent, node.primary.literal_idx);
-
     return parent;
 
 error:
@@ -11465,12 +11299,6 @@ CNDEF Cn_Ast_Idx cn_ast_finish_init_declarator(Cn_Lexer *lexer, Cn_Ast_Idx decla
     }
 
     Cn_Ast_Idx parent = cn_ast_node_list_append(node);
-    cn_ast_node_set_parent(parent, 
-            node.init_declarator.declarator_idx,
-            node.init_declarator.gnu_asm_label_idx,
-            node.init_declarator.initializer_idx,
-            );
-    cn_ast_list_set_parent(parent, &node.init_declarator.gnu_attribute_specifiers);
     return parent;
     
 error:
@@ -11514,8 +11342,6 @@ CNDEF Cn_Ast_Idx cn_ast_parse_initializer(Cn_Lexer *lexer) {
     }
 
     Cn_Ast_Idx parent = cn_ast_node_list_append(node);
-    cn_ast_node_set_parent(parent, node.initializer.expression_idx);
-    cn_ast_list_set_parent(parent, &node.initializer.designations);
     return parent;
     
 error:
@@ -11570,8 +11396,6 @@ CNDEF Cn_Ast_Idx cn_ast_parse_designation(Cn_Lexer *lexer) {
     node.designation.initializer_idx = initializer_idx;
 
     Cn_Ast_Idx parent = cn_ast_node_list_append(node);
-    cn_ast_list_set_parent(parent, &node.designation.designators);
-    cn_ast_node_set_parent(parent, node.designation.initializer_idx);
     return parent;
     
 error:
@@ -11632,11 +11456,6 @@ CNDEF Cn_Ast_Idx cn_ast_parse_designator(Cn_Lexer *lexer) {
     }
 
     Cn_Ast_Idx parent = cn_ast_node_list_append(node);
-    cn_ast_node_set_parent(parent, 
-            node.designator.identifier_idx,
-            node.designator.expression_idx,
-            node.designator.expression_range_end_idx,
-            );
     return parent;
     
 error:
@@ -11685,10 +11504,6 @@ CNDEF Cn_Ast_Idx cn_ast_parse_declarator(Cn_Lexer *lexer, bool *ok) {
     node.declarator.direct_declarator_idx = child_idx;
     
     Cn_Ast_Idx parent = cn_ast_node_list_append(node);
-    cn_ast_node_set_parent(parent, 
-            node.declarator.pointer_idx,
-            node.declarator.direct_declarator_idx
-            );
     *ok = true;
     return parent;
     
@@ -11724,7 +11539,6 @@ CNDEF Cn_Ast_Idx cn_ast_parse_pointer(Cn_Lexer *lexer) {
     }
     
     Cn_Ast_Idx parent = cn_ast_node_list_append(node);
-    cn_ast_node_set_parent(parent, node.pointer.pointer_idx);
     return parent;
     
 error:
@@ -11757,7 +11571,6 @@ CNDEF Cn_Ast_Idx cn_ast_parse_direct_declarator(Cn_Lexer *lexer, bool *is_abstra
         if (!cn_parse_expect(lexer, CN_TOKEN_PARAN_CLOSE)) goto error;
 
         direct_declarator_idx = cn_ast_node_list_append(node);
-        cn_ast_node_set_parent(direct_declarator_idx, node.direct_declarator_grouped.declarator_idx);
     }
     // identifier case.
     else if (cn_lexer_expect(lexer, CN_TOKEN_IDENTIFIER)) {
@@ -11797,10 +11610,6 @@ CNDEF Cn_Ast_Idx cn_ast_parse_direct_declarator(Cn_Lexer *lexer, bool *is_abstra
             node.direct_declarator_array.direct_declarator_idx = direct_declarator_idx;
 
             direct_declarator_idx = cn_ast_node_list_append(node);
-            cn_ast_node_set_parent(direct_declarator_idx,
-                    node.direct_declarator_array.direct_declarator_idx,
-                    node.direct_declarator_array.expression_idx
-                    );
             continue;
         }
         // direct_declarator '(' ('void' | parameter_declarations)? ')' case.
@@ -11830,8 +11639,6 @@ CNDEF Cn_Ast_Idx cn_ast_parse_direct_declarator(Cn_Lexer *lexer, bool *is_abstra
             node.direct_declarator_function.direct_declarator_idx = direct_declarator_idx;
 
             direct_declarator_idx = cn_ast_node_list_append(node);
-            cn_ast_node_set_parent(direct_declarator_idx, node.direct_declarator_function.direct_declarator_idx);
-            cn_ast_list_set_parent(direct_declarator_idx, &node.direct_declarator_function.parameter_declarations);
             continue;
         }
 
@@ -12047,8 +11854,6 @@ CNDEF Cn_Ast_Idx cn_ast_parse_declaration_specifiers(Cn_Lexer *lexer) {
     }
 
     Cn_Ast_Idx idx = cn_ast_node_list_append(node);
-    cn_ast_node_set_parent(idx, node.declaration_specifiers.type_specifier_idx);
-    cn_ast_list_set_parent(idx, &node.declaration_specifiers.gnu_attribute_specifiers);
     return idx;
 
 error:
@@ -12202,7 +12007,6 @@ CNDEF Cn_Ast_Idx cn_ast_parse_gnu_typeof(Cn_Lexer *lexer) {
     if (!cn_parse_expect(lexer, CN_TOKEN_PARAN_CLOSE)) goto error;
 
     Cn_Ast_Idx parent = cn_ast_node_list_append(node);
-    cn_ast_node_set_parent(parent, node.gnu_typeof.target_idx);
     return parent;
 
 error:
@@ -12380,10 +12184,6 @@ CNDEF Cn_Ast_Idx cn_ast_parse_type_name(Cn_Lexer *lexer) {
     node.type_name.abstract_declarator_idx = abstract_declarator_idx;
 
     Cn_Ast_Idx parent = cn_ast_node_list_append(node);
-    cn_ast_node_set_parent(parent, 
-            node.type_name.specifier_qualifier_idx,
-            node.type_name.abstract_declarator_idx,
-            );
     return parent;
 
 error:
@@ -12457,7 +12257,6 @@ CNDEF Cn_Ast_Idx cn_ast_parse_specifier_qualifier(Cn_Lexer *lexer) {
     }
 
     Cn_Ast_Idx idx = cn_ast_node_list_append(node);
-    cn_ast_node_set_parent(idx, node.specifier_qualifier.type_specifier_idx);
     return idx;
 
 error:
@@ -12513,7 +12312,6 @@ CNDEF Cn_Ast_Idx cn_ast_parse_parameter_declaration(Cn_Lexer *lexer) {
     if (!ok) goto error;
 
     Cn_Ast_Idx idx = cn_ast_node_list_append(node);
-    cn_ast_node_set_parent(idx, node.parameter_declaration.declaration_specifiers_idx, node.parameter_declaration.declarator_idx);
     return idx;
 
 error:
@@ -12617,17 +12415,6 @@ CNDEF Cn_Ast_Idx cn_ast_parse_struct_or_union_specifier(Cn_Lexer *lexer) {
     }
 
     Cn_Ast_Idx parent = cn_ast_node_list_append(node);
-    if (node.kind == CN_AST_STRUCT_SPECIFIER) {
-        cn_ast_list_set_parent(parent, &node.struct_specifier.attribute_specifiers);
-        cn_ast_list_set_parent(parent, &node.struct_specifier.gnu_attribute_specifiers);
-        cn_ast_node_set_parent(parent, node.struct_specifier.identifier_idx);
-        cn_ast_list_set_parent(parent, &node.struct_specifier.member_declarations);
-    } else {
-        cn_ast_list_set_parent(parent, &node.union_specifier.attribute_specifiers);
-        cn_ast_list_set_parent(parent, &node.union_specifier.gnu_attribute_specifiers);
-        cn_ast_node_set_parent(parent, node.union_specifier.identifier_idx);
-        cn_ast_list_set_parent(parent, &node.union_specifier.member_declarations);
-    }
     return parent;
 
 error:
@@ -12656,9 +12443,6 @@ CNDEF Cn_Ast_Idx cn_ast_parse_member_declaration(Cn_Lexer *lexer) {
     if (!cn_parse_expect(lexer, CN_TOKEN_SEMICOLON)) goto error;
 
     Cn_Ast_Idx parent = cn_ast_node_list_append(node);
-    cn_ast_list_set_parent(parent, &node.member_declaration.attribute_specifiers);
-    cn_ast_node_set_parent(parent, node.member_declaration.specifier_qualifier_idx);
-    cn_ast_list_set_parent(parent, &node.member_declaration.member_declarators);
     return parent;
 
 error:
@@ -12722,11 +12506,6 @@ CNDEF Cn_Ast_Idx cn_ast_parse_member_declarator(Cn_Lexer *lexer) {
     if (!ok) goto error;
 
     Cn_Ast_Idx parent = cn_ast_node_list_append(node);
-    cn_ast_node_set_parent(parent, 
-            node.member_declarator.declarator_idx,
-            node.member_declarator.bitfield_idx
-            );
-    cn_ast_list_set_parent(parent, &node.member_declarator.gnu_attribute_specifiers);
     return parent;
 
 error:
@@ -12812,13 +12591,6 @@ CNDEF Cn_Ast_Idx cn_ast_parse_enum_specifier(Cn_Lexer *lexer) {
     }
 
     Cn_Ast_Idx parent = cn_ast_node_list_append(node);
-    cn_ast_list_set_parent(parent, &node.enum_specifier.attribute_specifiers);
-    cn_ast_list_set_parent(parent, &node.enum_specifier.gnu_attribute_specifiers);
-    cn_ast_list_set_parent(parent, &node.enum_specifier.enumerators);
-    cn_ast_node_set_parent(parent, 
-            node.enum_specifier.identifier_idx,
-            node.enum_specifier.specifier_qualifier_idx,
-            );
     return parent;
 
 error:
@@ -12853,12 +12625,6 @@ CNDEF Cn_Ast_Idx cn_ast_parse_enumerator(Cn_Lexer *lexer) {
     }
 
     Cn_Ast_Idx parent = cn_ast_node_list_append(node);
-    cn_ast_list_set_parent(parent, &node.enumerator.attribute_specifiers);
-    cn_ast_list_set_parent(parent, &node.enumerator.gnu_attribute_specifiers);
-    cn_ast_node_set_parent(parent, 
-            node.enumerator.identifier_idx,
-            node.enumerator.expression_idx,
-            );
     return parent;
 
 error:
@@ -12908,7 +12674,6 @@ CNDEF Cn_Ast_Idx cn_ast_parse_attribute_specifier(Cn_Lexer *lexer) {
     if (!cn_parse_expect(lexer, CN_TOKEN_SQR_BRACES_CLOSE)) goto error;
 
     Cn_Ast_Idx parent = cn_ast_node_list_append(node);
-    cn_ast_list_set_parent(parent, &node.attribute_specifier.attributes);
     return parent;
 
 error:
@@ -12972,9 +12737,6 @@ CNDEF Cn_Ast_Idx cn_ast_parse_attribute(Cn_Lexer *lexer) {
     }
 
     Cn_Ast_Idx parent = cn_ast_node_list_append(node);
-    cn_ast_node_set_parent(parent, node.attribute.vendor_identifier_idx);
-    cn_ast_node_set_parent(parent, node.attribute.identifier_idx);
-    cn_ast_list_set_parent(parent, &node.attribute.arguments);
     return parent;
 
 error:
@@ -13025,7 +12787,6 @@ CNDEF Cn_Ast_Idx cn_ast_parse_gnu_attribute_specifier(Cn_Lexer *lexer) {
     if (!cn_parse_expect(lexer, CN_TOKEN_PARAN_CLOSE)) goto error;
 
     Cn_Ast_Idx parent = cn_ast_node_list_append(node);
-    cn_ast_list_set_parent(parent, &node.gnu_attribute_specifier.gnu_attributes);
     return parent;
 
 error:
@@ -13079,8 +12840,6 @@ CNDEF Cn_Ast_Idx cn_ast_parse_gnu_attribute(Cn_Lexer *lexer) {
     }
 
     Cn_Ast_Idx parent = cn_ast_node_list_append(node);
-    cn_ast_node_set_parent(parent, node.gnu_attribute.identifier_idx);
-    cn_ast_list_set_parent(parent, &node.gnu_attribute.arguments);
     return parent;
 
 error:
@@ -13106,7 +12865,6 @@ CNDEF Cn_Ast_Idx cn_ast_parse_gnu_asm_label(Cn_Lexer *lexer) {
     if (!cn_parse_expect(lexer, CN_TOKEN_PARAN_CLOSE)) goto error;
 
     Cn_Ast_Idx parent = cn_ast_node_list_append(node);
-    cn_ast_node_set_parent(parent, node.gnu_asm_label.string_idx);
     return parent;
 
 error:
@@ -16020,7 +15778,6 @@ CNDEF Cn_Ast_Idx cn_copy(Cn_Ast_Idx idx) {
     Cn_Ast_Idx copy_idx = cn_ast_node_list_append(*cn_ast_get_as_node(idx));
 
     cn_ast_get_as_node(copy_idx)->flags |= CN_AST_SYNTHETIC;
-    cn_ast_get_as_node(copy_idx)->parent_idx = CN_AST_NIL_IDX;
 
     // NOTE: Copy of the child is made into a temporary first, because copying
     // can grow the node list and invalidate any pointer into it.
@@ -16382,20 +16139,8 @@ CNDEF Cn_Ast_Idx cn_get_attribute(Cn_Ast_Idx node, Cn_String attribute_name) {
 }
 
 CNDEF void cn_remove_attribute(Cn_Ast_Idx attribute_idx) {
-    Cn_Ast_Attribute *attribute = cn_ast_get(attribute_idx);
-    Cn_Ast_Attribute_Specifier *attribute_specifier = cn_ast_get(attribute->parent_idx);
-    
-    int64_t index = -1;
-    for (int64_t i = 0; i < attribute_specifier->attributes.length; i++) {
-        if (attribute_specifier->attributes.idxs[i] == attribute_idx) {
-            index = i;
-            break;
-        }
-    }
-
-    CN_ASSERT(index != -1);
-
-    cn_remove_from_list(&attribute_specifier->attributes, index);
+    // Problematic to remove now... maybe.
+    CN_TODO("cn_remove_attribute.");
 }
 
 CNDEF Cn_Ast_Idx cn__build_wrap_if_primary(Cn_Ast_Idx idx) {
@@ -16409,7 +16154,6 @@ CNDEF Cn_Ast_Idx cn__build_wrap_if_primary(Cn_Ast_Idx idx) {
                 });
 
         node = cn_ast_get(idx);
-        node->parent_idx = parent_idx;
         return parent_idx;
     }
 

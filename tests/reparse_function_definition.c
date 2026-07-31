@@ -110,12 +110,7 @@ Cn_Result handler(Cn_Message_Kind kind, void *message) {
     // Reporting modification on every parsed function definition,
     // it rolls back to the checkpoint and makes parser take the reparse path.
     if (kind == CN_MESSAGE_PARSED_FUNCTION) {
-        Cn_Message_Parsed_Function *msg = message;
-        Cn_Ast_Idx attribute_idx = cn_get_attribute(msg->node_idx, CN_STR_LIT("reparse"));
-        if (attribute_idx != CN_AST_NIL_IDX) {
-            cn_remove_attribute(attribute_idx);
-            return CN_RESULT_MODIFIED;
-        }
+        return CN_RESULT_MODIFIED_NO_REPEAT;
     }
 
     return CN_RESULT_NONE;
