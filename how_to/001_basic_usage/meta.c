@@ -41,7 +41,17 @@ Cn_Result msg_handler(Cn_Message_Kind kind, void *message) {
                 
                 Cn_Ast_Idx *items = cn_array_list_make(Cn_Ast_Idx, 4);
 
-                cn_array_list_append(&items, cn_build_format("printf(\">>>\");\n"));
+                Cn_Ast_Idx ident_idx;
+                cn_get_declarator_info(
+                        cn_ast_get_as_node(msg->node_idx)->function.declarator_idx,
+                        &ident_idx
+                        );
+
+                CN_ASSERT(cn_ast_get_as_node(ident_idx)->kind == CN_AST_IDENTIFIER);
+
+                cn_array_list_append(&items, cn_build_format("printf(\">>> hello from: '%.*s'\\n\");\n", 
+                            CN_UNPACK(cn_ast_get_as_node(ident_idx)->identifier.name))
+                        );
                 
                 for (int64_t i = 0; i < cn_ast_get_as_node(block_idx)->block.block_items.length; i++) {
                     cn_array_list_append(&items, cn_ast_get_as_node(block_idx)->block.block_items.idxs[i]);
