@@ -23,8 +23,6 @@
 
       - CNDEF                               Appends additional things to function declarations.
       - CN_ASSERT(condition)                Redefine which assert() cnotes.h shall use.
-      - CN_REALLOC(oldptr, size)            Redefine which realloc() cnotes.h shall use.
-      - CN_FREE(ptr)                        Redefine which free() cnotes.h shall use.
       - CN_AST_NODE_LIST_INITIAL_CAP        Redefine initial capacity of array list that holds ast nodes.
 
     # API Conventions & Navigation
@@ -83,16 +81,6 @@
 #   include <assert.h>
 #   define CN_ASSERT assert
 #endif // CN_ASSERT
-
-#ifndef CN_REALLOC
-#   include <stdlib.h>
-#   define CN_REALLOC realloc
-#endif // CN_REALLOC
-
-#ifndef CN_FREE
-#   include <stdlib.h>
-#   define CN_FREE free
-#endif // CN_FREE
 
 #ifdef _WIN32
 #   define CN_LINE_END "\r\n"
@@ -175,7 +163,11 @@
 #define CN_ARRAY_GET(array, index) \
     (CN_ASSERT((size_t)index < CN_ARRAY_LENGTH(array)), array[(size_t)index])
 
-// LOG SECTION
+/**
+ * ============================================
+ * SECTION: Logging
+ * ============================================
+ */
 typedef enum {
     CN_INFO,
     CN_WARNING,
@@ -184,11 +176,9 @@ typedef enum {
 } Cn_Log_Level;
 
 /**
- * Any messages with the level below cn_min_log_level are going to be suppressed. 
- * Idea stolen from nob, just like the most of the library structure. 
- * Thank you nob and stb.
+ * Any messages with the level below cn_log_min_level are going to be suppressed. 
  */
-extern Cn_Log_Level cn_min_log_level;
+extern Cn_Log_Level cn_log_min_level;
 
 typedef void (Cn_Log_Handler)(Cn_Log_Level level, const char *format, va_list args);
 
@@ -213,7 +203,11 @@ CNDEF Cn_Log_Handler cn_null_log_handler;
  */
 CNDEF void cn_log(Cn_Log_Level level, const char *format, ...);
 
-// HASHING SECTION
+/**
+ * ============================================
+ * SECTION: Hashing
+ * ============================================
+ */
 typedef uint64_t (Cn_Hash_Function)(const void *data);
 
 typedef bool (Cn_Equals_Function)(const void *a, const void *b);
@@ -241,9 +235,11 @@ CNDEF uint64_t cn_hash_bytes(void *data, int64_t length);
  */
 CNDEF uint64_t cn_hash_mix(uint64_t a, uint64_t b);
 
-// STRING SECTION
-
 /**
+ * ============================================
+ * SECTION: String
+ * ============================================
+
  * Here length based strings behave like string views,
  * they contain simple structure: length + data.
  * And an interface to variously modify and use them.
@@ -455,7 +451,11 @@ CNDEF bool cn_str_equals(const Cn_String *str1, const Cn_String *str2);
  */
 CNDEF uint64_t cn_str_hash(const Cn_String *str);
 
-// STRING BUILDER SECTION
+/**
+ * ============================================
+ * SECTION: String Builder
+ * ============================================
+ */
 typedef struct {
     int64_t capacity;
     int64_t length;
@@ -523,7 +523,95 @@ CNDEF void cn_sb_reverse(Cn_String_Builder *sb);
  */
 CNDEF Cn_String cn_sb_to_str(Cn_String_Builder *sb);
 
-// CHAINED ARENA SECTION
+/**
+ * ============================================
+ * SECTION: Allocator 
+ * ============================================
+ *
+ * This library uses a variety of different allocators: arenas, pools, block allocators, etc...
+ * But also this library doesn't want to introduce extra complexity regarding usage of such allocators,
+ * so the in order to provide the middle-ground between simplicty and functionality, all
+ * allocators must implement same foundational interface and can be replaced to one another at 
+ * any point in time. This allows use to customize and control memory while library has
+ * stable and understood internals on how everything works.
+ *
+ * Each allocator must implement it's own interface for functions:
+ *  
+ *  - CNDEF void *cn_alloc(Cn_Allocator *allocator, size_t size);
+ *  - CNDEF void *cn_realloc(Cn_Allocator *allocator, void *mem, size_t new_size);
+ *  - CNDEF void cn_free(Cn_Allocator *allocator, void *mem);
+ *  - CNDEF void cn_free_all(Cn_Allocator *allocator);
+ *
+ * NOTE: If allocator cannot perform certain function like arena cannot free allocated memory by pointer, 
+ * it is allowed to stub out function and print warning on attempt of using it.
+ *
+ * Then switching global allocator becomes as simple as setting global allocator global variable.
+ */
+
+#include <stdlib.h>
+
+typedef union cn_allocator Cn_Allocator;
+
+typedef CNDEF void *(Cn_Alloc)(Cn_Allocator *allocator, size_t size);
+typedef CNDEF void *(Cn_Realloc)(Cn_Allocator *allocator, void *mem, size_t new_size);
+typedef CNDEF void (Cn_Free)(Cn_Allocator *allocator, void *mem);
+typedef CNDEF void (Cn_Free_All)(Cn_Allocator *allocator);
+
+#define CN_ALLOCATOR_BASE_MEMBERS   \
+    Cn_Alloc        *alloc;         \
+    Cn_Realloc      *realloc;       \
+    Cn_Free         *free;          \
+    Cn_Free_All     *free_all;      \
+
+typedef struct {
+    CN_ALLOCATOR_BASE_MEMBERS
+} Cn_Allocator_Base;
+
+#define CN_ALLOCATOR_BASE                       \
+    union {                                     \
+        Cn_Allocator_Base base;                 \
+        struct { CN_ALLOCATOR_BASE_MEMBERS };   \
+    }
+
+
+typedef struct { CN_ALLOCATOR_BASE;
+    size_t capacity;
+    void *allocation;
+    void *ptr;
+} Cn_Arena;
+
+/**
+ * Constructs arena and allocates memory of capacity size.
+ */
+CNDEF Cn_Arena cn_arena_make(size_t capacity);
+
+/**
+ * Allocates next chunk of memory from arena.
+ */
+CNDEF void *cn_arena_alloc(Cn_Arena *arena, size_t size);
+
+/**
+ * Reallocs chunk of memory from arena.
+ * Is using cn_arena_alloc underneath.
+ */
+CNDEF void *cn_arena_realloc(Cn_Arena *arena, void *mem, size_t new_size);
+
+/**
+ * Stubbed out in actual implementation, 
+ * since arena cannot free previously allocated memory
+ */
+CNDEF void cn_arena_free(Cn_Arena *arena, void *mem);
+
+/**
+ * Cleans up all memory used by the arena.
+ */
+CNDEF void cn_arena_free_all(Cn_Arena *arena);
+
+/**
+ * Completely destroys arena and frees all memory occupied by it.
+ */
+CNDEF void cn_arena_destroy(Cn_Arena *arena);
+
 
 /**
  * Chained arena is an allocator that linearly gives memory and when needed allocates next block.
@@ -544,37 +632,51 @@ CNDEF Cn_String cn_sb_to_str(Cn_String_Builder *sb);
  *
  *  These setup allows quick append allocation and pop deallocation.
  */
-typedef struct {
-    uint64_t block_capacity;
-    void *block;
+typedef struct { CN_ALLOCATOR_BASE;
+    size_t block_capacity;
+    void  *block;
 } Cn_Chained_Arena;
 
 #define CN_CHAINED_ARENA_BLOCK_HEADER(block) ((Cn_Chained_Arena_Block_Header *)((uint8_t *)(block) - sizeof(Cn_Chained_Arena_Block_Header)))
 
 typedef struct {
-    void *prev;
-    uint64_t allocated;
+    void  *prev;
+    void  *next;
+    size_t allocated;
 } Cn_Chained_Arena_Block_Header;
 
 /**
  * Initializes arena by allocating first block and setting all pointers.
  */
-CNDEF Cn_Chained_Arena cn_chained_arena_make(uint64_t block_capacity);
+CNDEF Cn_Chained_Arena cn_chained_arena_make(size_t block_capacity);
 
 /**
  * Allocates specified memory size from the arena.
- *
- * RETURNS: Pointer to the memory segment.
- *
- * IMPORTANT: It will be invalid once arena is freed.
  */
-CNDEF void *cn_chained_arena_alloc(Cn_Chained_Arena *arena, uint64_t size);
+CNDEF void *cn_chained_arena_alloc(Cn_Chained_Arena *arena, size_t size);
+
+/**
+ * Reallocs chunk of memory from arena.
+ * Is using cn_chained_arena_alloc underneath.
+ */
+CNDEF void *cn_chained_arena_realloc(Cn_Chained_Arena *arena, void *mem, size_t new_size);
+
+/**
+ * Stubbed out in actual implementation, 
+ * since arena cannot free previously allocated memory
+ */
+CNDEF void cn_chained_arena_free(Cn_Chained_Arena *arena, void *mem);
+
+/**
+ * Cleans up all memory used by the arena.
+ */
+CNDEF void cn_chained_arena_free_all(Cn_Chained_Arena *arena);
 
 /**
  * Dellocates specified memory size from the front of the arena.
  * If specified size completely deallocates whole block, it is freed.
  */
-CNDEF void cn_chained_arena_dealloc(Cn_Chained_Arena *arena, uint64_t size);
+CNDEF void cn_chained_arena_dealloc(Cn_Chained_Arena *arena, size_t size);
 
 /**
  * Given chained arena and pointer allocated by it, it will compute index 
@@ -589,21 +691,61 @@ CNDEF void cn_chained_arena_dealloc(Cn_Chained_Arena *arena, uint64_t size);
  * Even if address was not supplied correctly, but it happens to point to the allocated memory, 
  * this function will properly return.
  */
-CNDEF int64_t cn_chained_arena_allocation_info(Cn_Chained_Arena *arena, void *allocation_ptr, uint64_t *offset);
+CNDEF int64_t cn_chained_arena_allocation_info(Cn_Chained_Arena *arena, void *allocation_ptr, size_t *offset);
 
 /**
  * Given chained arena computes total allocated size by the arena.
  *
  * RETURNS: Total allocated size.
  */
-CNDEF uint64_t cn_chained_arena_allocated(Cn_Chained_Arena *arena);
+CNDEF size_t cn_chained_arena_allocated(Cn_Chained_Arena *arena);
 
 #define cn_ast_chained_arena_foreach_in_block(type, it, block) for (type *it = (type *)(block); (uint8_t *)it <= (uint8_t *)(block) + CN_CHAINED_ARENA_BLOCK_HEADER(block)->allocated - sizeof(type); it++)
 
 /**
- * Completely frees all memory occupied by the arena.
+ * Completely destroys arena and frees all memory occupied by it.
  */
-CNDEF void cn_chained_arena_free(Cn_Chained_Arena *arena);
+CNDEF void cn_chained_arena_destroy(Cn_Chained_Arena *arena);
+
+typedef struct { CN_ALLOCATOR_BASE;
+
+} Cn_Pool;
+
+union cn_allocator {
+    CN_ALLOCATOR_BASE;
+    Cn_Arena arena;
+    Cn_Chained_Arena chained_arena;
+    Cn_Pool pool;
+};
+
+extern Cn_Allocator *cn_default_allocator;
+
+/**
+ * Wrapper that calls alloc on allocator passing allocater self 
+ * as a paremeter.
+ */
+CNDEF void *cn_alloc(Cn_Allocator *allocator, size_t size);
+
+/**
+ * Wrapper that calls realloc on allocator passing allocater self 
+ * as a paremeter.
+ */
+CNDEF void *cn_realloc(Cn_Allocator *allocator, void *mem, size_t size);
+
+/**
+ * Wrapper that calls free on allocator passing allocater self 
+ * as a paremeter.
+ */
+CNDEF void cn_free(Cn_Allocator *allocator, void *mem);
+
+/**
+ * Wrapper that calls free_all on allocator passing allocater self 
+ * as a paremeter.
+ */
+CNDEF void cn_free_all(Cn_Allocator *allocator);
+
+#define CN_REALLOC(mem, size) cn_realloc(cn_default_allocator, (mem), (size))
+#define CN_FREE(mem) cn_free(cn_default_allocator, (mem))
 
 // ARRAY LIST SECTION
 typedef struct {
@@ -4487,13 +4629,13 @@ CNDEF Cn_Ast_Idx cn__build_declaration(Cn_Ast_Idx declaration_specifiers, Cn_Ast
 #ifdef CN_IMPLEMENTATION
 
 // LOG SECTION
-Cn_Log_Level cn_min_log_level = CN_INFO;
+Cn_Log_Level cn_log_min_level = CN_INFO;
 
 Cn_Log_Handler *cn_log_handler = &cn_default_log_handler;
 
 CNDEF void cn_default_log_handler(Cn_Log_Level level, const char *format, va_list args) {
     
-    if (level < cn_min_log_level)
+    if (level < cn_log_min_level)
         return;
 
     switch (level) {
@@ -4965,14 +5107,70 @@ CNDEF Cn_String cn_sb_to_str(Cn_String_Builder *sb) {
     return CN_STR(sb->length, sb->data);
 }
 
+/**
+ * ============================================
+ * IMPLEMENTATION SECTION: Allocator 
+ * ============================================
+ */
+CNDEF Cn_Arena cn_arena_make(size_t capacity) {
+    CN_ASSERT(capacity > 0);
 
-// CHAINED ARENA SECTION
-CNDEF Cn_Chained_Arena cn_chained_arena_make(uint64_t block_capacity) {
+    void *mem = realloc(NULL, capacity);
+
+    if (mem == NULL) {
+        cn_log(CN_ERROR, "Couldn't malloc %zu bytes of memory for the arena.", capacity);
+        return (Cn_Arena) {0};
+    }
+
+    return (Cn_Arena) {
+        .alloc      = (Cn_Alloc *)cn_arena_alloc,
+        .realloc    = (Cn_Realloc *)cn_arena_realloc,
+        .free       = (Cn_Free *)cn_arena_free,
+        .free_all   = (Cn_Free_All *)cn_free_all,
+        .capacity   = capacity,
+        .allocation = mem,
+        .ptr        = mem,
+    };
+}
+
+CNDEF void *cn_arena_alloc(Cn_Arena *arena, size_t size) {
+    arena->ptr += size;
+
+    if (arena->ptr > arena->allocation + arena->capacity) {
+        cn_log(CN_ERROR, "Couldn't allocate %zu bytes of memory from the arena, this allocation exceeded arena's capacity.", size);
+        return NULL;
+    }
+
+    return arena->ptr - size;
+}
+
+CNDEF void *cn_arena_realloc(Cn_Arena *arena, void *mem, size_t new_size) {
+    CN_UNUSED(mem);
+    return cn_arena_alloc(arena, new_size);
+}
+
+CNDEF void cn_arena_free(Cn_Arena *arena, void *mem) {
+    CN_UNUSED(arena);
+    CN_UNUSED(mem);
+    cn_log(CN_WARNING, "Coudln't free memory in arena, arena doesn't implement free mechanism, use free_all instead, or destroy arena completely.");
+}
+
+CNDEF void cn_arena_free_all(Cn_Arena *arena) {
+    arena->ptr = arena->allocation;
+}
+
+CNDEF void cn_arena_destroy(Cn_Arena *arena) {
+    free(arena->allocation);
+    *arena = (Cn_Arena) {0};
+}
+
+CNDEF Cn_Chained_Arena cn_chained_arena_make(size_t block_capacity) {
     CN_ASSERT(block_capacity > 0);
 
-    Cn_Chained_Arena_Block_Header *header = (Cn_Chained_Arena_Block_Header *)CN_REALLOC(NULL, sizeof(Cn_Chained_Arena_Block_Header) + block_capacity);
+    Cn_Chained_Arena_Block_Header *header = realloc(NULL, sizeof(Cn_Chained_Arena_Block_Header) + block_capacity);
 
     header->prev = NULL;
+    header->next = NULL;
     header->allocated = 0;
     
     return (Cn_Chained_Arena) {
@@ -4981,14 +5179,18 @@ CNDEF Cn_Chained_Arena cn_chained_arena_make(uint64_t block_capacity) {
     };
 }
 
-CNDEF void *cn_chained_arena_alloc(Cn_Chained_Arena *arena, uint64_t size) {
+CNDEF void *cn_chained_arena_alloc(Cn_Chained_Arena *arena, size_t size) {
     CN_ASSERT(size > 0);
     CN_ASSERT(size <= arena->block_capacity);
 
     Cn_Chained_Arena_Block_Header *header = CN_CHAINED_ARENA_BLOCK_HEADER(arena->block);
 
     if ((header->allocated + size) > arena->block_capacity) {
-        header = (Cn_Chained_Arena_Block_Header *)CN_REALLOC(NULL, sizeof(Cn_Chained_Arena_Block_Header) + arena->block_capacity);
+        if (header->next == NULL) {
+            header->next = realloc(NULL, sizeof(Cn_Chained_Arena_Block_Header) + arena->block_capacity);
+            ((Cn_Chained_Arena_Block_Header *)header->next)->next = NULL;
+        }
+        header = header->next;
 
         header->prev = arena->block;
         header->allocated = 0;
@@ -5000,18 +5202,40 @@ CNDEF void *cn_chained_arena_alloc(Cn_Chained_Arena *arena, uint64_t size) {
     return (uint8_t *)arena->block + header->allocated - size;
 }
 
-CNDEF void cn_chained_arena_dealloc(Cn_Chained_Arena *arena, uint64_t size) {
+CNDEF void *cn_chained_arena_realloc(Cn_Chained_Arena *arena, void *mem, size_t new_size) {
+    CN_UNUSED(mem);
+    return cn_chained_arena_alloc(arena, new_size);
+}
+
+CNDEF void cn_chained_arena_free(Cn_Chained_Arena *arena, void *mem) {
+    CN_UNUSED(arena);
+    CN_UNUSED(mem);
+    cn_log(CN_WARNING, "Coudln't free memory in chained arena, chained arena doesn't implement free mechanism, use free_all instead, or destroy chained arena completely.");
+}
+
+CNDEF void cn_chained_arena_free_all(Cn_Chained_Arena *arena) {
     Cn_Chained_Arena_Block_Header *header = CN_CHAINED_ARENA_BLOCK_HEADER(arena->block);
-    uint64_t decrease;
+
+    while (header->prev != NULL) {
+        header->allocated = 0;
+        arena->block = header->prev;
+        header = CN_CHAINED_ARENA_BLOCK_HEADER(arena->block);
+    }
+
+    header->allocated = 0;
+}
+
+CNDEF void cn_chained_arena_dealloc(Cn_Chained_Arena *arena, size_t size) {
+    Cn_Chained_Arena_Block_Header *header = CN_CHAINED_ARENA_BLOCK_HEADER(arena->block);
+    size_t decrease;
 
     while (size > 0) {
         if (header->allocated == 0) {
             // No more blocks to deallocate simply return.
             if (header->prev == NULL) return;
             
-            // Freeing current block, going back to the previous.
+            // going back to the previous.
             arena->block = header->prev;
-            CN_FREE(header);
         }
 
         header = CN_CHAINED_ARENA_BLOCK_HEADER(arena->block);
@@ -5022,7 +5246,7 @@ CNDEF void cn_chained_arena_dealloc(Cn_Chained_Arena *arena, uint64_t size) {
     }
 }
 
-CNDEF int64_t cn_chained_arena_allocation_info(Cn_Chained_Arena *arena, void *allocation_ptr, uint64_t *offset) {
+CNDEF int64_t cn_chained_arena_allocation_info(Cn_Chained_Arena *arena, void *allocation_ptr, size_t *offset) {
     Cn_Chained_Arena_Block_Header *header;
     uint8_t *ptr = allocation_ptr;
     Cn_Chained_Arena a = *arena;
@@ -5054,8 +5278,8 @@ CNDEF int64_t cn_chained_arena_allocation_info(Cn_Chained_Arena *arena, void *al
     return idx;
 }
 
-CNDEF uint64_t cn_chained_arena_allocated(Cn_Chained_Arena *arena) {
-    uint64_t allocated = 0;
+CNDEF size_t cn_chained_arena_allocated(Cn_Chained_Arena *arena) {
+    size_t allocated = 0;
     Cn_Chained_Arena a = *arena;
     Cn_Chained_Arena_Block_Header *header = CN_CHAINED_ARENA_BLOCK_HEADER(a.block);
     
@@ -5070,16 +5294,16 @@ CNDEF uint64_t cn_chained_arena_allocated(Cn_Chained_Arena *arena) {
     return allocated;
 }
 
-CNDEF void cn_chained_arena_free(Cn_Chained_Arena *arena) {
+CNDEF void cn_chained_arena_destroy(Cn_Chained_Arena *arena) {
     Cn_Chained_Arena_Block_Header *header = CN_CHAINED_ARENA_BLOCK_HEADER(arena->block);
 
     while (header->prev != NULL) {
         arena->block = header->prev;
-        CN_FREE(header);
+        free(header);
         header = CN_CHAINED_ARENA_BLOCK_HEADER(arena->block);
     }
 
-    CN_FREE(header);
+    free(header);
 
     arena->block = NULL;
     arena->block_capacity = 0;
@@ -7320,9 +7544,9 @@ CNDEF void cn_ast_free(Cn_Ast_Data *data) {
 
     cn_array_list_free(&data->scope_stack);
 
-    cn_chained_arena_free(&data->permanent_strings_arena);
+    cn_chained_arena_destroy(&data->permanent_strings_arena);
 
-    cn_chained_arena_free(&data->scoped_strings_arena);
+    cn_chained_arena_destroy(&data->scoped_strings_arena);
 
     cn_hash_table_free(&data->tag_binding_table);
 
@@ -7336,11 +7560,11 @@ CNDEF void cn_ast_free(Cn_Ast_Data *data) {
 
     cn_array_list_free(&data->binding_defined_idx_list);
 
-    cn_chained_arena_free(&data->type_children_arena);
+    cn_chained_arena_destroy(&data->type_children_arena);
 
     cn_hash_set_free(&data->type_ptr_set);
 
-    cn_chained_arena_free(&data->type_arena);
+    cn_chained_arena_destroy(&data->type_arena);
 
     cn_array_list_free(&data->node_list);
 
@@ -17312,7 +17536,7 @@ CNDEF Cn_Result cn__send_message(Cn_Message_Kind kind, Cn_Message message) {
 }
 
 CNDEF void cn_log_types() {
-    if (CN_INFO >= cn_min_log_level) {
+    if (CN_INFO >= cn_log_min_level) {
         cn_log(CN_INFO, "Type universe:" CN_ANSI_BLUE);
 
         void *block = cn__ast_data->type_arena.block;
@@ -17333,7 +17557,7 @@ CNDEF void cn_log_types() {
 }
 
 CNDEF void cn_log_bindings() {
-    if (CN_INFO >= cn_min_log_level) {
+    if (CN_INFO >= cn_log_min_level) {
         // First binding is NIL, so skip index 0.
         cn_log(CN_INFO, "Bindings:" CN_ANSI_BRIGHT_YELLOW);
         for (int i = 1; i < cn_array_list_length(&cn__ast_data->binding_list); i++) {
