@@ -707,9 +707,115 @@ CNDEF size_t cn_chained_arena_allocated(Cn_Chained_Arena *arena);
  */
 CNDEF void cn_chained_arena_destroy(Cn_Chained_Arena *arena);
 
-typedef struct { CN_ALLOCATOR_BASE;
 
+/**
+ * Pool is an allocator that hands out fixed size slots cut from pre divided blocks.
+ * It is constructed from a list of capacities, where every capacity defines a size class.
+ * Each size class owns a chain of blocks, and each block is a bit field of occupied
+ * slots followed by the memory those slots are cut from.
+ *
+ *  cn_pool_make(8, 64)
+ *
+ *              -------------------------     -------------------------
+ *  blocks[0] = | 8  | flags | mem     | --> | 8  | flags | mem     |
+ *              -------------------------     -------------------------
+ *              -------------------------
+ *  blocks[1] = | 64 | flags | mem     | --> NULL
+ *              -------------------------
+ *
+ *  blocks_length = 2
+ *
+ * Blocks are always of CN_POOL_BLOCK_MAX_CAPACITY bytes, so a size class of capacity 8
+ * cuts its block into 512 slots, while a size class of capacity 4096 cuts it into 1.
+ * When every block of a size class is full, one more block is chained to its end.
+ *
+ * Pool doesn't store any header next to the returned memory, so the block a pointer
+ * belongs to is found by searching the blocks for the one whose memory contains it.
+ *
+ * Pool struct itself only holds the array of size class chains and its length, and that
+ * array is the array of capacities supplied to cn_pool_make, overwritten in place with
+ * block pointers. Which is why:
+ *
+ *  - Capacities must be listed in strictly ascending order, so that the first size class
+ *    big enough for an allocation is also the tightest fit for it.
+ *  - Pool must not outlive the supplied array, cn_pool_make used with a compound literal
+ *    inside a function is only valid until the end of the enclosing block.
+ */
+#define CN_POOL_BLOCK_MAX_CAPACITY 4096
+#define CN_POOL_BLOCK_MIN_CAPACITY 8
+
+typedef struct cn_pool_block Cn_Pool_Block;
+
+struct cn_pool_block {
+    Cn_Pool_Block *next;
+    size_t capacity; // Capacity per allocation, size_t keeps mem aligned as malloc returned it.
+    uint8_t flags[CN_POOL_BLOCK_MAX_CAPACITY / CN_POOL_BLOCK_MIN_CAPACITY / 8]; // Bit flags, if bit set to, specific allocation is occupied.
+    uint8_t mem[CN_POOL_BLOCK_MAX_CAPACITY]; // Total allocation.
+};
+
+typedef struct { CN_ALLOCATOR_BASE;
+    Cn_Pool_Block **blocks;
+    size_t blocks_length;
 } Cn_Pool;
+
+/**
+ * Number of slots a block of given capacity is divided into.
+ */
+#define CN_POOL_BLOCK_SLOTS(block) (CN_POOL_BLOCK_MAX_CAPACITY / (block)->capacity)
+
+/**
+ * Constructs pool and allocates one block per supplied capacity.
+ * Capacities must be strictly ascending, multiples of CN_POOL_BLOCK_MIN_CAPACITY,
+ * and not bigger than CN_POOL_BLOCK_MAX_CAPACITY.
+ * Assumes sizeof(size_t) == sizeof(void *) because it reuses supplied array of capacities.
+ */
+#define cn_pool_make(...) cn__pool_make((size_t []) { __VA_ARGS__ }, (sizeof((size_t []) { __VA_ARGS__ }) / sizeof(size_t)))
+
+CNDEF Cn_Pool cn__pool_make(size_t capacities[], size_t capacities_length);
+
+/**
+ * Allocates next free slot of memory from the pool.
+ * Slot is taken from the smallest size class that fits the requested size.
+ */
+CNDEF void *cn_pool_alloc(Cn_Pool *pool, size_t size);
+
+/**
+ * Reallocs slot of memory from the pool.
+ * If new size still fits the slot, same memory is returned.
+ */
+CNDEF void *cn_pool_realloc(Cn_Pool *pool, void *mem, size_t new_size);
+
+/**
+ * Frees slot of memory from the pool.
+ */
+CNDEF void cn_pool_free(Cn_Pool *pool, void *mem);
+
+/**
+ * Marks every slot of every block as free, keeping the blocks themselves allocated.
+ */
+CNDEF void cn_pool_free_all(Cn_Pool *pool);
+
+/**
+ * Given pool and pointer allocated by it, it will find the block the pointer was
+ * allocated from, and index of the slot it occupies in that block.
+ *
+ * RETURNS: Block containing the pointer, NULL if pointer supplied doesn't point to the
+ * beginning of an occupied slot, which is also the case for already freed memory.
+ *
+ * OUTPUTS: Index of the occupied slot in the found block.
+ *
+ * NOTE: This function will properly return if supplied pointer points to the memory held
+ * by the pool. Even if address was not supplied correctly, but it happens to point to the
+ * beginning of an occupied slot, this function will properly return.
+ */
+CNDEF Cn_Pool_Block *cn_pool_allocation_info(Cn_Pool *pool, void *allocation_ptr, size_t *slot);
+
+/**
+ * Completely destroys pool and frees all memory occupied by it.
+ * Supplied array of capacities is not freed, since pool doesn't own it.
+ */
+CNDEF void cn_pool_destroy(Cn_Pool *pool);
+
 
 union cn_allocator {
     CN_ALLOCATOR_BASE;
@@ -5126,7 +5232,7 @@ CNDEF Cn_Arena cn_arena_make(size_t capacity) {
         .alloc      = (Cn_Alloc *)cn_arena_alloc,
         .realloc    = (Cn_Realloc *)cn_arena_realloc,
         .free       = (Cn_Free *)cn_arena_free,
-        .free_all   = (Cn_Free_All *)cn_free_all,
+        .free_all   = (Cn_Free_All *)cn_arena_free_all,
         .capacity   = capacity,
         .allocation = mem,
         .ptr        = mem,
@@ -5174,6 +5280,10 @@ CNDEF Cn_Chained_Arena cn_chained_arena_make(size_t block_capacity) {
     header->allocated = 0;
     
     return (Cn_Chained_Arena) {
+        .alloc      = (Cn_Alloc *)cn_chained_arena_alloc,
+        .realloc    = (Cn_Realloc *)cn_chained_arena_realloc,
+        .free       = (Cn_Free *)cn_chained_arena_free,
+        .free_all   = (Cn_Free_All *)cn_chained_arena_free_all,
         .block_capacity = block_capacity,
         .block = header + 1,
     };
@@ -5307,6 +5417,223 @@ CNDEF void cn_chained_arena_destroy(Cn_Chained_Arena *arena) {
 
     arena->block = NULL;
     arena->block_capacity = 0;
+}
+
+static Cn_Pool_Block *cn__pool_block_make(size_t capacity) {
+    Cn_Pool_Block *block = realloc(NULL, sizeof(Cn_Pool_Block));
+
+    if (block == NULL) {
+        cn_log(CN_ERROR, "Couldn't malloc %zu bytes of memory for the pool block.", sizeof(Cn_Pool_Block));
+        return NULL;
+    }
+
+    block->next = NULL;
+    block->capacity = capacity;
+    memset(block->flags, 0, sizeof(block->flags));
+
+    return block;
+}
+
+/**
+ * Occupies first free slot of the block, NULL if every slot of the block is occupied.
+ */
+static void *cn__pool_block_alloc(Cn_Pool_Block *block) {
+    size_t slots = CN_POOL_BLOCK_SLOTS(block);
+
+    for (size_t slot = 0; slot < slots; slot++) {
+        // Whole byte of flags is occupied, skipping all 8 slots it covers at once.
+        if (block->flags[slot / 8] == 0xFF) {
+            slot += 7 - (slot % 8);
+            continue;
+        }
+
+        if (block->flags[slot / 8] & (1 << (slot % 8))) continue;
+
+        block->flags[slot / 8] |= 1 << (slot % 8);
+        return block->mem + slot * block->capacity;
+    }
+
+    return NULL;
+}
+
+CNDEF Cn_Pool cn__pool_make(size_t capacities[], size_t capacities_length) {
+    CN_ASSERT(capacities_length > 0);
+    CN_ASSERT(sizeof(size_t) == sizeof(Cn_Pool_Block *));
+
+    // IMPORTANT: Array of capacities is reused as an array of blocks, every capacity is
+    // read before the block allocated from it overwrites the very same slot.
+    Cn_Pool_Block **blocks = (Cn_Pool_Block **)capacities;
+    size_t previous = 0;
+
+    for (size_t i = 0; i < capacities_length; i++) {
+        size_t capacity = capacities[i];
+
+        CN_ASSERT(capacity >= CN_POOL_BLOCK_MIN_CAPACITY);
+        CN_ASSERT(capacity <= CN_POOL_BLOCK_MAX_CAPACITY);
+        CN_ASSERT(capacity % CN_POOL_BLOCK_MIN_CAPACITY == 0);
+        CN_ASSERT(capacity > previous); // Capacities must be strictly ascending.
+        previous = capacity;
+
+        blocks[i] = cn__pool_block_make(capacity);
+    }
+
+    return (Cn_Pool) {
+        .alloc          = (Cn_Alloc *)cn_pool_alloc,
+        .realloc        = (Cn_Realloc *)cn_pool_realloc,
+        .free           = (Cn_Free *)cn_pool_free,
+        .free_all       = (Cn_Free_All *)cn_pool_free_all,
+        .blocks         = blocks,
+        .blocks_length  = capacities_length,
+    };
+}
+
+CNDEF void *cn_pool_alloc(Cn_Pool *pool, size_t size) {
+    CN_ASSERT(size > 0);
+
+    for (size_t i = 0; i < pool->blocks_length; i++) {
+        Cn_Pool_Block *block = pool->blocks[i];
+        CN_ASSERT(block != NULL);
+
+        // Blocks are ordered by capacity, so the first one that fits is the tightest fit.
+        if (size > block->capacity) continue;
+
+        while (true) {
+            void *mem = cn__pool_block_alloc(block);
+            if (mem != NULL) return mem;
+
+            // Every block of this size class is full, chaining one more to the end.
+            if (block->next == NULL) {
+                block->next = cn__pool_block_make(block->capacity);
+                if (block->next == NULL) return NULL;
+            }
+
+            block = block->next;
+        }
+    }
+
+    cn_log(CN_ERROR, "Couldn't allocate %zu bytes of memory from the pool, no block has big enough capacity per allocation.", size);
+    return NULL;
+}
+
+CNDEF void *cn_pool_realloc(Cn_Pool *pool, void *mem, size_t new_size) {
+    if (mem == NULL) return cn_pool_alloc(pool, new_size);
+
+    size_t slot;
+    Cn_Pool_Block *block = cn_pool_allocation_info(pool, mem, &slot);
+
+    if (block == NULL) {
+        cn_log(CN_WARNING, "Couldn't realloc memory in the pool, supplied pointer doesn't point to the memory allocated by it.");
+        return NULL;
+    }
+
+    // New size still fits the slot, nothing has to move.
+    if (new_size <= block->capacity) return mem;
+
+    void *new_mem = cn_pool_alloc(pool, new_size);
+    if (new_mem == NULL) return NULL;
+
+    memcpy(new_mem, mem, block->capacity);
+    block->flags[slot / 8] &= ~(1 << (slot % 8));
+
+    return new_mem;
+}
+
+CNDEF void cn_pool_free(Cn_Pool *pool, void *mem) {
+    if (mem == NULL) return;
+
+    size_t slot;
+    Cn_Pool_Block *block = cn_pool_allocation_info(pool, mem, &slot);
+
+    if (block == NULL) {
+        cn_log(CN_WARNING, "Couldn't free memory in the pool, supplied pointer doesn't point to the memory allocated by it.");
+        return;
+    }
+
+    block->flags[slot / 8] &= ~(1 << (slot % 8));
+}
+
+CNDEF void cn_pool_free_all(Cn_Pool *pool) {
+    for (size_t i = 0; i < pool->blocks_length; i++) {
+        for (Cn_Pool_Block *block = pool->blocks[i]; block != NULL; block = block->next) {
+            memset(block->flags, 0, sizeof(block->flags));
+        }
+    }
+}
+
+CNDEF Cn_Pool_Block *cn_pool_allocation_info(Cn_Pool *pool, void *allocation_ptr, size_t *slot) {
+    uint8_t *ptr = allocation_ptr;
+
+    for (size_t i = 0; i < pool->blocks_length; i++) {
+        for (Cn_Pool_Block *block = pool->blocks[i]; block != NULL; block = block->next) {
+            size_t used = CN_POOL_BLOCK_SLOTS(block) * block->capacity;
+
+            if (ptr < block->mem || ptr >= block->mem + used) continue;
+
+            size_t offset = ptr - block->mem;
+
+            // Pointer points inside of the slot, instead of the beginning of it.
+            if (offset % block->capacity != 0) return NULL;
+
+            size_t found = offset / block->capacity;
+
+            // Slot is free, so nothing was allocated at this address.
+            if (!(block->flags[found / 8] & (1 << (found % 8)))) return NULL;
+
+            *slot = found;
+            return block;
+        }
+    }
+
+    // No block was found that contains address supplied by the user.
+    return NULL;
+}
+
+CNDEF void cn_pool_destroy(Cn_Pool *pool) {
+    for (size_t i = 0; i < pool->blocks_length; i++) {
+        Cn_Pool_Block *block = pool->blocks[i];
+
+        while (block != NULL) {
+            Cn_Pool_Block *next = block->next;
+            free(block);
+            block = next;
+        }
+
+        pool->blocks[i] = NULL;
+    }
+
+    pool->blocks = NULL;
+    pool->blocks_length = 0;
+}
+
+Cn_Allocator *cn_default_allocator = &(Cn_Allocator) { 
+    .alloc      = (Cn_Alloc *)malloc, 
+    .realloc    = (Cn_Realloc *)realloc, 
+    .free       = (Cn_Free *)free, 
+    .free_all   = NULL 
+};
+
+CNDEF void *cn_alloc(Cn_Allocator *allocator, size_t size) {
+    CN_ASSERT(allocator != NULL);
+    CN_ASSERT(allocator->alloc != NULL);
+    return allocator->alloc(allocator, size);
+}
+
+CNDEF void *cn_realloc(Cn_Allocator *allocator, void *mem, size_t size) {
+    CN_ASSERT(allocator != NULL);
+    CN_ASSERT(allocator->realloc != NULL);
+    return allocator->realloc(allocator, mem, size);
+}
+
+CNDEF void cn_free(Cn_Allocator *allocator, void *mem) {
+    CN_ASSERT(allocator != NULL);
+    CN_ASSERT(allocator->free != NULL);
+    return allocator->free(allocator, mem);
+}
+
+CNDEF void cn_free_all(Cn_Allocator *allocator) {
+    CN_ASSERT(allocator != NULL);
+    CN_ASSERT(allocator->free_all != NULL);
+    return allocator->free_all(allocator);
 }
 
 // ARRAY LIST SECTION
