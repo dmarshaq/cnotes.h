@@ -37,32 +37,29 @@ Cn_Result msg_handler(Cn_Message_Kind kind, void *message) {
         case CN_MESSAGE_PARSED_FUNCTION:
             {   
                 Cn_Message_Parsed_Function *msg = message;
-                Cn_Ast_Idx block_idx = cn_ast_get_as_node(msg->node_idx)->function.block_idx;
-                
-                Cn_Ast_Idx *items = cn_array_list_make(Cn_Ast_Idx, 4);
+                Cn_Ast_Block *block = msg->node->block;
 
-                Cn_Ast_Idx ident_idx;
-                cn_get_declarator_info(
-                        cn_ast_get_as_node(msg->node_idx)->function.declarator_idx,
-                        &ident_idx
+                Cn_Ast_Node **items = cn_array_list_make(Cn_Ast_Node *, 4);
+
+                Cn_Ast_Identifier *ident;
+                cn_get_declarator_info(msg->node->declarator, (Cn_Ast_Node **)&ident);
+
+                CN_ASSERT(ident->kind == CN_AST_IDENTIFIER);
+
+                cn_array_list_append(&items, cn_ast_node(cn_build_format("printf(\">>> hello from: '%.*s'\\n\");\n",
+                            CN_UNPACK(ident->name)))
                         );
 
-                CN_ASSERT(cn_ast_get_as_node(ident_idx)->kind == CN_AST_IDENTIFIER);
-
-                cn_array_list_append(&items, cn_build_format("printf(\">>> hello from: '%.*s'\\n\");\n", 
-                            CN_UNPACK(cn_ast_get_as_node(ident_idx)->identifier.name))
-                        );
-                
-                for (int64_t i = 0; i < cn_ast_get_as_node(block_idx)->block.block_items.length; i++) {
-                    cn_array_list_append(&items, cn_ast_get_as_node(block_idx)->block.block_items.idxs[i]);
+                for (int64_t i = 0; i < block->block_items.length; i++) {
+                    cn_array_list_append(&items, block->block_items.ptrs[i]);
                 }
 
                 Cn_Ast_List new = {
-                    .idxs = items,
+                    .ptrs = items,
                     .length = cn_array_list_length(&items),
                 };
 
-                cn_replace_list(&cn_ast_get_as_node(block_idx)->block.block_items, new);
+                block->block_items = new;
 
                 return CN_RESULT_MODIFIED_NO_REPEAT;
             }

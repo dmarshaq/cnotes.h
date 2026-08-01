@@ -107,6 +107,8 @@ const Cn_String src = CN_STR_BUFFER(
 );
 
 Cn_Result handler(Cn_Message_Kind kind, void *message) {
+    CN_UNUSED(message);
+
     // Reporting modification on every parsed function definition,
     // it rolls back to the checkpoint and makes parser take the reparse path.
     if (kind == CN_MESSAGE_PARSED_FUNCTION) {
