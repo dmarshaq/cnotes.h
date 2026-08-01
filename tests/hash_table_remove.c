@@ -1,12 +1,12 @@
 #include "../cnotes.h"
 
 void hash_table_put(int **table, int value, const char *key) {
-    Cn_String str = CN_CSTR(key);
+    Cn_String str = CN_STR(strlen(key), key);
     cn_hash_table_put(table, value, &str);
 }
 
 void hash_table_remove(int **table, const char *key) {
-    Cn_String str = CN_CSTR(key);
+    Cn_String str = CN_STR(strlen(key), key);
     cn_hash_table_remove(table, &str);
 }
 

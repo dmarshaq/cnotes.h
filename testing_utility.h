@@ -41,7 +41,7 @@ void cn__json_escape_str(FILE *f, Cn_String s) {
 }
 
 void cn__json_escape_cstr(FILE *f, char *str) {
-    cn__json_escape_str(f, CN_CSTR(str));
+    cn__json_escape_str(f, CN_STR(strlen(str), str));
 }
 
 CNDEF void cn_test_diagnostic_handler(Cn_Diagnostic_Level level, Cn_Location *loc, Cn_Diagnostic_Code code, Cn_String span, Cn_Diagnostic_Annotation annotations[], size_t annotations_length, const char *format, va_list args) {
@@ -63,7 +63,7 @@ CNDEF void cn_test_diagnostic_handler(Cn_Diagnostic_Level level, Cn_Location *lo
     char code_buf[32];
 
     if (!cn_str_is_empty(CN_DIAGNOSTIC_CODES[code])) {
-        snprintf(code_buf, sizeof(code_buf), "%.*s", CN_UNPACK(CN_DIAGNOSTIC_CODES[code]));
+        snprintf(code_buf, sizeof(code_buf), "%.*s", CN_STR_UNPACK(CN_DIAGNOSTIC_CODES[code]));
         code_str = code_buf;
     } else {
         snprintf(code_buf, sizeof(code_buf), "CN%04d", code);

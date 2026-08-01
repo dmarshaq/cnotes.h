@@ -256,11 +256,6 @@ typedef struct {
 #define CN_STR(length, data)            ((Cn_String) { (int64_t)length, (char *)data } )
 
 /**
- * Construct string view of supplied NUL terminated string.
- */
-#define CN_CSTR(cstring)                CN_STR(strlen(cstring), cstring)
-
-/**
  * Construct string view directly from literal.
  */
 #define CN_STR_LIT(literal)             CN_STR(sizeof(literal) - 1, literal)
@@ -281,18 +276,12 @@ typedef struct {
  * This macro "unpacks" the string into length and data components.
  * Is used in formating of the string. For example given string "str":
  *      
- *      printf("value of str: %.*s", CN_UNPACK(str));
+ *      printf("value of str: %.*s", CN_STR_UNPACK(str));
  *
  * NOTE: Cast to int is required, because %.*s expects maximum length of 32 bit INT_MAX.
  * Yes, it will truncate the string if it's length exceeds INT_MAX.
  */
-#define CN_UNPACK(str)                  (int)((str).length), (str).data
-
-/**
- * This is just a shortcut macro for unpackng any string literal 
- * into the same length and data components.
- */
-#define CN_UNPACK_LITERAL(literal)      (int)(sizeof(literal) - 1), (literal)
+#define CN_STR_UNPACK(str)                  (int)((str).length), (str).data
 
 /**
  * RETURNS: Cn_String that points to the memory of original "str" at index "start" with length up until index "end".
@@ -6658,9 +6647,9 @@ CNDEF void cn_lexer_print_snippet(Cn_Lexer *lexer, uint64_t index, int64_t lengt
     line = cn_str_substring(line, 0, end);
     uint64_t underline_offset = index - lexer->bol;
 
-    fprintf(stderr, "\n%4lu | %.*s", lexer->line, CN_UNPACK(cn_str_substring(line, 0, underline_offset)));
-    fprintf(stderr, "\033[31m%.*s\033[0m", CN_UNPACK(cn_str_substring(line, underline_offset, underline_offset + length)));
-    fprintf(stderr, "%.*s\n", CN_UNPACK(cn_str_substring(line, underline_offset + length, line.length)));
+    fprintf(stderr, "\n%4lu | %.*s", lexer->line, CN_STR_UNPACK(cn_str_substring(line, 0, underline_offset)));
+    fprintf(stderr, "\033[31m%.*s\033[0m", CN_STR_UNPACK(cn_str_substring(line, underline_offset, underline_offset + length)));
+    fprintf(stderr, "%.*s\n", CN_STR_UNPACK(cn_str_substring(line, underline_offset + length, line.length)));
     fprintf(stderr, "     | %*s\033[31m^", (int)underline_offset, "");
 
     for(int64_t i = 1; i < length; i++)
@@ -6856,52 +6845,52 @@ CNDEF void cn__type_stringify(const Cn_Type *type, Cn_String_Builder *left, Cn_S
 
     switch (type->kind) {
         case CN_OPAQUE:
-            cn_sb_append_str(left, CN_CSTR("<opaque>"));  return;
+            cn_sb_append_str(left, CN_STR_LIT("<opaque>"));  return;
         case CN_VOID:
-            cn_sb_append_str(left, CN_CSTR("void"));      return;
+            cn_sb_append_str(left, CN_STR_LIT("void"));      return;
         case CN_BOOL:
-            cn_sb_append_str(left, CN_CSTR("_Bool"));     return;
+            cn_sb_append_str(left, CN_STR_LIT("_Bool"));     return;
         case CN_UNKNOWN:
-            cn_sb_append_str(left, CN_CSTR("<unknown>")); return;
+            cn_sb_append_str(left, CN_STR_LIT("<unknown>")); return;
 
         case CN_INTEGER: {
             const Cn_Type_Integer *ti = (const Cn_Type_Integer *)type;
-            if (!ti->is_signed) cn_sb_append_str(left, CN_CSTR("unsigned "));
+            if (!ti->is_signed) cn_sb_append_str(left, CN_STR_LIT("unsigned "));
             switch (type->size) {
-                case 1:  cn_sb_append_str(left, CN_CSTR("char"));      return;
-                case 2:  cn_sb_append_str(left, CN_CSTR("short"));     return;
-                case 4:  cn_sb_append_str(left, CN_CSTR("int"));       return;
-                case 8:  cn_sb_append_str(left, CN_CSTR("long long")); return;
+                case 1:  cn_sb_append_str(left, CN_STR_LIT("char"));      return;
+                case 2:  cn_sb_append_str(left, CN_STR_LIT("short"));     return;
+                case 4:  cn_sb_append_str(left, CN_STR_LIT("int"));       return;
+                case 8:  cn_sb_append_str(left, CN_STR_LIT("long long")); return;
                 default: cn_sb_append_format(left, "int%lld_t", type->size * 8); return;
             }
         }
 
         case CN_FLOAT: {
             switch (type->size) {
-                case 4:  cn_sb_append_str(left, CN_CSTR("float"));       return;
-                case 8:  cn_sb_append_str(left, CN_CSTR("double"));      return;
-                case 16: cn_sb_append_str(left, CN_CSTR("long double")); return;
+                case 4:  cn_sb_append_str(left, CN_STR_LIT("float"));       return;
+                case 8:  cn_sb_append_str(left, CN_STR_LIT("double"));      return;
+                case 16: cn_sb_append_str(left, CN_STR_LIT("long double")); return;
                 default: cn_sb_append_format(left, "float%lld", type->size * 8); return;
             }
         }
 
         case CN_STRUCT: {
             const Cn_Type_Struct *ts = (const Cn_Type_Struct *)type;
-            cn_sb_append_str(left, CN_CSTR("struct "));
+            cn_sb_append_str(left, CN_STR_LIT("struct "));
             cn_sb_append_str(left, ts->tag);
             return;
         }
 
         case CN_UNION: {
             const Cn_Type_Union *tu = (const Cn_Type_Union *)type;
-            cn_sb_append_str(left, CN_CSTR("union "));
+            cn_sb_append_str(left, CN_STR_LIT("union "));
             cn_sb_append_str(left, tu->tag);
             return;
         }
 
         case CN_ENUM: {
             const Cn_Type_Enum *te = (const Cn_Type_Enum *)type;
-            cn_sb_append_str(left, CN_CSTR("enum "));
+            cn_sb_append_str(left, CN_STR_LIT("enum "));
             cn_sb_append_str(left, te->tag);
             return;
         }
@@ -6919,7 +6908,7 @@ CNDEF void cn__type_stringify(const Cn_Type *type, Cn_String_Builder *left, Cn_S
 
                 if (needs_space) cn_sb_append_char(left, ' ');
 
-                cn_sb_append_str(left, CN_CSTR("(*"));
+                cn_sb_append_str(left, CN_STR_LIT("(*"));
 
                 cn_sb_append_char(right, ')');
                 cn_sb_append_str(right, cn_sb_to_str(&inner_right));
@@ -6930,7 +6919,7 @@ CNDEF void cn__type_stringify(const Cn_Type *type, Cn_String_Builder *left, Cn_S
 
                 if (needs_space) cn_sb_append_char(left, ' ');
 
-                cn_sb_append_str(left, CN_CSTR("*"));
+                cn_sb_append_str(left, CN_STR_LIT("*"));
             }
 
             return;
@@ -6942,7 +6931,7 @@ CNDEF void cn__type_stringify(const Cn_Type *type, Cn_String_Builder *left, Cn_S
             if (ta->length >= 0)
                 cn_sb_append_format(right, "[%lld]", ta->length);
             else
-                cn_sb_append_str(right, CN_CSTR("[]"));
+                cn_sb_append_str(right, CN_STR_LIT("[]"));
             return;
         }
 
@@ -6952,10 +6941,10 @@ CNDEF void cn__type_stringify(const Cn_Type *type, Cn_String_Builder *left, Cn_S
 
             cn_sb_append_char(right, '(');
             if (tf->params_length == 0) {
-                cn_sb_append_str(right, CN_CSTR("void"));
+                cn_sb_append_str(right, CN_STR_LIT("void"));
             } else {
                 for (int64_t i = 0; i < tf->params_length; i++) {
-                    if (i > 0) cn_sb_append_str(right, CN_CSTR(", "));
+                    if (i > 0) cn_sb_append_str(right, CN_STR_LIT(", "));
 
                     Cn_String_Builder param_left  = cn_sb_make(32);
                     Cn_String_Builder param_right = cn_sb_make(32);
@@ -6981,13 +6970,13 @@ CNDEF void cn__type_stringify(const Cn_Type *type, Cn_String_Builder *left, Cn_S
             }
 
             if (type->flags & CN_TYPE_QUALIFIED_CONSTANT)
-                cn_sb_append_str(left, CN_CSTR("const "));
+                cn_sb_append_str(left, CN_STR_LIT("const "));
             if (type->flags & CN_TYPE_QUALIFIED_VOLATILE)
-                cn_sb_append_str(left, CN_CSTR("volatile "));
+                cn_sb_append_str(left, CN_STR_LIT("volatile "));
             if (type->flags & CN_TYPE_QUALIFIED_RESTRICT)
-                cn_sb_append_str(left, CN_CSTR("restrict "));
+                cn_sb_append_str(left, CN_STR_LIT("restrict "));
             if (type->flags & CN_TYPE_QUALIFIED_ATOMIC)
-                cn_sb_append_str(left, CN_CSTR("_Atomic "));
+                cn_sb_append_str(left, CN_STR_LIT("_Atomic "));
 
             if (tq->base_type->kind != CN_POINTER) {
                 cn__type_stringify(tq->base_type, left, right);
@@ -7032,7 +7021,7 @@ CNDEF void cn_type_print(const Cn_Type *t) {
         return;
     }
 
-    fprintf(stderr, "%.*s", CN_UNPACK(str));
+    fprintf(stderr, "%.*s", CN_STR_UNPACK(str));
 }
 
 CNDEF bool cn_type_is_constant(const Cn_Type *type) {
@@ -7884,16 +7873,16 @@ CNDEF void cn_ast_print(void * idx, int depth) {
             ADD_IDX(&cn_ast_as(Primary, node)->literal);
             break;
         case CN_AST_IDENTIFIER:
-            fprintf(stderr, " %.*s", CN_UNPACK(cn_ast_as(Identifier, node)->name));
+            fprintf(stderr, " %.*s", CN_STR_UNPACK(cn_ast_as(Identifier, node)->name));
             break;
         case CN_AST_INTEGER:
-            fprintf(stderr, " %.*s", CN_UNPACK(cn_ast_as(Integer, node)->value));
+            fprintf(stderr, " %.*s", CN_STR_UNPACK(cn_ast_as(Integer, node)->value));
             break;
         case CN_AST_FLOAT:
-            fprintf(stderr, " %.*s", CN_UNPACK(cn_ast_as(Float, node)->value));
+            fprintf(stderr, " %.*s", CN_STR_UNPACK(cn_ast_as(Float, node)->value));
             break;
         case CN_AST_STRING:
-            fprintf(stderr, " \"%.*s\"", CN_UNPACK(cn_ast_as(String, node)->str));
+            fprintf(stderr, " \"%.*s\"", CN_STR_UNPACK(cn_ast_as(String, node)->str));
             break;
         case CN_AST_INIT_DECLARATOR:
             ADD_IDX(&cn_ast_as(Init_Declarator, node)->declarator);
@@ -7992,7 +7981,7 @@ CNDEF void cn_ast_print(void * idx, int depth) {
             }
             break;
         case CN_AST_TYPE_SPECIFIER_TYPEDEF:
-            fprintf(stderr, " %.*s", CN_UNPACK(cn_ast_as(Type_Specifier_Typedef, node)->typedef_name));
+            fprintf(stderr, " %.*s", CN_STR_UNPACK(cn_ast_as(Type_Specifier_Typedef, node)->typedef_name));
             break;
         case CN_AST_TYPE_NAME:
             ADD_IDX(&cn_ast_as(Type_Name, node)->specifier_qualifier);
@@ -9160,14 +9149,14 @@ CNDEF bool cn__ast_bindings_conflict(Cn_Ast_Binding *a, Cn_Ast_Binding *b) {
 
     // Different binding kind.
     if (a->kind != b->kind) {
-        cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, b->src, CN_DC_ILLEGAL_BINDING, "'%.*s' redeclared as different kind of symbol.", CN_UNPACK(a->name));
+        cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, b->src, CN_DC_ILLEGAL_BINDING, "'%.*s' redeclared as different kind of symbol.", CN_STR_UNPACK(a->name));
         return true;
     }
     // Confliciting types.
     if (a->type != b->type) {
         Cn_String current_t = cn_type_stringify(CN_STR_BUFFER_EMPTY(128), a->type);
         Cn_String binding_t = cn_type_stringify(CN_STR_BUFFER_EMPTY(128), b->type);
-        cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, b->src, CN_DC_ILLEGAL_BINDING, "'%.*s' redeclared with a conflicting type, from %.*s to %.*s.", CN_UNPACK(b->name), CN_UNPACK(current_t), CN_UNPACK(binding_t));
+        cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, b->src, CN_DC_ILLEGAL_BINDING, "'%.*s' redeclared with a conflicting type, from %.*s to %.*s.", CN_STR_UNPACK(b->name), CN_STR_UNPACK(current_t), CN_STR_UNPACK(binding_t));
         return true;
     }
 
@@ -9200,7 +9189,7 @@ CNDEF Cn_Ast_Binding_Idx cn_ast_function_binding_declare(Cn_String name, void * 
 
             // Checking if it is redefinition.
             if (current->b_function.is_definition && binding.b_function.is_definition) {
-                cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, source, CN_DC_ILLEGAL_BINDING, "'%.*s' function redifinition.", CN_UNPACK(name));
+                cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, source, CN_DC_ILLEGAL_BINDING, "'%.*s' function redifinition.", CN_STR_UNPACK(name));
                 return CN_AST_NIL_BINDING_IDX;
             }
 
@@ -9240,7 +9229,7 @@ CNDEF Cn_Ast_Binding_Idx cn_ast_variable_binding_declare(Cn_String name, void * 
     // Checking if binding has valid type.
     if (is_definition && !(type->flags & CN_TYPE_COMPLETE)) {
         Cn_String type_str = cn_type_stringify(CN_STR_BUFFER_EMPTY(128), type);
-        cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, source, CN_DC_ILLEGAL_BINDING, "'%.*s' variable defined with incomplete type %.*s.", CN_UNPACK(name), CN_UNPACK(type_str));
+        cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, source, CN_DC_ILLEGAL_BINDING, "'%.*s' variable defined with incomplete type %.*s.", CN_STR_UNPACK(name), CN_STR_UNPACK(type_str));
         return CN_AST_NIL_BINDING_IDX;
     }
 
@@ -9265,12 +9254,12 @@ CNDEF Cn_Ast_Binding_Idx cn_ast_variable_binding_declare(Cn_String name, void * 
             if (cn__ast_bindings_conflict(current, &binding)) return CN_AST_NIL_BINDING_IDX;
 
             if (CN_AST_SCOPE_STACK_CURRENT_IDX != CN_AST_FILE_SCOPE_IDX) {
-                cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, source, CN_DC_ILLEGAL_BINDING, "'%.*s' variable redeclared in non-file scope.", CN_UNPACK(name));
+                cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, source, CN_DC_ILLEGAL_BINDING, "'%.*s' variable redeclared in non-file scope.", CN_STR_UNPACK(name));
                 return CN_AST_NIL_BINDING_IDX;
             }
 
             if (current->b_variable.is_definition && binding.b_variable.is_definition) {
-                cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, source, CN_DC_ILLEGAL_BINDING, "'%.*s' variable redifinition.", CN_UNPACK(name));
+                cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, source, CN_DC_ILLEGAL_BINDING, "'%.*s' variable redifinition.", CN_STR_UNPACK(name));
                 return CN_AST_NIL_BINDING_IDX;
             }
 
@@ -9309,7 +9298,7 @@ CNDEF Cn_Ast_Binding_Idx cn_ast_typedef_binding_declare(Cn_String name, void * s
             if (cn__ast_bindings_conflict(current, &binding)) return CN_AST_NIL_BINDING_IDX;
 
             // Typedef is not allowed to be redefined.
-            cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, source, CN_DC_ILLEGAL_BINDING, "'%.*s' typedef redifinition.", CN_UNPACK(name));
+            cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, source, CN_DC_ILLEGAL_BINDING, "'%.*s' typedef redifinition.", CN_STR_UNPACK(name));
             return CN_AST_NIL_BINDING_IDX;
         }
     } else {
@@ -9344,7 +9333,7 @@ CNDEF Cn_Ast_Binding_Idx cn_ast_enum_constant_binding_declare(Cn_String name, vo
             if (cn__ast_bindings_conflict(current, &binding)) return CN_AST_NIL_BINDING_IDX;
 
             // Enum constant is not allowed to be redefined.
-            cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, source, CN_DC_ILLEGAL_BINDING, "'%.*s' enum constant redifinition.", CN_UNPACK(name));
+            cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, source, CN_DC_ILLEGAL_BINDING, "'%.*s' enum constant redifinition.", CN_STR_UNPACK(name));
             return CN_AST_NIL_BINDING_IDX;
         }
     } else {
@@ -9402,7 +9391,7 @@ CNDEF Cn_Ast_Binding_Idx cn_ast_tag_binding_declare(Cn_String tag, Cn_Type_Kind 
 
     Cn_Ast_Binding *binding = cn__ast_data->binding_list + *ref;
     if (binding->type->kind != kind) {
-        cn_log(CN_ERROR, "Tag '%.*s' is already declared under different type. This tool deosn't support that in any form.", CN_UNPACK(tag));
+        cn_log(CN_ERROR, "Tag '%.*s' is already declared under different type. This tool deosn't support that in any form.", CN_STR_UNPACK(tag));
         return CN_AST_NIL_BINDING_IDX;
     }
 
@@ -9458,7 +9447,7 @@ CNDEF Cn_Ast_Binding_Idx cn_ast_label_binding_declare(Cn_String name, void * sou
         // Handling redeclaration, redifinition.
         if (current->scope_idx == CN_AST_SCOPE_STACK_CURRENT_IDX) {
             // Labels are not allowed to be redefined.
-            cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, source, CN_DC_ILLEGAL_BINDING, "'%.*s' label redifinition.", CN_UNPACK(name));
+            cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, source, CN_DC_ILLEGAL_BINDING, "'%.*s' label redifinition.", CN_STR_UNPACK(name));
             return CN_AST_NIL_BINDING_IDX;
         }
     } else {
@@ -9505,13 +9494,13 @@ CNDEF Cn_Ast_Translation_Unit *cn_ast_parse_translation_unit(Cn_Lexer *lexer) {
     {
         Cn_Type *opaque = cn__ast_add_type_if_not((Cn_Type *)&CN_TYPE_OPAQUE);
 
-        cn_ast_typedef_binding_declare(CN_CSTR("__builtin_va_list"),              NULL, opaque);
-        cn_ast_function_binding_declare(CN_CSTR("__builtin___sprintf_chk"),       NULL, 0, 0, opaque, NULL, false);
-        cn_ast_function_binding_declare(CN_CSTR("__builtin___snprintf_chk"),      NULL, 0, 0, opaque, NULL, false);
-        cn_ast_function_binding_declare(CN_CSTR("__builtin___vsprintf_chk"),      NULL, 0, 0, opaque, NULL, false);
-        cn_ast_function_binding_declare(CN_CSTR("__builtin___vsnprintf_chk"),     NULL, 0, 0, opaque, NULL, false);
-        cn_ast_function_binding_declare(CN_CSTR("__builtin_va_arg_pack"),         NULL, 0, 0, opaque, NULL, false);
-        cn_ast_function_binding_declare(CN_CSTR("__builtin_dynamic_object_size"), NULL, 0, 0, opaque, NULL, false);
+        cn_ast_typedef_binding_declare(CN_STR_LIT("__builtin_va_list"),              NULL, opaque);
+        cn_ast_function_binding_declare(CN_STR_LIT("__builtin___sprintf_chk"),       NULL, 0, 0, opaque, NULL, false);
+        cn_ast_function_binding_declare(CN_STR_LIT("__builtin___snprintf_chk"),      NULL, 0, 0, opaque, NULL, false);
+        cn_ast_function_binding_declare(CN_STR_LIT("__builtin___vsprintf_chk"),      NULL, 0, 0, opaque, NULL, false);
+        cn_ast_function_binding_declare(CN_STR_LIT("__builtin___vsnprintf_chk"),     NULL, 0, 0, opaque, NULL, false);
+        cn_ast_function_binding_declare(CN_STR_LIT("__builtin_va_arg_pack"),         NULL, 0, 0, opaque, NULL, false);
+        cn_ast_function_binding_declare(CN_STR_LIT("__builtin_dynamic_object_size"), NULL, 0, 0, opaque, NULL, false);
     }
 
     int64_t mark = cn_ast_stack_mark();
@@ -9580,7 +9569,7 @@ CNDEF Cn_Ast_External_Declaration *cn_ast_parse_external_declaration(Cn_Lexer *l
 
         cn_str_copy_to(cn_sb_to_str(&cn__emitter_sb), code.data);
 
-        // fprintf(stderr, "KAWABANGA REPARSE OF:\n%.*s", CN_UNPACK(code));
+        // fprintf(stderr, "KAWABANGA REPARSE OF:\n%.*s", CN_STR_UNPACK(code));
         Cn_Lexer l = {0};
         cn_lexer_init(&l, code, cn_default_blacklist);
         l.file = cn__saved_lexer.file;
@@ -12752,7 +12741,7 @@ CNDEF Cn_Type *cn__ast_type_from_struct(Cn_Ast_Node *ts) {
  
     if (struct_spec->member_declarations.length > 0) {
         if ((binding->type->flags & CN_TYPE_COMPLETE) && binding->scope_idx == CN_AST_SCOPE_STACK_CURRENT_IDX) {
-            cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, ts, CN_DC_REDEFINITION, "Redefinition of 'struct %.*s' is not allowed within the same scope.", CN_UNPACK(tag));
+            cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, ts, CN_DC_REDEFINITION, "Redefinition of 'struct %.*s' is not allowed within the same scope.", CN_STR_UNPACK(tag));
             goto error;
         }
  
@@ -12829,7 +12818,7 @@ CNDEF Cn_Type *cn__ast_type_from_union(Cn_Ast_Node *ts) {
  
     if (union_spec->member_declarations.length > 0) {
         if ((binding->type->flags & CN_TYPE_COMPLETE) && binding->scope_idx == CN_AST_SCOPE_STACK_CURRENT_IDX) {
-            cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, ts, CN_DC_REDEFINITION, "Redefinition of 'union %.*s' is not allowed within the same scope.", CN_UNPACK(tag));
+            cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, ts, CN_DC_REDEFINITION, "Redefinition of 'union %.*s' is not allowed within the same scope.", CN_STR_UNPACK(tag));
             goto error;
         }
  
@@ -12906,7 +12895,7 @@ CNDEF Cn_Type *cn__ast_type_from_enum(Cn_Ast_Node *ts) {
  
     if (enum_spec->flags & CN_AST_ENUM_HAS_DEFINITION) {
         if ((binding->type->flags & CN_TYPE_COMPLETE) && binding->scope_idx == CN_AST_SCOPE_STACK_CURRENT_IDX) {
-            cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, ts, CN_DC_REDEFINITION, "Redefinition of 'enum %.*s' is not allowed within the same scope.", CN_UNPACK(tag));
+            cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, ts, CN_DC_REDEFINITION, "Redefinition of 'enum %.*s' is not allowed within the same scope.", CN_STR_UNPACK(tag));
             goto error;
         }
  
@@ -13245,7 +13234,7 @@ CNDEF Cn_Type *cn__ast_usual_arithmetic_conversion(Cn_Type *a, Cn_Type *b) {
 CNDEF void cn__ast_illegal_binary(Cn_Ast_Node *node, Cn_Type *left, Cn_Type *right, const char *op_desc) {
     Cn_String left_str  = cn_type_stringify(CN_STR_BUFFER_EMPTY(128), left);
     Cn_String right_str = cn_type_stringify(CN_STR_BUFFER_EMPTY(128), right);
-    cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, node, CN_DC_ILLEGAL_TYPE, "Illegal %s between %.*s and %.*s types.", op_desc, CN_UNPACK(left_str), CN_UNPACK(right_str));
+    cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, node, CN_DC_ILLEGAL_TYPE, "Illegal %s between %.*s and %.*s types.", op_desc, CN_STR_UNPACK(left_str), CN_STR_UNPACK(right_str));
 }
 
 CNDEF bool cn__ast_is_null_pointer_constant(Cn_Ast_Node *expression) {
@@ -13559,7 +13548,7 @@ CNDEF Cn_Type *cn__ast_access_expression_typecheck(Cn_Ast_Node *node) {
         }
     }
 
-    cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, node, CN_DC_INVALID_SYMBOL, "No member named '%.*s' in struct.", CN_UNPACK(ident->name));
+    cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, node, CN_DC_INVALID_SYMBOL, "No member named '%.*s' in struct.", CN_STR_UNPACK(ident->name));
     return NULL;
 }
 
@@ -13613,7 +13602,7 @@ CNDEF Cn_Type *cn__ast_call_typecheck(Cn_Ast_Node *node) {
                 if (!(param_type->kind == CN_POINTER && cn__ast_is_null_pointer_constant(arg))) {
                         Cn_String a_str = cn_type_stringify(CN_STR_BUFFER_EMPTY(128), arg_type);
                         Cn_String p_str = cn_type_stringify(CN_STR_BUFFER_EMPTY(128), param_type);
-                        cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, node, CN_DC_ILLEGAL_TYPE, "Argument %lld of type %.*s is not assignable to parameter type %.*s.", i + 1, CN_UNPACK(a_str), CN_UNPACK(p_str));
+                        cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, node, CN_DC_ILLEGAL_TYPE, "Argument %lld of type %.*s is not assignable to parameter type %.*s.", i + 1, CN_STR_UNPACK(a_str), CN_STR_UNPACK(p_str));
                         return NULL;
                 }
             }
@@ -13735,14 +13724,14 @@ CNDEF Cn_Type *cn__ast_cast_expression_typecheck(Cn_Ast_Node *node) {
     // Target must be scalar.
     if (!cn_type_is_scalar(target)) {
         Cn_String t_str = cn_type_stringify(CN_STR_BUFFER_EMPTY(128), target);
-        cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, node, CN_DC_ILLEGAL_TYPE, "Cannot cast to non-scalar type %.*s.", CN_UNPACK(t_str));
+        cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, node, CN_DC_ILLEGAL_TYPE, "Cannot cast to non-scalar type %.*s.", CN_STR_UNPACK(t_str));
         return NULL;
     }
 
     // Operand must be scalar.
     if (!cn_type_is_scalar(operand)) {
         Cn_String o_str = cn_type_stringify(CN_STR_BUFFER_EMPTY(128), operand);
-        cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, node, CN_DC_ILLEGAL_TYPE, "Cannot cast from non-scalar type %.*s.", CN_UNPACK(o_str));
+        cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, node, CN_DC_ILLEGAL_TYPE, "Cannot cast from non-scalar type %.*s.", CN_STR_UNPACK(o_str));
         return NULL;
     }
 
@@ -13750,7 +13739,7 @@ CNDEF Cn_Type *cn__ast_cast_expression_typecheck(Cn_Ast_Node *node) {
     if ((target->kind == CN_POINTER && operand->kind == CN_FLOAT) || (target->kind == CN_FLOAT && operand->kind == CN_POINTER)) {
         Cn_String t_str = cn_type_stringify(CN_STR_BUFFER_EMPTY(128), target);
         Cn_String o_str = cn_type_stringify(CN_STR_BUFFER_EMPTY(128), operand);
-        cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, node, CN_DC_ILLEGAL_TYPE, "Cannot cast between floating type and pointer %.*s to %.*s.", CN_UNPACK(o_str), CN_UNPACK(t_str));
+        cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, node, CN_DC_ILLEGAL_TYPE, "Cannot cast between floating type and pointer %.*s to %.*s.", CN_STR_UNPACK(o_str), CN_STR_UNPACK(t_str));
         return NULL;
     }
 
@@ -13768,7 +13757,7 @@ CNDEF Cn_Type *cn__ast_compound_expression_typecheck(Cn_Ast_Node *node) {
 
     if (!(cn_type_unqualified(target)->flags & CN_TYPE_COMPLETE)) {
         Cn_String t_str = cn_type_stringify(CN_STR_BUFFER_EMPTY(128), target);
-        cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, cn_ast_as(Compound, node)->type_name, CN_DC_ILLEGAL_TYPE, "Cannot have incomplete target type %.*s in compound literal.", CN_UNPACK(t_str));
+        cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, cn_ast_as(Compound, node)->type_name, CN_DC_ILLEGAL_TYPE, "Cannot have incomplete target type %.*s in compound literal.", CN_STR_UNPACK(t_str));
         return NULL;
     }
     
@@ -13872,7 +13861,7 @@ CNDEF Cn_Type *cn__ast_ternary_expression_typecheck(Cn_Ast_Node *node) {
     {
         Cn_String a_str = cn_type_stringify(CN_STR_BUFFER_EMPTY(128), a);
         Cn_String b_str = cn_type_stringify(CN_STR_BUFFER_EMPTY(128), b);
-        cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, node, CN_DC_ILLEGAL_TYPE, "Incompatible operand types in '?:' expression, %.*s and %.*s.", CN_UNPACK(a_str), CN_UNPACK(b_str));
+        cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, node, CN_DC_ILLEGAL_TYPE, "Incompatible operand types in '?:' expression, %.*s and %.*s.", CN_STR_UNPACK(a_str), CN_STR_UNPACK(b_str));
     }
     return NULL;
 }
@@ -13901,7 +13890,7 @@ CNDEF Cn_Type *cn__ast_assignment_expression_typecheck(Cn_Ast_Node *node) {
                     if (!(left->kind == CN_POINTER && cn__ast_is_null_pointer_constant(cn_ast_as(Assign, node)->right))) {
                         Cn_String left_str  = cn_type_stringify(CN_STR_BUFFER_EMPTY(128), left);
                         Cn_String right_str = cn_type_stringify(CN_STR_BUFFER_EMPTY(128), right);
-                        cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, node, CN_DC_ILLEGAL_TYPE, "Cannot assign %.*s to %.*s.", CN_UNPACK(right_str), CN_UNPACK(left_str));
+                        cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, node, CN_DC_ILLEGAL_TYPE, "Cannot assign %.*s to %.*s.", CN_STR_UNPACK(right_str), CN_STR_UNPACK(left_str));
                         return NULL;
                     }
                 }
@@ -14104,7 +14093,7 @@ CNDEF Cn_Type *cn_ast_expression_typecheck(void * expression) {
     // if (result != NULL) {
     //     Cn_String typename = CN_STR_BUFFER_EMPTY(128);
     //     cn_type_stringify(typename, result);
-    //     cn_diagnostic_node(CN_DIAGNOSTIC_INFO, node, CN_DC_ZERO, "%.*s", CN_UNPACK(typename));
+    //     cn_diagnostic_node(CN_DIAGNOSTIC_INFO, node, CN_DC_ZERO, "%.*s", CN_STR_UNPACK(typename));
     // }
     
     return result;
@@ -14868,7 +14857,7 @@ CNDEF Cn_Type *cn__ast_designator_typecheck(Cn_Ast_Designator *designator, Cn_Ty
     // Shouldn't really happen, but still worth to check, if user decides to call this function.
     if (!(type->flags & CN_TYPE_COMPLETE)) {
         Cn_String type_str = cn_type_stringify(CN_STR_BUFFER_EMPTY(128), type);
-        cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, designator, CN_DC_ILLEGAL_TYPE, "Designator on incomplete type %.*s.", CN_UNPACK(type_str));
+        cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, designator, CN_DC_ILLEGAL_TYPE, "Designator on incomplete type %.*s.", CN_STR_UNPACK(type_str));
         return NULL;
     }
 
@@ -14954,7 +14943,7 @@ CNDEF Cn_Type *cn__ast_designator_typecheck(Cn_Ast_Designator *designator, Cn_Ty
                     }
                 }
 
-                cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, designator, CN_DC_ILLEGAL_TYPE, "No member %.*s in struct specified by identifier designator.", CN_UNPACK(identifier->name));
+                cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, designator, CN_DC_ILLEGAL_TYPE, "No member %.*s in struct specified by identifier designator.", CN_STR_UNPACK(identifier->name));
                 return NULL;
             }
         case CN_UNION: 
@@ -14972,7 +14961,7 @@ CNDEF Cn_Type *cn__ast_designator_typecheck(Cn_Ast_Designator *designator, Cn_Ty
                     }
                 }
 
-                cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, designator, CN_DC_ILLEGAL_TYPE, "No member %.*s in union specified by identifier designator.", CN_UNPACK(identifier->name));
+                cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, designator, CN_DC_ILLEGAL_TYPE, "No member %.*s in union specified by identifier designator.", CN_STR_UNPACK(identifier->name));
                 return NULL;
             }
         default:
@@ -14996,7 +14985,7 @@ CNDEF bool cn__ast_designation_typecheck(Cn_Ast_Designation *designation, Cn_Typ
         // Shouldn't really happen, but still worth to check, if user decides to call this function.
         if (!(type->flags & CN_TYPE_COMPLETE)) {
             Cn_String type_str = cn_type_stringify(CN_STR_BUFFER_EMPTY(128), type);
-            cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, designation, CN_DC_ILLEGAL_TYPE, "Designation on incomplete type %.*s.", CN_UNPACK(type_str));
+            cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, designation, CN_DC_ILLEGAL_TYPE, "Designation on incomplete type %.*s.", CN_STR_UNPACK(type_str));
             return false;
         }
         
@@ -15051,7 +15040,7 @@ CNDEF bool cn_ast_initializer_typecheck(void *initializer_node, Cn_Type *type) {
             if (!(type->kind == CN_POINTER && cn__ast_is_null_pointer_constant(initializer->expression))) {
                 Cn_String left_str  = cn_type_stringify(CN_STR_BUFFER_EMPTY(128), type);
                 Cn_String right_str = cn_type_stringify(CN_STR_BUFFER_EMPTY(128), expression_type);
-                cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, initializer->expression, CN_DC_ILLEGAL_TYPE, "Cannot assign %.*s to %.*s in initializer.", CN_UNPACK(right_str), CN_UNPACK(left_str));
+                cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, initializer->expression, CN_DC_ILLEGAL_TYPE, "Cannot assign %.*s to %.*s in initializer.", CN_STR_UNPACK(right_str), CN_STR_UNPACK(left_str));
                 return false;
             }
         }
@@ -15115,13 +15104,13 @@ CNDEF void cn_default_diagnostic_handler(Cn_Diagnostic_Level level, Cn_Location 
     }
 
     if (loc->line == 0 && loc->column == 0) {
-        fprintf(stderr, CN_ANSI_BOLD"%.*s"CN_ANSI_RESET" ", CN_UNPACK(loc->file));
+        fprintf(stderr, CN_ANSI_BOLD"%.*s"CN_ANSI_RESET" ", CN_STR_UNPACK(loc->file));
     } else {
-        fprintf(stderr, CN_ANSI_BOLD"%.*s:%ld:%ld:"CN_ANSI_RESET" ", CN_UNPACK(loc->file), loc->line, loc->column);
+        fprintf(stderr, CN_ANSI_BOLD"%.*s:%ld:%ld:"CN_ANSI_RESET" ", CN_STR_UNPACK(loc->file), loc->line, loc->column);
     }
 
     if (!cn_str_is_empty(CN_DIAGNOSTIC_CODES[code])) {
-        fprintf(stderr, "%.*s: ", CN_UNPACK(CN_DIAGNOSTIC_CODES[code]));
+        fprintf(stderr, "%.*s: ", CN_STR_UNPACK(CN_DIAGNOSTIC_CODES[code]));
     } else {
         fprintf(stderr, CN_ANSI_BRIGHT_BLACK"[CN%04d]"CN_ANSI_RESET": ", code);
     }
@@ -15187,14 +15176,14 @@ CNDEF void cn_default_diagnostic_handler(Cn_Diagnostic_Level level, Cn_Location 
             // Printing till annotation.
             if (inline_offset > printed) {
                 snippet = cn_str_substring(line, printed, inline_offset);
-                fprintf(stderr, "%.*s", CN_UNPACK(snippet));
+                fprintf(stderr, "%.*s", CN_STR_UNPACK(snippet));
                 printed += inline_offset;
             }
 
             // Printing annotated snippet.
             int64_t length = annotations->length < line.length - printed ? annotations->length : line.length - printed;
             snippet = cn_str_substring(line, printed, printed + length);
-            fprintf(stderr, "%s%.*s"CN_ANSI_RESET, ansi_color, CN_UNPACK(snippet));
+            fprintf(stderr, "%s%.*s"CN_ANSI_RESET, ansi_color, CN_STR_UNPACK(snippet));
             printed += length;
 
 
@@ -15205,7 +15194,7 @@ annotations_next:
 
         if (printed < line.length) {
             snippet = cn_str_substring(line, printed, line.length);
-            fprintf(stderr, "%.*s", CN_UNPACK(snippet));
+            fprintf(stderr, "%.*s", CN_STR_UNPACK(snippet));
         }
 
         fputs(CN_LINE_END, stderr);
@@ -15347,7 +15336,7 @@ CNDEF void cn_log_bindings() {
                     break;
             }
 
-            fprintf(stderr, "%.*s -> ", CN_UNPACK(cn__ast_data->binding_list[i].name));
+            fprintf(stderr, "%.*s -> ", CN_STR_UNPACK(cn__ast_data->binding_list[i].name));
             cn_type_print(cn__ast_data->binding_list[i].type);
             fputc('\n', stderr);
         }
@@ -15418,7 +15407,7 @@ CNDEF int cn_tu_process(Cn_Translation_Unit *tu, Cn_Flags flags) {
 
     // Printing source.
     if (flags & CN_PRINT_SOURCE) {
-        cn_log(CN_INFO, "Received:\n" CN_ANSI_BRIGHT_BLACK "%.*s" CN_ANSI_RESET, CN_UNPACK(tu->content));
+        cn_log(CN_INFO, "Received:\n" CN_ANSI_BRIGHT_BLACK "%.*s" CN_ANSI_RESET, CN_STR_UNPACK(tu->content));
     }
 
     // Setting up lexer.
@@ -15430,7 +15419,7 @@ CNDEF int cn_tu_process(Cn_Translation_Unit *tu, Cn_Flags flags) {
         cn_log(CN_INFO, "Tokenized:" CN_ANSI_CYAN);
         do {
             Cn_String str = cn_source_to_str(&cn_lexer_token(&lexer).src);
-            fprintf(stderr, "TOKEN:     %.*s\n", CN_UNPACK(str));
+            fprintf(stderr, "TOKEN:     %.*s\n", CN_STR_UNPACK(str));
             cn_lexer_next_token(&lexer);
         } while (cn_lexer_token(&lexer).type != CN_TOKEN_EOF);
         fprintf(stderr, CN_ANSI_RESET"\n");

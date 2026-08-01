@@ -7,7 +7,7 @@ int main(void) {
 
     // Test keywords
     {
-        cn_lexer_init(&lexer, CN_CSTR("int char float double void"), (Cn_Lexer_Blacklist){0});
+        cn_lexer_init(&lexer, CN_STR_LIT("int char float double void"), (Cn_Lexer_Blacklist){0});
 
         CN_ASSERT(cn_lexer_token(&lexer).type == CN_TOKEN_INT);
         cn_lexer_next_token(&lexer);
@@ -24,7 +24,7 @@ int main(void) {
 
     // Test storage class and qualifier keywords
     {
-        cn_lexer_init(&lexer, CN_CSTR("static extern const volatile register auto typedef"), (Cn_Lexer_Blacklist){0});
+        cn_lexer_init(&lexer, CN_STR_LIT("static extern const volatile register auto typedef"), (Cn_Lexer_Blacklist){0});
 
         CN_ASSERT(cn_lexer_token(&lexer).type == CN_TOKEN_STATIC);
         cn_lexer_next_token(&lexer);
@@ -43,7 +43,7 @@ int main(void) {
 
     // Test control flow keywords
     {
-        cn_lexer_init(&lexer, CN_CSTR("if else switch while do for goto continue break return"), (Cn_Lexer_Blacklist){0});
+        cn_lexer_init(&lexer, CN_STR_LIT("if else switch while do for goto continue break return"), (Cn_Lexer_Blacklist){0});
 
         CN_ASSERT(cn_lexer_token(&lexer).type == CN_TOKEN_IF);
         cn_lexer_next_token(&lexer);
@@ -68,7 +68,7 @@ int main(void) {
 
     // Test type keywords
     {
-        cn_lexer_init(&lexer, CN_CSTR("struct union enum sizeof"), (Cn_Lexer_Blacklist){0});
+        cn_lexer_init(&lexer, CN_STR_LIT("struct union enum sizeof"), (Cn_Lexer_Blacklist){0});
 
         CN_ASSERT(cn_lexer_token(&lexer).type == CN_TOKEN_STRUCT);
         cn_lexer_next_token(&lexer);
@@ -81,7 +81,7 @@ int main(void) {
 
     // Test identifiers
     {
-        cn_lexer_init(&lexer, CN_CSTR("foo bar_baz _underscore myVar123"), (Cn_Lexer_Blacklist){0});
+        cn_lexer_init(&lexer, CN_STR_LIT("foo bar_baz _underscore myVar123"), (Cn_Lexer_Blacklist){0});
 
         CN_ASSERT(cn_lexer_token(&lexer).type == CN_TOKEN_IDENTIFIER);
         cn_lexer_next_token(&lexer);
@@ -94,7 +94,7 @@ int main(void) {
 
     // Test integer literals
     {
-        cn_lexer_init(&lexer, CN_CSTR("42 0 123 0x1F"), (Cn_Lexer_Blacklist){0});
+        cn_lexer_init(&lexer, CN_STR_LIT("42 0 123 0x1F"), (Cn_Lexer_Blacklist){0});
 
         CN_ASSERT(cn_lexer_token(&lexer).type == CN_TOKEN_INTEGER_VALUE);
         cn_lexer_next_token(&lexer);
@@ -107,13 +107,13 @@ int main(void) {
 
     // TODO: Test octal literals (0777) - may not be supported
     // {
-    //     cn_lexer_init(&lexer, CN_CSTR("0777"), (Cn_Lexer_Blacklist){0});
+    //     cn_lexer_init(&lexer, CN_STR_LIT("0777"), (Cn_Lexer_Blacklist){0});
     //     CN_ASSERT(cn_lexer_token(&lexer).type == CN_TOKEN_INTEGER_VALUE);
     // }
 
     // Test float literals
     {
-        cn_lexer_init(&lexer, CN_CSTR("3.14 0.5 1e10 2.5e-3"), (Cn_Lexer_Blacklist){0});
+        cn_lexer_init(&lexer, CN_STR_LIT("3.14 0.5 1e10 2.5e-3"), (Cn_Lexer_Blacklist){0});
 
         CN_ASSERT(cn_lexer_token(&lexer).type == CN_TOKEN_FLOAT_VALUE);
         cn_lexer_next_token(&lexer);
@@ -126,7 +126,7 @@ int main(void) {
 
     // Test string literals
     {
-        cn_lexer_init(&lexer, CN_CSTR("\"hello\" \"world\""), (Cn_Lexer_Blacklist){0});
+        cn_lexer_init(&lexer, CN_STR_LIT("\"hello\" \"world\""), (Cn_Lexer_Blacklist){0});
 
         CN_ASSERT(cn_lexer_token(&lexer).type == CN_TOKEN_STRING);
         cn_lexer_next_token(&lexer);
@@ -135,7 +135,7 @@ int main(void) {
 
     // Test single-char operators and punctuation
     {
-        cn_lexer_init(&lexer, CN_CSTR("( ) { } [ ] ; : , ."), (Cn_Lexer_Blacklist){0});
+        cn_lexer_init(&lexer, CN_STR_LIT("( ) { } [ ] ; : , ."), (Cn_Lexer_Blacklist){0});
 
         CN_ASSERT(cn_lexer_token(&lexer).type == CN_TOKEN_PARAN_OPEN);
         cn_lexer_next_token(&lexer);
@@ -160,7 +160,7 @@ int main(void) {
 
     // Test arithmetic operators
     {
-        cn_lexer_init(&lexer, CN_CSTR("+ - * / %"), (Cn_Lexer_Blacklist){0});
+        cn_lexer_init(&lexer, CN_STR_LIT("+ - * / %"), (Cn_Lexer_Blacklist){0});
 
         CN_ASSERT(cn_lexer_token(&lexer).type == CN_TOKEN_PLUS);
         cn_lexer_next_token(&lexer);
@@ -175,7 +175,7 @@ int main(void) {
 
     // Test comparison operators
     {
-        cn_lexer_init(&lexer, CN_CSTR("< > <= >= == !="), (Cn_Lexer_Blacklist){0});
+        cn_lexer_init(&lexer, CN_STR_LIT("< > <= >= == !="), (Cn_Lexer_Blacklist){0});
 
         CN_ASSERT(cn_lexer_token(&lexer).type == CN_TOKEN_LESS);
         cn_lexer_next_token(&lexer);
@@ -192,7 +192,7 @@ int main(void) {
 
     // Test logical and bitwise operators
     {
-        cn_lexer_init(&lexer, CN_CSTR("&& || ! & | ^ ~"), (Cn_Lexer_Blacklist){0});
+        cn_lexer_init(&lexer, CN_STR_LIT("&& || ! & | ^ ~"), (Cn_Lexer_Blacklist){0});
 
         CN_ASSERT(cn_lexer_token(&lexer).type == CN_TOKEN_AND);
         cn_lexer_next_token(&lexer);
@@ -211,7 +211,7 @@ int main(void) {
 
     // Test shift operators
     {
-        cn_lexer_init(&lexer, CN_CSTR("<< >>"), (Cn_Lexer_Blacklist){0});
+        cn_lexer_init(&lexer, CN_STR_LIT("<< >>"), (Cn_Lexer_Blacklist){0});
 
         CN_ASSERT(cn_lexer_token(&lexer).type == CN_TOKEN_LSHIFT);
         cn_lexer_next_token(&lexer);
@@ -220,7 +220,7 @@ int main(void) {
 
     // Test assignment operators
     {
-        cn_lexer_init(&lexer, CN_CSTR("= += -= *= /= %= &= |= ^= <<= >>="), (Cn_Lexer_Blacklist){0});
+        cn_lexer_init(&lexer, CN_STR_LIT("= += -= *= /= %= &= |= ^= <<= >>="), (Cn_Lexer_Blacklist){0});
 
         CN_ASSERT(cn_lexer_token(&lexer).type == CN_TOKEN_ASSIGN);
         cn_lexer_next_token(&lexer);
@@ -247,7 +247,7 @@ int main(void) {
 
     // Test increment/decrement and other operators
     {
-        cn_lexer_init(&lexer, CN_CSTR("++ -- -> ? ..."), (Cn_Lexer_Blacklist){0});
+        cn_lexer_init(&lexer, CN_STR_LIT("++ -- -> ? ..."), (Cn_Lexer_Blacklist){0});
 
         CN_ASSERT(cn_lexer_token(&lexer).type == CN_TOKEN_INCREMENT);
         cn_lexer_next_token(&lexer);

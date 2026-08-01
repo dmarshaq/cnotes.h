@@ -2,12 +2,12 @@
 #include <unistd.h>
 
 void hash_table_put(int **table, int value, const char *key) {
-    Cn_String str = CN_CSTR(key);
+    Cn_String str = CN_STR(strlen(key), key);
     cn_hash_table_put(table, value, &str);
 }
 
 int *hash_table_get(int **table, const char *key) {
-    Cn_String str = CN_CSTR(key);
+    Cn_String str = CN_STR(strlen(key), key);
     int *result = cn_hash_table_get(table, &str);
     CN_ASSERT(result != NULL);
     return result;

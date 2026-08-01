@@ -47,7 +47,7 @@ Cn_Result msg_handler(Cn_Message_Kind kind, void *message) {
                 CN_ASSERT(ident->kind == CN_AST_IDENTIFIER);
 
                 cn_array_list_append(&items, cn_ast_node(cn_build_format("printf(\">>> hello from: '%.*s'\\n\");\n",
-                            CN_UNPACK(ident->name)))
+                            CN_STR_UNPACK(ident->name)))
                         );
 
                 for (int64_t i = 0; i < block->block_items.length; i++) {

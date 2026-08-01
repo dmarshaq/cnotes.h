@@ -12,7 +12,7 @@ int main(void) {
     CN_ASSERT(sb.data[0] == 'h');
     CN_ASSERT(sb.data[1] == 'i');
 
-    cn_sb_append_str(&sb, CN_CSTR("_world"));
+    cn_sb_append_str(&sb, CN_STR_LIT("_world"));
     CN_ASSERT(sb.length == 8);
     CN_ASSERT(sb.capacity == CN_SB_STACK_STORAGE_CAP);
 
@@ -25,11 +25,11 @@ int main(void) {
     CN_ASSERT(sb.capacity == CN_SB_STACK_STORAGE_CAP);
 
     // Stack spill to heap.
-    cn_sb_append_str(&sb, CN_CSTR("abcdefghijklmnopqrstuvwxyz"));
+    cn_sb_append_str(&sb, CN_STR_LIT("abcdefghijklmnopqrstuvwxyz"));
     CN_ASSERT(sb.length == 26);
     CN_ASSERT(sb.capacity == CN_SB_STACK_STORAGE_CAP);
 
-    cn_sb_append_str(&sb, CN_CSTR("ABCDEF"));
+    cn_sb_append_str(&sb, CN_STR_LIT("ABCDEF"));
     CN_ASSERT(sb.length == 32);
     CN_ASSERT(sb.capacity == CN_SB_STACK_STORAGE_CAP);
 
@@ -59,7 +59,7 @@ int main(void) {
 
     // Reverse.
     Cn_String_Builder sb4 = cn_sb_make(16);
-    cn_sb_append_str(&sb4, CN_CSTR("**tni"));
+    cn_sb_append_str(&sb4, CN_STR_LIT("**tni"));
     cn_sb_reverse(&sb4);
     CN_ASSERT(sb4.length == 5);
     CN_ASSERT(memcmp(sb4.data, "int**", 5) == 0);

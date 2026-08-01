@@ -5,7 +5,7 @@ int main(void) {
 
     // Test cn_lexer_peek - look ahead without consuming
     {
-        cn_lexer_init(&lexer, CN_CSTR("int x = 42;"), (Cn_Lexer_Blacklist){0});
+        cn_lexer_init(&lexer, CN_STR_LIT("int x = 42;"), (Cn_Lexer_Blacklist){0});
 
         // Current token is "int"
         CN_ASSERT(cn_lexer_token(&lexer).type == CN_TOKEN_INT);
@@ -21,7 +21,7 @@ int main(void) {
 
     // Test cn_lexer_expect
     {
-        cn_lexer_init(&lexer, CN_CSTR("int x"), (Cn_Lexer_Blacklist){0});
+        cn_lexer_init(&lexer, CN_STR_LIT("int x"), (Cn_Lexer_Blacklist){0});
 
         CN_ASSERT(cn_lexer_expect(&lexer, CN_TOKEN_INT) == true);
         cn_lexer_next_token(&lexer);
@@ -31,7 +31,7 @@ int main(void) {
 
     // Test navigation to EOF
     {
-        cn_lexer_init(&lexer, CN_CSTR("a b c"), (Cn_Lexer_Blacklist){0});
+        cn_lexer_init(&lexer, CN_STR_LIT("a b c"), (Cn_Lexer_Blacklist){0});
 
         CN_ASSERT(cn_lexer_token(&lexer).type == CN_TOKEN_IDENTIFIER);
         cn_lexer_next_token(&lexer);
@@ -48,13 +48,13 @@ int main(void) {
 
     // Test empty input
     {
-        cn_lexer_init(&lexer, CN_CSTR(""), (Cn_Lexer_Blacklist){0});
+        cn_lexer_init(&lexer, CN_STR_LIT(""), (Cn_Lexer_Blacklist){0});
         CN_ASSERT(cn_lexer_token(&lexer).type == CN_TOKEN_EOF);
     }
 
     // Test whitespace handling
     {
-        cn_lexer_init(&lexer, CN_CSTR("   int   \n\t  x   "), (Cn_Lexer_Blacklist){0});
+        cn_lexer_init(&lexer, CN_STR_LIT("   int   \n\t  x   "), (Cn_Lexer_Blacklist){0});
 
         CN_ASSERT(cn_lexer_token(&lexer).type == CN_TOKEN_INT);
         cn_lexer_next_token(&lexer);
@@ -65,7 +65,7 @@ int main(void) {
 
     // Test peek beyond EOF returns EOF
     {
-        cn_lexer_init(&lexer, CN_CSTR("x"), (Cn_Lexer_Blacklist){0});
+        cn_lexer_init(&lexer, CN_STR_LIT("x"), (Cn_Lexer_Blacklist){0});
 
         CN_ASSERT(cn_lexer_token(&lexer).type == CN_TOKEN_IDENTIFIER);
         CN_ASSERT(cn_lexer_peek(&lexer, 1).type == CN_TOKEN_EOF);
@@ -75,7 +75,7 @@ int main(void) {
 
     // Test complex expression tokenization
     {
-        cn_lexer_init(&lexer, CN_CSTR("a+b*c-d/e%f"), (Cn_Lexer_Blacklist){0});
+        cn_lexer_init(&lexer, CN_STR_LIT("a+b*c-d/e%f"), (Cn_Lexer_Blacklist){0});
 
         CN_ASSERT(cn_lexer_token(&lexer).type == CN_TOKEN_IDENTIFIER);  // a
         cn_lexer_next_token(&lexer);
@@ -102,7 +102,7 @@ int main(void) {
 
     // Test function declaration tokenization
     {
-        cn_lexer_init(&lexer, CN_CSTR("int foo(int x, int y)"), (Cn_Lexer_Blacklist){0});
+        cn_lexer_init(&lexer, CN_STR_LIT("int foo(int x, int y)"), (Cn_Lexer_Blacklist){0});
 
         CN_ASSERT(cn_lexer_token(&lexer).type == CN_TOKEN_INT);
         cn_lexer_next_token(&lexer);

@@ -2,17 +2,17 @@
 #include <unistd.h>
 
 void hash_set_put(Cn_String **set, const char *value) {
-    Cn_String str = CN_CSTR(value);
+    Cn_String str = CN_STR_LIT(value);
     (void)cn_hash_set_put(set, str);
 }
 
 bool hash_set_contains(Cn_String **set, const char *value) {
-    Cn_String str = CN_CSTR(value);
+    Cn_String str = CN_STR_LIT(value);
     return cn_hash_set_contains(set, str);
 }
 
 void hash_set_remove(Cn_String **set, const char *value) {
-    Cn_String str = CN_CSTR(value);
+    Cn_String str = CN_STR_LIT(value);
     return cn_hash_set_remove(set, str);
 }
 
