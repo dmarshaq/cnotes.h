@@ -11,7 +11,7 @@ int main(int argc, char **argv) {
         if (argc == 0) break;
 
         // Allocate AST data storage.
-        Cn_Ast_Data ast_data = {0};
+        Cn_Tu_Data ast_data = {0};
         cn_ast_init(&ast_data);
 
         // Processing single translation unit.
@@ -77,7 +77,7 @@ Cn_Result msg_handler(Cn_Message_Kind kind, void *message) {
                     else if (statement->kind == CN_AST_RETURN && cn_array_list_length(&deffered_stack) > 0) {
                         // Replacing return with rvalue set and goto statement.
                         Cn_Ast_Block_Item *rvalue_set = cn_build_block_item(cn_build_expr_statement(
-                                cn_build_assign(CN_ASSIGNMENT_OP_ASSIGN, 
+                                cn_build_assign(CN_AST_ASSIGNMENT_OP_ASSIGN, 
                                     cn_build_identifier(cn__defer_rvalue),
                                     cn_ast_as(Return, statement)->expression,
                                     ),

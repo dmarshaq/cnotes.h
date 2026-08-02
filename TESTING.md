@@ -64,8 +64,9 @@ int main(void) {
     // Such tests don't have to be recorder, but empty `.stdout.txt` must created for such tests.
     // If not error will be emitted about absence of golden file.
     cn_diagnostic_handler = &cn_test_diagnostic_handler;
-    Cn_Translation_Unit tu = cn_tu_make("input.i", .source = src);
-    cn_tu_process(&tu, CN_NO_CODE_OUTPUT);
+    Cn_Translation_Unit tu = {0};
+    cn_tu_init(&tu, "input.i", .source = src, .flags = CN_TU_NO_CODE_OUTPUT);
+    cn_tu_process(&tu);
     return 0;
 }
 ```

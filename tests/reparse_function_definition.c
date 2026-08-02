@@ -106,23 +106,22 @@ const Cn_String src = CN_STR_BUFFER(
     "}\n"
 );
 
-Cn_Result handler(Cn_Message_Kind kind, void *message) {
-    CN_UNUSED(message);
-
+Cn_Message_Response handler(Cn_Message *message) {
     // Reporting modification on every parsed function definition,
     // it rolls back to the checkpoint and makes parser take the reparse path.
-    if (kind == CN_MESSAGE_PARSED_FUNCTION) {
-        return CN_RESULT_MODIFIED_NO_REPEAT;
+    if (message->kind == CN_MESSAGE_AST_PARSED && message->flags & CN_MESSAGE_AST_FUNCTION && message->flags & CN_MESSAGE_AST_UNMODIFIED) {
+        return CN_MESSAGE_RESPONSE_MODIFIED;
     }
 
-    return CN_RESULT_NONE;
+    return CN_MESSAGE_RESPONSE_NONE;
 }
 
 int main(void) {
     cn_diagnostic_handler = &cn_test_diagnostic_handler;
     cn_message_handler = &handler;
 
-    Cn_Translation_Unit tu = cn_tu_make("input.i", .source = src);
-    cn_tu_process(&tu, CN_NO_CODE_OUTPUT);
+    Cn_Translation_Unit tu = {0};
+    cn_tu_init(&tu, "input.i", .source = src, .flags = CN_TU_NO_CODE_OUTPUT);
+    cn_tu_process(&tu);
     return 0;
 }
