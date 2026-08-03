@@ -51,6 +51,7 @@
         `arena_`                        Interface for Cn_Arena operations.
         `chained_arena_`                Interface for Cn_Chained_Arena operations.
         `pool_`                         Interface for Cn_Pool operations.
+        `da_`                           Interface to operate on dynamic arrays.
         `array_list_`                   Interface to operate on dynamically allocated array list.
         `hash_table_`                   Interface to operate on dynamically allocated hash table.
         `hash_set_`                     Interface to operate on dynamically allocated hash set.
@@ -2038,7 +2039,7 @@ typedef struct {
 typedef struct {
     Cn_Ast_Node **ptrs;
     int64_t       length;
-} Cn_Ast_List;
+} Cn_Ast_Nodes;
 
 /**
  * Downcast a generic node pointer to a concrete node type.
@@ -2066,7 +2067,7 @@ struct cn_ast_code { CN_AST_BASE;
 };
 
 struct cn_ast_translation_unit { CN_AST_BASE;
-    Cn_Ast_List external_declarations; // List of Cn_Ast_External_Declaration.
+    Cn_Ast_Nodes external_declarations; // List of Cn_Ast_External_Declaration.
 };
 
 struct cn_ast_external_declaration { CN_AST_BASE;
@@ -2074,21 +2075,21 @@ struct cn_ast_external_declaration { CN_AST_BASE;
 };
 
 struct cn_ast_declaration { CN_AST_BASE;
-    Cn_Ast_List                    attribute_specifiers; // List of Cn_Ast_Attribute_Specifier.
+    Cn_Ast_Nodes                    attribute_specifiers; // List of Cn_Ast_Attribute_Specifier.
     Cn_Ast_Declaration_Specifiers *declaration_specifiers;
-    Cn_Ast_List                    init_declarators; // List of Cn_Ast_Init_Declarator.
+    Cn_Ast_Nodes                    init_declarators; // List of Cn_Ast_Init_Declarator.
 };
 
 struct cn_ast_function { CN_AST_BASE;
-    Cn_Ast_List                    attribute_specifiers; // List of Cn_Ast_Attribute_Specifier.
+    Cn_Ast_Nodes                    attribute_specifiers; // List of Cn_Ast_Attribute_Specifier.
     Cn_Ast_Declaration_Specifiers *declaration_specifiers;
     Cn_Ast_Declarator             *declarator;
     Cn_Ast_Block                  *block;
 };
 
 struct cn_ast_block { CN_AST_BASE;
-    Cn_Ast_List attribute_specifiers; // List of Cn_Ast_Attribute_Specifier.
-    Cn_Ast_List block_items; // List of ast nodes of type Cn_Ast_Block_Item.
+    Cn_Ast_Nodes attribute_specifiers; // List of Cn_Ast_Attribute_Specifier.
+    Cn_Ast_Nodes block_items; // List of ast nodes of type Cn_Ast_Block_Item.
 };
 
 struct cn_ast_block_item { CN_AST_BASE;
@@ -2096,32 +2097,32 @@ struct cn_ast_block_item { CN_AST_BASE;
 };
 
 struct cn_ast_if_statement { CN_AST_BASE;
-    Cn_Ast_List  attribute_specifiers; // List of Cn_Ast_Attribute_Specifier.
+    Cn_Ast_Nodes  attribute_specifiers; // List of Cn_Ast_Attribute_Specifier.
     Cn_Ast_Node *condition;
     Cn_Ast_Node *then_statement;
     Cn_Ast_Node *else_statement; // Can be NULL.
 };
 
 struct cn_ast_switch_statement { CN_AST_BASE;
-    Cn_Ast_List  attribute_specifiers; // List of Cn_Ast_Attribute_Specifier.
+    Cn_Ast_Nodes  attribute_specifiers; // List of Cn_Ast_Attribute_Specifier.
     Cn_Ast_Node *condition;
     Cn_Ast_Node *body;
 };
 
 struct cn_ast_while_statement { CN_AST_BASE;
-    Cn_Ast_List  attribute_specifiers; // List of Cn_Ast_Attribute_Specifier.
+    Cn_Ast_Nodes  attribute_specifiers; // List of Cn_Ast_Attribute_Specifier.
     Cn_Ast_Node *condition; // Expression.
     Cn_Ast_Node *body; // Statement.
 };
 
 struct cn_ast_do_while { CN_AST_BASE;
-    Cn_Ast_List  attribute_specifiers; // List of Cn_Ast_Attribute_Specifier.
+    Cn_Ast_Nodes  attribute_specifiers; // List of Cn_Ast_Attribute_Specifier.
     Cn_Ast_Node *condition; // Expression.
     Cn_Ast_Node *body; // Statement.
 };
 
 struct cn_ast_for_statement { CN_AST_BASE;
-    Cn_Ast_List  attribute_specifiers; // List of Cn_Ast_Attribute_Specifier.
+    Cn_Ast_Nodes  attribute_specifiers; // List of Cn_Ast_Attribute_Specifier.
     Cn_Ast_Node *initialization; // Declaration or expression.
     Cn_Ast_Node *condition; // Expression.
     Cn_Ast_Node *update; // Expression.
@@ -2129,32 +2130,32 @@ struct cn_ast_for_statement { CN_AST_BASE;
 };
 
 struct cn_ast_label { CN_AST_BASE;
-    Cn_Ast_List        attribute_specifiers; // List of Cn_Ast_Attribute_Specifier.
+    Cn_Ast_Nodes        attribute_specifiers; // List of Cn_Ast_Attribute_Specifier.
     Cn_Ast_Identifier *identifier;
     Cn_Ast_Node       *expression; // Only in 'case' label.
     Cn_Ast_Node       *statement;
 };
 
 struct cn_ast_goto_statement { CN_AST_BASE;
-    Cn_Ast_List        attribute_specifiers; // List of Cn_Ast_Attribute_Specifier.
+    Cn_Ast_Nodes        attribute_specifiers; // List of Cn_Ast_Attribute_Specifier.
     Cn_Ast_Identifier *identifier; // Name of the label.
 };
 
 struct cn_ast_return_statement { CN_AST_BASE;
-    Cn_Ast_List  attribute_specifiers; // List of Cn_Ast_Attribute_Specifier.
+    Cn_Ast_Nodes  attribute_specifiers; // List of Cn_Ast_Attribute_Specifier.
     Cn_Ast_Node *expression; // Can be NULL.
 };
 
 struct cn_ast_break_statement { CN_AST_BASE;
-    Cn_Ast_List attribute_specifiers; // List of Cn_Ast_Attribute_Specifier.
+    Cn_Ast_Nodes attribute_specifiers; // List of Cn_Ast_Attribute_Specifier.
 };
 
 struct cn_ast_continue_statement { CN_AST_BASE;
-    Cn_Ast_List attribute_specifiers; // List of Cn_Ast_Attribute_Specifier.
+    Cn_Ast_Nodes attribute_specifiers; // List of Cn_Ast_Attribute_Specifier.
 };
 
 struct cn_ast_expression_statement { CN_AST_BASE;
-    Cn_Ast_List  attribute_specifiers; // List of Cn_Ast_Attribute_Specifier.
+    Cn_Ast_Nodes  attribute_specifiers; // List of Cn_Ast_Attribute_Specifier.
     Cn_Ast_Node *expression;
 };
 
@@ -2175,7 +2176,7 @@ struct cn_ast_access { CN_AST_BASE;
 struct cn_ast_call { CN_AST_BASE;
     Cn_Type *    type;
     Cn_Ast_Node *expression;
-    Cn_Ast_List  arguments; // List of expressions.
+    Cn_Ast_Nodes  arguments; // List of expressions.
 };
 
 struct cn_ast_unary { CN_AST_BASE;
@@ -2193,7 +2194,7 @@ struct cn_ast_cast { CN_AST_BASE;
 struct cn_ast_compound { CN_AST_BASE;
     Cn_Type *         type;
     Cn_Ast_Type_Name *type_name;
-    Cn_Ast_List       designations; // List of Cn_Ast_Designation.
+    Cn_Ast_Nodes       designations; // List of Cn_Ast_Designation.
 };
 
 struct cn_ast_sizeof_expression { CN_AST_BASE;
@@ -2244,18 +2245,18 @@ struct cn_ast_string { CN_AST_BASE;
 
 struct cn_ast_init_declarator { CN_AST_BASE;
     Cn_Ast_Declarator    *declarator;
-    Cn_Ast_List           gnu_attribute_specifiers; // List of Cn_Ast_Gnu_Attribute_Specifier.
+    Cn_Ast_Nodes           gnu_attribute_specifiers; // List of Cn_Ast_Gnu_Attribute_Specifier.
     Cn_Ast_Gnu_Asm_Label *gnu_asm_label;
     Cn_Ast_Initializer   *initializer;
 };
 
 struct cn_ast_initializer { CN_AST_BASE;
     Cn_Ast_Node *expression;  // Can be NULL if not single expression initializer.
-    Cn_Ast_List  designations;   // Can be empty if not compound intializer '{' '}'.
+    Cn_Ast_Nodes  designations;   // Can be empty if not compound intializer '{' '}'.
 };
 
 struct cn_ast_designation { CN_AST_BASE;
-    Cn_Ast_List         designators;    // Can be empty. List of Cn_Ast_Designator.
+    Cn_Ast_Nodes         designators;    // Can be empty. List of Cn_Ast_Designator.
     Cn_Ast_Initializer *initializer;
 };
 
@@ -2286,14 +2287,14 @@ struct cn_ast_direct_declarator_array { CN_AST_BASE;
 
 struct cn_ast_direct_declarator_function { CN_AST_BASE;
     Cn_Ast_Node *direct_declarator;
-    Cn_Ast_List  parameter_declarations; // List of Cn_Ast_Parameter_Declaration.
+    Cn_Ast_Nodes  parameter_declarations; // List of Cn_Ast_Parameter_Declaration.
 };
 
 struct cn_ast_declaration_specifiers { CN_AST_BASE;
     Cn_Ast_Storage_Specifier_Flags  storage_specifiers;
     Cn_Ast_Qualifier_Flags          qualifiers;
     Cn_Ast_Function_Specifier_Flags function_specifiers;
-    Cn_Ast_List                 gnu_attribute_specifiers; // List of Cn_Ast_Gnu_Attribute_Specifier.
+    Cn_Ast_Nodes                 gnu_attribute_specifiers; // List of Cn_Ast_Gnu_Attribute_Specifier.
     Cn_Ast_Node                *type_specifier;
 };
 
@@ -2327,63 +2328,63 @@ struct cn_ast_parameter_declaration { CN_AST_BASE;
 };
 
 struct cn_ast_struct_specifier { CN_AST_BASE;
-    Cn_Ast_List        attribute_specifiers; // List of Cn_Ast_Attribute_Specifier.
-    Cn_Ast_List        gnu_attribute_specifiers; // List of Cn_Ast_Gnu_Attribute_Specifier.
+    Cn_Ast_Nodes        attribute_specifiers; // List of Cn_Ast_Attribute_Specifier.
+    Cn_Ast_Nodes        gnu_attribute_specifiers; // List of Cn_Ast_Gnu_Attribute_Specifier.
     Cn_Ast_Identifier *identifier;
-    Cn_Ast_List        member_declarations; // List of Cn_Ast_Member_Declaration.
+    Cn_Ast_Nodes        member_declarations; // List of Cn_Ast_Member_Declaration.
 };
 
 struct cn_ast_union_specifier { CN_AST_BASE;
-    Cn_Ast_List        attribute_specifiers; // List of Cn_Ast_Attribute_Specifier.
-    Cn_Ast_List        gnu_attribute_specifiers; // List of Cn_Ast_Gnu_Attribute_Specifier.
+    Cn_Ast_Nodes        attribute_specifiers; // List of Cn_Ast_Attribute_Specifier.
+    Cn_Ast_Nodes        gnu_attribute_specifiers; // List of Cn_Ast_Gnu_Attribute_Specifier.
     Cn_Ast_Identifier *identifier;
-    Cn_Ast_List        member_declarations; // List of Cn_Ast_Member_Declaration.
+    Cn_Ast_Nodes        member_declarations; // List of Cn_Ast_Member_Declaration.
 };
 
 struct cn_ast_member_declaration { CN_AST_BASE;
-    Cn_Ast_List                 attribute_specifiers; // List of Cn_Ast_Attribute_Specifier.
+    Cn_Ast_Nodes                 attribute_specifiers; // List of Cn_Ast_Attribute_Specifier.
     Cn_Ast_Specifier_Qualifier *specifier_qualifier;
-    Cn_Ast_List                 member_declarators; // List of Cn_Ast_Member_Declarator.
+    Cn_Ast_Nodes                 member_declarators; // List of Cn_Ast_Member_Declarator.
 };
 
 struct cn_ast_member_declarator { CN_AST_BASE;
     Cn_Ast_Declarator *declarator;
     Cn_Ast_Node       *bitfield;
-    Cn_Ast_List        gnu_attribute_specifiers; // List of Cn_Ast_Gnu_Attribute_Specifier.
+    Cn_Ast_Nodes        gnu_attribute_specifiers; // List of Cn_Ast_Gnu_Attribute_Specifier.
 };
 
 struct cn_ast_enum_specifier { CN_AST_BASE;
-    Cn_Ast_List                 attribute_specifiers; // List of Cn_Ast_Attribute_Specifier.
-    Cn_Ast_List                 gnu_attribute_specifiers; // List of Cn_Ast_Gnu_Attribute_Specifier.
+    Cn_Ast_Nodes                 attribute_specifiers; // List of Cn_Ast_Attribute_Specifier.
+    Cn_Ast_Nodes                 gnu_attribute_specifiers; // List of Cn_Ast_Gnu_Attribute_Specifier.
     Cn_Ast_Identifier          *identifier;
     Cn_Ast_Specifier_Qualifier *specifier_qualifier;
-    Cn_Ast_List                 enumerators; // List of Cn_Ast_Enumerator.
+    Cn_Ast_Nodes                 enumerators; // List of Cn_Ast_Enumerator.
 };
 
 struct cn_ast_enumerator { CN_AST_BASE;
     Cn_Ast_Identifier *identifier;
-    Cn_Ast_List        attribute_specifiers; // List of Cn_Ast_Attribute_Specifier.
-    Cn_Ast_List        gnu_attribute_specifiers; // List of Cn_Ast_Gnu_Attribute_Specifier.
+    Cn_Ast_Nodes        attribute_specifiers; // List of Cn_Ast_Attribute_Specifier.
+    Cn_Ast_Nodes        gnu_attribute_specifiers; // List of Cn_Ast_Gnu_Attribute_Specifier.
     Cn_Ast_Node       *expression;
 };
 
 struct cn_ast_attribute_specifier { CN_AST_BASE;
-    Cn_Ast_List attributes; // List of Cn_Ast_Attribute.
+    Cn_Ast_Nodes attributes; // List of Cn_Ast_Attribute.
 };
 
 struct cn_ast_attribute { CN_AST_BASE;
     Cn_Ast_Identifier *vendor_identifier;
     Cn_Ast_Identifier *identifier;
-    Cn_Ast_List        arguments;
+    Cn_Ast_Nodes        arguments;
 };
 
 struct cn_ast_gnu_attribute_specifier { CN_AST_BASE;
-    Cn_Ast_List gnu_attributes; // List of Cn_Ast_Gnu_Attribute.
+    Cn_Ast_Nodes gnu_attributes; // List of Cn_Ast_Gnu_Attribute.
 };
 
 struct cn_ast_gnu_attribute { CN_AST_BASE;
     Cn_Ast_Identifier *identifier;
-    Cn_Ast_List        arguments;
+    Cn_Ast_Nodes        arguments;
 };
 
 struct cn_ast_gnu_asm_label { CN_AST_BASE;
@@ -2446,10 +2447,35 @@ CNDEF bool cn_ast_is_primary(void * node);
 #define cn_ast_stack_discard(mark) cn_array_list_pop_multiple(&cn__tu_data->ptr_stack, cn_array_list_length(&cn__tu_data->ptr_stack) - (mark))
 
 /**
- * Finalizes a range of the ptr_stack (from mark to end) into a Cn_Ast_List.
+ * Finalizes a range of the ptr_stack (from mark to end) into a Cn_Ast_Nodes.
  * Pops the finalized indices from the stack.
  */
-CNDEF Cn_Ast_List cn_ast_stack_finalize(int64_t mark);
+CNDEF Cn_Ast_Nodes cn_ast_stack_finalize(int64_t mark);
+
+/**
+ * Orderly removes entry from the list completely, 
+ * forever decreasing list's length.
+ */
+CNDEF Cn_Ast_Node *cn_ast_remove_from_list(Cn_Ast_Nodes *list, int64_t index);
+
+/**
+ * Deep copies list, allocating memory for the every node branch.
+ * Use with caution, copying giant branches is not recommended.
+ * It is recursive.
+ */
+CNDEF Cn_Ast_Nodes cn_ast_copy_list(Cn_Ast_Nodes list);
+
+/**
+ * Deep copies ast, allocating memory for the branch.
+ * Use with caution, copying giant branches is not recommended.
+ * It is recursive.
+ */
+CNDEF void *cn_ast_copy(void *node);
+
+/**
+ * Removes attribute from the attribute list.
+ */
+CNDEF bool cn_ast_remove_attribute(void *target, Cn_String attribute_name);
 
 /**
  * ============================================
@@ -2665,7 +2691,7 @@ CNDEF Cn_Binding_Idx cn_binding_table_get(Cn_String name, Cn_Binding_Idx **bindi
  *
  * RETURNS: NIL if error occured, binding idx on success.
  */
-CNDEF Cn_Binding_Idx cn_binding_declare_function(Cn_String name, void * source, Cn_Ast_Storage_Specifier_Flags storage_flags, Cn_Ast_Function_Specifier_Flags function_flags, Cn_Type *type, Cn_Ast_List *parameter_declarations, bool is_definition);
+CNDEF Cn_Binding_Idx cn_binding_declare_function(Cn_String name, void * source, Cn_Ast_Storage_Specifier_Flags storage_flags, Cn_Ast_Function_Specifier_Flags function_flags, Cn_Type *type, Cn_Ast_Nodes *parameter_declarations, bool is_definition);
 
 /**
  * Adds new variable binding to the current scope.
@@ -2784,7 +2810,7 @@ extern Cn_Message_Handler *cn_message_handler;
  *
  * RETURNS: True on success, false if any errors occured.
  */
-CNDEF bool cn_analyze_declaration(void * declaration_specifiers, Cn_Ast_List init_declarators);
+CNDEF bool cn_analyze_declaration(void * declaration_specifiers, Cn_Ast_Nodes init_declarators);
 
 /**
  * Analyzes already constructed ast nodes as function definition.
@@ -2836,7 +2862,7 @@ CNDEF Cn_Any cn_analyze_evaluate_expression(void * expression, void *buffer);
  *
  * RETURNS: False if error occured, true on success.
  */
-CNDEF bool cn_analyze_typecheck_designations(Cn_Ast_List designations, Cn_Type *type);
+CNDEF bool cn_analyze_typecheck_designations(Cn_Ast_Nodes designations, Cn_Type *type);
 
 /**
  * Recursive function that type checks initializer against known type. 
@@ -2969,7 +2995,7 @@ CNDEF Cn_Ast_Node *cn_parse_function_or_declaration(Cn_Lexer *lexer);
  *          : attribute_specifiers declaration_specifiers init_declarators? gnu_attribute_specifiers
  *          ;
  */
-CNDEF Cn_Ast_Node *cn_parse_finish_declaration(Cn_Lexer *lexer, Cn_Ast_List attribute_specifiers);
+CNDEF Cn_Ast_Node *cn_parse_finish_declaration(Cn_Lexer *lexer, Cn_Ast_Nodes attribute_specifiers);
 
 /**
  * Determines whether tokens indicate start of declaration, 
@@ -3023,7 +3049,7 @@ CNDEF Cn_Ast_Node *cn_parse_statement(Cn_Lexer *lexer);
  *          | expression_statement
  *          ;
  */
-CNDEF Cn_Ast_Node *cn_parse_finish_statement(Cn_Lexer *lexer, Cn_Ast_List attribute_specifiers);
+CNDEF Cn_Ast_Node *cn_parse_finish_statement(Cn_Lexer *lexer, Cn_Ast_Nodes attribute_specifiers);
 
 /**
  * Parses code starting of with lexer current token as block.
@@ -3159,7 +3185,7 @@ CNDEF Cn_Ast_Node *cn_parse_expression_statement(Cn_Lexer *lexer);
  *          : expression (',' expression)*
  *          ;
  */
-CNDEF Cn_Ast_List cn_parse_arguments(Cn_Lexer *lexer, bool *ok);
+CNDEF Cn_Ast_Nodes cn_parse_arguments(Cn_Lexer *lexer, bool *ok);
 
 typedef enum : uint8_t {
     /**
@@ -3461,7 +3487,7 @@ CNDEF Cn_Ast_Node *cn_parse_expression_leaf(Cn_Lexer *lexer, Cn_Parse_Expression
  *          : init_declarator (',' init_declarator)*
  *          ;
  */
-CNDEF Cn_Ast_List cn_parse_finish_init_declarators(Cn_Lexer *lexer, void * declarator, bool *ok);
+CNDEF Cn_Ast_Nodes cn_parse_finish_init_declarators(Cn_Lexer *lexer, void * declarator, bool *ok);
 
 /**
  * Parses code starting of with lexer current token as init declarator list.
@@ -3470,7 +3496,7 @@ CNDEF Cn_Ast_List cn_parse_finish_init_declarators(Cn_Lexer *lexer, void * decla
  *          : init_declarator (',' init_declarator)*
  *          ;
  */
-CNDEF Cn_Ast_List cn_parse_init_declarators(Cn_Lexer *lexer, bool *ok);
+CNDEF Cn_Ast_Nodes cn_parse_init_declarators(Cn_Lexer *lexer, bool *ok);
 
 /**
  * Finishes parsing code starting of with lexer current token 
@@ -3508,7 +3534,7 @@ CNDEF Cn_Ast_Initializer *cn_parse_initializer(Cn_Lexer *lexer);
  *          : '{' ( designation (',' designation)* )? ','? '}'
  *          ;
  */
-CNDEF Cn_Ast_List cn_parse_designations(Cn_Lexer *lexer, bool *ok);
+CNDEF Cn_Ast_Nodes cn_parse_designations(Cn_Lexer *lexer, bool *ok);
 
 /**
  * Parses code starting of with lexer current token as designation.
@@ -3526,7 +3552,7 @@ CNDEF Cn_Ast_Designation *cn_parse_designation(Cn_Lexer *lexer);
  *          : designator+
  *          ;
  */
-CNDEF Cn_Ast_List cn_parse_designators(Cn_Lexer *lexer, bool *ok);
+CNDEF Cn_Ast_Nodes cn_parse_designators(Cn_Lexer *lexer, bool *ok);
 
 /**
  * Parses code starting of with lexer current token as designators.
@@ -3763,7 +3789,7 @@ CNDEF Cn_Ast_Specifier_Qualifier *cn_parse_specifier_qualifier(Cn_Lexer *lexer);
  *          : parameter_declaration (',' parameter_declaration)*
  *          ;
  */
-CNDEF Cn_Ast_List cn_parse_parameter_declarations(Cn_Lexer *lexer, bool *variadic, bool *ok);
+CNDEF Cn_Ast_Nodes cn_parse_parameter_declarations(Cn_Lexer *lexer, bool *variadic, bool *ok);
 
 /**
  * Parses code starting of with lexer current token as parameter declaration.
@@ -3807,7 +3833,7 @@ CNDEF Cn_Ast_Member_Declaration *cn_parse_member_declaration(Cn_Lexer *lexer);
  *          : member_declarator (',' member_declarator)*
  *          ;
  */
-CNDEF Cn_Ast_List cn_parse_member_declarators(Cn_Lexer *lexer, bool *ok);
+CNDEF Cn_Ast_Nodes cn_parse_member_declarators(Cn_Lexer *lexer, bool *ok);
 
 /**
  * Parses code starting of with lexer current token as member declarator.
@@ -3846,7 +3872,7 @@ CNDEF Cn_Ast_Enumerator *cn_parse_enumerator(Cn_Lexer *lexer);
  *          : attribute_specifier*
  *          ;
  */
-CNDEF Cn_Ast_List cn_parse_attribute_specifiers(Cn_Lexer *lexer, bool *ok);
+CNDEF Cn_Ast_Nodes cn_parse_attribute_specifiers(Cn_Lexer *lexer, bool *ok);
 
 /**
  * Parses code starting of with lexer current token as attribute specifier.
@@ -3864,7 +3890,7 @@ CNDEF Cn_Ast_Attribute_Specifier *cn_parse_attribute_specifier(Cn_Lexer *lexer);
  *          : attribute (',' attribute)*
  *          ;
  */
-CNDEF Cn_Ast_List cn_parse_attributes(Cn_Lexer *lexer, bool *ok);
+CNDEF Cn_Ast_Nodes cn_parse_attributes(Cn_Lexer *lexer, bool *ok);
 
 /**
  * Parses code starting of with lexer current token as attribute.
@@ -3882,7 +3908,7 @@ CNDEF Cn_Ast_Attribute *cn_parse_attribute(Cn_Lexer *lexer);
  *          : gnu_attribute_specifier*
  *          ;
  */
-CNDEF Cn_Ast_List cn_parse_gnu_attribute_specifiers(Cn_Lexer *lexer, bool *ok);
+CNDEF Cn_Ast_Nodes cn_parse_gnu_attribute_specifiers(Cn_Lexer *lexer, bool *ok);
 
 /**
  * Parses code starting of with lexer current token as GNU attribute specifier.
@@ -3900,7 +3926,7 @@ CNDEF Cn_Ast_Gnu_Attribute_Specifier *cn_parse_gnu_attribute_specifier(Cn_Lexer 
  *          : gnu_attribute (',' gnu_attribute)*
  *          ;
  */
-CNDEF Cn_Ast_List cn_parse_gnu_attributes(Cn_Lexer *lexer, bool *ok);
+CNDEF Cn_Ast_Nodes cn_parse_gnu_attributes(Cn_Lexer *lexer, bool *ok);
 
 /**
  * Parses code starting of with lexer current token as GNU attribute.
@@ -3984,11 +4010,16 @@ CNDEF Cn_Ast_Code *cn__build_format(const char *file, int64_t line, const char *
  * Builds list out of supplied nodes.
  * Accepts variadic array of nodes in order.
  *
- * RETURNS: List composed of supplied nodes.
+ * RETURNS: List composed of supplied nodes, allocated internally in arena.
  */
-#define cn_build_list(...) cn__build_list((void *[]) { __VA_ARGS__ }, sizeof((void *[]) { __VA_ARGS__ }) / sizeof(void *))
+#define cn_build_list(...) cn_build_list_from((void *[]) { __VA_ARGS__ }, sizeof((void *[]) { __VA_ARGS__ }) / sizeof(void *))
 
-CNDEF Cn_Ast_List cn__build_list(void *ptrs[], int64_t length);
+/**
+ * Builds list out of supplied nodes.
+ *
+ * RETURNS: List composed of supplied nodes, allocated internally in arena.
+ */
+CNDEF Cn_Ast_Nodes cn_build_list_from(void *ptrs[], int64_t length);
 
 /**
  * Builds identifier with supplied name.
@@ -4065,7 +4096,7 @@ CNDEF Cn_Ast_Unary *cn__build_unary(Cn_Ast_Unary_Operator_Kind op, void *express
  */
 #define cn_build_func_call(callee, arguments, ...) cn__build_func_call(callee, arguments, (Cn_Build_Opt) { .file = __FILE__, .line =__LINE__, __VA_ARGS__ })
 
-CNDEF Cn_Ast_Call *cn__build_func_call(void *callee, Cn_Ast_List arguments, Cn_Build_Opt opt);
+CNDEF Cn_Ast_Call *cn__build_func_call(void *callee, Cn_Ast_Nodes arguments, Cn_Build_Opt opt);
 
 /**
  * Builds expression statement, expression must be 
@@ -4164,7 +4195,7 @@ CNDEF Cn_Ast_Direct_Declarator_Array *cn__build_direct_declarator_array(void *di
  */
 #define cn_build_direct_declarator_function(direct_declarator, parameter_declarations, variadic, ...) cn__build_direct_declarator_function(direct_declarator, parameter_declarations, variadic, (Cn_Build_Opt) { .file = __FILE__, .line =__LINE__, __VA_ARGS__ })
 
-CNDEF Cn_Ast_Direct_Declarator_Function *cn__build_direct_declarator_function(void *direct_declarator, Cn_Ast_List parameter_declarations, bool variadic, Cn_Build_Opt opt);
+CNDEF Cn_Ast_Direct_Declarator_Function *cn__build_direct_declarator_function(void *direct_declarator, Cn_Ast_Nodes parameter_declarations, bool variadic, Cn_Build_Opt opt);
 
 /**
  * Builds declarator, pointer can be NIL if declarator is not wrapped with
@@ -4198,7 +4229,7 @@ CNDEF Cn_Ast_Init_Declarator *cn__build_init_declarator(Cn_Ast_Declarator *decla
  */
 #define cn_build_declaration(declaration_specifiers, init_declarators, ...) cn__build_declaration(declaration_specifiers, init_declarators, (Cn_Build_Opt) { .file = __FILE__, .line =__LINE__, __VA_ARGS__ })
 
-CNDEF Cn_Ast_Declaration *cn__build_declaration(Cn_Ast_Declaration_Specifiers *declaration_specifiers, Cn_Ast_List init_declarators, Cn_Build_Opt opt);
+CNDEF Cn_Ast_Declaration *cn__build_declaration(Cn_Ast_Declaration_Specifiers *declaration_specifiers, Cn_Ast_Nodes init_declarators, Cn_Build_Opt opt);
 
 /**
  * ============================================
@@ -4321,9 +4352,9 @@ typedef struct {
      */
     Cn_Chained_Arena ast_arena;
     /**
-     * Stack of Cn_Ast_Node *used during parsing to build Cn_Ast_List arrays.
+     * Stack of Cn_Ast_Node *used during parsing to build Cn_Ast_Nodes arrays.
      * Parsing functions push indices onto this stack, then finalize ranges
-     * into Cn_Ast_List when the list is complete.
+     * into Cn_Ast_Nodes when the list is complete.
      */
     Cn_Ast_Node **ptr_stack;
     /**
@@ -4464,40 +4495,6 @@ CNDEF int cn_tu_process(Cn_Translation_Unit *tu);
  */
 CNDEF void cn_tu_free(Cn_Translation_Unit *tu);
 
-/**
- * TEMPORARY
- *
- * Orderly removes entry from the list completely, 
- * forever decreasing list's length.
- */
-CNDEF Cn_Ast_Node *cn_remove_from_list(Cn_Ast_List *list, int64_t index);
-
-/**
- * TEMPORARY
- *
- * Deep copies list, allocating memory for the every node branch.
- * Use with caution, copying giant branches like translation unit is not recommended.
- * Returned idx's won't have it's parent set, and all ast nodes will have SYNTHETIC flag.
- * And all replaced information is erased. It is recursive.
- */
-CNDEF Cn_Ast_List cn_copy_list(Cn_Ast_List list);
-
-/**
- * TEMPORARY
- *
- * Deep copies ast, allocating memory for the branch.
- * Use with caution, copying giant branches like translation unit is not recommended.
- * Returned idx's won't have it's parent set, and all ast nodes will have SYNTHETIC flag.
- * And all replaced information is erased. It is recursive.
- */
-CNDEF void *cn_copy(void * idx);
-
-/**
- * TEMPORARY
- *
- * Removes attribute from the attribute list.
- */
-CNDEF bool cn_remove_attribute(void *target, Cn_String attribute_name);
 
 
 
@@ -7632,7 +7629,7 @@ const char *CN__AST_PRINT_LAST_TAB  = "└── ";
 #define CN__AST_PRINT_LAST()  do { cn__ast_print_prefixes[depth] = CN__AST_PRINT_EMPTY_TAB; CN__AST_PRINT_TABS(depth, CN__AST_PRINT_LAST_TAB); } while(0)
 #define CN__AST_PRINT_SPLIT() do { CN__AST_PRINT_TABS(depth, CN__AST_PRINT_SPLIT_TAB); } while(0)
 
-CNDEF void cn__ast_print_list(Cn_Ast_List list, const char *list_name, int depth) {
+CNDEF void cn__ast_print_list(Cn_Ast_Nodes list, const char *list_name, int depth) {
     CN_ASSERT(depth < (int)CN_ARRAY_LENGTH(cn__ast_print_prefixes));
 
     cn__ast_print_prefixes[depth] = CN__AST_PRINT_FLAT_TAB;
@@ -7975,13 +7972,13 @@ CNDEF void cn_ast_print(void * idx, int depth) {
         if (i == next - 1) {
             CN__AST_PRINT_LAST();
             if (list_names[i] != NULL) 
-                cn__ast_print_list(*((Cn_Ast_List *)ptrs[i]), list_names[i], depth + 1);
+                cn__ast_print_list(*((Cn_Ast_Nodes *)ptrs[i]), list_names[i], depth + 1);
             else 
                 cn_ast_print(*((Cn_Ast_Node **)ptrs[i]), depth + 1);
         } else {
             CN__AST_PRINT_SPLIT();
             if (list_names[i] != NULL) 
-                cn__ast_print_list(*((Cn_Ast_List *)ptrs[i]), list_names[i],  depth + 1);
+                cn__ast_print_list(*((Cn_Ast_Nodes *)ptrs[i]), list_names[i],  depth + 1);
             else 
                 cn_ast_print(*((Cn_Ast_Node **)ptrs[i]), depth + 1);
         }
@@ -8019,11 +8016,11 @@ CNDEF bool cn_ast_is_primary(void * node_ptr) {
         node->kind == CN_AST_STRING;
 }
 
-CNDEF Cn_Ast_List cn_ast_stack_finalize(int64_t mark) {
+CNDEF Cn_Ast_Nodes cn_ast_stack_finalize(int64_t mark) {
     int64_t stack_len = cn_array_list_length(&cn__tu_data->ptr_stack);
     int64_t count = stack_len - mark;
 
-    if (count <= 0) return (Cn_Ast_List) { .ptrs = NULL, .length = 0 };
+    if (count <= 0) return (Cn_Ast_Nodes) { .ptrs = NULL, .length = 0 };
     
 
     // Allocated from the ast arena, so the list is rolled back by a checkpoint
@@ -8036,8 +8033,304 @@ CNDEF Cn_Ast_List cn_ast_stack_finalize(int64_t mark) {
     // Pop the finalized indices from stack.
     cn_array_list_pop_multiple(&cn__tu_data->ptr_stack, count);
 
-    return (Cn_Ast_List) { .ptrs = ptrs, .length = count };
+    return (Cn_Ast_Nodes) { .ptrs = ptrs, .length = count };
 }
+
+CNDEF Cn_Ast_Node *cn_ast_remove_from_list(Cn_Ast_Nodes *list, int64_t index) {
+    CN_ASSERT(index >= 0 && index < list->length);
+
+    Cn_Ast_Node *removed = list->ptrs[index];
+    memmove(list->ptrs + index, list->ptrs + index + 1, (size_t)(list->length - index - 1) * sizeof(Cn_Ast_Node *));
+    list->length--;
+    return removed;
+}
+
+CNDEF Cn_Ast_Nodes cn_ast_copy_list(Cn_Ast_Nodes list) {
+    int64_t mark = cn_ast_stack_mark();
+
+    for (int64_t i = 0; i < list.length; i++) {
+        cn_ast_stack_push(cn_ast_copy(list.ptrs[i]));
+    }
+
+    return cn_ast_stack_finalize(mark);
+}
+
+CNDEF void *cn_ast_copy(void * idx) {
+    if (idx == NULL) return NULL;
+
+    Cn_Ast_Node *node = idx;
+
+    // Nodes are allocated at their own size, so a copy has to know the size of
+    // the concrete kind it is copying.
+    Cn_Ast_Node *copy = cn__ast_new(node, cn_ast_node_size(node->kind));
+
+    copy->flags |= CN_AST_SYNTHETIC;
+
+#define COPY_LIST(T, field) cn_ast_as(T, copy)->field = cn_ast_copy_list(cn_ast_as(T, copy)->field)
+#define COPY_PTR(T, field)  cn_ast_as(T, copy)->field = cn_ast_copy(cn_ast_as(T, copy)->field)
+
+    switch (copy->kind) {
+        case CN_AST_TRANSLATION_UNIT:
+            COPY_LIST(Translation_Unit, external_declarations);
+            return copy;
+        case CN_AST_CODE:
+            return copy;
+        case CN_AST_EXTERNAL_DECLARATION:
+            COPY_PTR(External_Declaration, child);
+            return copy;
+        case CN_AST_DECLARATION:
+            COPY_LIST(Declaration, attribute_specifiers);
+            COPY_PTR(Declaration, declaration_specifiers);
+            COPY_LIST(Declaration, init_declarators);
+            return copy;
+        case CN_AST_FUNCTION:
+            COPY_LIST(Function, attribute_specifiers);
+            COPY_PTR(Function, declaration_specifiers);
+            COPY_PTR(Function, declarator);
+            COPY_PTR(Function, block);
+            return copy;
+        case CN_AST_BLOCK:
+            COPY_LIST(Block, attribute_specifiers);
+            COPY_LIST(Block, block_items);
+            return copy;
+        case CN_AST_BLOCK_ITEM:
+            COPY_PTR(Block_Item, declaration_or_statement);
+            return copy;
+        case CN_AST_IF:
+            COPY_LIST(If, attribute_specifiers);
+            COPY_PTR(If, condition);
+            COPY_PTR(If, then_statement);
+            COPY_PTR(If, else_statement);
+            return copy;
+        case CN_AST_SWITCH:
+            COPY_LIST(Switch, attribute_specifiers);
+            COPY_PTR(Switch, condition);
+            COPY_PTR(Switch, body);
+            return copy;
+        case CN_AST_WHILE:
+            COPY_LIST(While, attribute_specifiers);
+            COPY_PTR(While, condition);
+            COPY_PTR(While, body);
+            return copy;
+        case CN_AST_DO_WHILE:
+            COPY_LIST(Do_While, attribute_specifiers);
+            COPY_PTR(Do_While, condition);
+            COPY_PTR(Do_While, body);
+            return copy;
+        case CN_AST_FOR:
+            COPY_LIST(For, attribute_specifiers);
+            COPY_PTR(For, initialization);
+            COPY_PTR(For, condition);
+            COPY_PTR(For, update);
+            COPY_PTR(For, body);
+            return copy;
+        case CN_AST_LABEL:
+            COPY_LIST(Label, attribute_specifiers);
+            COPY_PTR(Label, identifier);
+            COPY_PTR(Label, expression);
+            COPY_PTR(Label, statement);
+            return copy;
+        case CN_AST_GOTO:
+            COPY_LIST(Goto, attribute_specifiers);
+            COPY_PTR(Goto, identifier);
+            return copy;
+        case CN_AST_RETURN:
+            COPY_LIST(Return, attribute_specifiers);
+            COPY_PTR(Return, expression);
+            return copy;
+        case CN_AST_BREAK:
+            COPY_LIST(Break, attribute_specifiers);
+            return copy;
+        case CN_AST_CONTINUE:
+            COPY_LIST(Continue, attribute_specifiers);
+            return copy;
+        case CN_AST_EXPRESSION_STATEMENT:
+            COPY_LIST(Expression_Statement, attribute_specifiers);
+            COPY_PTR(Expression_Statement, expression);
+            return copy;
+        case CN_AST_BINARY:
+            COPY_PTR(Binary, left);
+            COPY_PTR(Binary, right);
+            return copy;
+        case CN_AST_ACCESS:
+            COPY_PTR(Access, expression);
+            COPY_PTR(Access, member);
+            return copy;
+        case CN_AST_CALL:
+            COPY_PTR(Call, expression);
+            COPY_LIST(Call, arguments);
+            return copy;
+        case CN_AST_UNARY:
+            COPY_PTR(Unary, expression);
+            return copy;
+        case CN_AST_CAST:
+            COPY_PTR(Cast, type_name);
+            COPY_PTR(Cast, expression);
+            return copy;
+        case CN_AST_COMPOUND:
+            COPY_PTR(Compound, type_name);
+            COPY_LIST(Compound, designations);
+            return copy;
+        case CN_AST_SIZEOF:
+            COPY_PTR(Sizeof, target);
+            return copy;
+        case CN_AST_TERNARY:
+            COPY_PTR(Ternary, condition);
+            COPY_PTR(Ternary, if_true);
+            COPY_PTR(Ternary, if_false);
+            return copy;
+        case CN_AST_ASSIGN:
+            COPY_PTR(Assign, left);
+            COPY_PTR(Assign, right);
+            return copy;
+        case CN_AST_POSTFIX:
+            COPY_PTR(Postfix, expression);
+            return copy;
+        case CN_AST_PRIMARY:
+            COPY_PTR(Primary, literal);
+            return copy;
+        case CN_AST_IDENTIFIER:
+            return copy;
+        case CN_AST_INTEGER:
+            return copy;
+        case CN_AST_FLOAT:
+            return copy;
+        case CN_AST_STRING:
+            return copy;
+        case CN_AST_INIT_DECLARATOR:
+            COPY_PTR(Init_Declarator, declarator);
+            COPY_LIST(Init_Declarator, gnu_attribute_specifiers);
+            COPY_PTR(Init_Declarator, gnu_asm_label);
+            COPY_PTR(Init_Declarator, initializer);
+            return copy;
+        case CN_AST_INITIALIZER:
+            COPY_PTR(Initializer, expression);
+            COPY_LIST(Initializer, designations);
+            return copy;
+        case CN_AST_DESIGNATION:
+            COPY_LIST(Designation, designators);
+            COPY_PTR(Designation, initializer);
+            return copy;
+        case CN_AST_DESIGNATOR:
+            COPY_PTR(Designator, identifier);
+            COPY_PTR(Designator, expression);
+            COPY_PTR(Designator, expression_range_end);
+            return copy;
+        case CN_AST_DECLARATOR:
+            COPY_PTR(Declarator, pointer);
+            COPY_PTR(Declarator, direct_declarator);
+            return copy;
+        case CN_AST_POINTER:
+            COPY_PTR(Pointer, pointer);
+            return copy;
+        case CN_AST_DIRECT_DECLARATOR_GROUPED:
+            COPY_PTR(Direct_Declarator_Grouped, declarator);
+            return copy;
+        case CN_AST_DIRECT_DECLARATOR_ARRAY:
+            COPY_PTR(Direct_Declarator_Array, direct_declarator);
+            COPY_PTR(Direct_Declarator_Array, expression);
+            return copy;
+        case CN_AST_DIRECT_DECLARATOR_FUNCTION:
+            COPY_PTR(Direct_Declarator_Function, direct_declarator);
+            COPY_LIST(Direct_Declarator_Function, parameter_declarations);
+            return copy;
+        case CN_AST_DECLARATION_SPECIFIERS:
+            COPY_LIST(Declaration_Specifiers, gnu_attribute_specifiers);
+            COPY_PTR(Declaration_Specifiers, type_specifier);
+            return copy;
+        case CN_AST_GNU_TYPEOF:
+            COPY_PTR(Gnu_Typeof, target);
+            return copy;
+        case CN_AST_TYPE_SPECIFIER_PRIMITIVE:
+            return copy;
+        case CN_AST_TYPE_SPECIFIER_TYPEDEF:
+            return copy;
+        case CN_AST_TYPE_NAME:
+            COPY_PTR(Type_Name, specifier_qualifier);
+            COPY_PTR(Type_Name, abstract_declarator);
+            return copy;
+        case CN_AST_SPECIFIER_QUALIFIER:
+            COPY_PTR(Specifier_Qualifier, type_specifier);
+            return copy;
+        case CN_AST_PARAMETER_DECLARATION:
+            COPY_PTR(Parameter_Declaration, declaration_specifiers);
+            COPY_PTR(Parameter_Declaration, declarator);
+            return copy;
+        case CN_AST_STRUCT_SPECIFIER:
+            COPY_LIST(Struct_Specifier, attribute_specifiers);
+            COPY_LIST(Struct_Specifier, gnu_attribute_specifiers);
+            COPY_PTR(Struct_Specifier, identifier);
+            COPY_LIST(Struct_Specifier, member_declarations);
+            return copy;
+        case CN_AST_UNION_SPECIFIER:
+            COPY_LIST(Union_Specifier, attribute_specifiers);
+            COPY_LIST(Union_Specifier, gnu_attribute_specifiers);
+            COPY_PTR(Union_Specifier, identifier);
+            COPY_LIST(Union_Specifier, member_declarations);
+            return copy;
+        case CN_AST_MEMBER_DECLARATION:
+            COPY_LIST(Member_Declaration, attribute_specifiers);
+            COPY_PTR(Member_Declaration, specifier_qualifier);
+            COPY_LIST(Member_Declaration, member_declarators);
+            return copy;
+        case CN_AST_MEMBER_DECLARATOR:
+            COPY_PTR(Member_Declarator, declarator);
+            COPY_PTR(Member_Declarator, bitfield);
+            COPY_LIST(Member_Declarator, gnu_attribute_specifiers);
+            return copy;
+        case CN_AST_ENUM_SPECIFIER:
+            COPY_LIST(Enum_Specifier, attribute_specifiers);
+            COPY_LIST(Enum_Specifier, gnu_attribute_specifiers);
+            COPY_PTR(Enum_Specifier, identifier);
+            COPY_PTR(Enum_Specifier, specifier_qualifier);
+            COPY_LIST(Enum_Specifier, enumerators);
+            return copy;
+        case CN_AST_ENUMERATOR:
+            COPY_PTR(Enumerator, identifier);
+            COPY_LIST(Enumerator, attribute_specifiers);
+            COPY_LIST(Enumerator, gnu_attribute_specifiers);
+            COPY_PTR(Enumerator, expression);
+            return copy;
+        case CN_AST_ATTRIBUTE_SPECIFIER:
+            COPY_LIST(Attribute_Specifier, attributes);
+            return copy;
+        case CN_AST_ATTRIBUTE:
+            COPY_PTR(Attribute, vendor_identifier);
+            COPY_PTR(Attribute, identifier);
+            COPY_LIST(Attribute, arguments);
+            return copy;
+        case CN_AST_GNU_ATTRIBUTE_SPECIFIER:
+            COPY_LIST(Gnu_Attribute_Specifier, gnu_attributes);
+            return copy;
+        case CN_AST_GNU_ATTRIBUTE:
+            COPY_PTR(Gnu_Attribute, identifier);
+            COPY_LIST(Gnu_Attribute, arguments);
+            return copy;
+        case CN_AST_GNU_ASM_LABEL:
+            COPY_PTR(Gnu_Asm_Label, string);
+            return copy;
+        case CN_AST_UNKNOWN:
+            cn_log(CN_ERROR, "Unsupported copy ast node kind.");
+            return copy;
+    }
+
+#undef COPY_LIST
+#undef COPY_PTR
+
+    return NULL;
+}
+
+
+CNDEF bool cn_ast_remove_attribute(void *target, Cn_String attribute_name) {
+    Cn_Ast_Attribute_Specifier *owner = NULL;
+    int64_t index = -1;
+
+    if (cn_get_attribute_info(target, attribute_name, &owner, &index) == NULL) return false;
+
+    cn_ast_remove_from_list(&owner->attributes, index);
+    return true;
+}
+
 
 /**
  * ============================================
@@ -8132,7 +8425,7 @@ CNDEF Cn_Ast_Attribute *cn_get_attribute_info(void *target, Cn_String attribute_
     if (target == NULL) return NULL;
 
     Cn_Ast_Node *node = target;
-    Cn_Ast_List attribute_specifiers;
+    Cn_Ast_Nodes attribute_specifiers;
 
     switch (node->kind) {
         case CN_AST_DECLARATION:
@@ -8196,7 +8489,7 @@ CNDEF Cn_Ast_Attribute *cn_get_attribute_info(void *target, Cn_String attribute_
             
         case CN_AST_ATTRIBUTE_SPECIFIER:
             // A specifier is searched directly, it owns its attributes.
-            attribute_specifiers = (Cn_Ast_List) { .ptrs = &node, .length = 1 };
+            attribute_specifiers = (Cn_Ast_Nodes) { .ptrs = &node, .length = 1 };
             break;
         default:
             return NULL;
@@ -8522,7 +8815,7 @@ CNDEF bool cn__binding_conflict(Cn_Binding *a, Cn_Binding *b) {
     return false;
 }
 
-CNDEF Cn_Binding_Idx cn_binding_declare_function(Cn_String name, void * source, Cn_Ast_Storage_Specifier_Flags storage_flags, Cn_Ast_Function_Specifier_Flags function_flags, Cn_Type *type, Cn_Ast_List *parameter_declarations, bool is_definition) {
+CNDEF Cn_Binding_Idx cn_binding_declare_function(Cn_String name, void * source, Cn_Ast_Storage_Specifier_Flags storage_flags, Cn_Ast_Function_Specifier_Flags function_flags, Cn_Type *type, Cn_Ast_Nodes *parameter_declarations, bool is_definition) {
     CN_ASSERT(cn_array_list_length(&cn__tu_data->scope_stack) > 0);
 
     Cn_Binding binding = {
@@ -8848,7 +9141,7 @@ Cn_Message_Handler *cn_message_handler = NULL;
  * ============================================
  */
 
-CNDEF bool cn_analyze_declaration(void * declaration_specifiers, Cn_Ast_List init_declarators) {
+CNDEF bool cn_analyze_declaration(void * declaration_specifiers, Cn_Ast_Nodes init_declarators) {
     Cn_Ast_Declaration_Specifiers *decl_spec = declaration_specifiers;
 
     // No declarators, then just analzing declaration specifiers.
@@ -8880,7 +9173,7 @@ CNDEF bool cn_analyze_declaration(void * declaration_specifiers, Cn_Ast_List ini
                         &identifier
                         );
 
-                Cn_Ast_List *parameter_declarations = NULL;
+                Cn_Ast_Nodes *parameter_declarations = NULL;
                 if (parameter_type_list != NULL)
                     parameter_declarations = &((Cn_Ast_Direct_Declarator_Function *)parameter_type_list)->parameter_declarations;
 
@@ -8951,7 +9244,7 @@ CNDEF bool cn_analyze_function(void * declaration_specifiers, void * declarator,
         return false;
     }
 
-    Cn_Ast_List *parameter_declarations = NULL;
+    Cn_Ast_Nodes *parameter_declarations = NULL;
     if (parameter_type_list != NULL) {
         parameter_declarations = &((Cn_Ast_Direct_Declarator_Function *)parameter_type_list)->parameter_declarations;
     }
@@ -11139,7 +11432,7 @@ CNDEF bool cn__analyze_typecheck_designation(Cn_Ast_Designation *designation, Cn
     return cn_analyze_typecheck_initializer(designation->initializer, type);
 }
 
-CNDEF bool cn_analyze_typecheck_designations(Cn_Ast_List designations, Cn_Type *type) {
+CNDEF bool cn_analyze_typecheck_designations(Cn_Ast_Nodes designations, Cn_Type *type) {
     int64_t ordinal = 0;
     for (int64_t i = 0; i < designations.length; i++) {
         if (!cn__analyze_typecheck_designation(cn_ast_as(Designation, designations.ptrs[i]), type, &ordinal)) return false;
@@ -11236,9 +11529,9 @@ CNDEF void cn__emit_code(Cn_Emitter *e, Cn_Ast_Code *node) {
 CNDEF void cn__emit_storage_specifiers(Cn_Emitter *e, Cn_Ast_Storage_Specifier_Flags storage);
 CNDEF void cn__emit_qualifiers(Cn_Emitter *e, Cn_Ast_Qualifier_Flags qualifiers);
 CNDEF void cn__emit_function_specifiers(Cn_Emitter *e, Cn_Ast_Function_Specifier_Flags func_spec);
-CNDEF void cn__emit_gnu_attribute_specifiers(Cn_Emitter *e, Cn_Ast_List specifiers);
-CNDEF void cn__emit_attribute_specifiers(Cn_Emitter *e, Cn_Ast_List specifiers);
-CNDEF void cn__emit_designations(Cn_Emitter *e, Cn_Ast_List designations);
+CNDEF void cn__emit_gnu_attribute_specifiers(Cn_Emitter *e, Cn_Ast_Nodes specifiers);
+CNDEF void cn__emit_attribute_specifiers(Cn_Emitter *e, Cn_Ast_Nodes specifiers);
+CNDEF void cn__emit_designations(Cn_Emitter *e, Cn_Ast_Nodes designations);
 
 CNDEF void cn__emit_translation_unit(Cn_Emitter *e, Cn_Ast_Translation_Unit *node) {
     for (int64_t i = 0; i < node->external_declarations.length; i++) {
@@ -11688,7 +11981,7 @@ CNDEF void cn__emit_initializer(Cn_Emitter *e, Cn_Ast_Initializer *node) {
     cn__emit_str_lit(e, "}");
 }
 
-CNDEF void cn__emit_designations(Cn_Emitter *e, Cn_Ast_List designations) {
+CNDEF void cn__emit_designations(Cn_Emitter *e, Cn_Ast_Nodes designations) {
     for (int64_t i = 0; i < designations.length; i++) {
         cn_emit(e, designations.ptrs[i]);
 
@@ -11965,7 +12258,7 @@ CNDEF void cn__emit_member_declarator(Cn_Emitter *e, Cn_Ast_Member_Declarator *n
     cn__emit_attribute_specifiers(e, node->gnu_attribute_specifiers);
 }
 
-CNDEF void cn__emit_gnu_attribute_specifiers(Cn_Emitter *e, Cn_Ast_List specifiers) {
+CNDEF void cn__emit_gnu_attribute_specifiers(Cn_Emitter *e, Cn_Ast_Nodes specifiers) {
     for (int64_t i = 0; i < specifiers.length; i++) {
         cn__emit_str_lit(e, " ");
         cn_emit(e, specifiers.ptrs[i]);
@@ -12037,7 +12330,7 @@ CNDEF void cn__emit_enumerator(Cn_Emitter *e, Cn_Ast_Enumerator *node) {
     cn__emit_str_lit(e, ",");
 }
 
-CNDEF void cn__emit_attribute_specifiers(Cn_Emitter *e, Cn_Ast_List specifiers) {
+CNDEF void cn__emit_attribute_specifiers(Cn_Emitter *e, Cn_Ast_Nodes specifiers) {
     for (int64_t i = 0; i < specifiers.length; i++) {
         cn_emit(e, specifiers.ptrs[i]);
         cn__emit_str_lit(e, " ");
@@ -12276,7 +12569,7 @@ CNDEF Cn_Ast_Node *cn_parse_function_or_declaration(Cn_Lexer *lexer) {
 
     // Getting attributes [[]].
     bool ok;
-    Cn_Ast_List attribute_specifiers = cn_parse_attribute_specifiers(lexer, &ok);
+    Cn_Ast_Nodes attribute_specifiers = cn_parse_attribute_specifiers(lexer, &ok);
     if (!ok) goto error;
 
     // Getting declration specifiers.
@@ -12307,7 +12600,7 @@ CNDEF Cn_Ast_Node *cn_parse_function_or_declaration(Cn_Lexer *lexer) {
         node.declaration_specifiers = declaration_specifiers;
 
         // New types can be made, even in empty declaration.
-        ok = cn_analyze_declaration(node.declaration_specifiers, (Cn_Ast_List) {0});
+        ok = cn_analyze_declaration(node.declaration_specifiers, (Cn_Ast_Nodes) {0});
         if (!ok) goto error;
 
         Cn_Ast_Node *parent = cn_ast_new(node);
@@ -12386,7 +12679,7 @@ error:
     return NULL;
 }
 
-CNDEF Cn_Ast_Node *cn_parse_finish_declaration(Cn_Lexer *lexer, Cn_Ast_List attribute_specifiers) {
+CNDEF Cn_Ast_Node *cn_parse_finish_declaration(Cn_Lexer *lexer, Cn_Ast_Nodes attribute_specifiers) {
     Cn_Lexer original_state = *lexer;
 
     Cn_Ast_Declaration node = {
@@ -12413,7 +12706,7 @@ CNDEF Cn_Ast_Node *cn_parse_finish_declaration(Cn_Lexer *lexer, Cn_Ast_List attr
         node.flags |= CN_AST_DECLARATION_IS_EMPTY;
 
         // New types can be made, even in empty declaration.
-        ok = cn_analyze_declaration(node.declaration_specifiers, (Cn_Ast_List) {0});
+        ok = cn_analyze_declaration(node.declaration_specifiers, (Cn_Ast_Nodes) {0});
         if (!ok) goto error;
 
         Cn_Ast_Node *parent = cn_ast_new(node);
@@ -12495,7 +12788,7 @@ CNDEF Cn_Ast_Node *cn_parse_statement(Cn_Lexer *lexer) {
     Cn_Lexer original_state = *lexer;
 
     bool ok;
-    Cn_Ast_List attribute_specifiers = cn_parse_attribute_specifiers(lexer, &ok);
+    Cn_Ast_Nodes attribute_specifiers = cn_parse_attribute_specifiers(lexer, &ok);
     if (!ok) goto error;
 
     return cn_parse_finish_statement(lexer, attribute_specifiers);
@@ -12506,7 +12799,7 @@ error:
     return NULL;
 }
 
-CNDEF Cn_Ast_Node *cn_parse_finish_statement(Cn_Lexer *lexer, Cn_Ast_List attribute_specifiers) {
+CNDEF Cn_Ast_Node *cn_parse_finish_statement(Cn_Lexer *lexer, Cn_Ast_Nodes attribute_specifiers) {
     Cn_Ast_Node *statement;
 
     if (cn_lexer_expect(lexer, CN_TOKEN_CASE) || cn_lexer_peek(lexer, 1).type == CN_TOKEN_COLON) {
@@ -12652,7 +12945,7 @@ CNDEF Cn_Ast_Block_Item *cn_parse_block_item(Cn_Lexer *lexer) {
     // Parsing attribute specifiers here in order to get to the tokens that would 
     // disambiguate delcaration vs statement situation.
     bool ok;
-    Cn_Ast_List attribute_specifiers = cn_parse_attribute_specifiers(lexer, &ok);
+    Cn_Ast_Nodes attribute_specifiers = cn_parse_attribute_specifiers(lexer, &ok);
     if (!ok) goto error;
 
     Cn_Ast_Node *declaration_or_statement;
@@ -12829,7 +13122,7 @@ CNDEF Cn_Ast_Node *cn_parse_for_statement(Cn_Lexer *lexer) {
     
     if (!cn_parse_optional(lexer, CN_TOKEN_SEMICOLON)) {
         bool ok;
-        Cn_Ast_List attribute_specifiers = cn_parse_attribute_specifiers(lexer, &ok);
+        Cn_Ast_Nodes attribute_specifiers = cn_parse_attribute_specifiers(lexer, &ok);
         if (!ok) goto error;
 
         Cn_Ast_Node *declaration_or_expression;
@@ -13044,7 +13337,7 @@ error:
     return NULL;
 }
 
-CNDEF Cn_Ast_List cn_parse_arguments(Cn_Lexer *lexer, bool *ok) {
+CNDEF Cn_Ast_Nodes cn_parse_arguments(Cn_Lexer *lexer, bool *ok) {
     Cn_Lexer original_state = *lexer;
 
     int64_t mark = cn_ast_stack_mark();
@@ -13065,7 +13358,7 @@ error:
     CN__TRACE_ERROR
     *lexer = original_state;
     *ok = false;
-    return (Cn_Ast_List) {0};
+    return (Cn_Ast_Nodes) {0};
 }
 
 CNDEF Cn_Ast_Node *cn_parse_expression_increasing_precedence(Cn_Lexer *lexer, void * left, int min_precedence, Cn_Parse_Expression_Flags flags) {;
@@ -13394,7 +13687,7 @@ error:
     return NULL;
 }
 
-CNDEF Cn_Ast_List cn_parse_finish_init_declarators(Cn_Lexer *lexer, void * declarator, bool *ok) {
+CNDEF Cn_Ast_Nodes cn_parse_finish_init_declarators(Cn_Lexer *lexer, void * declarator, bool *ok) {
     Cn_Lexer original_state = *lexer;
 
     int64_t mark = cn_ast_stack_mark();
@@ -13418,10 +13711,10 @@ error:
     CN__TRACE_ERROR
     *lexer = original_state;
     *ok = false;
-    return (Cn_Ast_List) {0};
+    return (Cn_Ast_Nodes) {0};
 }
 
-CNDEF Cn_Ast_List cn_parse_init_declarators(Cn_Lexer *lexer, bool *ok) {
+CNDEF Cn_Ast_Nodes cn_parse_init_declarators(Cn_Lexer *lexer, bool *ok) {
     Cn_Lexer original_state = *lexer;
 
     bool decl_ok;
@@ -13439,7 +13732,7 @@ error:
     CN__TRACE_ERROR
     *lexer = original_state;
     *ok = false;
-    return (Cn_Ast_List) {0};
+    return (Cn_Ast_Nodes) {0};
 }
 
 CNDEF Cn_Ast_Init_Declarator *cn_parse_finish_init_declarator(Cn_Lexer *lexer, Cn_Ast_Declarator *declarator) {
@@ -13519,7 +13812,7 @@ error:
     return NULL;
 }
 
-CNDEF Cn_Ast_List cn_parse_designations(Cn_Lexer *lexer, bool *ok) {
+CNDEF Cn_Ast_Nodes cn_parse_designations(Cn_Lexer *lexer, bool *ok) {
     Cn_Lexer original_state = *lexer;
 
     if (!cn_parse_expect(lexer, CN_TOKEN_CURLY_OPEN)) goto error;
@@ -13543,7 +13836,7 @@ error:
     CN__TRACE_ERROR
     *ok = false;
     *lexer = original_state;
-    return (Cn_Ast_List) {0};
+    return (Cn_Ast_Nodes) {0};
 }
 
 CNDEF Cn_Ast_Designation *cn_parse_designation(Cn_Lexer *lexer) {
@@ -13573,7 +13866,7 @@ error:
     return NULL;
 }
 
-CNDEF Cn_Ast_List cn_parse_designators(Cn_Lexer *lexer, bool *ok) {
+CNDEF Cn_Ast_Nodes cn_parse_designators(Cn_Lexer *lexer, bool *ok) {
     Cn_Lexer original_state = *lexer;
 
     int64_t mark = cn_ast_stack_mark();
@@ -13593,7 +13886,7 @@ error:
     CN__TRACE_ERROR
     *ok = false;
     *lexer = original_state;
-    return (Cn_Ast_List) {0};
+    return (Cn_Ast_Nodes) {0};
 }
 
 CNDEF Cn_Ast_Designator *cn_parse_designator(Cn_Lexer *lexer) {
@@ -14434,7 +14727,7 @@ error:
     return NULL;
 }
 
-CNDEF Cn_Ast_List cn_parse_parameter_declarations(Cn_Lexer *lexer, bool *variadic, bool *ok) {
+CNDEF Cn_Ast_Nodes cn_parse_parameter_declarations(Cn_Lexer *lexer, bool *variadic, bool *ok) {
     Cn_Lexer original_state = *lexer;
 
     *variadic = false;
@@ -14465,7 +14758,7 @@ error:
     CN__TRACE_ERROR
     *lexer = original_state;
     *ok = false;
-    return (Cn_Ast_List) {0};
+    return (Cn_Ast_Nodes) {0};
 }
 
 CNDEF Cn_Ast_Parameter_Declaration *cn_parse_parameter_declaration(Cn_Lexer *lexer) {
@@ -14613,7 +14906,7 @@ error:
     return NULL;
 }
 
-CNDEF Cn_Ast_List cn_parse_member_declarators(Cn_Lexer *lexer, bool *ok) {
+CNDEF Cn_Ast_Nodes cn_parse_member_declarators(Cn_Lexer *lexer, bool *ok) {
     Cn_Lexer original_state = *lexer;
 
     int64_t mark = cn_ast_stack_mark();
@@ -14634,7 +14927,7 @@ error:
     CN__TRACE_ERROR
     *ok = false;
     *lexer = original_state;
-    return (Cn_Ast_List) {0};
+    return (Cn_Ast_Nodes) {0};
 }
 
 CNDEF Cn_Ast_Member_Declarator *cn_parse_member_declarator(Cn_Lexer *lexer) {
@@ -14795,7 +15088,7 @@ error:
     return NULL;
 }
 
-CNDEF Cn_Ast_List cn_parse_attribute_specifiers(Cn_Lexer *lexer, bool *ok) {
+CNDEF Cn_Ast_Nodes cn_parse_attribute_specifiers(Cn_Lexer *lexer, bool *ok) {
     Cn_Lexer original_state = *lexer;
 
     int64_t mark = cn_ast_stack_mark();
@@ -14815,7 +15108,7 @@ error:
     CN__TRACE_ERROR
     *lexer = original_state;
     *ok = false;
-    return (Cn_Ast_List) {0};
+    return (Cn_Ast_Nodes) {0};
 }
 
 CNDEF Cn_Ast_Attribute_Specifier *cn_parse_attribute_specifier(Cn_Lexer *lexer) {
@@ -14844,7 +15137,7 @@ error:
     return NULL;
 }
 
-CNDEF Cn_Ast_List cn_parse_attributes(Cn_Lexer *lexer, bool *ok) {
+CNDEF Cn_Ast_Nodes cn_parse_attributes(Cn_Lexer *lexer, bool *ok) {
     Cn_Lexer original_state = *lexer;
 
     int64_t mark = cn_ast_stack_mark();
@@ -14868,7 +15161,7 @@ error:
     CN__TRACE_ERROR
     *lexer = original_state;
     *ok = false;
-    return (Cn_Ast_List) {0};
+    return (Cn_Ast_Nodes) {0};
 }
 
 CNDEF Cn_Ast_Attribute *cn_parse_attribute(Cn_Lexer *lexer) {
@@ -14907,7 +15200,7 @@ error:
     return NULL;
 }
 
-CNDEF Cn_Ast_List cn_parse_gnu_attribute_specifiers(Cn_Lexer *lexer, bool *ok) {
+CNDEF Cn_Ast_Nodes cn_parse_gnu_attribute_specifiers(Cn_Lexer *lexer, bool *ok) {
     Cn_Lexer original_state = *lexer;
 
     int64_t mark = cn_ast_stack_mark();
@@ -14927,7 +15220,7 @@ error:
     CN__TRACE_ERROR
     *lexer = original_state;
     *ok = false;
-    return (Cn_Ast_List) {0};
+    return (Cn_Ast_Nodes) {0};
 }
 
 CNDEF Cn_Ast_Gnu_Attribute_Specifier *cn_parse_gnu_attribute_specifier(Cn_Lexer *lexer) {
@@ -14957,7 +15250,7 @@ error:
     return NULL;
 }
 
-CNDEF Cn_Ast_List cn_parse_gnu_attributes(Cn_Lexer *lexer, bool *ok) {
+CNDEF Cn_Ast_Nodes cn_parse_gnu_attributes(Cn_Lexer *lexer, bool *ok) {
     Cn_Lexer original_state = *lexer;
 
     int64_t mark = cn_ast_stack_mark();
@@ -14981,7 +15274,7 @@ error:
     CN__TRACE_ERROR
     *lexer = original_state;
     *ok = false;
-    return (Cn_Ast_List) {0};
+    return (Cn_Ast_Nodes) {0};
 }
 
 CNDEF Cn_Ast_Gnu_Attribute *cn_parse_gnu_attribute(Cn_Lexer *lexer) {
@@ -15214,7 +15507,7 @@ CNDEF Cn_Ast_Code *cn__build_format(const char *file, int64_t line, const char *
     return cn_ast_new(node);
 }
 
-CNDEF Cn_Ast_List cn__build_list(void *ptrs[], int64_t length) {
+CNDEF Cn_Ast_Nodes cn_build_list_from(void *ptrs[], int64_t length) {
     int64_t mark = cn_ast_stack_mark();
 
     for (int64_t i = 0; i < length; i++) {
@@ -15329,7 +15622,7 @@ CNDEF Cn_Ast_Unary *cn__build_unary(Cn_Ast_Unary_Operator_Kind op, void *express
     return cn_ast_new(node);
 }
 
-CNDEF Cn_Ast_Call *cn__build_func_call(void *callee, Cn_Ast_List arguments, Cn_Build_Opt opt) {
+CNDEF Cn_Ast_Call *cn__build_func_call(void *callee, Cn_Ast_Nodes arguments, Cn_Build_Opt opt) {
     Cn_Ast_Call node = {
         .kind = CN_AST_CALL,
         .flags = CN_AST_SYNTHETIC,
@@ -15473,7 +15766,7 @@ CNDEF Cn_Ast_Direct_Declarator_Array *cn__build_direct_declarator_array(void *di
     return cn_ast_new(node);
 }
 
-CNDEF Cn_Ast_Direct_Declarator_Function *cn__build_direct_declarator_function(void *direct_declarator, Cn_Ast_List parameter_declarations, bool variadic, Cn_Build_Opt opt) {
+CNDEF Cn_Ast_Direct_Declarator_Function *cn__build_direct_declarator_function(void *direct_declarator, Cn_Ast_Nodes parameter_declarations, bool variadic, Cn_Build_Opt opt) {
     Cn_Ast_Direct_Declarator_Function node = {
         .kind = CN_AST_DIRECT_DECLARATOR_FUNCTION,
         .flags = CN_AST_SYNTHETIC,
@@ -15516,7 +15809,7 @@ CNDEF Cn_Ast_Init_Declarator *cn__build_init_declarator(Cn_Ast_Declarator *decla
     return cn_ast_new(node);
 }
 
-CNDEF Cn_Ast_Declaration *cn__build_declaration(Cn_Ast_Declaration_Specifiers *declaration_specifiers, Cn_Ast_List init_declarators, Cn_Build_Opt opt) {
+CNDEF Cn_Ast_Declaration *cn__build_declaration(Cn_Ast_Declaration_Specifiers *declaration_specifiers, Cn_Ast_Nodes init_declarators, Cn_Build_Opt opt) {
     Cn_Ast_Declaration node = {
         .kind = CN_AST_DECLARATION,
         .flags = CN_AST_SYNTHETIC,
@@ -15912,302 +16205,6 @@ CNDEF void cn_tu_free(Cn_Translation_Unit *tu) {
     if (!(tu->flags & CN__TU_OPT_SOURCE)) CN_FREE(tu->data.source.data);
     cn__tu_data_free(&tu->data);
     *tu = (Cn_Translation_Unit) {0};
-}
-
-CNDEF Cn_Ast_Node *cn_remove_from_list(Cn_Ast_List *list, int64_t index) {
-    CN_ASSERT(index >= 0 && index < list->length);
-
-    Cn_Ast_Node *removed = list->ptrs[index];
-    memmove(list->ptrs + index, list->ptrs + index + 1,
-            (size_t)(list->length - index - 1) * sizeof(Cn_Ast_Node *));
-    list->length--;
-    return removed;
-}
-
-CNDEF Cn_Ast_List cn_copy_list(Cn_Ast_List list) {
-    int64_t mark = cn_ast_stack_mark();
-
-    for (int64_t i = 0; i < list.length; i++) {
-        cn_ast_stack_push(cn_copy(list.ptrs[i]));
-    }
-
-    return cn_ast_stack_finalize(mark);
-}
-
-CNDEF void *cn_copy(void * idx) {
-    if (idx == NULL) return NULL;
-
-    Cn_Ast_Node *node = idx;
-
-    // Nodes are allocated at their own size, so a copy has to know the size of
-    // the concrete kind it is copying.
-    Cn_Ast_Node *copy = cn__ast_new(node, cn_ast_node_size(node->kind));
-
-    copy->flags |= CN_AST_SYNTHETIC;
-
-#define COPY_LIST(T, field) cn_ast_as(T, copy)->field = cn_copy_list(cn_ast_as(T, copy)->field)
-#define COPY_PTR(T, field)  cn_ast_as(T, copy)->field = cn_copy(cn_ast_as(T, copy)->field)
-
-    switch (copy->kind) {
-        case CN_AST_TRANSLATION_UNIT:
-            COPY_LIST(Translation_Unit, external_declarations);
-            return copy;
-        case CN_AST_CODE:
-            return copy;
-        case CN_AST_EXTERNAL_DECLARATION:
-            COPY_PTR(External_Declaration, child);
-            return copy;
-        case CN_AST_DECLARATION:
-            COPY_LIST(Declaration, attribute_specifiers);
-            COPY_PTR(Declaration, declaration_specifiers);
-            COPY_LIST(Declaration, init_declarators);
-            return copy;
-        case CN_AST_FUNCTION:
-            COPY_LIST(Function, attribute_specifiers);
-            COPY_PTR(Function, declaration_specifiers);
-            COPY_PTR(Function, declarator);
-            COPY_PTR(Function, block);
-            return copy;
-        case CN_AST_BLOCK:
-            COPY_LIST(Block, attribute_specifiers);
-            COPY_LIST(Block, block_items);
-            return copy;
-        case CN_AST_BLOCK_ITEM:
-            COPY_PTR(Block_Item, declaration_or_statement);
-            return copy;
-        case CN_AST_IF:
-            COPY_LIST(If, attribute_specifiers);
-            COPY_PTR(If, condition);
-            COPY_PTR(If, then_statement);
-            COPY_PTR(If, else_statement);
-            return copy;
-        case CN_AST_SWITCH:
-            COPY_LIST(Switch, attribute_specifiers);
-            COPY_PTR(Switch, condition);
-            COPY_PTR(Switch, body);
-            return copy;
-        case CN_AST_WHILE:
-            COPY_LIST(While, attribute_specifiers);
-            COPY_PTR(While, condition);
-            COPY_PTR(While, body);
-            return copy;
-        case CN_AST_DO_WHILE:
-            COPY_LIST(Do_While, attribute_specifiers);
-            COPY_PTR(Do_While, condition);
-            COPY_PTR(Do_While, body);
-            return copy;
-        case CN_AST_FOR:
-            COPY_LIST(For, attribute_specifiers);
-            COPY_PTR(For, initialization);
-            COPY_PTR(For, condition);
-            COPY_PTR(For, update);
-            COPY_PTR(For, body);
-            return copy;
-        case CN_AST_LABEL:
-            COPY_LIST(Label, attribute_specifiers);
-            COPY_PTR(Label, identifier);
-            COPY_PTR(Label, expression);
-            COPY_PTR(Label, statement);
-            return copy;
-        case CN_AST_GOTO:
-            COPY_LIST(Goto, attribute_specifiers);
-            COPY_PTR(Goto, identifier);
-            return copy;
-        case CN_AST_RETURN:
-            COPY_LIST(Return, attribute_specifiers);
-            COPY_PTR(Return, expression);
-            return copy;
-        case CN_AST_BREAK:
-            COPY_LIST(Break, attribute_specifiers);
-            return copy;
-        case CN_AST_CONTINUE:
-            COPY_LIST(Continue, attribute_specifiers);
-            return copy;
-        case CN_AST_EXPRESSION_STATEMENT:
-            COPY_LIST(Expression_Statement, attribute_specifiers);
-            COPY_PTR(Expression_Statement, expression);
-            return copy;
-        case CN_AST_BINARY:
-            COPY_PTR(Binary, left);
-            COPY_PTR(Binary, right);
-            return copy;
-        case CN_AST_ACCESS:
-            COPY_PTR(Access, expression);
-            COPY_PTR(Access, member);
-            return copy;
-        case CN_AST_CALL:
-            COPY_PTR(Call, expression);
-            COPY_LIST(Call, arguments);
-            return copy;
-        case CN_AST_UNARY:
-            COPY_PTR(Unary, expression);
-            return copy;
-        case CN_AST_CAST:
-            COPY_PTR(Cast, type_name);
-            COPY_PTR(Cast, expression);
-            return copy;
-        case CN_AST_COMPOUND:
-            COPY_PTR(Compound, type_name);
-            COPY_LIST(Compound, designations);
-            return copy;
-        case CN_AST_SIZEOF:
-            COPY_PTR(Sizeof, target);
-            return copy;
-        case CN_AST_TERNARY:
-            COPY_PTR(Ternary, condition);
-            COPY_PTR(Ternary, if_true);
-            COPY_PTR(Ternary, if_false);
-            return copy;
-        case CN_AST_ASSIGN:
-            COPY_PTR(Assign, left);
-            COPY_PTR(Assign, right);
-            return copy;
-        case CN_AST_POSTFIX:
-            COPY_PTR(Postfix, expression);
-            return copy;
-        case CN_AST_PRIMARY:
-            COPY_PTR(Primary, literal);
-            return copy;
-        case CN_AST_IDENTIFIER:
-            return copy;
-        case CN_AST_INTEGER:
-            return copy;
-        case CN_AST_FLOAT:
-            return copy;
-        case CN_AST_STRING:
-            return copy;
-        case CN_AST_INIT_DECLARATOR:
-            COPY_PTR(Init_Declarator, declarator);
-            COPY_LIST(Init_Declarator, gnu_attribute_specifiers);
-            COPY_PTR(Init_Declarator, gnu_asm_label);
-            COPY_PTR(Init_Declarator, initializer);
-            return copy;
-        case CN_AST_INITIALIZER:
-            COPY_PTR(Initializer, expression);
-            COPY_LIST(Initializer, designations);
-            return copy;
-        case CN_AST_DESIGNATION:
-            COPY_LIST(Designation, designators);
-            COPY_PTR(Designation, initializer);
-            return copy;
-        case CN_AST_DESIGNATOR:
-            COPY_PTR(Designator, identifier);
-            COPY_PTR(Designator, expression);
-            COPY_PTR(Designator, expression_range_end);
-            return copy;
-        case CN_AST_DECLARATOR:
-            COPY_PTR(Declarator, pointer);
-            COPY_PTR(Declarator, direct_declarator);
-            return copy;
-        case CN_AST_POINTER:
-            COPY_PTR(Pointer, pointer);
-            return copy;
-        case CN_AST_DIRECT_DECLARATOR_GROUPED:
-            COPY_PTR(Direct_Declarator_Grouped, declarator);
-            return copy;
-        case CN_AST_DIRECT_DECLARATOR_ARRAY:
-            COPY_PTR(Direct_Declarator_Array, direct_declarator);
-            COPY_PTR(Direct_Declarator_Array, expression);
-            return copy;
-        case CN_AST_DIRECT_DECLARATOR_FUNCTION:
-            COPY_PTR(Direct_Declarator_Function, direct_declarator);
-            COPY_LIST(Direct_Declarator_Function, parameter_declarations);
-            return copy;
-        case CN_AST_DECLARATION_SPECIFIERS:
-            COPY_LIST(Declaration_Specifiers, gnu_attribute_specifiers);
-            COPY_PTR(Declaration_Specifiers, type_specifier);
-            return copy;
-        case CN_AST_GNU_TYPEOF:
-            COPY_PTR(Gnu_Typeof, target);
-            return copy;
-        case CN_AST_TYPE_SPECIFIER_PRIMITIVE:
-            return copy;
-        case CN_AST_TYPE_SPECIFIER_TYPEDEF:
-            return copy;
-        case CN_AST_TYPE_NAME:
-            COPY_PTR(Type_Name, specifier_qualifier);
-            COPY_PTR(Type_Name, abstract_declarator);
-            return copy;
-        case CN_AST_SPECIFIER_QUALIFIER:
-            COPY_PTR(Specifier_Qualifier, type_specifier);
-            return copy;
-        case CN_AST_PARAMETER_DECLARATION:
-            COPY_PTR(Parameter_Declaration, declaration_specifiers);
-            COPY_PTR(Parameter_Declaration, declarator);
-            return copy;
-        case CN_AST_STRUCT_SPECIFIER:
-            COPY_LIST(Struct_Specifier, attribute_specifiers);
-            COPY_LIST(Struct_Specifier, gnu_attribute_specifiers);
-            COPY_PTR(Struct_Specifier, identifier);
-            COPY_LIST(Struct_Specifier, member_declarations);
-            return copy;
-        case CN_AST_UNION_SPECIFIER:
-            COPY_LIST(Union_Specifier, attribute_specifiers);
-            COPY_LIST(Union_Specifier, gnu_attribute_specifiers);
-            COPY_PTR(Union_Specifier, identifier);
-            COPY_LIST(Union_Specifier, member_declarations);
-            return copy;
-        case CN_AST_MEMBER_DECLARATION:
-            COPY_LIST(Member_Declaration, attribute_specifiers);
-            COPY_PTR(Member_Declaration, specifier_qualifier);
-            COPY_LIST(Member_Declaration, member_declarators);
-            return copy;
-        case CN_AST_MEMBER_DECLARATOR:
-            COPY_PTR(Member_Declarator, declarator);
-            COPY_PTR(Member_Declarator, bitfield);
-            COPY_LIST(Member_Declarator, gnu_attribute_specifiers);
-            return copy;
-        case CN_AST_ENUM_SPECIFIER:
-            COPY_LIST(Enum_Specifier, attribute_specifiers);
-            COPY_LIST(Enum_Specifier, gnu_attribute_specifiers);
-            COPY_PTR(Enum_Specifier, identifier);
-            COPY_PTR(Enum_Specifier, specifier_qualifier);
-            COPY_LIST(Enum_Specifier, enumerators);
-            return copy;
-        case CN_AST_ENUMERATOR:
-            COPY_PTR(Enumerator, identifier);
-            COPY_LIST(Enumerator, attribute_specifiers);
-            COPY_LIST(Enumerator, gnu_attribute_specifiers);
-            COPY_PTR(Enumerator, expression);
-            return copy;
-        case CN_AST_ATTRIBUTE_SPECIFIER:
-            COPY_LIST(Attribute_Specifier, attributes);
-            return copy;
-        case CN_AST_ATTRIBUTE:
-            COPY_PTR(Attribute, vendor_identifier);
-            COPY_PTR(Attribute, identifier);
-            COPY_LIST(Attribute, arguments);
-            return copy;
-        case CN_AST_GNU_ATTRIBUTE_SPECIFIER:
-            COPY_LIST(Gnu_Attribute_Specifier, gnu_attributes);
-            return copy;
-        case CN_AST_GNU_ATTRIBUTE:
-            COPY_PTR(Gnu_Attribute, identifier);
-            COPY_LIST(Gnu_Attribute, arguments);
-            return copy;
-        case CN_AST_GNU_ASM_LABEL:
-            COPY_PTR(Gnu_Asm_Label, string);
-            return copy;
-        case CN_AST_UNKNOWN:
-            cn_log(CN_ERROR, "Unsupported copy ast node kind.");
-            return copy;
-    }
-
-#undef COPY_LIST
-#undef COPY_PTR
-
-    return NULL;
-}
-
-
-CNDEF bool cn_remove_attribute(void *target, Cn_String attribute_name) {
-    Cn_Ast_Attribute_Specifier *owner = NULL;
-    int64_t index = -1;
-
-    if (cn_get_attribute_info(target, attribute_name, &owner, &index) == NULL) return false;
-
-    cn_remove_from_list(&owner->attributes, index);
-    return true;
 }
 
 

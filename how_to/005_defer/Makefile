@@ -27,8 +27,8 @@ $(BUILD_DIR)/%.o: $(BUILD_DIR)/%.i
 $(BUILD_DIR):
 	mkdir -p $(BUILD_DIR)
 
-$(META): meta.c
-	$(CC) $(CFLAGS) meta.c -o $(META)
+$(META): meta.c defer.c
+	$(CC) $(CFLAGS) meta.c defer.c -o $(META)
 
 $(TARGET): $(OBJS)
 	$(CC) $(CFLAGS) $(OBJS) -o $(TARGET)
