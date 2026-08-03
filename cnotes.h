@@ -51,7 +51,6 @@
         `arena_`                        Interface for Cn_Arena operations.
         `chained_arena_`                Interface for Cn_Chained_Arena operations.
         `pool_`                         Interface for Cn_Pool operations.
-        `da_`                           Interface to operate on dynamic arrays.
         `array_list_`                   Interface to operate on dynamically allocated array list.
         `hash_table_`                   Interface to operate on dynamically allocated hash table.
         `hash_set_`                     Interface to operate on dynamically allocated hash set.
@@ -487,7 +486,13 @@ typedef struct {
 CNDEF Cn_String_Builder cn__sb_make(int64_t initial_capacity);
 
 /**
- * Free's heap memory occupied by string builder, 
+ * Grows string builder's capacity so it can hold at least required_length bytes.
+ * Does nothing if it already fits.
+ */
+CNDEF void cn__sb_resize_to_fit(Cn_String_Builder *sb, int64_t required_length);
+
+/**
+ * Free's heap memory occupied by string builder,
  * only if capacity > CN_SB_STACK_STORAGE_CAP.
  */
 CNDEF void cn_sb_free(Cn_String_Builder *sb);
@@ -507,6 +512,12 @@ CNDEF void cn_sb_append_char(Cn_String_Builder *sb, char c);
  * Appends string to the specified string builder.
  */
 CNDEF void cn_sb_append_str(Cn_String_Builder *sb, Cn_String str);
+
+/**
+ * Inserts string at the front of the specified string builder,
+ * shifting existing contents to the right.
+ */
+CNDEF void cn_sb_prepend_str(Cn_String_Builder *sb, Cn_String str);
 
 /**
  * Formats string and appends output to the specified string builder.
@@ -1265,6 +1276,12 @@ typedef struct {
 CNDEF void cn_lexer_init(Cn_Lexer *lexer, Cn_String content, Cn_Lexer_Blacklist blacklist);
 
 /**
+ * Compared to `cn_lexer_init` following function only intializes content, setting queue cursor and everything else.
+ * It overwrites previous content and tokens that were enqueued in lexer. Without touching `file`, `line` or `blacklist` values.
+ */
+CNDEF void cn_lexer_load_content(Cn_Lexer *lexer, Cn_String content);
+
+/**
  * Advances lexer, grabs next token.
  */
 CNDEF void cn_lexer_next_token(Cn_Lexer *lexer);
@@ -1286,6 +1303,11 @@ CNDEF bool cn_lexer_expect(Cn_Lexer *lexer, Cn_Token_Type type);
  * CN_TOKEN_EOF if requested token comes after already found CN_TOKEN_EOF.
  */
 CNDEF Cn_Token cn_lexer_peek(Cn_Lexer *lexer, int64_t offset);
+
+/**
+ * Logs next `n` tokens from lexer, if `n == -1` logs all available tokens.
+ */
+CNDEF void cn_lexer_log_tokens(Cn_Lexer *lexer, int64_t n);
 
 /**
  * RETURNS: Static string of the token type. Used in messages.
@@ -1457,9 +1479,12 @@ CNDEF uint64_t cn_type_hash(const Cn_Type *type);
  * IMPORTANT: Buffer should be big enough to hold string, 
  * otherwise it will be cutoff short.
  *
+ * OPTIONAL: If `identifier` is not empty string it will 
+ * insert this name at the end of the type.
+ *
  * RETURNS: Resulting string.
  */
-CNDEF Cn_String cn_type_stringify(Cn_String buffer, const Cn_Type *type);
+CNDEF Cn_String cn_type_stringify(Cn_String buffer, const Cn_Type *type, Cn_String identifier);
 
 /**
  * Prints type to stderr, using cn_type_stringify.
@@ -4963,28 +4988,42 @@ CNDEF void cn_sb_append_char(Cn_String_Builder *sb, char c) {
     sb->length++;
 }
 
-CNDEF void cn_sb_append_str(Cn_String_Builder *sb, Cn_String str) {
-    if (sb->length + str.length > sb->capacity) {
-        // IMPORTANT: To understand where this calculation comes from check cn__array_list_resize_to_fit implementation.
-        // It uses same calculation that simplifies pow and log of base 2 caluclation to just using bit manipulation.
-        int64_t ratio = (sb->length + str.length) / sb->capacity;
-        if (ratio < 1) ratio = 1;
-        int highest_bit_pos = 63 - CN_COUNT_LEADING_ZEROS(ratio);
-        CN_ASSERT(highest_bit_pos >= 0);
-        int64_t capacity_multiplier = (int64_t)(1 << (highest_bit_pos + 1));
+CNDEF void cn__sb_resize_to_fit(Cn_String_Builder *sb, int64_t required_length) {
+    if (required_length <= sb->capacity) return;
 
-        if (sb->capacity > CN_SB_STACK_STORAGE_CAP) {
-            sb->data = CN_REALLOC(sb->data, sb->capacity * capacity_multiplier);
-        } else {
-            char *old = sb->data;
-            sb->data = CN_REALLOC(NULL, sb->capacity * capacity_multiplier);
-            memcpy(sb->data, old, sb->length);
-        }
+    // IMPORTANT: To understand where this calculation comes from check cn__array_list_resize_to_fit implementation.
+    // It uses same calculation that simplifies pow and log of base 2 caluclation to just using bit manipulation.
+    int64_t ratio = required_length / sb->capacity;
+    if (ratio < 1) ratio = 1;
+    int highest_bit_pos = 63 - CN_COUNT_LEADING_ZEROS(ratio);
+    CN_ASSERT(highest_bit_pos >= 0);
+    int64_t capacity_multiplier = (int64_t)(1 << (highest_bit_pos + 1));
 
-        sb->capacity *= capacity_multiplier;
+    if (sb->capacity > CN_SB_STACK_STORAGE_CAP) {
+        sb->data = CN_REALLOC(sb->data, sb->capacity * capacity_multiplier);
+    } else {
+        char *old = sb->data;
+        sb->data = CN_REALLOC(NULL, sb->capacity * capacity_multiplier);
+        memcpy(sb->data, old, sb->length);
     }
 
+    sb->capacity *= capacity_multiplier;
+}
+
+CNDEF void cn_sb_append_str(Cn_String_Builder *sb, Cn_String str) {
+    cn__sb_resize_to_fit(sb, sb->length + str.length);
+
     memcpy(sb->data + sb->length, str.data, str.length);
+    sb->length += str.length;
+}
+
+CNDEF void cn_sb_prepend_str(Cn_String_Builder *sb, Cn_String str) {
+    cn__sb_resize_to_fit(sb, sb->length + str.length);
+
+    // Shifting first, so that the front is free for the incoming string.
+    // memmove, not memcpy, because source and destination overlap.
+    memmove(sb->data + str.length, sb->data, sb->length);
+    memcpy(sb->data, str.data, str.length);
     sb->length += str.length;
 }
 
@@ -6518,12 +6557,20 @@ CNDEF void cn_lexer_init(Cn_Lexer *lexer, Cn_String content, Cn_Lexer_Blacklist 
     *lexer = (Cn_Lexer) {0};
     
     lexer->line = 1;
-    lexer->content = content;
     lexer->blacklist = blacklist;
 
+    cn_lexer_load_content(lexer, content);
+}
+
+CNDEF void cn_lexer_load_content(Cn_Lexer *lexer, Cn_String content) {
+    lexer->cursor   = 0;
+    lexer->bol      = 0;
+    lexer->content  = content;
+
     // Fill queue.
-    lexer->tail_idx = 0;
-    lexer->current_idx = 0;
+    lexer->head_idx     = 0;
+    lexer->tail_idx     = 0;
+    lexer->current_idx  = 0;
     Cn_Token token;
     for (int64_t i = 0; i < CN_LEXER_QUEUE_COUNT; i++) {
         do {
@@ -6597,6 +6644,22 @@ CNDEF Cn_Token cn_lexer_peek(Cn_Lexer *lexer, int64_t offset) {
     }
     
     return lexer->queue[(lexer->current_idx + offset) % CN_LEXER_QUEUE_COUNT];
+}
+
+CNDEF void cn_lexer_log_tokens(Cn_Lexer *lexer, int64_t n) {
+    Cn_Lexer copy = *lexer;
+    cn_log(CN_INFO, "Tokenized:" CN_ANSI_CYAN);
+    do {
+        fprintf(stderr, "TOKEN:     %s\n", cn_token_kind_name(cn_lexer_token(&copy).type));
+        cn_lexer_next_token(&copy);
+
+        if (n > 0) {
+            n--;
+            if (n == 0) break;
+        }
+    } while (cn_lexer_token(&copy).type != CN_TOKEN_EOF);
+
+    fprintf(stderr, CN_ANSI_RESET"\n");
 }
 
 CNDEF const char *cn_token_kind_name(Cn_Token_Type type) {
@@ -6993,10 +7056,21 @@ CNDEF void cn__type_stringify(const Cn_Type *type, Cn_String_Builder *left, Cn_S
         case CN_ARRAY: {
             const Cn_Type_Array *ta = (const Cn_Type_Array *)type;
             cn__type_stringify(ta->element_type, left, right);
+
+            // Suffix goes in FRONT of whatever the element type already put into 'right'.
+            // Recursion runs outermost first, so prepending is what keeps outer dimensions
+            // ahead of inner ones ("int m[3][4]") and keeps the brackets inside the
+            // parentheses for an array of function pointers ("int (*fps[3])(int)").
+            Cn_String_Builder suffix = cn_sb_make(32);
+
             if (ta->length >= 0)
-                cn_sb_append_format(right, "[%lld]", ta->length);
+                cn_sb_append_format(&suffix, "[%lld]", ta->length);
             else
-                cn_sb_append_str(right, CN_STR_LIT("[]"));
+                cn_sb_append_str(&suffix, CN_STR_LIT("[]"));
+
+            cn_sb_prepend_str(right, cn_sb_to_str(&suffix));
+
+            cn_sb_free(&suffix);
             return;
         }
 
@@ -7004,26 +7078,35 @@ CNDEF void cn__type_stringify(const Cn_Type *type, Cn_String_Builder *left, Cn_S
             const Cn_Type_Function *tf = (const Cn_Type_Function *)type;
             cn__type_stringify(tf->return_type, left, right);
 
-            cn_sb_append_char(right, '(');
+            // Same reasoning as CN_ARRAY: the parameter list has to land in front of any
+            // suffix the return type left behind, so it is built separately and prepended
+            // in one go. That is what gives "int (*f(void))[10]" instead of "int (*f)[10](void)".
+            Cn_String_Builder params = cn_sb_make(32);
+
+            cn_sb_append_char(&params, '(');
             if (tf->params_length == 0) {
-                cn_sb_append_str(right, CN_STR_LIT("void"));
+                cn_sb_append_str(&params, CN_STR_LIT("void"));
             } else {
                 for (int64_t i = 0; i < tf->params_length; i++) {
-                    if (i > 0) cn_sb_append_str(right, CN_STR_LIT(", "));
+                    if (i > 0) cn_sb_append_str(&params, CN_STR_LIT(", "));
 
                     Cn_String_Builder param_left  = cn_sb_make(32);
                     Cn_String_Builder param_right = cn_sb_make(32);
 
                     cn__type_stringify(tf->params[i].type, &param_left, &param_right);
 
-                    cn_sb_append_str(right, cn_sb_to_str(&param_left));
-                    cn_sb_append_str(right, cn_sb_to_str(&param_right));
+                    cn_sb_append_str(&params, cn_sb_to_str(&param_left));
+                    cn_sb_append_str(&params, cn_sb_to_str(&param_right));
 
                     cn_sb_free(&param_left);
                     cn_sb_free(&param_right);
                 }
             }
-            cn_sb_append_char(right, ')');
+            cn_sb_append_char(&params, ')');
+
+            cn_sb_prepend_str(right, cn_sb_to_str(&params));
+
+            cn_sb_free(&params);
             return;
         }
 
@@ -7052,22 +7135,50 @@ CNDEF void cn__type_stringify(const Cn_Type *type, Cn_String_Builder *left, Cn_S
     }
 }
 
-CNDEF Cn_String cn_type_stringify(Cn_String buffer, const Cn_Type *type) {
+CNDEF Cn_String cn_type_stringify(Cn_String buffer, const Cn_Type *type, Cn_String identifier) {
     Cn_String_Builder left  = cn_sb_make(CN_SB_STACK_STORAGE_CAP);
     Cn_String_Builder right = cn_sb_make(CN_SB_STACK_STORAGE_CAP);
 
     cn__type_stringify(type, &left, &right);
 
+    // The declarator name goes between the two halves, not after them.
+    // That is the whole reason 'right' exists: for arrays and function pointers the
+    // suffix has to stay outside the name, giving "int a[10]" and "int (*f)(void)"
+    // rather than "int[10] a" and "int (*)(void) f".
+    bool has_identifier = identifier.data != NULL && identifier.length > 0;
+
+    // A separator is only wanted when 'left' ends on a type name. When it ends on
+    // '*' or '(' the name has to sit flush against it, as in "int *p".
+    bool needs_space = false;
+    if (has_identifier && left.length > 0) {
+        char last = left.data[left.length - 1];
+        needs_space = (last != '*' && last != '(');
+    }
+
     int64_t total = left.length + right.length;
+    if (has_identifier) total += identifier.length;
+    if (needs_space)    total += 1;
+
     if (total > buffer.length) {
         cn_log(CN_ERROR, "cn_type_stringify: buffer too small, needed %lld got %lld", total, buffer.length);
         cn_sb_free(&left);
         cn_sb_free(&right);
-        return CN_STR(NULL, 0);
+        return CN_STR(0, NULL);
     }
 
-    memcpy(buffer.data, left.data, left.length);
-    memcpy(buffer.data + left.length,  right.data, right.length);
+    int64_t offset = 0;
+
+    memcpy(buffer.data + offset, left.data, left.length);
+    offset += left.length;
+
+    if (needs_space) buffer.data[offset++] = ' ';
+
+    if (has_identifier) {
+        memcpy(buffer.data + offset, identifier.data, identifier.length);
+        offset += identifier.length;
+    }
+
+    memcpy(buffer.data + offset, right.data, right.length);
 
     cn_sb_free(&left);
     cn_sb_free(&right);
@@ -7080,7 +7191,7 @@ CNDEF void cn_type_print(const Cn_Type *t) {
     if (t == NULL) { fputs("<null>", stderr); return; }
 
     char buf[256];
-    Cn_String str = cn_type_stringify(CN_STR(sizeof(buf), buf), t);
+    Cn_String str = cn_type_stringify(CN_STR(sizeof(buf), buf), t, (Cn_String) {0});
     if (str.data == NULL) {
         fputs("<stringify failed>", stderr);
         return;
@@ -8806,8 +8917,8 @@ CNDEF bool cn__binding_conflict(Cn_Binding *a, Cn_Binding *b) {
     }
     // Confliciting types.
     if (a->type != b->type) {
-        Cn_String current_t = cn_type_stringify(CN_STR_BUFFER_EMPTY(128), a->type);
-        Cn_String binding_t = cn_type_stringify(CN_STR_BUFFER_EMPTY(128), b->type);
+        Cn_String current_t = cn_type_stringify(CN_STR_BUFFER_EMPTY(128), a->type, (Cn_String) {0});
+        Cn_String binding_t = cn_type_stringify(CN_STR_BUFFER_EMPTY(128), b->type, (Cn_String) {0});
         cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, b->src, CN_DC_ILLEGAL_BINDING, "'%.*s' redeclared with a conflicting type, from %.*s to %.*s.", CN_STR_UNPACK(b->name), CN_STR_UNPACK(current_t), CN_STR_UNPACK(binding_t));
         return true;
     }
@@ -8880,7 +8991,7 @@ CNDEF Cn_Binding_Idx cn_binding_declare_variable(Cn_String name, void * source, 
 
     // Checking if binding has valid type.
     if (is_definition && !(type->flags & CN_TYPE_COMPLETE)) {
-        Cn_String type_str = cn_type_stringify(CN_STR_BUFFER_EMPTY(128), type);
+        Cn_String type_str = cn_type_stringify(CN_STR_BUFFER_EMPTY(128), type, (Cn_String) {0});
         cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, source, CN_DC_ILLEGAL_BINDING, "'%.*s' variable defined with incomplete type %.*s.", CN_STR_UNPACK(name), CN_STR_UNPACK(type_str));
         return CN_BINDING_NIL_IDX;
     }
@@ -9864,8 +9975,8 @@ CNDEF Cn_Type *cn__analyze_usual_arithmetic_conversion(Cn_Type *a, Cn_Type *b) {
 }
 
 CNDEF void cn__analyze_error_illegal_binary(Cn_Ast_Node *node, Cn_Type *left, Cn_Type *right, const char *op_desc) {
-    Cn_String left_str  = cn_type_stringify(CN_STR_BUFFER_EMPTY(128), left);
-    Cn_String right_str = cn_type_stringify(CN_STR_BUFFER_EMPTY(128), right);
+    Cn_String left_str  = cn_type_stringify(CN_STR_BUFFER_EMPTY(128), left, (Cn_String) {0});
+    Cn_String right_str = cn_type_stringify(CN_STR_BUFFER_EMPTY(128), right, (Cn_String) {0});
     cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, node, CN_DC_ILLEGAL_TYPE, "Illegal %s between %.*s and %.*s types.", op_desc, CN_STR_UNPACK(left_str), CN_STR_UNPACK(right_str));
 }
 
@@ -10232,8 +10343,8 @@ CNDEF Cn_Type *cn__analyze_typecheck_call(Cn_Ast_Node *node) {
             if (!cn_type_is_assignable(param_type, arg_type)) {
                 // Additionally to checking type assignable checking edge case of NULL pointer assignment to pointer type, example int *a = 0
                 if (!(param_type->kind == CN_POINTER && cn__analyze_is_null_pointer_constant(arg))) {
-                        Cn_String a_str = cn_type_stringify(CN_STR_BUFFER_EMPTY(128), arg_type);
-                        Cn_String p_str = cn_type_stringify(CN_STR_BUFFER_EMPTY(128), param_type);
+                        Cn_String a_str = cn_type_stringify(CN_STR_BUFFER_EMPTY(128), arg_type, (Cn_String) {0});
+                        Cn_String p_str = cn_type_stringify(CN_STR_BUFFER_EMPTY(128), param_type, (Cn_String) {0});
                         cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, node, CN_DC_ILLEGAL_TYPE, "Argument %lld of type %.*s is not assignable to parameter type %.*s.", i + 1, CN_STR_UNPACK(a_str), CN_STR_UNPACK(p_str));
                         return NULL;
                 }
@@ -10355,22 +10466,22 @@ CNDEF Cn_Type *cn__analyze_typecheck_cast(Cn_Ast_Node *node) {
 
     // Target must be scalar.
     if (!cn_type_is_scalar(target)) {
-        Cn_String t_str = cn_type_stringify(CN_STR_BUFFER_EMPTY(128), target);
+        Cn_String t_str = cn_type_stringify(CN_STR_BUFFER_EMPTY(128), target, (Cn_String) {0});
         cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, node, CN_DC_ILLEGAL_TYPE, "Cannot cast to non-scalar type %.*s.", CN_STR_UNPACK(t_str));
         return NULL;
     }
 
     // Operand must be scalar.
     if (!cn_type_is_scalar(operand)) {
-        Cn_String o_str = cn_type_stringify(CN_STR_BUFFER_EMPTY(128), operand);
+        Cn_String o_str = cn_type_stringify(CN_STR_BUFFER_EMPTY(128), operand, (Cn_String) {0});
         cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, node, CN_DC_ILLEGAL_TYPE, "Cannot cast from non-scalar type %.*s.", CN_STR_UNPACK(o_str));
         return NULL;
     }
 
     // Floating types can't be cast to or from pointers.
     if ((target->kind == CN_POINTER && operand->kind == CN_FLOAT) || (target->kind == CN_FLOAT && operand->kind == CN_POINTER)) {
-        Cn_String t_str = cn_type_stringify(CN_STR_BUFFER_EMPTY(128), target);
-        Cn_String o_str = cn_type_stringify(CN_STR_BUFFER_EMPTY(128), operand);
+        Cn_String t_str = cn_type_stringify(CN_STR_BUFFER_EMPTY(128), target, (Cn_String) {0});
+        Cn_String o_str = cn_type_stringify(CN_STR_BUFFER_EMPTY(128), operand, (Cn_String) {0});
         cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, node, CN_DC_ILLEGAL_TYPE, "Cannot cast between floating type and pointer %.*s to %.*s.", CN_STR_UNPACK(o_str), CN_STR_UNPACK(t_str));
         return NULL;
     }
@@ -10388,7 +10499,7 @@ CNDEF Cn_Type *cn__analyze_typecheck_compound(Cn_Ast_Node *node) {
     if (target == NULL) return NULL;
 
     if (!(cn_type_unqualified(target)->flags & CN_TYPE_COMPLETE)) {
-        Cn_String t_str = cn_type_stringify(CN_STR_BUFFER_EMPTY(128), target);
+        Cn_String t_str = cn_type_stringify(CN_STR_BUFFER_EMPTY(128), target, (Cn_String) {0});
         cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, cn_ast_as(Compound, node)->type_name, CN_DC_ILLEGAL_TYPE, "Cannot have incomplete target type %.*s in compound literal.", CN_STR_UNPACK(t_str));
         return NULL;
     }
@@ -10491,8 +10602,8 @@ CNDEF Cn_Type *cn__analyze_typecheck_ternary(Cn_Ast_Node *node) {
 
     // No common type int vs pointer or mismatched structs.
     {
-        Cn_String a_str = cn_type_stringify(CN_STR_BUFFER_EMPTY(128), a);
-        Cn_String b_str = cn_type_stringify(CN_STR_BUFFER_EMPTY(128), b);
+        Cn_String a_str = cn_type_stringify(CN_STR_BUFFER_EMPTY(128), a, (Cn_String) {0});
+        Cn_String b_str = cn_type_stringify(CN_STR_BUFFER_EMPTY(128), b, (Cn_String) {0});
         cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, node, CN_DC_ILLEGAL_TYPE, "Incompatible operand types in '?:' expression, %.*s and %.*s.", CN_STR_UNPACK(a_str), CN_STR_UNPACK(b_str));
     }
     return NULL;
@@ -10520,8 +10631,8 @@ CNDEF Cn_Type *cn__analyze_typecheck_assignment(Cn_Ast_Node *node) {
                 if (!cn_type_is_assignable(left, right)) {
 
                     if (!(left->kind == CN_POINTER && cn__analyze_is_null_pointer_constant(cn_ast_as(Assign, node)->right))) {
-                        Cn_String left_str  = cn_type_stringify(CN_STR_BUFFER_EMPTY(128), left);
-                        Cn_String right_str = cn_type_stringify(CN_STR_BUFFER_EMPTY(128), right);
+                        Cn_String left_str  = cn_type_stringify(CN_STR_BUFFER_EMPTY(128), left, (Cn_String) {0});
+                        Cn_String right_str = cn_type_stringify(CN_STR_BUFFER_EMPTY(128), right, (Cn_String) {0});
                         cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, node, CN_DC_ILLEGAL_TYPE, "Cannot assign %.*s to %.*s.", CN_STR_UNPACK(right_str), CN_STR_UNPACK(left_str));
                         return NULL;
                     }
@@ -11272,7 +11383,7 @@ CNDEF Cn_Type *cn__analyze_typecheck_designator(Cn_Ast_Designator *designator, C
     type = cn_type_unqualified(type);
     // Shouldn't really happen, but still worth to check, if user decides to call this function.
     if (!(type->flags & CN_TYPE_COMPLETE)) {
-        Cn_String type_str = cn_type_stringify(CN_STR_BUFFER_EMPTY(128), type);
+        Cn_String type_str = cn_type_stringify(CN_STR_BUFFER_EMPTY(128), type, (Cn_String) {0});
         cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, designator, CN_DC_ILLEGAL_TYPE, "Designator on incomplete type %.*s.", CN_STR_UNPACK(type_str));
         return NULL;
     }
@@ -11400,7 +11511,7 @@ CNDEF bool cn__analyze_typecheck_designation(Cn_Ast_Designation *designation, Cn
 
         // Shouldn't really happen, but still worth to check, if user decides to call this function.
         if (!(type->flags & CN_TYPE_COMPLETE)) {
-            Cn_String type_str = cn_type_stringify(CN_STR_BUFFER_EMPTY(128), type);
+            Cn_String type_str = cn_type_stringify(CN_STR_BUFFER_EMPTY(128), type, (Cn_String) {0});
             cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, designation, CN_DC_ILLEGAL_TYPE, "Designation on incomplete type %.*s.", CN_STR_UNPACK(type_str));
             return false;
         }
@@ -11454,8 +11565,8 @@ CNDEF bool cn_analyze_typecheck_initializer(void *initializer_node, Cn_Type *typ
         if (!cn_type_is_assignable(type, expression_type)) {
 
             if (!(type->kind == CN_POINTER && cn__analyze_is_null_pointer_constant(initializer->expression))) {
-                Cn_String left_str  = cn_type_stringify(CN_STR_BUFFER_EMPTY(128), type);
-                Cn_String right_str = cn_type_stringify(CN_STR_BUFFER_EMPTY(128), expression_type);
+                Cn_String left_str  = cn_type_stringify(CN_STR_BUFFER_EMPTY(128), type, (Cn_String) {0});
+                Cn_String right_str = cn_type_stringify(CN_STR_BUFFER_EMPTY(128), expression_type, (Cn_String) {0});
                 cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, initializer->expression, CN_DC_ILLEGAL_TYPE, "Cannot assign %.*s to %.*s in initializer.", CN_STR_UNPACK(right_str), CN_STR_UNPACK(left_str));
                 return false;
             }
@@ -12540,6 +12651,7 @@ CNDEF Cn_Ast_External_Declaration *cn_parse_external_declaration(Cn_Lexer *lexer
 
             // Now that we have new code stored safely in output arena, we can parse it again.
             Cn_Lexer l = saved_lexer;
+            cn_lexer_load_content(&l, code);
             function_or_declaration = cn_parse_function_or_declaration(&l);
             if (function_or_declaration == NULL) goto error;
 
@@ -14223,6 +14335,38 @@ error:
     return NULL;
 }
 
+CNDEF Cn_Ast_Type_Specifier_Primitive *cn__parse_primitive_info_to_type_specifier(Cn_Primitive_Type_Info *info, Cn_Location *loc, Cn_Source *src) {
+    // Implicit int case - if width or sign specified but no kind.
+    if (info->kind == CN_AST_TYPE_NONE) {
+        info->kind = CN_AST_TYPE_INT;
+    }
+
+    if (info->width != CN_AST_TYPE_WIDTH_NONE && info->kind != CN_AST_TYPE_INT && info->kind != CN_AST_TYPE_DOUBLE) {
+        cn_diagnostic_src(CN_DIAGNOSTIC_ERROR, loc, src, CN_DC_INVALID_TYPE_SPECIFIER, "Specified type width on non 'int' or non 'double' type.");
+        goto error;
+    }
+
+    if (info->sign != CN_AST_TYPE_SIGN_NONE && info->kind != CN_AST_TYPE_INT && info->kind != CN_AST_TYPE_CHAR) {
+        cn_diagnostic_src(CN_DIAGNOSTIC_ERROR, loc, src, CN_DC_INVALID_TYPE_SPECIFIER, "Specified type sign on non 'int' or 'char' type.");
+        goto error;
+    }
+
+    Cn_Ast_Type_Specifier_Primitive ts_node = {
+        .kind = CN_AST_TYPE_SPECIFIER_PRIMITIVE,
+        .loc = *loc,
+        .src = *src,
+        .primitive_kind = info->kind,
+        .width = info->width,
+        .sign = info->sign,
+    };
+
+    return cn_ast_new(ts_node);
+
+error:
+    CN__TRACE_ERROR
+    return NULL;
+}
+
 CNDEF Cn_Ast_Declaration_Specifiers *cn_parse_declaration_specifiers(Cn_Lexer *lexer) {
     Cn_Lexer original_state = *lexer;
 
@@ -14289,30 +14433,7 @@ CNDEF Cn_Ast_Declaration_Specifiers *cn_parse_declaration_specifiers(Cn_Lexer *l
     // If we have primitive type info, create the node now.
     // Otherwise type_specifier was already set by cn_parse_try_type_specifier.
     if (primitive_info.kind != CN_AST_TYPE_NONE || primitive_info.width != CN_AST_TYPE_WIDTH_NONE || primitive_info.sign != CN_AST_TYPE_SIGN_NONE) {
-        // Implicit int case - if width or sign specified but no kind.
-        if (primitive_info.kind == CN_AST_TYPE_NONE) {
-            primitive_info.kind = CN_AST_TYPE_INT;
-        }
-
-        if (primitive_info.width != CN_AST_TYPE_WIDTH_NONE && primitive_info.kind != CN_AST_TYPE_INT) {
-            cn_diagnostic_src(CN_DIAGNOSTIC_ERROR, &node.loc, &node.src, CN_DC_INVALID_TYPE_SPECIFIER, "Specified type width on non 'int' type.");
-            goto error;
-        }
-
-        if (primitive_info.sign != CN_AST_TYPE_SIGN_NONE && primitive_info.kind != CN_AST_TYPE_INT && primitive_info.kind != CN_AST_TYPE_CHAR) {
-            cn_diagnostic_src(CN_DIAGNOSTIC_ERROR, &node.loc, &node.src, CN_DC_INVALID_TYPE_SPECIFIER, "Specified type sign on non 'int' or 'char' type.");
-            goto error;
-        }
-
-        Cn_Ast_Type_Specifier_Primitive ts_node = {
-            .kind = CN_AST_TYPE_SPECIFIER_PRIMITIVE,
-            .loc = node.loc,
-            .src = node.src,
-            .primitive_kind = primitive_info.kind,
-            .width = primitive_info.width,
-            .sign = primitive_info.sign,
-        };
-        node.type_specifier = cn_ast_new(ts_node);
+        node.type_specifier = (Cn_Ast_Node *) cn__parse_primitive_info_to_type_specifier(&primitive_info, &node.loc, &node.src);
     }
 
     Cn_Ast_Declaration_Specifiers *idx = cn_ast_new(node);
@@ -14692,30 +14813,7 @@ CNDEF Cn_Ast_Specifier_Qualifier *cn_parse_specifier_qualifier(Cn_Lexer *lexer) 
 
     // If we have primitive type info, create the node now.
     if (primitive_info.kind != CN_AST_TYPE_NONE || primitive_info.width != CN_AST_TYPE_WIDTH_NONE || primitive_info.sign != CN_AST_TYPE_SIGN_NONE) {
-        // Implicit int case.
-        if (primitive_info.kind == CN_AST_TYPE_NONE) {
-            primitive_info.kind = CN_AST_TYPE_INT;
-        }
-
-        if (primitive_info.width != CN_AST_TYPE_WIDTH_NONE && primitive_info.kind != CN_AST_TYPE_INT) {
-            cn_diagnostic_src(CN_DIAGNOSTIC_ERROR, &cn_lexer_token(lexer).loc, &cn_lexer_token(lexer).src, CN_DC_INVALID_TYPE_SPECIFIER, "Specified type width on non 'int' type.");
-            goto error;
-        }
-
-        if (primitive_info.sign != CN_AST_TYPE_SIGN_NONE && primitive_info.kind != CN_AST_TYPE_INT && primitive_info.kind != CN_AST_TYPE_CHAR) {
-            cn_diagnostic_src(CN_DIAGNOSTIC_ERROR, &cn_lexer_token(lexer).loc, &cn_lexer_token(lexer).src, CN_DC_INVALID_TYPE_SPECIFIER, "Specified type sign on non 'int' or 'char' type.");
-            goto error;
-        }
-
-        Cn_Ast_Type_Specifier_Primitive ts_node = {
-            .kind = CN_AST_TYPE_SPECIFIER_PRIMITIVE,
-            .loc = node.loc,
-            .src = node.src,
-            .primitive_kind = primitive_info.kind,
-            .width = primitive_info.width,
-            .sign = primitive_info.sign,
-        };
-        node.type_specifier = cn_ast_new(ts_node);
+        node.type_specifier = (Cn_Ast_Node *) cn__parse_primitive_info_to_type_specifier(&primitive_info, &cn_lexer_token(lexer).loc, &cn_lexer_token(lexer).src);
     }
 
     Cn_Ast_Specifier_Qualifier *idx = cn_ast_new(node);
@@ -16149,13 +16247,7 @@ CNDEF int cn_tu_process(Cn_Translation_Unit *tu) {
     // Printing tokens.
     if (tu->flags & CN_TU_PRINT_TOKENS) {
         cn_lexer_init(&lexer, cn__tu_data->source, cn__default_blacklist);
-        cn_log(CN_INFO, "Tokenized:" CN_ANSI_CYAN);
-        do {
-            Cn_String str = cn_source_to_str(&cn_lexer_token(&lexer).src);
-            fprintf(stderr, "TOKEN:     %.*s\n", CN_STR_UNPACK(str));
-            cn_lexer_next_token(&lexer);
-        } while (cn_lexer_token(&lexer).type != CN_TOKEN_EOF);
-        fprintf(stderr, CN_ANSI_RESET"\n");
+        cn_lexer_log_tokens(&lexer, -1);
     }
     
     // Building AST.

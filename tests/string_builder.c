@@ -65,5 +65,42 @@ int main(void) {
     CN_ASSERT(memcmp(sb4.data, "int**", 5) == 0);
     cn_sb_free(&sb4);
 
+    // Prepend onto an empty builder, then in front of existing contents.
+    Cn_String_Builder sb5 = cn_sb_make(16);
+    cn_sb_prepend_str(&sb5, CN_STR_LIT("[4]"));
+    CN_ASSERT(sb5.length == 3);
+    CN_ASSERT(memcmp(sb5.data, "[4]", 3) == 0);
+
+    cn_sb_prepend_str(&sb5, CN_STR_LIT("[3]"));
+    CN_ASSERT(sb5.length == 6);
+    CN_ASSERT(memcmp(sb5.data, "[3][4]", 6) == 0);
+
+    // Mixing with append keeps both ends intact.
+    cn_sb_append_str(&sb5, CN_STR_LIT("(void)"));
+    cn_sb_prepend_str(&sb5, CN_STR_LIT("*"));
+    CN_ASSERT(sb5.length == 13);
+    CN_ASSERT(memcmp(sb5.data, "*[3][4](void)", 13) == 0);
+
+    // Prepending an empty string is a no-op.
+    cn_sb_prepend_str(&sb5, CN_STR(0, NULL));
+    CN_ASSERT(sb5.length == 13);
+    CN_ASSERT(memcmp(sb5.data, "*[3][4](void)", 13) == 0);
+    cn_sb_free(&sb5);
+
+    // Prepend spilling stack backed storage over to the heap, contents preserved.
+    Cn_String_Builder sb6 = cn_sb_make(CN_SB_STACK_STORAGE_CAP);
+    CN_ASSERT(sb6.capacity == CN_SB_STACK_STORAGE_CAP);
+    cn_sb_append_char(&sb6, 'z');
+
+    char filler[CN_SB_STACK_STORAGE_CAP];
+    memset(filler, 'a', sizeof(filler));
+    cn_sb_prepend_str(&sb6, CN_STR(sizeof(filler), filler));
+
+    CN_ASSERT(sb6.capacity > CN_SB_STACK_STORAGE_CAP);
+    CN_ASSERT(sb6.length == CN_SB_STACK_STORAGE_CAP + 1);
+    CN_ASSERT(memcmp(sb6.data, filler, sizeof(filler)) == 0);
+    CN_ASSERT(sb6.data[CN_SB_STACK_STORAGE_CAP] == 'z');
+    cn_sb_free(&sb6);
+
     return 0;
 }

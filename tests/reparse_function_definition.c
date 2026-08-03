@@ -118,6 +118,7 @@ Cn_Message_Response handler(Cn_Message *message) {
 
 int main(void) {
     cn_diagnostic_handler = &cn_test_diagnostic_handler;
+    cn_diagnostic_handler = &cn_default_diagnostic_handler;
     cn_message_handler = &handler;
 
     Cn_Translation_Unit tu = {0};

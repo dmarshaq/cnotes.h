@@ -9,7 +9,7 @@
 // A deferred statement is not executed where it is written. Instead the
 // metaprogram moves it to the end of the block it appears in, and reroutes
 // every exit out of that block through it. So a defer runs when its enclosing
-// scope ends, no matter how control leaves that scope.
+// scope ends, no matter how control leaves that scope. (The only exception is arbitrary exit with `goto`)
 //
 // Each example below prints as it goes, so the ordering the metaprogram
 // produces is visible in the output.
