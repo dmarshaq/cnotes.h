@@ -91,7 +91,7 @@ pre-processor:
 gcc -E -o my_main.i my_main.c
 ```
 
-### 3. Write your meta program
+#### 3. Write your meta program
 In **exactly one** translation unit, define `CN_IMPLEMENTATION` before the
 include. Every other file that uses the API includes the header normally.
 
@@ -134,6 +134,9 @@ gcc -o meta meta.c
 
 # Compiling meta-processed my_main.i
 gcc -o my_main my_main.i
+
+# Running program
+./my_main
 ```
 
 ---
