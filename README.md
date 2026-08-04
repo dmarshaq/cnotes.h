@@ -53,7 +53,7 @@ Following is the list of features that are still not implemented, but will be in
  -  **FAM, Flexible Array Member.**
  -  **MSVC Specific compiler extensions.**
  -  **Full Type Table serialization into .i file for Cn_Type introspection.**
- -  **CFG, Control-Flow Graph contrustion and analysis interface for the advanced meta-programming.**
+ -  **CFG, Control-Flow Graph construction and analysis interface for the advanced meta-programming.**
 
 ---
 
