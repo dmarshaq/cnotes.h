@@ -99,8 +99,8 @@ This means two `.c` files: one meta-program file that defines and uses
 `cnotes.h`, and the main file the meta program will process.
 
 ```c
-// meta.c — the one file that holds the implementation of cnotes.h
-// sets everything up and performs operations on the main.c file.
+// `meta.c` is the one file that holds implementation of `cnotes.h`
+// sets everything up and performs operations on the `main.c` file.
 #define CN_IMPLEMENTATION
 #include "cnotes.h"
 
