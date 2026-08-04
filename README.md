@@ -5,9 +5,12 @@
 ![License](https://img.shields.io/badge/License-MIT-blue)
 ![C](https://img.shields.io/badge/C-blue)
 
+> [!WARNING]
+> **Initial development.** This library does not yet implement its full scope, and APIs may change without notice. Not recommended for production use.
+
 ---
 
-## Overview
+## :pushpin: Overview
 
 `cnotes.h` is a self-contained, single-header C library that parses pre-processed C translation units (`.i` files), builds a typed Abstract Syntax Tree, resolves symbols and bindings, and evaluates constant expressions — all within a single `#include`. It is designed for authors who need code generation and introspection capabilities without too much complexity and overhead. Aiming to give practical tools for various meta programming techniques that utilize transformation and introspection of C source at compile time.
 
@@ -17,13 +20,24 @@ The library core meta programming ideas are also inspired by Jai Programming Lan
 
 ---
 
-## Features & Scope
+## :dart: Goal
 
-`cnotes.h` end goal is to provide integration with major C compilers like, `GCC`, `Clang` and `MSVC` as well as be able to understand their various syntactical features and details. And be compatible with `C99` standard.
+`cnotes.h` aims to integrate with major C compilers — GCC, Clang, and MSVC —
+understanding each compiler's syntax and extensions, while staying compatible
+with the C99 standard.
 
-**As of right now:** The library keeps up only with `GCC` and some of the `GNU` extension respectively, it is **NOT** fully completed to satisfy outlined goals *yet...* That is due to sheer complexity and alterations different compilers and their extensions introduce, which will be supported as library progresses.
+### :clipboard: Current Status
+
+**Compiler support:** GCC (partial) · Clang (not started) · MSVC (not started)
+
+GCC support currently covers core C99+ and some GNU extensions. Clang and
+MSVC are not yet started. Each compiler's extensions and language features
+add complexity, so support is being added incrementally rather than all at once.
 
 Following is the list of features that are still not implemented, but will be in the future.
+
+> [!NOTE]
+> This list might NOT include every feature that was not implemented, and can be added to as they are discovered or suggested.
 
  -  **VLA, variable length arrays support.**
  -  **Struct and Union empty member declarations.**
@@ -39,57 +53,54 @@ Following is the list of features that are still not implemented, but will be in
  -  **FAM, Flexible Array Member.**
  -  **MSVC Specific compiler extensions.**
  -  **Full Type Table serialization into .i file for Cn_Type introspection.**
- -  **CFG, Control-Flow Graph contrusction and analysis interface for the advanced meta-programming.**
-
-Note that this list might NOT include every feature that was not implemented, and can be added to as they are discovered or suggested.
+ -  **CFG, Control-Flow Graph contrustion and analysis interface for the advanced meta-programming.**
 
 ---
 
-## Quick Start
+## :bulb: Quick Start
 
-The library was designed for the specific pipeline in order to provide most effective and powerful introspection and code modification. Basically looking like this:
+The only file needed in your project from this repository is [cnotes.h](https://github.com/dmarshaq/cnotes.h/blob/main/cnotes.h). The rest of the files you create by yourself and customize how everything runs in your own build system.
+
+`cnotes.h` is built around a fixed processing pipeline that enables
+AST-level introspection and code modification:
+
+```mermaid
+flowchart TD
+    A["Source file (.c)"] -->|compiler pre-processor| B["Translation unit (.i)"]
+    B -->|"cnotes.h: meta-program hooks,\nAST inspection & modification"| C["Modified translation unit (.i)"]
+    C -->|compiler| D["Target binary"]
 ```
-Source Files                    *.c
-|
-|       Compiler Pre-Processor.
-|
-Translation Units               *.i
-|
-|       cnotes.h processing:
-|       Messaging loop where meta programs can be hooked.
-|       Abstract Syntax Tree modifications and introspections occur here.
-|
-Modified Translation Units      *.i
-|
-|       Compiler.
-|
-Target Binary                   
-```
-Manual example usage is outlined below.
 
-### 1. Obtain the header
+:mag_right: **Examples:** If you want to jump straight into playable code — see [how_to](https://github.com/dmarshaq/cnotes.h/tree/main/how_to)
 
+### :hammer_and_wrench: Manual Setup
+
+Below is the manual workflow of how meta-program is built and ran on the source file.
+
+#### 1. Obtain the header
 Copy `cnotes.h` into your project. No other files are required.
 
-### 2. Pre-process your source file
-
-`cnotes.h` operates on **pre-processed** `.i` files — macros must already be expanded in order for the library to parse C files correctly. Use your compiler's pre-processor:
+#### 2. Pre-process your source file
+`cnotes.h` operates on **pre-processed** `.i` files — macros must already be
+expanded for the library to parse C files correctly. Use your compiler's
+pre-processor:
 
 ```sh
 # GCC
-# Pre-Processing my_main.c
+# Pre-processing my_main.c
 gcc -E -o my_main.i my_main.c
 ```
 
-### 3. Use the library
+### 3. Write your meta program
+In **exactly one** translation unit, define `CN_IMPLEMENTATION` before the
+include. Every other file that uses the API includes the header normally.
 
-In **exactly one** translation unit define `CN_IMPLEMENTATION` before the include. Every other file that uses the API just includes the header normally. 
-
-You want to have two `.c` files, one for meta program code *that defines and uses cnotes.h* and main file that  meta program will process.
+This means two `.c` files: one meta-program file that defines and uses
+`cnotes.h`, and the main file the meta program will process.
 
 ```c
 // meta.c — the one file that holds the implementation of cnotes.h
-// sets everything up and perfoms operations on the main.c file.
+// sets everything up and performs operations on the main.c file.
 #define CN_IMPLEMENTATION
 #include "cnotes.h"
 
@@ -111,14 +122,20 @@ int main(void) {
 }
 ```
 
-### 4. Processing file and compiling
+#### 4. Build and run
 
 ```sh
 # GCC
 # Compiling meta program
 gcc -o meta meta.c
+
 # Running meta program
 ./meta
+
 # Compiling meta-processed my_main.i
 gcc -o my_main my_main.i
 ```
+
+---
+
+:seedling: *Feel free to contribute to the project!*
