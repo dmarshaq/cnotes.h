@@ -32,14 +32,14 @@ Following is the list of features that are still not implemented, but will be in
  -  **K&R-style function definitions.**
  -  **_Atomic specifiers.**
  -  **_Complex types.**
- -  **long double support.**
+ -  **Char literals.**
  -  **HEX float literals.**
  -  **Binary integer literals.**
  -  **Label + goto correctness checking.**
  -  **FAM, Flexible Array Member.**
  -  **MSVC Specific compiler extensions.**
- -  **Code modification via any string insertion and parsing.**
  -  **Full Type Table serialization into .i file for Cn_Type introspection.**
+ -  **CFG, Control-Flow Graph contrusction and analysis interface for the advanced meta-programming.**
 
 Note that this list might NOT include every feature that was not implemented, and can be added to as they are discovered or suggested.
 
@@ -94,18 +94,18 @@ You want to have two `.c` files, one for meta program code *that defines and use
 #include "cnotes.h"
 
 int main(void) {
-    // Allocate AST data storage.
-    Cn_Ast_Data ast_data = {0};
-    cn_ast_init(&ast_data);
+    // Initialization, passing input file.
+    Cn_Translation_Unit tu = {0};
+    if (!cn_tu_init(&tu, "my_main.i")) return 1;
 
-    // Open and process a pre-processed file.
-    Cn_Translation_Unit tu = cn_tu_make("my_file.i");
-    if (cn_tu_process(&tu, CN_PRINT_AST | CN_PRINT_BINDINGS) != 0) {
-        fprintf(stderr, "Processing failed with %lld error(s)\n", ast_data.error_count);
+    // Processing translation unit.
+    if (cn_tu_process(&tu) != 0) {
+        fprintf(stderr, "Processing failed with %ld error(s)\n", tu.data.error_count);
         cn_tu_free(&tu);
         return 1;
     }
 
+    // Freeing everything.
     cn_tu_free(&tu);
     return 0;
 }

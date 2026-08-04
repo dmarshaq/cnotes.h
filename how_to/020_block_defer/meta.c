@@ -1,9 +1,3 @@
-// This how_to builds on `001_basic_usage`, so the driver below is kept as thin as possible,
-// every interesting thing happens in `defer.c`.
-//
-// Notice that this file is the only one that defines `CN_IMPLEMENTATION`, `defer.c` includes
-// `cnotes.h` too, but only gets the header part of it. That is the usual stb-style setup and it
-// is what lets a meta program grow across multiple files.
 #define CN_IMPLEMENTATION
 #include "cnotes.h"
 
@@ -38,7 +32,7 @@ Cn_Message_Response defer_handler(Cn_Message *message);
 Cn_Message_Response msg_handler(Cn_Message *message) {
     Cn_Message_Response response = CN_MESSAGE_RESPONSE_NONE;
 
-    // One of the ways to structure handling of various meta programs is to
+    // One of the ways to structure handling a ton of various meta programs it to 
     // delegate messages to handlers, this can be done in variety of ways.
     // Following structure will make sense once more handlers will be called.
     response = defer_handler(message);

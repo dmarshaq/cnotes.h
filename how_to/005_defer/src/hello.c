@@ -3,23 +3,28 @@
 #include <string.h>
 #include <time.h>
 
-// This file demonstrates the scoped `[[defer]]` metaprogram implemented in
-// `defer.c`, one construct at a time.
+// This file demonstrates the function scoped `[[defer]]` metaprogram implemented in `defer.c`,
+// one construct at a time.
 //
-// A deferred statement is not executed where it is written. Instead the
-// metaprogram moves it to the end of the block it appears in, and reroutes
-// every exit out of that block through it. So a defer runs when its enclosing
-// scope ends, no matter how control leaves that scope. (The only exception is arbitrary exit with `goto`)
+// A deferred statement is not executed where it is written. Instead the metaprogram moves it to
+// the end of the function, and reroutes every `return` through it. So a defer runs when the
+// function is done, no matter which `return` ends it.
 //
-// Each example below prints as it goes, so the ordering the metaprogram
-// produces is visible in the output.
+// Two things follow from "function scope", and both are on purpose:
+//  - `[[defer]]` may only be written in the function's own block. Writing one inside a loop or
+//    an inner block is an error, `020_block_defer` is the version that handles those.
+//  - `break` and `continue` are left alone. They stay inside the function, so they have no
+//    reason to run the function's defers.
+//
+// Each example below prints as it goes, so the ordering the metaprogram produces is visible in
+// the output.
 
 // ---------------------------------------------------------------------------
 // The basics
 // ---------------------------------------------------------------------------
 
-// A deferred statement runs after the rest of the block, even though it is
-// written first. The returned expression is still evaluated before it runs.
+// A deferred statement runs after the rest of the function, even though it is written first.
+// The returned expression is still evaluated before it runs.
 int doubled(int x) {
     [[defer]] printf("    ...and the defer runs last\n");
 
@@ -37,8 +42,8 @@ void countdown(void) {
     printf("    registering three defers\n");
 }
 
-// `[[defer]]` can take a whole block, which is how you defer more than one
-// statement without writing three separate defers.
+// `[[defer]]` can take a whole block, which is how you defer more than one statement without
+// writing three separate defers.
 void deferred_block(void) {
     [[defer]] {
         printf("    closing down\n");
@@ -52,9 +57,9 @@ void deferred_block(void) {
 // Why defer is useful: one cleanup, many exits
 // ---------------------------------------------------------------------------
 
-// Without defer this function would need the free() repeated on all three
-// return paths, or a goto-to-cleanup ladder at the bottom. With defer the
-// release sits directly under the acquisition and covers every exit.
+// Without defer this function would need the free() repeated on all three return paths, or a
+// goto-to-cleanup ladder at the bottom. With defer the release sits directly under the
+// acquisition and covers every exit.
 int load_name(const char *input, char *out, int out_size) {
     char *buf = malloc(64);
     if (buf == NULL) return -1;
@@ -80,8 +85,11 @@ int load_name(const char *input, char *out, int out_size) {
     return (int)strlen(out);
 }
 
-// The rerouting applies to every `return` in the function, so branchy code
-// keeps its cleanup guarantee without any extra bookkeeping.
+// Note that the `return -1` above is written before the defer, and the metaprogram leaves it
+// alone: at that point in the function there is nothing registered to run yet.
+
+// The rerouting applies to every `return` below the defer, so branchy code keeps its cleanup
+// guarantee without any extra bookkeeping.
 int classify(int value) {
     [[defer]] printf("    classify(%d) finished\n", value);
 
@@ -92,125 +100,80 @@ int classify(int value) {
     return 2;
 }
 
+// A `void` function works the same way, a bare `return;` is rerouted just like one with a value.
+void greet(const char *name) {
+    [[defer]] printf("    greeting done\n");
+
+    if (name == NULL) {
+        printf("    nobody to greet\n");
+        return;
+    }
+
+    printf("    hello, %s\n", name);
+}
+
 // ---------------------------------------------------------------------------
-// Defer inside loops
+// Returns in nested scopes
 // ---------------------------------------------------------------------------
 
-// A loop body is its own scope, so a defer written inside it belongs to a
-// single iteration and fires at the bottom of each one.
-void per_iteration(int n) {
-    for (int i = 0; i < n; i++) {
-        [[defer]] printf("    iteration %d closed\n", i);
-
-        printf("    iteration %d open\n", i);
-    }
-}
-
-// `break` leaves the loop body early, so the metaprogram runs the iteration's
-// defer first and only then actually breaks out of the loop.
-void stop_early(int n) {
-    for (int i = 0; i < n; i++) {
-        [[defer]] printf("    iteration %d closed\n", i);
-
-        if (i == 2) {
-            printf("    iteration %d: stopping\n", i);
-            break;
-        }
-
-        printf("    iteration %d open\n", i);
-    }
-
-    printf("    loop is over\n");
-}
-
-// `continue` is handled the same way: the defer runs, then the loop moves on
-// to the next iteration.
-void skip_odd(int n) {
-    for (int i = 0; i < n; i++) {
-        [[defer]] printf("    iteration %d closed\n", i);
-
-        if (i % 2 != 0) {
-            printf("    iteration %d: skipping\n", i);
-            continue;
-        }
-
-        printf("    iteration %d open\n", i);
-    }
-}
-
-// Returning from inside a loop unwinds both scopes: the loop body's defer runs
-// first, then the function's, before the value goes back to the caller.
+// The defer belongs to the function, but the `return` it has to cover can sit anywhere. Here it
+// is inside a loop, two scopes down, and it still leaves through the deferred statement.
 int find_first(const int *values, int count, int wanted) {
     [[defer]] printf("    search finished\n");
 
     for (int i = 0; i < count; i++) {
-        [[defer]] printf("    checked slot %d\n", i);
-
         if (values[i] == wanted) {
             printf("    found %d at slot %d\n", wanted, i);
             return i;
         }
     }
 
+    printf("    no match\n");
     return -1;
 }
 
-// Nested loops each keep their own defers, so the inner one fires on every
-// inner iteration and the outer one at the end of each outer iteration.
-void grid(int rows, int cols) {
-    for (int r = 0; r < rows; r++) {
-        [[defer]] printf("    row %d closed\n", r);
+// Same story inside a switch: the `return` in the case body is an exit out of the function, so
+// it goes through the defer.
+int scale(int code) {
+    [[defer]] printf("    scale(%d) finished\n", code);
 
-        for (int c = 0; c < cols; c++) {
-            [[defer]] printf("      cell %d,%d closed\n", r, c);
-
-            printf("      cell %d,%d open\n", r, c);
-        }
-    }
-}
-
-// ---------------------------------------------------------------------------
-// Defer in other scopes
-// ---------------------------------------------------------------------------
-
-// A bare block is a scope like any other. Its defer fires at the closing brace,
-// and the statements after the block still run normally.
-void inner_scope(void) {
-    printf("    before the block\n");
-    {
-        [[defer]] printf("    leaving the block\n");
-
-        printf("    inside the block\n");
-    }
-    printf("    after the block\n");
-}
-
-// A switch case body is a block too, so its defer runs before `break` passes
-// control out of the switch.
-void describe(int code) {
     switch (code) {
-        case 1: {
-            [[defer]] printf("    case 1 closed\n");
+        case 0: return 0;
+        case 1: return 10;
+        case 2: return 20;
+        default: return -1;
+    }
+}
 
-            printf("    handling code 1\n");
+// `break` and `continue` are a different matter. They only move control around inside the
+// function, so the metaprogram leaves them untouched and the defer still runs once, at the end.
+void stop_early(int n) {
+    [[defer]] printf("    stop_early finished\n");
+
+    for (int i = 0; i < n; i++) {
+        if (i % 2 != 0) continue;
+
+        if (i == 4) {
+            printf("    stopping at %d\n", i);
             break;
         }
-        default: {
-            printf("    unhandled code %d\n", code);
-            break;
-        }
+
+        printf("    step %d\n", i);
     }
 
-    printf("    past the switch\n");
+    printf("    loop is over\n");
 }
 
 // ---------------------------------------------------------------------------
-// Building on defer: a scope timer
+// Building on defer: a function timer
 // ---------------------------------------------------------------------------
 
-// Because a defer is tied to the scope it is written in, a macro can open a
-// timer and register the reporting half in one line. The caller never has to
-// remember to stop it.
+// Because a defer is tied to the function it is written in, a macro can start a timer and
+// register the reporting half in one line. The caller never has to remember to stop it, and
+// every `return` reports before leaving.
+//
+// `010_profiling` takes this one step further and generates the same code from an attribute on
+// the function, so the body does not have to mention the timer at all.
 #define TIME(name)\
     clock_t cn_t_start = clock();\
     [[defer]] {\
@@ -234,8 +197,8 @@ int main(void) {
     int values[5] = { 4, 8, 15, 16, 23 };
     int result;
 
-    // Note the ordering here: the defer inside `doubled` runs before this
-    // printf gets its value, because the defer is part of leaving `doubled`.
+    // Note the ordering here: the defer inside `doubled` runs before this printf gets its value,
+    // because the defer is part of leaving `doubled`.
     printf("doubled(21):\n");
     result = doubled(21);
     printf("    = %d\n", result);
@@ -256,30 +219,26 @@ int main(void) {
     result = classify(42);
     printf("    = %d\n", result);
 
-    printf("\nper_iteration(3):\n");
-    per_iteration(3);
+    printf("\ngreet(\"world\"):\n");
+    greet("world");
 
-    printf("\nstop_early(5):\n");
-    stop_early(5);
-
-    printf("\nskip_odd(4):\n");
-    skip_odd(4);
+    printf("\ngreet(NULL):\n");
+    greet(NULL);
 
     printf("\nfind_first(values, 5, 15):\n");
     result = find_first(values, 5, 15);
     printf("    = %d\n", result);
 
-    printf("\ngrid(2, 2):\n");
-    grid(2, 2);
+    printf("\nfind_first(values, 5, 99):\n");
+    result = find_first(values, 5, 99);
+    printf("    = %d\n", result);
 
-    printf("\ninner_scope():\n");
-    inner_scope();
+    printf("\nscale(2):\n");
+    result = scale(2);
+    printf("    = %d\n", result);
 
-    printf("\ndescribe(1):\n");
-    describe(1);
-
-    printf("\ndescribe(7):\n");
-    describe(7);
+    printf("\nstop_early(6):\n");
+    stop_early(6);
 
     printf("\nsum_to(100000):\n");
     result = sum_to(100000);

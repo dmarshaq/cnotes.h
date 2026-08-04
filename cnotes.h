@@ -647,6 +647,10 @@ CNDEF void cn_arena_destroy(Cn_Arena *arena);
  *
  *
  *  These setup allows quick append allocation and pop deallocation.
+ *
+ *  Every block carries its own capacity, which normally is the block_capacity set by the user.
+ *  An allocation that doesn't fit in a regular block gets an oversized block of exactly its size,
+ *  so no allocation is ever refused because of the block_capacity chosen.
  */
 typedef struct { CN_ALLOCATOR_BASE;
     size_t block_capacity;
@@ -658,6 +662,7 @@ typedef struct { CN_ALLOCATOR_BASE;
 typedef struct {
     void  *prev;
     void  *next;
+    size_t capacity;
     size_t allocated;
 } Cn_Chained_Arena_Block_Header;
 
@@ -668,6 +673,9 @@ CNDEF Cn_Chained_Arena cn_chained_arena_make(size_t block_capacity);
 
 /**
  * Allocates specified memory size from the arena.
+ *
+ * NOTE: If size is bigger than the arena's block_capacity, an oversized block of exactly
+ * that size is allocated to hold it, and a warning is logged.
  */
 CNDEF void *cn_chained_arena_alloc(Cn_Chained_Arena *arena, size_t size);
 
@@ -2898,7 +2906,6 @@ CNDEF bool cn_analyze_typecheck_designations(Cn_Ast_Nodes designations, Cn_Type 
  */
 CNDEF bool cn_analyze_typecheck_initializer(void * initializer, Cn_Type *type);
 
-
 /**
  * ============================================
  * SECTION: Emit
@@ -4435,6 +4442,13 @@ CNDEF void cn__tu_save(Cn_Tu_Saved *state);
  */
 CNDEF void cn__tu_rollback(Cn_Tu_Saved *state);
 
+/**
+ * Emits new code and then rollbacks to the saved state. 
+ * Making sure new code is recorded exactly after rollback.
+ */
+CNDEF Cn_String cn__tu_emit_and_rollback(Cn_Ast_Node *node, Cn_Tu_Saved *state);
+
+
 
 #define CN_AST_ARENA_BLOCK_CAP                      4096
 #define CN_AST_TYPE_ARENA_BLOCK_CAP                 (sizeof(Cn_Type) * 64)
@@ -5139,6 +5153,7 @@ CNDEF Cn_Chained_Arena cn_chained_arena_make(size_t block_capacity) {
 
     header->prev = NULL;
     header->next = NULL;
+    header->capacity = block_capacity;
     header->allocated = 0;
 
     return (Cn_Chained_Arena) {
@@ -5153,16 +5168,32 @@ CNDEF Cn_Chained_Arena cn_chained_arena_make(size_t block_capacity) {
 
 CNDEF void *cn_chained_arena_alloc(Cn_Chained_Arena *arena, size_t size) {
     CN_ASSERT(size > 0);
-    CN_ASSERT(size <= arena->block_capacity);
 
     Cn_Chained_Arena_Block_Header *header = CN_CHAINED_ARENA_BLOCK_HEADER(arena->block);
 
-    if ((header->allocated + size) > arena->block_capacity) {
-        if (header->next == NULL) {
-            header->next = realloc(NULL, sizeof(Cn_Chained_Arena_Block_Header) + arena->block_capacity);
-            ((Cn_Chained_Arena_Block_Header *)header->next)->next = NULL;
+    if ((header->allocated + size) > header->capacity) {
+        Cn_Chained_Arena_Block_Header *next = header->next;
+
+        // Already chained block is reused only if the allocation actually fits in it.
+        // Every block is at least block_capacity big, so this can only fail for oversized allocations.
+        if (next == NULL || next->capacity < size) {
+            size_t capacity = size > arena->block_capacity ? size : arena->block_capacity;
+
+            if (capacity > arena->block_capacity) {
+                cn_log(CN_WARNING, "Oversized allocation of %zu bytes in chained arena of %zu bytes block capacity, block of %zu bytes was allocated to hold it.", size, arena->block_capacity, capacity);
+            }
+
+            Cn_Chained_Arena_Block_Header *block = realloc(NULL, sizeof(Cn_Chained_Arena_Block_Header) + capacity);
+            block->capacity = capacity;
+
+            // Chaining in front of whatever was already there, so blocks that were too small
+            // for this allocation are kept for the next one that fits in them.
+            block->next = next;
+            header->next = block;
+            next = block;
         }
-        header = header->next;
+
+        header = next;
 
         header->prev = arena->block;
         header->allocated = 0;
@@ -5268,6 +5299,9 @@ CNDEF size_t cn_chained_arena_allocated(Cn_Chained_Arena *arena) {
 
 CNDEF void cn_chained_arena_destroy(Cn_Chained_Arena *arena) {
     Cn_Chained_Arena_Block_Header *header = CN_CHAINED_ARENA_BLOCK_HEADER(arena->block);
+    while (header->next != NULL) {
+        header = (Cn_Chained_Arena_Block_Header *) header->next;
+    }
 
     while (header->prev != NULL) {
         arena->block = header->prev;
@@ -10104,6 +10138,10 @@ CNDEF Cn_Type *cn__analyze_typecheck_binary(Cn_Ast_Node *node) {
     Cn_Type *right = cn_analyze_typecheck_expression(cn_ast_as(Binary, node)->right);
     if (right == NULL) return NULL;
 
+    // Dropping qualifiers for binary typechecing.
+    left = cn_type_unqualified(left);
+    right = cn_type_unqualified(right);
+
     switch (cn_ast_as(Binary, node)->operator) {
         case CN_AST_BINARY_OP_ADDITION: 
             {
@@ -10623,6 +10661,10 @@ CNDEF Cn_Type *cn__analyze_typecheck_assignment(Cn_Ast_Node *node) {
         cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, node, CN_DC_ILLEGAL_TYPE, "Left operand of assignment is not a modifiable lvalue.");
         return NULL;
     }
+    
+    // Droping qualifiers, since we already checked the lvalue.
+    left = cn_type_unqualified(left);
+    right = cn_type_unqualified(right);
 
     switch (cn_ast_as(Assign, node)->operator) {
         // Simple assignment: right must be assignable to left, with NULL constant to pointer case handled too.
@@ -12555,13 +12597,87 @@ CNDEF Cn_Ast_Translation_Unit *cn_parse_translation_unit(Cn_Lexer *lexer) {
 
     int64_t mark = cn_ast_stack_mark();
 
+    // Sending message for the start.
+    if (cn_message_handler != NULL) {
+        // Making lexer.
+        Cn_Lexer l = *lexer;
+        Cn_Ast_Node *null;
+
+        Cn_Message_Tu_Start message = { 
+            .kind = CN_MESSAGE_TU_START, 
+            .null_ptr = &null,
+        };
+        Cn_Message_Response   response;
+
+        do {
+            null = NULL;
+
+            response = cn_message_handler((Cn_Message*) &message);
+
+            if (response != CN_MESSAGE_RESPONSE_MODIFIED) break; 
+
+            // Emitting without rollback, because there is nothing to undo.
+            Cn_String_Builder sb = cn_sb_make(512);
+            Cn_Emitter emitter = { .write = cn_emit_write_sb, .ctx = &sb };
+            cn_emit(&emitter, null);
+
+            Cn_String code = CN_STR(sb.length, cn_chained_arena_alloc(&cn__tu_data->output_arena, sb.length));
+            cn_str_copy_to(cn_sb_to_str(&sb), code.data);
+            cn_sb_free(&sb);
+            
+            // Now that we have new code stored safely in output arena, we can parse it again.
+            cn_lexer_load_content(&l, code);
+
+            Cn_Ast_External_Declaration *next_idx = cn_parse_external_declaration(&l);
+            if (next_idx == NULL) goto error;
+            cn_ast_stack_push(next_idx);
+        } while (true);
+    }
+    
+
     while (cn_lexer_token(lexer).type != CN_TOKEN_EOF) {
         Cn_Ast_External_Declaration *next_idx = cn_parse_external_declaration(lexer);
 
-        if (next_idx == NULL)
-            goto error;
+        if (next_idx == NULL) goto error;
 
         cn_ast_stack_push(next_idx);
+    }
+
+    // Sending message for the end.
+    if (cn_message_handler != NULL) {
+        // Making lexer.
+        Cn_Lexer l = *lexer;
+        Cn_Ast_Node *null;
+
+        Cn_Message_Tu_End message = { 
+            .kind = CN_MESSAGE_TU_END, 
+            .null_ptr = &null,
+        };
+        Cn_Message_Response   response;
+
+        do {
+            null = NULL;
+
+            response = cn_message_handler((Cn_Message*) &message);
+
+            if (response != CN_MESSAGE_RESPONSE_MODIFIED) break; 
+
+            // Emitting without rollback, because there is nothing to undo.
+            Cn_String_Builder sb = cn_sb_make(512);
+            Cn_Emitter emitter = { .write = cn_emit_write_sb, .ctx = &sb };
+            cn_emit(&emitter, null);
+
+            Cn_String code = CN_STR(sb.length, cn_chained_arena_alloc(&cn__tu_data->output_arena, sb.length));
+            cn_str_copy_to(cn_sb_to_str(&sb), code.data);
+            cn_sb_free(&sb);
+            
+            // Now that we have new code stored safely in output arena, we can parse it again.
+            cn_lexer_load_content(&l, code);
+
+            Cn_Ast_External_Declaration *next_idx = cn_parse_external_declaration(&l);
+            if (next_idx == NULL) goto error;
+            cn_ast_stack_push(next_idx);
+        } while (true);
     }
 
     node.external_declarations = cn_ast_stack_finalize(mark);
@@ -12634,20 +12750,7 @@ CNDEF Cn_Ast_External_Declaration *cn_parse_external_declaration(Cn_Lexer *lexer
             // If no modifications, just breaking, since nothing changed.
             if (response != CN_MESSAGE_RESPONSE_MODIFIED) break; 
 
-
-            // Otherwise emitting modified ast and then reparsing it. To send the message again and validate what user did.
-            Cn_String_Builder sb = cn_sb_make(512);
-            Cn_Emitter emitter = { .write = cn_emit_write_sb, .ctx = &sb };
-            cn_emit(&emitter, function_or_declaration);
-            
-            // Doing rollback here simulate reparse from the point before we began anything.
-            // we have new code already emmited, now just restoring everything and copyig it into output arena.
-            // then just parsing. It is not done before emit, cause emit utilizes ast that might have been using data
-            // stored in output arena.
-            cn__tu_rollback(&saved_state);
-            
-            Cn_String code = CN_STR(sb.length, cn_chained_arena_alloc(&cn__tu_data->output_arena, sb.length));
-            cn_str_copy_to(cn_sb_to_str(&sb), code.data);
+            Cn_String code = cn__tu_emit_and_rollback(function_or_declaration, &saved_state);
 
             // Now that we have new code stored safely in output arena, we can parse it again.
             Cn_Lexer l = saved_lexer;
@@ -12659,7 +12762,6 @@ CNDEF Cn_Ast_External_Declaration *cn_parse_external_declaration(Cn_Lexer *lexer
             ast_message.flags &= ~(CN_MESSAGE_AST_UNMODIFIED);
 
             // Not forgetting to free sb.
-            cn_sb_free(&sb);
         } while (true);
     }
 
@@ -16106,6 +16208,25 @@ CNDEF void cn__tu_rollback(Cn_Tu_Saved *state) {
     cn__tu_data->function_scope_idx = state->saved_function_scope_idx;
     cn_array_list_pop_multiple(&cn__tu_data->ptr_stack, cn_array_list_length(&cn__tu_data->ptr_stack) - state->saved_ptr_stack_length);
     cn__tu_data->counter = state->saved_counter;
+}
+
+CNDEF Cn_String cn__tu_emit_and_rollback(Cn_Ast_Node *node, Cn_Tu_Saved *state) {
+    // Otherwise emitting modified ast and then reparsing it. To send the message again and validate what user did.
+    Cn_String_Builder sb = cn_sb_make(512);
+    Cn_Emitter emitter = { .write = cn_emit_write_sb, .ctx = &sb };
+    cn_emit(&emitter, node);
+
+    // Doing rollback here to simulate reparse from the point before we began anything.
+    // we have new code already emmited, now just restoring everything and copyig it into output arena.
+    // then just parsing. It is not done before emit, cause emit utilizes ast that might have been using data
+    // stored in output arena.
+    cn__tu_rollback(state);
+
+    Cn_String code = CN_STR(sb.length, cn_chained_arena_alloc(&cn__tu_data->output_arena, sb.length));
+    cn_str_copy_to(cn_sb_to_str(&sb), code.data);
+    cn_sb_free(&sb);
+
+    return code;
 }
 
 CNDEF bool cn__tu_data_init(Cn_Tu_Data *data) {
