@@ -100,7 +100,7 @@ This means two `.c` files: one meta-program file that defines and uses
 
 ```c
 // `meta.c` is the one file that holds implementation of `cnotes.h`
-// sets everything up and performs operations on the `main.c` file.
+// sets everything up and performs operations on the `my_main.i` file.
 #define CN_IMPLEMENTATION
 #include "cnotes.h"
 
