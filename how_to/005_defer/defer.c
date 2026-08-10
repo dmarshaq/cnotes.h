@@ -224,7 +224,7 @@ Cn_Message_Response defer_handler(Cn_Message *message) {
     cn_array_list_free(&items);
     cn_array_list_free(&deferred_stack);
 
-    return CN_MESSAGE_RESPONSE_NONE;
+    return CN_MESSAGE_RESPONSE_MODIFIED;
 }
 
 // Walks one statement of the function looking for jumps that need rerouting.

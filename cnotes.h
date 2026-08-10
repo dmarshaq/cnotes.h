@@ -16428,6 +16428,7 @@ CNDEF void cn_tu_free(Cn_Translation_Unit *tu) {
 
 /* 
     Revision history:
+        0.1.1 (2026-08-10) Fix how_to/005_defer CN_MESSAGE_RESPONSE_NONE to CN_MESSAGE_RESPONSE_MODIFIED.
         0.1.0 (2026-08-04) Initial development first release.
 */
 
