@@ -6,7 +6,7 @@
 ![C](https://img.shields.io/badge/C-blue)
 
 > [!WARNING]
-> **Initial development.** This library does not yet implement its full scope, and APIs may change without notice. Not recommended for production use.
+> **Initial development.** This library does not yet implement its full scope, and APIs may change without notice. Not recommended for production use or for your serious projects.
 
 ---
 
@@ -16,7 +16,10 @@
 
 The library is influenced by the design philosophy of [`stb`](https://github.com/nothings/stb) and [`nob`](https://github.com/tsoding/nob.h): easy integration with no dependencies, no giant build systems, just one file.
 
-The library core meta programming ideas are also inspired by Jai Programming Language.
+The library core meta programming ideas are also heavily inspired by Jai Programming Language.
+
+> [!IMPORTANT]
+> **Above all**, `cnotes.h` is a personal learning project. I built it to explore how language parsing, source transformation and meta programming work under the hood. It's shared openly in case others find it useful or interesting, but it isn't meant to be a product or a replacement for established tools.
 
 ---
 
@@ -127,13 +130,13 @@ int main(void) {
 ```sh
 # GCC
 # Compiling meta program
-gcc -o meta meta.c
+gcc -Wextra -Wall -std=c99 -o meta meta.c
 
 # Running meta program
 ./meta
 
 # Compiling meta-processed my_main.i
-gcc -o my_main my_main.i
+gcc -Wextra -Wall -std=c99 -o my_main my_main.i
 
 # Running program
 ./my_main
@@ -141,4 +144,4 @@ gcc -o my_main my_main.i
 
 ---
 
-:seedling: *Feel free to contribute to the project!*
+:seedling: Suggestions are welcome! The project is still in early development, so I'm keeping a close eye on its direction. Not every change may be merged, but every idea is appreciated.
