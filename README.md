@@ -1,4 +1,4 @@
-# cnotes.h — Single Header C Meta Programming Library
+# cnotes.h — Single Header C Meta-Programming Library
 
 **A header-only library for building C meta programs, static analysis tools, and source transformation pipelines — operating directly on pre-processed `.i` files.**
 
@@ -12,14 +12,14 @@
 
 ## :pushpin: Overview
 
-`cnotes.h` is a self-contained, single-header C library that parses pre-processed C translation units (`.i` files), builds a typed Abstract Syntax Tree, resolves symbols and bindings, and evaluates constant expressions — all within a single `#include`. It is designed for authors who need code generation and introspection capabilities without too much complexity and overhead. Aiming to give practical tools for various meta programming techniques that utilize transformation and introspection of C source at compile time.
+`cnotes.h` is a self-contained, single-header C library that parses pre-processed C translation units (`.i` files), builds a typed Abstract Syntax Tree, resolves symbols and bindings, and evaluates constant expressions — all within a single `#include`. It is designed for authors who need code generation and introspection capabilities without too much complexity and overhead. Aiming to give practical tools for various meta-programming techniques that utilize transformation and introspection of C source at compile time.
 
 The library is influenced by the design philosophy of [`stb`](https://github.com/nothings/stb) and [`nob`](https://github.com/tsoding/nob.h): easy integration with no dependencies, no giant build systems, just one file.
 
-The library core meta programming ideas are also heavily inspired by Jai Programming Language.
+The library core meta-programming ideas are also heavily inspired by Jai Programming Language.
 
 > [!IMPORTANT]
-> **Above all**, `cnotes.h` is a personal learning project. I built it to explore how language parsing, source transformation and meta programming work under the hood. It's shared openly in case others find it useful or interesting, but it isn't meant to be a product or a replacement for established tools.
+> **Above all**, `cnotes.h` is a personal learning project. I built it to explore how language parsing, source transformation and meta-programming work under the hood. It's shared openly in case others find it useful or interesting, but it isn't meant to be a product or a replacement for established tools.
 
 ---
 
@@ -70,7 +70,7 @@ AST-level introspection and code modification:
 ```mermaid
 flowchart TD
     A["Source file (.c)"] -->|compiler pre-processor| B["Translation unit (.i)"]
-    B -->|"cnotes.h: meta-program hooks,\nAST inspection & modification"| C["Modified translation unit (.i)"]
+    B -->|"cnotes.h: meta program hooks,\nAST inspection & modification"| C["Modified translation unit (.i)"]
     C -->|compiler| D["Target binary"]
 ```
 
@@ -78,7 +78,7 @@ flowchart TD
 
 ### :hammer_and_wrench: Manual Setup
 
-Below is the manual workflow of how meta-program is built and ran on the source file.
+Below is the manual workflow of how meta program is built and ran on the source file.
 
 #### 1. Obtain the header
 Copy `cnotes.h` into your project. No other files are required.
@@ -98,7 +98,7 @@ gcc -E -o my_main.i my_main.c
 In **exactly one** translation unit, define `CN_IMPLEMENTATION` before the
 include. Every other file that uses the API includes the header normally.
 
-This means two `.c` files: one meta-program file that defines and uses
+This means two `.c` files: one meta program file that defines and uses
 `cnotes.h`, and the main file the meta program will process.
 
 ```c
@@ -135,7 +135,7 @@ gcc -Wextra -Wall -std=c99 -o meta meta.c
 # Running meta program
 ./meta
 
-# Compiling meta-processed my_main.i
+# Compiling meta processed my_main.i
 gcc -Wextra -Wall -std=c99 -o my_main my_main.i
 
 # Running program
