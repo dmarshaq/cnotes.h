@@ -1,4 +1,4 @@
-/*  cnotes - v0.1.0 - MIT License - https://github.com/dmarshaq/cnotes.h
+/*  cnotes - v0.1.1 - MIT License - https://github.com/dmarshaq/cnotes.h
 
     A header-only library for building C meta programs, static analysis tools, 
     and source transformation pipelines - operating directly on pre-processed .i files.
