@@ -45,9 +45,10 @@ void cn__json_escape_cstr(FILE *f, char *str) {
 }
 
 CNDEF void cn_test_diagnostic_handler(Cn_Diagnostic_Level level, Cn_Location *loc, Cn_Diagnostic_Code code, Cn_String span, Cn_Diagnostic_Annotation annotations[], size_t annotations_length, const char *format, va_list args) {
-    CN_UNUSED(span);
-    CN_UNUSED(annotations);
-    CN_UNUSED(annotations_length);
+    // Also using default diagnostic handler to print human readable diagnostic immediately.
+    // Usefull in debuging why certain test fails on emitted diagnostic.
+    // This output is in stderr so its not impacting anything.
+    cn_default_diagnostic_handler(level, loc, code, span, annotations, annotations_length, format, args);
 
     if (level < cn_min_diagnostic_level)
         return;

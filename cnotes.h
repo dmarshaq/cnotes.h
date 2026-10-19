@@ -1132,6 +1132,7 @@ typedef enum {
     CN_TOKEN_LINE_MARKER,
     CN_TOKEN_INTEGER_VALUE,
     CN_TOKEN_FLOAT_VALUE,
+    CN_TOKEN_CHAR_VALUE,
     CN_TOKEN_IDENTIFIER,
     // Keyword tokens
     CN_TOKEN_GNU_EXTENSION,
@@ -1986,6 +1987,7 @@ CNDEF Cn_Ast_Postfix_Operator_Kind cn_ast_is_postfix_operator(Cn_Lexer *lexer);
     X(IDENTIFIER,                       Identifier,                         identifier)                     \
     X(INTEGER,                          Integer,                            integer)                        \
     X(FLOAT,                            Float,                              flt)                            \
+    X(CHAR,                             Char,                               character)                      \
     X(STRING,                           String,                             string)                         \
     /* --- declarator and declaration machinary --------------------------- */                              \
     X(INIT_DECLARATOR,                  Init_Declarator,                    init_declarator)                \
@@ -2269,6 +2271,10 @@ struct cn_ast_integer { CN_AST_BASE;
 };
 
 struct cn_ast_flt { CN_AST_BASE;
+    Cn_String value;
+};
+
+struct cn_ast_character { CN_AST_BASE;
     Cn_String value;
 };
 
@@ -2864,7 +2870,7 @@ CNDEF bool cn_analyze_function(void * declaration_specifiers, void * declarator,
  *
  * RETURNS: The resolved type, or NULL on error.
  */
-CNDEF Cn_Type *cn_analyze_to_type(Cn_Ast_Qualifier_Flags flags, void * type_specifier, void * declarator);
+CNDEF Cn_Type *cn_analyze_to_type(Cn_Ast_Qualifier_Flags flags, void *type_specifier, void *declarator);
 
 /**
  * Recursive function that type checks expression 
@@ -2875,7 +2881,7 @@ CNDEF Cn_Type *cn_analyze_to_type(Cn_Ast_Qualifier_Flags flags, void * type_spec
  *
  * RETURNS: NULL if error occured, resulting type of an expression on success.
  */
-CNDEF Cn_Type *cn_analyze_typecheck_expression(void * expression);
+CNDEF Cn_Type *cn_analyze_typecheck_expression(void *expression);
 
 /**
  * Evaluates an expression, uses supplied buffer to store data.
@@ -2888,7 +2894,7 @@ CNDEF Cn_Type *cn_analyze_typecheck_expression(void * expression);
  * RETURNS: NIL if expression wasn't typechecked or if expression 
  * cannot be evaluated at compile time, valid any struct on success.
  */
-CNDEF Cn_Any cn_analyze_evaluate_expression(void * expression, void *buffer);
+CNDEF Cn_Any cn_analyze_evaluate_expression(void *expression, void *buffer);
 
 /**
  * Recursive function that type checks designations against known type. 
@@ -2904,7 +2910,7 @@ CNDEF bool cn_analyze_typecheck_designations(Cn_Ast_Nodes designations, Cn_Type 
  *
  * RETURNS: False if error occured, true on success.
  */
-CNDEF bool cn_analyze_typecheck_initializer(void * initializer, Cn_Type *type);
+CNDEF bool cn_analyze_typecheck_initializer(void *initializer, Cn_Type *type);
 
 /**
  * ============================================
@@ -3660,6 +3666,11 @@ CNDEF Cn_Ast_Integer *cn_parse_integer(Cn_Lexer *lexer);
  * Parses code starting of with lexer current token as float.
  */
 CNDEF Cn_Ast_Float *cn_parse_float(Cn_Lexer *lexer);
+
+/**
+ * Parses code starting of with lexer current token as char.
+ */
+CNDEF Cn_Ast_Char *cn_parse_character(Cn_Lexer *lexer);
 
 /**
  * Parses code starting of with lexer current token as string literal.
@@ -6490,10 +6501,48 @@ number_lexer_fail:
         l->cursor++;
 
         while (l->cursor < l->content.length) {
-            if (l->content.data[l->cursor] == '"' && l->content.data[l->cursor - 1] != '\\') {
-                // If a valid string end.
+            if (l->content.data[l->cursor] == '"') {
+                // Is a valid string end.
                 break;
             }
+
+            if (l->content.data[l->cursor] == '\\') {
+                token.src.length++;
+                l->cursor++;
+
+                // TODO: For the future, error reporting in lexer, is not implemented?
+                // Although, the lexer does return unknown token on failed lexing, sometimes that state is not reached.
+                // It doesn't catch any errors related to incorrect token syntaxing that is parsed during lexing...
+                // However such errors only occur in cases where either lexer is built wrong or supplied source is substantially damaged.
+                // Either way making lexer be more robust, will probably be required as library grows more...
+            }
+
+            token.src.length++;
+            l->cursor++;
+        }
+
+        token.src.length++;
+        l->cursor++;
+
+        return token;
+    }
+
+    if (l->content.data[l->cursor] == '\'') {
+        token.type = CN_TOKEN_CHAR_VALUE;
+        token.src.length++;
+        l->cursor++;
+
+        while (l->cursor < l->content.length) {
+            if (l->content.data[l->cursor] == '\'') {
+                // Is a valid char end.
+                break;
+            }
+
+            if (l->content.data[l->cursor] == '\\') {
+                token.src.length++;
+                l->cursor++;
+            }
+
             token.src.length++;
             l->cursor++;
         }
@@ -6705,6 +6754,7 @@ CNDEF const char *cn_token_kind_name(Cn_Token_Type type) {
         case CN_TOKEN_LINE_MARKER:      return "<line marker>";
         case CN_TOKEN_INTEGER_VALUE:    return "<integer literal>";
         case CN_TOKEN_FLOAT_VALUE:      return "<float literal>";
+        case CN_TOKEN_CHAR_VALUE:       return "<value literal>";
         case CN_TOKEN_IDENTIFIER:       return "<identifier>";
         // Keyword tokens
         case CN_TOKEN_GNU_EXTENSION:    return "__extension__";
@@ -7942,6 +7992,9 @@ CNDEF void cn_ast_print(void * idx, int depth) {
         case CN_AST_FLOAT:
             fprintf(stderr, " %.*s", CN_STR_UNPACK(cn_ast_as(Float, node)->value));
             break;
+        case CN_AST_CHAR:
+            fprintf(stderr, " %.*s", CN_STR_UNPACK(cn_ast_as(Char, node)->value));
+            break;
         case CN_AST_STRING:
             fprintf(stderr, " \"%.*s\"", CN_STR_UNPACK(cn_ast_as(String, node)->str));
             break;
@@ -8341,6 +8394,8 @@ CNDEF void *cn_ast_copy(void * idx) {
         case CN_AST_FLOAT:
             return copy;
         case CN_AST_STRING:
+            return copy;
+        case CN_AST_CHAR:
             return copy;
         case CN_AST_INIT_DECLARATOR:
             COPY_PTR(Init_Declarator, declarator);
@@ -10133,10 +10188,10 @@ CNDEF Cn_Type *cn__analyze_typecheck_binary(Cn_Ast_Node *node) {
     CN_ASSERT(node->kind == CN_AST_BINARY);
 
     Cn_Type *left = cn_analyze_typecheck_expression(cn_ast_as(Binary, node)->left);
-    if (left == NULL) return NULL;
+    if (left == NULL) goto error;
 
     Cn_Type *right = cn_analyze_typecheck_expression(cn_ast_as(Binary, node)->right);
-    if (right == NULL) return NULL;
+    if (right == NULL) goto error;
 
     // Dropping qualifiers for binary typechecing.
     left = cn_type_unqualified(left);
@@ -10153,12 +10208,12 @@ CNDEF Cn_Type *cn__analyze_typecheck_binary(Cn_Ast_Node *node) {
                     Cn_Type *other_type = left->kind == CN_POINTER ? right : left;
                     if (other_type->kind != CN_INTEGER) {
                         cn__analyze_error_illegal_binary(node, left, right, "pointer addition");
-                        return NULL;
+                        goto error;
                     }
                     return ptr_type;
                 }
                 cn__analyze_error_illegal_binary(node, left, right, "addition");
-                return NULL;
+                goto error;
             }
 
         case CN_AST_BINARY_OP_SUBTRACTION: 
@@ -10174,23 +10229,23 @@ CNDEF Cn_Type *cn__analyze_typecheck_binary(Cn_Ast_Node *node) {
                             return cn__ast_add_type_if_not((Cn_Type *)&CN_TYPE_PTRDIFF);
                         }
                         cn__analyze_error_illegal_binary(node, left, right, "pointer subtraction");
-                        return NULL;
+                        goto error;
                     }
                     return ptr_type;
                 }
                 cn__analyze_error_illegal_binary(node, left, right, "subtraction");
-                return NULL;
+                goto error;
             }
 
         case CN_AST_BINARY_OP_ARRAY_SUB: 
             {
                 if (left->kind != CN_POINTER && left->kind != CN_ARRAY) {
                     cn__analyze_error_illegal_binary(node, left, right, "array subscript (left operand must be a pointer or array)");
-                    return NULL;
+                    goto error;
                 }
                 if (right->kind != CN_INTEGER) {
                     cn__analyze_error_illegal_binary(node, left, right, "array subscript (subscript must be an integer)");
-                    return NULL;
+                    goto error;
                 }
 
                 return left->kind == CN_POINTER ? left->pointer.ptr_to : left->array.element_type;
@@ -10206,7 +10261,7 @@ CNDEF Cn_Type *cn__analyze_typecheck_binary(Cn_Ast_Node *node) {
                 cn__analyze_error_illegal_binary(node, left, right,
                         cn_ast_as(Binary, node)->operator == CN_AST_BINARY_OP_MULTIPLICATION
                         ? "multiplication" : "division");
-                return NULL;
+                goto error;
             }
 
         // Integer-only, usual arithmetic conversions.
@@ -10219,7 +10274,7 @@ CNDEF Cn_Type *cn__analyze_typecheck_binary(Cn_Ast_Node *node) {
                     return cn__analyze_usual_arithmetic_conversion(left, right);
                 }
                 cn__analyze_error_illegal_binary(node, left, right, "integer operation");
-                return NULL;
+                goto error;
             }
 
         // Shifts: each operand promoted independently; result is the promoted LEFT
@@ -10231,7 +10286,7 @@ CNDEF Cn_Type *cn__analyze_typecheck_binary(Cn_Ast_Node *node) {
                     return cn__analyze_integer_promote(left);
                 }
                 cn__analyze_error_illegal_binary(node, left, right, "shift");
-                return NULL;
+                goto error;
             }
 
         // Relational: arithmetic vs arithmetic, or pointer vs pointer. Result is int.
@@ -10244,7 +10299,7 @@ CNDEF Cn_Type *cn__analyze_typecheck_binary(Cn_Ast_Node *node) {
                     || (left->kind == CN_POINTER && right->kind == CN_POINTER);
                 if (!ok) {
                     cn__analyze_error_illegal_binary(node, left, right, "relational comparison");
-                    return NULL;
+                    goto error;
                 }
                 return cn__ast_add_type_if_not((Cn_Type *)&CN_TYPE_INT);
             }
@@ -10259,7 +10314,7 @@ CNDEF Cn_Type *cn__analyze_typecheck_binary(Cn_Ast_Node *node) {
                     || (left->kind == CN_INTEGER && right->kind == CN_POINTER);
                 if (!ok) {
                     cn__analyze_error_illegal_binary(node, left, right, "equality comparison");
-                    return NULL;
+                    goto error;
                 }
                 return cn__ast_add_type_if_not((Cn_Type *)&CN_TYPE_INT);
             }
@@ -10271,7 +10326,7 @@ CNDEF Cn_Type *cn__analyze_typecheck_binary(Cn_Ast_Node *node) {
                 return cn__ast_add_type_if_not((Cn_Type *)&CN_TYPE_INT);
             }
             cn__analyze_error_illegal_binary(node, left, right, "logical operation");
-            return NULL;
+            goto error;
         }
 
         // Comma: result is the type of the right operand.
@@ -10280,16 +10335,20 @@ CNDEF Cn_Type *cn__analyze_typecheck_binary(Cn_Ast_Node *node) {
 
         default: {
             cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, node, CN_DC_EXPECTED_TOKEN, "Expected binary operator.");
-            return NULL;
+            goto error;
         }
     }
+
+error:
+    CN__TRACE_ERROR
+    return NULL;
 }
 
 CNDEF Cn_Type *cn__analyze_typecheck_access(Cn_Ast_Node *node) {
     CN_ASSERT(node->kind == CN_AST_ACCESS);
 
     Cn_Type *base = cn_analyze_typecheck_expression(cn_ast_as(Access, node)->expression);
-    if (base == NULL) return NULL;
+    if (base == NULL) goto error;
 
     // Removing qualifiers from base type here, won't need them.
     base = cn_type_unqualified(base);
@@ -10299,7 +10358,7 @@ CNDEF Cn_Type *cn__analyze_typecheck_access(Cn_Ast_Node *node) {
         // '->' : operand must be a pointer to a struct/union.
         if (base->kind != CN_POINTER) {
             cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, node, CN_DC_ILLEGAL_TYPE, "'->' requires a pointer operand.");
-            return NULL;
+            goto error;
         }
         struct_type = ((Cn_Type_Pointer *)base)->ptr_to;
     } else {
@@ -10313,12 +10372,12 @@ CNDEF Cn_Type *cn__analyze_typecheck_access(Cn_Ast_Node *node) {
     // TODO: Allow CN_UNION once union types are implemented.
     if (struct_type->kind != CN_STRUCT) {
         cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, node, CN_DC_ILLEGAL_TYPE, "Member access on non-struct type.");
-        return NULL;
+        goto error;
     }
 
     if (!(struct_type->flags & CN_TYPE_COMPLETE)) {
         cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, node, CN_DC_INCOMPLETE_TYPE, "Cannot access member of incomplete type.");
-        return NULL;
+        goto error;
     }
 
     Cn_Ast_Identifier *ident = (cn_ast_as(Access, node)->member);
@@ -10330,6 +10389,10 @@ CNDEF Cn_Type *cn__analyze_typecheck_access(Cn_Ast_Node *node) {
     }
 
     cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, node, CN_DC_INVALID_SYMBOL, "No member named '%.*s' in struct.", CN_STR_UNPACK(ident->name));
+    goto error;
+
+error:
+    CN__TRACE_ERROR
     return NULL;
 }
 
@@ -10337,7 +10400,7 @@ CNDEF Cn_Type *cn__analyze_typecheck_call(Cn_Ast_Node *node) {
     CN_ASSERT(node->kind == CN_AST_CALL);
 
     Cn_Type *callee = cn_analyze_typecheck_expression(cn_ast_as(Call, node)->expression);
-    if (callee == NULL) return NULL;
+    if (callee == NULL) goto error;
 
     // If opaque, ignore type checking for this function, completely.
     if (callee->kind == CN_OPAQUE) return callee;
@@ -10348,7 +10411,7 @@ CNDEF Cn_Type *cn__analyze_typecheck_call(Cn_Ast_Node *node) {
 
     if (fn->kind != CN_FUNCTION) {
         cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, node, CN_DC_ILLEGAL_TYPE, "Called object is not a function or function pointer.");
-        return NULL;
+        goto error;
     }
 
     Cn_Type_Function *func_type = (Cn_Type_Function *)fn;
@@ -10359,11 +10422,11 @@ CNDEF Cn_Type *cn__analyze_typecheck_call(Cn_Ast_Node *node) {
     if (func_type->is_variadic) {
         if (arg_count < func_type->params_length) {
             cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, node, CN_DC_ILLEGAL_TYPE, "Variadic function expects at least %lld argument(s) but %lld were provided.", func_type->params_length, arg_count);
-            return NULL;
+            goto error;
         }
     } else if (arg_count != func_type->params_length) {
         cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, node, CN_DC_ILLEGAL_TYPE, "Function expects %lld argument(s) but %lld were provided.", func_type->params_length, arg_count);
-        return NULL;
+        goto error;
     }
 
     // Each argument must be assignable to its corresponding parameter type.
@@ -10371,7 +10434,7 @@ CNDEF Cn_Type *cn__analyze_typecheck_call(Cn_Ast_Node *node) {
         Cn_Ast_Node *arg = cn_ast_as(Call, node)->arguments.ptrs[i];
 
         Cn_Type *arg_type = cn_analyze_typecheck_expression(arg);
-        if (arg_type == NULL) return NULL;
+        if (arg_type == NULL) goto error;
 
 
         // If parameter is not part of variadic list, typechecking with function param type, otherwise ignoring.
@@ -10384,13 +10447,18 @@ CNDEF Cn_Type *cn__analyze_typecheck_call(Cn_Ast_Node *node) {
                         Cn_String a_str = cn_type_stringify(CN_STR_BUFFER_EMPTY(128), arg_type, (Cn_String) {0});
                         Cn_String p_str = cn_type_stringify(CN_STR_BUFFER_EMPTY(128), param_type, (Cn_String) {0});
                         cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, node, CN_DC_ILLEGAL_TYPE, "Argument %lld of type %.*s is not assignable to parameter type %.*s.", i + 1, CN_STR_UNPACK(a_str), CN_STR_UNPACK(p_str));
-                        return NULL;
+                        goto error;
                 }
             }
         }
     }
 
     return func_type->return_type;
+
+error:
+    CN__TRACE_ERROR
+    return NULL;
+
 }
 
 CNDEF Cn_Type *cn__analyze_typecheck_unary(Cn_Ast_Node *node) {
@@ -10398,7 +10466,7 @@ CNDEF Cn_Type *cn__analyze_typecheck_unary(Cn_Ast_Node *node) {
 
     Cn_Ast_Node *operand_node = cn_ast_as(Unary, node)->expression;
     Cn_Type *operand = cn_analyze_typecheck_expression(operand_node);
-    if (operand == NULL) return NULL;
+    if (operand == NULL) goto error;
 
     switch (cn_ast_as(Unary, node)->operator) {
         // ++x / --x : modifiable lvalue of scalar type; result is the operand's type.
@@ -10407,11 +10475,11 @@ CNDEF Cn_Type *cn__analyze_typecheck_unary(Cn_Ast_Node *node) {
             {
                 if (!cn__analyze_is_modifiable_lvalue(operand_node)) {
                     cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, node, CN_DC_ILLEGAL_TYPE, "Operand of '++'/'--' is not a modifiable lvalue.");
-                    return NULL;
+                    goto error;
                 }
                 if (!cn_type_is_scalar(operand)) {
                     cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, node, CN_DC_ILLEGAL_TYPE, "Operand of '++'/'--' must be of scalar type.");
-                    return NULL;
+                    goto error;
                 }
 
                 return operand;
@@ -10423,7 +10491,7 @@ CNDEF Cn_Type *cn__analyze_typecheck_unary(Cn_Ast_Node *node) {
             {
                 if (!cn_type_is_arithmetic(operand)) {
                     cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, node, CN_DC_ILLEGAL_TYPE, "Operand of unary '+'/'-' must be of arithmetic type.");
-                    return NULL;
+                    goto error;
                 }
                 return cn__analyze_integer_promote(operand);
             }
@@ -10433,7 +10501,7 @@ CNDEF Cn_Type *cn__analyze_typecheck_unary(Cn_Ast_Node *node) {
             {
                 if (operand->kind != CN_INTEGER) {
                     cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, node, CN_DC_ILLEGAL_TYPE, "Operand of '~' must be of integer type.");
-                    return NULL;
+                    goto error;
                 }
                 return cn__analyze_integer_promote(operand);
             }
@@ -10443,7 +10511,7 @@ CNDEF Cn_Type *cn__analyze_typecheck_unary(Cn_Ast_Node *node) {
             {
                 if (!cn_type_is_scalar(operand)) {
                     cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, node, CN_DC_ILLEGAL_TYPE, "Operand of '!' must be of scalar type.");
-                    return NULL;
+                    goto error;
                 }
                 return cn__ast_add_type_if_not((Cn_Type *)&CN_TYPE_INT);
             }
@@ -10453,13 +10521,13 @@ CNDEF Cn_Type *cn__analyze_typecheck_unary(Cn_Ast_Node *node) {
             {
                 if (operand->kind != CN_POINTER) {
                     cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, node, CN_DC_ILLEGAL_TYPE, "Cannot dereference a non-pointer type.");
-                    return NULL;
+                    goto error;
                 }
 
                 Cn_Type *ptr_to = ((Cn_Type_Pointer *)operand)->ptr_to;
                 if (ptr_to->kind == CN_VOID) {
                     cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, node, CN_DC_ILLEGAL_TYPE, "Cannot dereference a void * type.");
-                    return NULL;
+                    goto error;
                 }
 
                 return ptr_to;
@@ -10470,7 +10538,7 @@ CNDEF Cn_Type *cn__analyze_typecheck_unary(Cn_Ast_Node *node) {
             {
                 if (!cn__analyze_is_lvalue(operand_node)) {
                     cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, node, CN_DC_ILLEGAL_TYPE, "Cannot take the address of a non-lvalue.");
-                    return NULL;
+                    goto error;
                 }
                 Cn_Type *void_t = cn__ast_add_type_if_not((Cn_Type *)&CN_TYPE_VOID);
                 Cn_Type ptr = cn_type_make_pointer(void_t);
@@ -10480,9 +10548,13 @@ CNDEF Cn_Type *cn__analyze_typecheck_unary(Cn_Ast_Node *node) {
         default: 
             {
                 cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, node, CN_DC_EXPECTED_TOKEN, "Expected unary operator.");
-                return NULL;
+                goto error;
             }
     }
+
+error:
+    CN__TRACE_ERROR
+    return NULL;
 }
 
 CNDEF Cn_Type *cn__analyze_typecheck_cast(Cn_Ast_Node *node) {
@@ -10492,10 +10564,10 @@ CNDEF Cn_Type *cn__analyze_typecheck_cast(Cn_Ast_Node *node) {
     Cn_Ast_Node *type_name = cn_ast_node((cn_ast_as(Cast, node)->type_name));
     Cn_Ast_Node *spec_qual = cn_ast_node((cn_ast_as(Type_Name, type_name)->specifier_qualifier));
     Cn_Type *target = cn_analyze_to_type(cn_ast_as(Specifier_Qualifier, spec_qual)->qualifiers, cn_ast_as(Specifier_Qualifier, spec_qual)->type_specifier, cn_ast_as(Type_Name, type_name)->abstract_declarator);
-    if (target == NULL) return NULL;
+    if (target == NULL) goto error;
 
     Cn_Type *operand = cn_analyze_typecheck_expression(cn_ast_as(Cast, node)->expression);
-    if (operand == NULL) return NULL;
+    if (operand == NULL) goto error;
 
     // Cast to void: always allowed, value is discarded.
     if (target->kind == CN_VOID) {
@@ -10506,14 +10578,14 @@ CNDEF Cn_Type *cn__analyze_typecheck_cast(Cn_Ast_Node *node) {
     if (!cn_type_is_scalar(target)) {
         Cn_String t_str = cn_type_stringify(CN_STR_BUFFER_EMPTY(128), target, (Cn_String) {0});
         cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, node, CN_DC_ILLEGAL_TYPE, "Cannot cast to non-scalar type %.*s.", CN_STR_UNPACK(t_str));
-        return NULL;
+        goto error;
     }
 
     // Operand must be scalar.
     if (!cn_type_is_scalar(operand)) {
         Cn_String o_str = cn_type_stringify(CN_STR_BUFFER_EMPTY(128), operand, (Cn_String) {0});
         cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, node, CN_DC_ILLEGAL_TYPE, "Cannot cast from non-scalar type %.*s.", CN_STR_UNPACK(o_str));
-        return NULL;
+        goto error;
     }
 
     // Floating types can't be cast to or from pointers.
@@ -10521,10 +10593,15 @@ CNDEF Cn_Type *cn__analyze_typecheck_cast(Cn_Ast_Node *node) {
         Cn_String t_str = cn_type_stringify(CN_STR_BUFFER_EMPTY(128), target, (Cn_String) {0});
         Cn_String o_str = cn_type_stringify(CN_STR_BUFFER_EMPTY(128), operand, (Cn_String) {0});
         cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, node, CN_DC_ILLEGAL_TYPE, "Cannot cast between floating type and pointer %.*s to %.*s.", CN_STR_UNPACK(o_str), CN_STR_UNPACK(t_str));
-        return NULL;
+        goto error;
     }
 
     return target;
+
+
+error:
+    CN__TRACE_ERROR
+    return NULL;
 }
 
 CNDEF Cn_Type *cn__analyze_typecheck_compound(Cn_Ast_Node *node) {
@@ -10534,17 +10611,22 @@ CNDEF Cn_Type *cn__analyze_typecheck_compound(Cn_Ast_Node *node) {
     Cn_Ast_Node *type_name = cn_ast_node((cn_ast_as(Compound, node)->type_name));
     Cn_Ast_Node *spec_qual = cn_ast_node((cn_ast_as(Type_Name, type_name)->specifier_qualifier));
     Cn_Type *target = cn_analyze_to_type(cn_ast_as(Specifier_Qualifier, spec_qual)->qualifiers, cn_ast_as(Specifier_Qualifier, spec_qual)->type_specifier, cn_ast_as(Type_Name, type_name)->abstract_declarator);
-    if (target == NULL) return NULL;
+    if (target == NULL) goto error;
 
     if (!(cn_type_unqualified(target)->flags & CN_TYPE_COMPLETE)) {
         Cn_String t_str = cn_type_stringify(CN_STR_BUFFER_EMPTY(128), target, (Cn_String) {0});
         cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, cn_ast_as(Compound, node)->type_name, CN_DC_ILLEGAL_TYPE, "Cannot have incomplete target type %.*s in compound literal.", CN_STR_UNPACK(t_str));
-        return NULL;
+         goto error;
     }
     
-    if (!cn_analyze_typecheck_designations(cn_ast_as(Compound, node)->designations, target)) return NULL;
+    if (!cn_analyze_typecheck_designations(cn_ast_as(Compound, node)->designations, target))  goto error;
 
     return target;
+
+error:
+    CN__TRACE_ERROR
+    return NULL;
+
 }
 
 CNDEF Cn_Type *cn__analyze_typecheck_sizeof(Cn_Ast_Node *node) {
@@ -10565,43 +10647,48 @@ CNDEF Cn_Type *cn__analyze_typecheck_sizeof(Cn_Ast_Node *node) {
         operand = cn_analyze_typecheck_expression(cn_ast_as(Sizeof, node)->target);
     }
 
-    if (operand == NULL) return NULL;
+    if (operand == NULL) goto error;
 
     if (operand->kind == CN_FUNCTION) {
         cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, node, CN_DC_ILLEGAL_TYPE, "Cannot take 'sizeof' of a function type.");
-        return NULL;
+        goto error;
     }
 
     if (operand->kind == CN_VOID) {
         cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, node, CN_DC_ILLEGAL_TYPE, "Cannot take 'sizeof' of a void type.");
-        return NULL;
+        goto error;
     }
 
     if (!(operand->flags & CN_TYPE_COMPLETE)) {
         cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, node, CN_DC_INCOMPLETE_TYPE, "Cannot take 'sizeof' of an incomplete type.");
-        return NULL;
+        goto error;
     }
 
     return cn__ast_add_type_if_not((Cn_Type *)&CN_TYPE_SIZE);
+
+error:
+    CN__TRACE_ERROR
+    return NULL;
+
 }
 
 CNDEF Cn_Type *cn__analyze_typecheck_ternary(Cn_Ast_Node *node) {
     CN_ASSERT(node->kind == CN_AST_TERNARY);
 
     Cn_Type *cond = cn_analyze_typecheck_expression(cn_ast_as(Ternary, node)->condition);
-    if (cond == NULL) return NULL;
+    if (cond == NULL) goto error;
 
     // Condition must be scalar.
     if (!cn_type_is_scalar(cond)) {
         cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, node, CN_DC_ILLEGAL_TYPE, "Condition of '?:' must be of scalar type.");
-        return NULL;
+        goto error;
     }
 
     Cn_Type *a = cn_analyze_typecheck_expression(cn_ast_as(Ternary, node)->if_true);
-    if (a == NULL) return NULL;
+    if (a == NULL) goto error;
 
     Cn_Type *b = cn_analyze_typecheck_expression(cn_ast_as(Ternary, node)->if_false);
-    if (b == NULL) return NULL;
+    if (b == NULL) goto error;
 
     // Both arithmetic.
     if (cn_type_is_arithmetic(a) && cn_type_is_arithmetic(b)) {
@@ -10644,6 +10731,10 @@ CNDEF Cn_Type *cn__analyze_typecheck_ternary(Cn_Ast_Node *node) {
         Cn_String b_str = cn_type_stringify(CN_STR_BUFFER_EMPTY(128), b, (Cn_String) {0});
         cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, node, CN_DC_ILLEGAL_TYPE, "Incompatible operand types in '?:' expression, %.*s and %.*s.", CN_STR_UNPACK(a_str), CN_STR_UNPACK(b_str));
     }
+    goto error;
+
+error:
+    CN__TRACE_ERROR
     return NULL;
 }
 
@@ -10651,15 +10742,15 @@ CNDEF Cn_Type *cn__analyze_typecheck_assignment(Cn_Ast_Node *node) {
     CN_ASSERT(node->kind == CN_AST_ASSIGN);
 
     Cn_Type *left = cn_analyze_typecheck_expression(cn_ast_as(Assign, node)->left);
-    if (left == NULL) return NULL;
+    if (left == NULL) goto error;
 
     Cn_Type *right = cn_analyze_typecheck_expression(cn_ast_as(Assign, node)->right);
-    if (right == NULL) return NULL;
+    if (right == NULL) goto error;
 
     // Left must be a modifiable lvalue for every assignment form.
     if (!cn__analyze_is_modifiable_lvalue(cn_ast_as(Assign, node)->left)) {
         cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, node, CN_DC_ILLEGAL_TYPE, "Left operand of assignment is not a modifiable lvalue.");
-        return NULL;
+        goto error;
     }
     
     // Droping qualifiers, since we already checked the lvalue.
@@ -10676,7 +10767,7 @@ CNDEF Cn_Type *cn__analyze_typecheck_assignment(Cn_Ast_Node *node) {
                         Cn_String left_str  = cn_type_stringify(CN_STR_BUFFER_EMPTY(128), left, (Cn_String) {0});
                         Cn_String right_str = cn_type_stringify(CN_STR_BUFFER_EMPTY(128), right, (Cn_String) {0});
                         cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, node, CN_DC_ILLEGAL_TYPE, "Cannot assign %.*s to %.*s.", CN_STR_UNPACK(right_str), CN_STR_UNPACK(left_str));
-                        return NULL;
+                        goto error;
                     }
                 }
                 return left;
@@ -10689,7 +10780,7 @@ CNDEF Cn_Type *cn__analyze_typecheck_assignment(Cn_Ast_Node *node) {
                 if (cn_type_is_arithmetic(left) && cn_type_is_arithmetic(right)) return left;
                 if (left->kind == CN_POINTER && right->kind == CN_INTEGER)       return left;
                 cn__analyze_error_illegal_binary(node, left, right, cn_ast_as(Assign, node)->operator == CN_AST_ASSIGNMENT_OP_PLUS ? "'+=' assignment" : "'-=' assignment");
-                return NULL;
+                goto error;
             }
 
         // '*=' / '/=' : arithmetic both sides.
@@ -10698,7 +10789,7 @@ CNDEF Cn_Type *cn__analyze_typecheck_assignment(Cn_Ast_Node *node) {
             {
                 if (cn_type_is_arithmetic(left) && cn_type_is_arithmetic(right)) return left;
                 cn__analyze_error_illegal_binary(node, left, right, "arithmetic assignment");
-                return NULL;
+                goto error;
             }
 
         // '%=' '<<=' '>>=' '&=' '^=' '|=' : integer both sides.
@@ -10711,15 +10802,19 @@ CNDEF Cn_Type *cn__analyze_typecheck_assignment(Cn_Ast_Node *node) {
             {
                 if (left->kind == CN_INTEGER && right->kind == CN_INTEGER) return left;
                 cn__analyze_error_illegal_binary(node, left, right, "integer assignment");
-                return NULL;
+                goto error;
             }
 
         default: 
             {
                 cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, node, CN_DC_EXPECTED_TOKEN, "Expected assignment operator.");
-                return NULL;
+                goto error;
             }
     }
+
+error:
+    CN__TRACE_ERROR
+    return NULL;
 }
 
 CNDEF Cn_Type *cn__analyze_typecheck_postfix(Cn_Ast_Node *node) {
@@ -10727,7 +10822,7 @@ CNDEF Cn_Type *cn__analyze_typecheck_postfix(Cn_Ast_Node *node) {
 
     Cn_Ast_Node *operand_node = cn_ast_as(Postfix, node)->expression;
     Cn_Type *operand = cn_analyze_typecheck_expression(operand_node);
-    if (operand == NULL) return NULL;
+    if (operand == NULL) goto error;
 
     switch (cn_ast_as(Postfix, node)->operator) {
         // x++ / x-- : modifiable lvalue of scalar type; result is the operand's type.
@@ -10736,11 +10831,11 @@ CNDEF Cn_Type *cn__analyze_typecheck_postfix(Cn_Ast_Node *node) {
             {
                 if (!cn__analyze_is_modifiable_lvalue(operand_node)) {
                     cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, node, CN_DC_ILLEGAL_TYPE, "Operand of postfix '++'/'--' is not a modifiable lvalue.");
-                    return NULL;
+                    goto error;
                 }
                 if (!cn_type_is_scalar(operand)) {
                     cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, node, CN_DC_ILLEGAL_TYPE, "Operand of postfix '++'/'--' must be of scalar type.");
-                    return NULL;
+                    goto error;
                 }
                 return operand;
             }
@@ -10748,9 +10843,13 @@ CNDEF Cn_Type *cn__analyze_typecheck_postfix(Cn_Ast_Node *node) {
         default: 
             {
                 cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, node, CN_DC_EXPECTED_TOKEN, "Expected postfix operator.");
-                return NULL;
+                goto error;
             }
     }
+
+error:
+    CN__TRACE_ERROR
+    return NULL;
 }
 
 CNDEF Cn_Type *cn_analyze_typecheck_expression(void * expression) {
@@ -10830,13 +10929,13 @@ CNDEF Cn_Type *cn_analyze_typecheck_expression(void * expression) {
 
                             if (idx == CN_BINDING_NIL_IDX) {
                                 cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, literal, CN_DC_INVALID_SYMBOL, "Primary expression identifier is not a known symbol.");
-                                return NULL;
+                                goto error;
                             }
 
                             Cn_Binding *binding = cn__tu_data->binding_list + idx;
                             if (binding->kind == CN_BINDING_TAG || binding->kind == CN_BINDING_TYPEDEF) {
                                 cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, literal, CN_DC_INVALID_SYMBOL, "Primary expression identifier is expected to be a variable name, function name, or enum name.");
-                                return NULL;
+                                goto error;
                             }
 
                             result = binding->type;
@@ -10861,9 +10960,14 @@ CNDEF Cn_Type *cn_analyze_typecheck_expression(void * expression) {
                             result = cn__ast_add_type_if_not(&const_char_ptr);
                             break;
                         }
+                    case CN_AST_CHAR:
+                        {   
+                            result = cn__ast_add_type_if_not((Cn_Type *)&CN_TYPE_CHAR);
+                            break;
+                        }
                     default:
                         cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, node, CN_DC_EXPECTED_EXPRESSION, "Expected primary expression to typecheck.");
-                        break;
+                        goto error;
                 }
 
                 cn_ast_as(Primary, node)->type = result;
@@ -10871,10 +10975,14 @@ CNDEF Cn_Type *cn_analyze_typecheck_expression(void * expression) {
             }
         default:
             cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, node, CN_DC_EXPECTED_EXPRESSION, "Expected expression to typecheck.");
-            break;
+            goto error;
     }
-    
+
     return result;
+
+error:
+    CN__TRACE_ERROR
+    return NULL;
 }
 
 CNDEF Cn_Any cn__analyze_evaluate_binary(Cn_Ast_Node *node, void *buffer) {
@@ -11427,7 +11535,7 @@ CNDEF Cn_Type *cn__analyze_typecheck_designator(Cn_Ast_Designator *designator, C
     if (!(type->flags & CN_TYPE_COMPLETE)) {
         Cn_String type_str = cn_type_stringify(CN_STR_BUFFER_EMPTY(128), type, (Cn_String) {0});
         cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, designator, CN_DC_ILLEGAL_TYPE, "Designator on incomplete type %.*s.", CN_STR_UNPACK(type_str));
-        return NULL;
+        goto error;
     }
 
     switch (type->kind) {
@@ -11435,61 +11543,61 @@ CNDEF Cn_Type *cn__analyze_typecheck_designator(Cn_Ast_Designator *designator, C
             {
                 if (designator->identifier != NULL) {
                     cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, designator, CN_DC_ILLEGAL_TYPE, "Identifier designator used on array type.");
-                    return NULL;
+                    goto error;
                 }
 
                 
                 Cn_Type *expression_type = cn_analyze_typecheck_expression(designator->expression);
-                if (expression_type == NULL) return NULL;
+                if (expression_type == NULL) goto error;
                 
                 uint8_t buffer[CN_TYPE_SCALAR_MAX_SIZE];
                 Cn_Any any = cn_analyze_evaluate_expression(designator->expression, buffer);
 
                 if (cn_any_is_empty(any)) {
                     cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, designator->expression, CN_DC_INVALID_CONSTANT_EXPRESSION, "Invalid constant expression in array designator.");
-                    return NULL;
+                    goto error;
                 }
 
                 if (any.type->kind != CN_INTEGER) {
                     cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, designator->expression, CN_DC_INVALID_CONSTANT_EXPRESSION, "Non integer result from constant expression in array designator.");
-                    return NULL;
+                    goto error;
                 }
 
                 int64_t index = cn_any_read_int(any);
 
                 if (index >= type->array.length) {
                     cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, designator->expression, CN_DC_INVALID_CONSTANT_EXPRESSION, "Out of bound access from constant expression in array designator, at index %ld, for array length %ld.", index, type->array.length);
-                    return NULL;
+                    goto error;
                 }
                 
                 if (ordinal != NULL) *ordinal = index;
                 
                 if (designator->expression_range_end != NULL) {
                     expression_type = cn_analyze_typecheck_expression(designator->expression_range_end);
-                    if (expression_type == NULL) return NULL;
+                    if (expression_type == NULL) goto error;
 
                     any = cn_analyze_evaluate_expression(designator->expression_range_end, buffer);
 
                     if (cn_any_is_empty(any)) {
                         cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, designator->expression_range_end, CN_DC_INVALID_CONSTANT_EXPRESSION, "Invalid constant expression in array designator.");
-                        return NULL;
+                        goto error;
                     }
 
                     if (any.type->kind != CN_INTEGER) {
                         cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, designator->expression_range_end, CN_DC_INVALID_CONSTANT_EXPRESSION, "Non integer result from constant expression in array designator.");
-                        return NULL;
+                        goto error;
                     }
 
                     int64_t end_index = cn_any_read_int(any);
 
                     if (end_index >= type->array.length) {
                         cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, designator->expression_range_end, CN_DC_INVALID_CONSTANT_EXPRESSION, "Out of bound access from constant expression in array designator, at index %ld, for array length %ld.", end_index, type->array.length);
-                        return NULL;
+                        goto error;
                     }
 
                     if (end_index < index) {
                         cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, designator->expression_range_end, CN_DC_INVALID_CONSTANT_EXPRESSION, "Invalid range in array designator, end index %ld is less then start index %ld.", end_index, index);
-                        return NULL;
+                        goto error;
                     }
 
                     if (ordinal != NULL) *ordinal = end_index;
@@ -11501,7 +11609,7 @@ CNDEF Cn_Type *cn__analyze_typecheck_designator(Cn_Ast_Designator *designator, C
             {
                 if (designator->expression != NULL) {
                     cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, designator, CN_DC_ILLEGAL_TYPE, "Array designator used on struct type.");
-                    return NULL;
+                    goto error;
                 }
 
                 Cn_Ast_Identifier *identifier = designator->identifier;
@@ -11513,13 +11621,13 @@ CNDEF Cn_Type *cn__analyze_typecheck_designator(Cn_Ast_Designator *designator, C
                 }
 
                 cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, designator, CN_DC_ILLEGAL_TYPE, "No member %.*s in struct specified by identifier designator.", CN_STR_UNPACK(identifier->name));
-                return NULL;
+                goto error;
             }
         case CN_UNION: 
             {
                 if (designator->expression != NULL) {
                     cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, designator, CN_DC_ILLEGAL_TYPE, "Array designator used on union type.");
-                    return NULL;
+                    goto error;
                 }
 
                 Cn_Ast_Identifier *identifier = designator->identifier;
@@ -11531,12 +11639,16 @@ CNDEF Cn_Type *cn__analyze_typecheck_designator(Cn_Ast_Designator *designator, C
                 }
 
                 cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, designator, CN_DC_ILLEGAL_TYPE, "No member %.*s in union specified by identifier designator.", CN_STR_UNPACK(identifier->name));
-                return NULL;
+                goto error;
             }
         default:
             cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, designator, CN_DC_ILLEGAL_TYPE, "Designator used on non-compound type.");
-            return NULL;
+            goto error;
     }
+
+error:
+    CN__TRACE_ERROR
+    return NULL;
 }
 
 CNDEF bool cn__analyze_typecheck_designation(Cn_Ast_Designation *designation, Cn_Type *type, int64_t *ordinal) {
@@ -11555,7 +11667,7 @@ CNDEF bool cn__analyze_typecheck_designation(Cn_Ast_Designation *designation, Cn
         if (!(type->flags & CN_TYPE_COMPLETE)) {
             Cn_String type_str = cn_type_stringify(CN_STR_BUFFER_EMPTY(128), type, (Cn_String) {0});
             cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, designation, CN_DC_ILLEGAL_TYPE, "Designation on incomplete type %.*s.", CN_STR_UNPACK(type_str));
-            return false;
+            goto error;
         }
         
         switch (type->kind) {
@@ -11565,7 +11677,7 @@ CNDEF bool cn__analyze_typecheck_designation(Cn_Ast_Designation *designation, Cn
             case CN_STRUCT:
                 if (*ordinal >= type->struct_t.members_length) {
                     cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, designation, CN_DC_ILLEGAL_TYPE, "Out of bounds designation access on struct.");
-                    return false;
+                    goto error;
                 } 
                 type = type->struct_t.members[*ordinal].type;
                 break;
@@ -11573,7 +11685,7 @@ CNDEF bool cn__analyze_typecheck_designation(Cn_Ast_Designation *designation, Cn
             case CN_UNION: 
                 if (*ordinal >= type->union_t.members_length) {
                     cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, designation, CN_DC_ILLEGAL_TYPE, "Out of bounds designation access on union.");
-                    return false;
+                    goto error;
                 } 
                 type = type->union_t.members[*ordinal].type;
                 break;
@@ -11583,16 +11695,24 @@ CNDEF bool cn__analyze_typecheck_designation(Cn_Ast_Designation *designation, Cn
     }
 
     return cn_analyze_typecheck_initializer(designation->initializer, type);
+
+error:
+    CN__TRACE_ERROR
+    return false;
 }
 
 CNDEF bool cn_analyze_typecheck_designations(Cn_Ast_Nodes designations, Cn_Type *type) {
     int64_t ordinal = 0;
     for (int64_t i = 0; i < designations.length; i++) {
-        if (!cn__analyze_typecheck_designation(cn_ast_as(Designation, designations.ptrs[i]), type, &ordinal)) return false;
+        if (!cn__analyze_typecheck_designation(cn_ast_as(Designation, designations.ptrs[i]), type, &ordinal)) goto error;
         ordinal++;
     }
 
     return true;
+
+error:
+    CN__TRACE_ERROR
+    return false;
 }
 
 CNDEF bool cn_analyze_typecheck_initializer(void *initializer_node, Cn_Type *type) {
@@ -11602,6 +11722,7 @@ CNDEF bool cn_analyze_typecheck_initializer(void *initializer_node, Cn_Type *typ
 
     if (initializer->expression != NULL) {
         Cn_Type *expression_type = cn_analyze_typecheck_expression(initializer->expression);
+        if (expression_type == NULL) goto error;
 
         // Simple assignment check, same as in assignment expression typechecking.
         if (!cn_type_is_assignable(type, expression_type)) {
@@ -11610,7 +11731,7 @@ CNDEF bool cn_analyze_typecheck_initializer(void *initializer_node, Cn_Type *typ
                 Cn_String left_str  = cn_type_stringify(CN_STR_BUFFER_EMPTY(128), type, (Cn_String) {0});
                 Cn_String right_str = cn_type_stringify(CN_STR_BUFFER_EMPTY(128), expression_type, (Cn_String) {0});
                 cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, initializer->expression, CN_DC_ILLEGAL_TYPE, "Cannot assign %.*s to %.*s in initializer.", CN_STR_UNPACK(right_str), CN_STR_UNPACK(left_str));
-                return false;
+                goto error;
             }
         }
 
@@ -11619,6 +11740,10 @@ CNDEF bool cn_analyze_typecheck_initializer(void *initializer_node, Cn_Type *typ
         
     // Compound initializer case:
     return cn_analyze_typecheck_designations(initializer->designations, type);
+
+error:
+    CN__TRACE_ERROR
+    return false;
 }
 
 /**
@@ -12376,6 +12501,10 @@ CNDEF void cn__emit_integer(Cn_Emitter *e, Cn_Ast_Integer *node) {
 }
 
 CNDEF void cn__emit_flt(Cn_Emitter *e, Cn_Ast_Float *node) {
+    cn__emit_str(e, node->value);
+}
+
+CNDEF void cn__emit_character(Cn_Emitter *e, Cn_Ast_Char *node) {
     cn__emit_str(e, node->value);
 }
 
@@ -13881,6 +14010,9 @@ CNDEF Cn_Ast_Node *cn_parse_expression_leaf(Cn_Lexer *lexer, Cn_Parse_Expression
         case CN_TOKEN_FLOAT_VALUE:
             literal = cn_ast_node(cn_parse_float(lexer));
             break;
+        case CN_TOKEN_CHAR_VALUE:
+            literal = cn_ast_node(cn_parse_character(lexer));
+            break;
         case CN_TOKEN_STRING:
             literal = cn_ast_node(cn_parse_string(lexer));
             break;
@@ -14385,6 +14517,29 @@ CNDEF Cn_Ast_Float *cn_parse_float(Cn_Lexer *lexer) {
     node.value = cn_source_to_str(&cn_lexer_token(lexer).src);
 
     cn_lexer_next_token(lexer);
+
+    return cn_ast_new(node);
+
+error:
+    CN__TRACE_ERROR
+    *lexer = original_state;
+    return NULL;
+}
+
+CNDEF Cn_Ast_Char *cn_parse_character(Cn_Lexer *lexer) {
+    Cn_Lexer original_state = *lexer;
+
+    Cn_Ast_Char node = { .kind = CN_AST_CHAR, .loc = cn_lexer_token(lexer).loc, .src = cn_lexer_token(lexer).src };
+
+    if (!cn_lexer_expect(lexer, CN_TOKEN_CHAR_VALUE)) {
+        cn_diagnostic_src(CN_DIAGNOSTIC_ERROR, &cn_lexer_token(lexer).loc, &cn_lexer_token(lexer).src, CN_DC_EXPECTED_TOKEN, "Expected char token.");
+        goto error;
+    }
+
+    node.value = cn_source_to_str(&cn_lexer_token(lexer).src);
+
+    cn_lexer_next_token(lexer);
+
 
     return cn_ast_new(node);
 
