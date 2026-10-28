@@ -1335,6 +1335,9 @@ typedef enum : uint8_t {
     CN_TYPE_QUALIFIED_RESTRICT = 0x4,
     CN_TYPE_QUALIFIED_VOLATILE = 0x8,
     CN_TYPE_QUALIFIED_ATOMIC   = 0x10,
+
+    CN_TYPE_ARRAY_VARIABLE     = 0x20,
+    CN_TYPE_ARRAY_UNSPECIFIED  = 0x40,
 } Cn_Type_Flags;
 
 typedef enum : uint8_t {
@@ -2845,11 +2848,35 @@ extern Cn_Message_Handler *cn_message_handler;
  */
 
 /**
- * Analyzes already constructed ast nodes as declaration.
+ * Flags to specify details on how certain analyze functions should work.
+ */
+typedef enum {
+    CN_APPLY_PARAMETER_ADJUSTMENT = 0x1,
+} Cn_Analyze_Flags;
+
+/**
+ * Struct to store optionals passed to `cn_analyze_declaration`.
+ */
+typedef struct {
+    void *declarator;
+    void *initializer;
+    Cn_Analyze_Flags flags;
+} Cn_Analyze_Declaration_Opt;
+
+/**
+ * Analyzes already constructed specifiers, declarator and initializer, as one binding.
+ *
+ * This function modifies the global state, by recording new binding from the given ast nodes.
+ * Initializer can be passed as NULL if binding doesn't contain definition.
+ * Also declarator itself can be passed as NULL, in that case, only declaration specifiers will be checked.
+ *
+ * This function does typecheck, can error if the certain binding is illegal in the current context, 
+ * or if there is any type mistaching, or undefined names.
  *
  * RETURNS: True on success, false if any errors occured.
  */
-CNDEF bool cn_analyze_declaration(void * declaration_specifiers, Cn_Ast_Nodes init_declarators);
+#define cn_analyze_declaration(declaration_specifiers, ...) cn__analyze_declaration_opt(declaration_specifiers, (Cn_Analyze_Declaration_Opt) { __VA_ARGS__ })
+CNDEF bool cn__analyze_declaration_opt(void *declaration_specifiers, Cn_Analyze_Declaration_Opt opt);
 
 /**
  * Analyzes already constructed ast nodes as function definition.
@@ -2858,6 +2885,7 @@ CNDEF bool cn_analyze_declaration(void * declaration_specifiers, Cn_Ast_Nodes in
  *
  * RETURNS: True on success, false if any errors occured.
  */
+[[deprecated("This function is deprecated, replace usage with cn_analyze_declarator instead.")]]
 CNDEF bool cn_analyze_function(void * declaration_specifiers, void * declarator, Cn_Binding_Idx *function_binding_idx);
 
 /**
@@ -2865,19 +2893,19 @@ CNDEF bool cn_analyze_function(void * declaration_specifiers, void * declarator,
  * The specifier gives the base type, the qualifiers are applied to it,
  * and the declarator wraps it in pointer, array or function layers.
  *
- * IMPORTNAT: declarator can be NIL, if no declarator present at all.
+ * IMPORTNAT: declarator can be NULL, if no declarator present at all.
  * In that case the type is composed only from type specifier and qualifiers.
  *
  * RETURNS: The resolved type, or NULL on error.
  */
-CNDEF Cn_Type *cn_analyze_to_type(Cn_Ast_Qualifier_Flags flags, void *type_specifier, void *declarator);
+CNDEF Cn_Type *cn_analyze_to_type(Cn_Ast_Qualifier_Flags qualifier, void *type_specifier, void *declarator, Cn_Analyze_Flags flags);
 
 /**
  * Recursive function that type checks expression 
  * by traversing ast nodes from bottom down,
  * and assigning appropriate type to every node.
  *
- * EXPECTS: Expression idx != 0.
+ * EXPECTS: Expression != NULL.
  *
  * RETURNS: NULL if error occured, resulting type of an expression on success.
  */
@@ -2889,7 +2917,8 @@ CNDEF Cn_Type *cn_analyze_typecheck_expression(void *expression);
  * NOTE: Size of the buffer can be determined 
  * from the resulting type of an expression.
  *
- * EXPECTS: Expression idx != 0 and expression to be typechecked.
+ * EXPECTS: Expression to be typechecked, or it to be NULL.
+ * If expression is NULL, then NIL is returned.
  *
  * RETURNS: NIL if expression wasn't typechecked or if expression 
  * cannot be evaluated at compile time, valid any struct on success.
@@ -3525,7 +3554,7 @@ CNDEF Cn_Ast_Node *cn_parse_expression_leaf(Cn_Lexer *lexer, Cn_Parse_Expression
  *          : init_declarator (',' init_declarator)*
  *          ;
  */
-CNDEF Cn_Ast_Nodes cn_parse_finish_init_declarators(Cn_Lexer *lexer, void * declarator, bool *ok);
+CNDEF Cn_Ast_Nodes cn_parse_finish_init_declarators(Cn_Lexer *lexer, void *declarator, bool *ok, void *declaration_specifiers);
 
 /**
  * Parses code starting of with lexer current token as init declarator list.
@@ -3534,7 +3563,7 @@ CNDEF Cn_Ast_Nodes cn_parse_finish_init_declarators(Cn_Lexer *lexer, void * decl
  *          : init_declarator (',' init_declarator)*
  *          ;
  */
-CNDEF Cn_Ast_Nodes cn_parse_init_declarators(Cn_Lexer *lexer, bool *ok);
+CNDEF Cn_Ast_Nodes cn_parse_init_declarators(Cn_Lexer *lexer, bool *ok, void *declaration_specifiers);
 
 /**
  * Finishes parsing code starting of with lexer current token 
@@ -3544,7 +3573,7 @@ CNDEF Cn_Ast_Nodes cn_parse_init_declarators(Cn_Lexer *lexer, bool *ok);
  *          : declarator gnu_attribute_specifiers gnu_asm_label? ('=' initializer)?
  *          ;
  */
-CNDEF Cn_Ast_Init_Declarator *cn_parse_finish_init_declarator(Cn_Lexer *lexer, Cn_Ast_Declarator *declarator);
+CNDEF Cn_Ast_Init_Declarator *cn_parse_finish_init_declarator(Cn_Lexer *lexer, Cn_Ast_Declarator *declarator, void *declaration_specifiers);
 
 /**
  * Parses code starting of with lexer current token as init declarator.
@@ -3553,7 +3582,7 @@ CNDEF Cn_Ast_Init_Declarator *cn_parse_finish_init_declarator(Cn_Lexer *lexer, C
  *          : declarator gnu_attribute_specifiers gnu_asm_label? ('=' initializer)?
  *          ;
  */
-CNDEF Cn_Ast_Init_Declarator *cn_parse_init_declarator(Cn_Lexer *lexer);
+CNDEF Cn_Ast_Init_Declarator *cn_parse_init_declarator(Cn_Lexer *lexer, void *declaration_specifiers);
 
 /**
  * Parses code starting of with lexer current token as initializer.
@@ -6948,7 +6977,7 @@ CNDEF bool cn_type_equals(const Cn_Type *a, const Cn_Type *b) {
 
     if (a->kind != b->kind) return false;
     if (a->flags != b->flags) return false;
-    if (a->size != b->size && a->align != b->align) return false;
+    if (a->size != b->size || a->align != b->align) return false;
 
     switch (a->kind) {
         case CN_INTEGER: {
@@ -6987,8 +7016,10 @@ CNDEF bool cn_type_equals(const Cn_Type *a, const Cn_Type *b) {
             }
         } break;
         case CN_ENUM:
+            CN_TODO("Implement structural equality for enum type.");
             break;
         case CN_UNION:
+            CN_TODO("Implement structural equality for union type.");
             break;
         case CN_QUALIFIED: {
             const Cn_Type_Qualified *qa = (const Cn_Type_Qualified *)a;
@@ -7039,8 +7070,10 @@ CNDEF uint64_t cn_type_hash(const Cn_Type *type) {
             }
         } break;
         case CN_ENUM:
+            CN_TODO("Implement hash for enum type.");
             break;
         case CN_UNION:
+            CN_TODO("Implement union for enum type.");
             break;
         case CN_QUALIFIED: {
             const Cn_Type_Qualified *tq = (const Cn_Type_Qualified *)type;
@@ -7147,10 +7180,15 @@ CNDEF void cn__type_stringify(const Cn_Type *type, Cn_String_Builder *left, Cn_S
             // parentheses for an array of function pointers ("int (*fps[3])(int)").
             Cn_String_Builder suffix = cn_sb_make(32);
 
-            if (ta->length >= 0)
-                cn_sb_append_format(&suffix, "[%lld]", ta->length);
-            else
+            if (!(ta->flags & CN_TYPE_COMPLETE)) {
                 cn_sb_append_str(&suffix, CN_STR_LIT("[]"));
+            } else if (ta->flags & CN_TYPE_ARRAY_UNSPECIFIED) {
+                cn_sb_append_str(&suffix, CN_STR_LIT("[*]"));
+            } else if (ta->flags & CN_TYPE_ARRAY_VARIABLE) {
+                cn_sb_append_str(&suffix, CN_STR_LIT("[]"));    // Have a better way to stringify VLA?
+            } else {
+                cn_sb_append_format(&suffix, "[%lld]", ta->length);
+            }
 
             cn_sb_prepend_str(right, cn_sb_to_str(&suffix));
 
@@ -7336,14 +7374,105 @@ CNDEF bool cn_type_is_assignable(const Cn_Type *to, const Cn_Type *from) {
     return false;
 }
 
+/**
+ * Helper function, collects qualifier flags across the whole qualified chain,
+ * since qualifiers can stack through typedef.
+ *
+ * RETURNS: Union of all qualifier flags, without CN_TYPE_COMPLETE.
+ */
+CNDEF Cn_Type_Flags cn__type_qualifier_flags(const Cn_Type *type) {
+    Cn_Type_Flags flags = 0;
+    while (type->kind == CN_QUALIFIED) {
+        flags |= type->flags;
+        type = ((const Cn_Type_Qualified *)type)->base_type;
+    }
+    return flags & ~CN_TYPE_COMPLETE;
+}
+
+/**
+ * Helper function, compares two parameter types the way they would be adjusted
+ * in a prototype: top-level qualifiers are dropped, arrays decay to pointers to
+ * their element type and functions decay to pointers to function.
+ *
+ * RETURNS: True if adjusted parameter types are compatible.
+ */
+CNDEF bool cn__type_is_compatible_param(const Cn_Type *a, const Cn_Type *b) {
+    // TODO: This function might be unnecessary. C does perfom decaying of arrays to pointers, and functions to pointers to the functions.
+    // But I wonder if actually enforcing stricter rules that are only written in `cn_type_is_compatible` is actually better.
+    // Or making array and pointer be compatible by default...
+
+    a = cn_type_unqualified(a);
+    b = cn_type_unqualified(b);
+
+    // Adjusting to the pointed-to type, so 'int a[]' and 'int *a' compare equal.
+    bool a_is_ptr = a->kind == CN_POINTER || a->kind == CN_ARRAY || a->kind == CN_FUNCTION;
+    bool b_is_ptr = b->kind == CN_POINTER || b->kind == CN_ARRAY || b->kind == CN_FUNCTION;
+    if (a_is_ptr && b_is_ptr) {
+        const Cn_Type *a_to = a->kind == CN_POINTER ? a->pointer.ptr_to : a->kind == CN_ARRAY ? a->array.element_type : a;
+        const Cn_Type *b_to = b->kind == CN_POINTER ? b->pointer.ptr_to : b->kind == CN_ARRAY ? b->array.element_type : b;
+        return cn_type_is_compatible(a_to, b_to);
+    }
+
+    return cn_type_is_compatible(a, b);
+}
+
 CNDEF bool cn_type_is_compatible(const Cn_Type *a, const Cn_Type *b) {
-    return a == b;
+    if (a == b) return true;
+
+    // If either type is opaque, then trust those are compatible.
+    if (a->kind == CN_OPAQUE || b->kind == CN_OPAQUE) return true;
+
+    // Qualifiers must match exactly, then compare unqualified types.
+    if (a->kind == CN_QUALIFIED || b->kind == CN_QUALIFIED) {
+        if (cn__type_qualifier_flags(a) != cn__type_qualifier_flags(b)) return false;
+        return cn_type_is_compatible(cn_type_unqualified(a), cn_type_unqualified(b));
+    }
+
+    if (a->kind != b->kind) return false;
+
+    switch (a->kind) {
+        case CN_POINTER:
+            return cn_type_is_compatible(a->pointer.ptr_to, b->pointer.ptr_to);
+
+        case CN_ARRAY: {
+            if (!cn_type_is_compatible(a->array.element_type, b->array.element_type)) return false;
+            // Incomplete array is compatible with any length.
+            // TODO: VLA is also compatible with any length, once it is represented.
+            if (!(a->flags & CN_TYPE_COMPLETE) || !(b->flags & CN_TYPE_COMPLETE)) return true;
+            return a->array.length == b->array.length;
+        }
+
+        case CN_FUNCTION: {
+            const Cn_Type_Function *fa = &a->function;
+            const Cn_Type_Function *fb = &b->function;
+            if (fa->is_variadic != fb->is_variadic) return false;
+            if (fa->params_length != fb->params_length) return false;
+            if (!cn_type_is_compatible(fa->return_type, fb->return_type)) return false;
+            for (int64_t i = 0; i < fa->params_length; i++) {
+                if (!cn__type_is_compatible_param(fa->params[i].type, fb->params[i].type)) return false;
+            }
+            return true;
+        }
+
+        // Tagged types share identity, so recursion never descends into members,
+        // which also keeps self-referential structs from looping.
+        // If you ask: "why not compare tag names here?" we can and it would be correct.
+        // But if tag names are equal that implies that a == b is true above.
+        // Because tag types are uniquenly stored by, well, tags. 
+        // So doing string comparising here is redundant.
+        case CN_STRUCT:
+        case CN_UNION:
+        case CN_ENUM:
+            return false;
+
+        default:
+            // Scalars and void, structural equality.
+            return cn_type_equals(a, b);
+    }
 }
 
 CNDEF bool cn_type_is_compatible_no_qualifiers(const Cn_Type *a, const Cn_Type *b) {
-    a = cn_type_unqualified(a);
-    b = cn_type_unqualified(b);
-    return a == b;
+    return cn_type_is_compatible(cn_type_unqualified(a), cn_type_unqualified(b));
 }
 
 CNDEF Cn_Type *cn_type_greatest_arithmetic_rank(const Cn_Type *a, const Cn_Type *b) {
@@ -9005,7 +9134,7 @@ CNDEF bool cn__binding_conflict(Cn_Binding *a, Cn_Binding *b) {
         return true;
     }
     // Confliciting types.
-    if (a->type != b->type) {
+    if (!cn_type_is_compatible(a->type, b->type)) {
         Cn_String current_t = cn_type_stringify(CN_STR_BUFFER_EMPTY(128), a->type, (Cn_String) {0});
         Cn_String binding_t = cn_type_stringify(CN_STR_BUFFER_EMPTY(128), b->type, (Cn_String) {0});
         cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, b->src, CN_DC_ILLEGAL_BINDING, "'%.*s' redeclared with a conflicting type, from %.*s to %.*s.", CN_STR_UNPACK(b->name), CN_STR_UNPACK(current_t), CN_STR_UNPACK(binding_t));
@@ -9341,83 +9470,160 @@ Cn_Message_Handler *cn_message_handler = NULL;
  * ============================================
  */
 
-CNDEF bool cn_analyze_declaration(void * declaration_specifiers, Cn_Ast_Nodes init_declarators) {
-    Cn_Ast_Declaration_Specifiers *decl_spec = declaration_specifiers;
 
-    // No declarators, then just analzing declaration specifiers.
-    if (init_declarators.length == 0) {
-        Cn_Type *type = cn_analyze_to_type(decl_spec->qualifiers, decl_spec->type_specifier, NULL);
-        return type != NULL;
+CNDEF bool cn__analyze_declaration_opt(void *declaration_specifiers, Cn_Analyze_Declaration_Opt opt) {
+    Cn_Ast_Declaration_Specifiers *decl_spec = declaration_specifiers;
+    Cn_Ast_Declarator *decl = opt.declarator;
+
+    // No declarator, then just analyzing declaration specifiers.
+    if (decl == NULL) {
+        return cn_analyze_to_type(decl_spec->qualifiers, decl_spec->type_specifier, NULL, 0) != NULL;
     }
 
-    // Iterating over declarators.
-    for (int64_t i = 0; i < init_declarators.length; i++) {
-        Cn_Ast_Init_Declarator *init_decl = cn_ast_as(Init_Declarator, init_declarators.ptrs[i]);
+    // Getting type.
+    Cn_Type *type = cn_analyze_to_type(decl_spec->qualifiers, decl_spec->type_specifier, decl, 0);
+    if (type == NULL) return false;
 
-        Cn_Type *type = cn_analyze_to_type(decl_spec->qualifiers, decl_spec->type_specifier, init_decl->declarator);
-        if (type == NULL) return false;
+    // Getting identifier at the end of declarator chain.
+    Cn_Ast_Node *identifier;
+    cn_get_declarator_info(decl, &identifier);
 
-        // Adding declarator to variable or typedef binding, if it is not abstract.
-        Cn_Ast_Node *identifier;
-        cn_get_declarator_info(init_decl->declarator, &identifier);
+    if (identifier->kind == CN_AST_IDENTIFIER) {
+        Cn_String name = cn_ast_as(Identifier, identifier)->name;
 
-        if (((Cn_Ast_Node *)identifier)->kind == CN_AST_IDENTIFIER) {
-            Cn_String name = ((Cn_Ast_Identifier *)identifier)->name;
+        // Function declaration case.
+        if (type->kind == CN_FUNCTION) {
+            Cn_Ast_Node *parameter_type_list;
+            cn_get_function_declarator_info(
+                    decl,
+                    &parameter_type_list,
+                    &identifier
+                    );
 
-            // Function declaration case.
-            if (type->kind == CN_FUNCTION) {
-                Cn_Ast_Node *parameter_type_list;
-                cn_get_function_declarator_info(
-                        init_decl->declarator,
-                        &parameter_type_list,
-                        &identifier
-                        );
+            Cn_Ast_Nodes *parameter_declarations = NULL;
+            if (parameter_type_list != NULL)
+                parameter_declarations = &((Cn_Ast_Direct_Declarator_Function *)parameter_type_list)->parameter_declarations;
 
-                Cn_Ast_Nodes *parameter_declarations = NULL;
-                if (parameter_type_list != NULL)
-                    parameter_declarations = &((Cn_Ast_Direct_Declarator_Function *)parameter_type_list)->parameter_declarations;
-
-                if (cn_binding_declare_function(
-                            name,
-                            identifier,
-                            decl_spec->storage_specifiers,
-                            decl_spec->function_specifiers,
-                            type,
-                            parameter_declarations,
-                            false
-                            ) == CN_BINDING_NIL_IDX) return false;
-
-                continue;
-            }
-
-            // Typedef declaration case.
-            if (decl_spec->storage_specifiers & CN_AST_STORAGE_SPECIFIER_TYPEDEF) {
-                if (cn_binding_declare_typedef(name, identifier, type) == CN_BINDING_NIL_IDX) return false;
-
-                continue;
-            }
-
-            // Variable declaration case.
-            bool is_definition = init_decl->initializer != NULL;
-
-            if (cn_binding_declare_variable(
+            if (cn_binding_declare_function(
                         name,
                         identifier,
                         decl_spec->storage_specifiers,
+                        decl_spec->function_specifiers,
                         type,
-                        is_definition
+                        parameter_declarations,
+                        false
                         ) == CN_BINDING_NIL_IDX) return false;
 
-
-            // Analyze initializer here (only happens in variable declaration case).
-            if (init_decl->initializer != NULL) {
-                if (!cn_analyze_typecheck_initializer(init_decl->initializer, type)) return false;
-            }
+            return true;
         }
+
+        // Typedef declaration case.
+        if (decl_spec->storage_specifiers & CN_AST_STORAGE_SPECIFIER_TYPEDEF) {
+            if (cn_binding_declare_typedef(name, identifier, type) == CN_BINDING_NIL_IDX) return false;
+
+            return true;
+        }
+
+        // Variable declaration case.
+        bool is_definition = opt.initializer != NULL;
+
+        if (cn_binding_declare_variable(
+                    name,
+                    identifier,
+                    decl_spec->storage_specifiers,
+                    type,
+                    is_definition
+                    ) == CN_BINDING_NIL_IDX) return false;
+
+
+        // Analyze initializer here (only happens in variable declaration case).
+        if (opt.initializer != NULL) {
+            if (!cn_analyze_typecheck_initializer(opt.initializer, type)) return false;
+        }
+
     }
 
     return true;
 }
+
+// CNDEF bool cn_analyze_declaration(void *declaration_specifiers, Cn_Ast_Nodes init_declarators) {
+//     Cn_Ast_Declaration_Specifiers *decl_spec = declaration_specifiers;
+// 
+//     // No declarators, then just analyzing declaration specifiers.
+//     if (init_declarators.length == 0) {
+//         Cn_Type *type = cn_analyze_to_type(decl_spec->qualifiers, decl_spec->type_specifier, NULL);
+//         return type != NULL;
+//     }
+// 
+//     // Iterating over declarators.
+//     for (int64_t i = 0; i < init_declarators.length; i++) {
+//         Cn_Ast_Init_Declarator *init_decl = cn_ast_as(Init_Declarator, init_declarators.ptrs[i]);
+// 
+//         Cn_Type *type = cn_analyze_to_type(decl_spec->qualifiers, decl_spec->type_specifier, init_decl->declarator);
+//         if (type == NULL) return false;
+// 
+//         // Adding declarator to variable or typedef binding, if it is not abstract.
+//         Cn_Ast_Node *identifier;
+//         cn_get_declarator_info(init_decl->declarator, &identifier);
+// 
+//         if (((Cn_Ast_Node *)identifier)->kind == CN_AST_IDENTIFIER) {
+//             Cn_String name = ((Cn_Ast_Identifier *)identifier)->name;
+// 
+//             // Function declaration case.
+//             if (type->kind == CN_FUNCTION) {
+//                 Cn_Ast_Node *parameter_type_list;
+//                 cn_get_function_declarator_info(
+//                         init_decl->declarator,
+//                         &parameter_type_list,
+//                         &identifier
+//                         );
+// 
+//                 Cn_Ast_Nodes *parameter_declarations = NULL;
+//                 if (parameter_type_list != NULL)
+//                     parameter_declarations = &((Cn_Ast_Direct_Declarator_Function *)parameter_type_list)->parameter_declarations;
+// 
+//                 if (cn_binding_declare_function(
+//                             name,
+//                             identifier,
+//                             decl_spec->storage_specifiers,
+//                             decl_spec->function_specifiers,
+//                             type,
+//                             parameter_declarations,
+//                             false
+//                             ) == CN_BINDING_NIL_IDX) return false;
+// 
+//                 continue;
+//             }
+// 
+//             // Typedef declaration case.
+//             if (decl_spec->storage_specifiers & CN_AST_STORAGE_SPECIFIER_TYPEDEF) {
+//                 if (cn_binding_declare_typedef(name, identifier, type) == CN_BINDING_NIL_IDX) return false;
+// 
+//                 continue;
+//             }
+// 
+//             // Variable declaration case.
+//             bool is_definition = init_decl->initializer != NULL;
+// 
+//             if (cn_binding_declare_variable(
+//                         name,
+//                         identifier,
+//                         decl_spec->storage_specifiers,
+//                         type,
+//                         is_definition
+//                         ) == CN_BINDING_NIL_IDX) return false;
+// 
+// 
+//             // Analyze initializer here (only happens in variable declaration case).
+//             if (init_decl->initializer != NULL) {
+//                 if (!cn_analyze_typecheck_initializer(init_decl->initializer, type)) return false;
+//             }
+//         }
+//     }
+// 
+//     return true;
+// }
+
 
 CNDEF bool cn_analyze_function(void * declaration_specifiers, void * declarator, Cn_Binding_Idx *function_binding_idx) {
     Cn_Ast_Declaration_Specifiers *decl_spec = declaration_specifiers;
@@ -9425,7 +9631,8 @@ CNDEF bool cn_analyze_function(void * declaration_specifiers, void * declarator,
     Cn_Type *type = cn_analyze_to_type(
             decl_spec->qualifiers, 
             decl_spec->type_specifier, 
-            declarator
+            declarator,
+            0
             );
     if (type == NULL) return false;
 
@@ -9554,7 +9761,7 @@ CNDEF Cn_Type *cn__analyze_type_from_gnu_typeof(Cn_Ast_Node *ts) {
     if (typeof_child->kind == CN_AST_TYPE_NAME) {
         Cn_Ast_Type_Name *tn = cn_ast_as(Type_Name, typeof_spec->target);
         Cn_Ast_Specifier_Qualifier *sq = tn->specifier_qualifier;
-        result = cn_analyze_to_type(sq->qualifiers, sq->type_specifier, tn->abstract_declarator);
+        result = cn_analyze_to_type(sq->qualifiers, sq->type_specifier, tn->abstract_declarator, 0);
     } else {
         result = cn_get_expression_type(typeof_spec->target);
     }
@@ -9607,7 +9814,7 @@ CNDEF Cn_Type *cn__analyze_type_from_struct(Cn_Ast_Node *ts) {
  
             for (int64_t d = 0; d < md->member_declarators.length; d++) {
                 Cn_Ast_Member_Declarator *decl = cn_ast_as(Member_Declarator, md->member_declarators.ptrs[d]);
-                Cn_Type *member_type = cn_analyze_to_type(sq->qualifiers, sq->type_specifier, decl->declarator);
+                Cn_Type *member_type = cn_analyze_to_type(sq->qualifiers, sq->type_specifier, decl->declarator, 0);
  
                 if (!(member_type->flags & CN_TYPE_COMPLETE)) {
                     cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, md->member_declarators.ptrs[d], CN_DC_INCOMPLETE_TYPE, "Cannot have incomplete member type in struct definition.");
@@ -9683,7 +9890,7 @@ CNDEF Cn_Type *cn__analyze_type_from_union(Cn_Ast_Node *ts) {
  
             for (int64_t d = 0; d < md->member_declarators.length; d++) {
                 Cn_Ast_Member_Declarator *decl = cn_ast_as(Member_Declarator, md->member_declarators.ptrs[d]);
-                Cn_Type *member_type = cn_analyze_to_type(sq->qualifiers, sq->type_specifier, decl->declarator);
+                Cn_Type *member_type = cn_analyze_to_type(sq->qualifiers, sq->type_specifier, decl->declarator, 0);
  
                 if (!(member_type->flags & CN_TYPE_COMPLETE)) {
                     cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, md->member_declarators.ptrs[d], CN_DC_INCOMPLETE_TYPE, "Cannot have incomplete member type in union definition.");
@@ -9749,7 +9956,7 @@ CNDEF Cn_Type *cn__analyze_type_from_enum(Cn_Ast_Node *ts) {
         Cn_Type *enum_base_type;
         if (enum_spec->specifier_qualifier != NULL) {
             Cn_Ast_Specifier_Qualifier *sq = enum_spec->specifier_qualifier;
-            enum_base_type = cn_analyze_to_type(sq->qualifiers, sq->type_specifier, NULL);
+            enum_base_type = cn_analyze_to_type(sq->qualifiers, sq->type_specifier, NULL, 0);
 
             if (enum_base_type == NULL) goto error;
 
@@ -9850,7 +10057,7 @@ error:
 }
  
 /**
- * Wraps 'result' in one pointer layer, plus optional qualifier, per '*' in the
+ * Wraps `result` in one pointer layer, plus optional qualifier, per '*' in the
  * pointer chain.
  *
  * RETURNS: The pointer wrapped type.
@@ -9874,15 +10081,24 @@ CNDEF Cn_Type *cn__analyze_type_apply_pointers(Cn_Type *result, Cn_Ast_Pointer *
 }
  
 /**
- * Wraps 'result' in one array layer described by the array direct declarator at
+ * Wraps `result` in one array layer described by the array direct declarator at
  * dd, evaluating its constant length. 
- *
- * TODO: Handle VLA.
  *
  * RETURNS: The array-wrapped type, or NULL on error.
  */
-CNDEF Cn_Type *cn__analyze_type_apply_array(Cn_Type *result, Cn_Ast_Node *dd) {
+CNDEF Cn_Type *cn__analyze_type_apply_array(Cn_Type *result, Cn_Ast_Node *dd, bool apply_parameter_adjustment) {
+    
     Cn_Ast_Direct_Declarator_Array *arr = cn_ast_as(Direct_Declarator_Array, dd);
+    
+    // Casting down to pointer type if adjusting parameter.
+    // TODO: Add qualifiers to pointer, 
+    // once parsing qualifiers in array declarator is supported.
+    if (apply_parameter_adjustment && (arr->direct_declarator == NULL || arr->direct_declarator->kind == CN_AST_IDENTIFIER)) {
+        Cn_Type ptr_type = cn_type_make_pointer(result);
+        result = cn__ast_add_type_if_not((Cn_Type *)&ptr_type);
+        return result;
+    }
+
     Cn_Type type = {0};
  
     type.array.kind = CN_ARRAY;
@@ -9895,14 +10111,24 @@ CNDEF Cn_Type *cn__analyze_type_apply_array(Cn_Type *result, Cn_Ast_Node *dd) {
     }
  
     type.array.element_type = result;
+    type.array.align = result->align;       // Align can be set in here, cause even if array size unknown, align is only dependent on the underlying element_type.
+
+    // If arr->expression is NULL, it means that there is no expression, 
+    // therefore we have incomplete array: '[]' case.
+    if (arr->expression == NULL) {
+        type.array.flags &= ~CN_TYPE_COMPLETE;
+        return cn__ast_add_type_if_not((Cn_Type *)&type);
+    }
  
     // Evaluate the constant length expression.
     uint8_t buffer[CN_TYPE_SCALAR_MAX_SIZE];
     Cn_Any any = cn_analyze_evaluate_expression(arr->expression, buffer);
  
     if (cn_any_is_empty(any)) {
-        cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, dd, CN_DC_INVALID_CONSTANT_EXPRESSION, "Invalid constant expression in array declarator.");
-        goto error;
+        // This is the case where expression inside '[...]' cannot be evaluated.
+        // Therefore we have VLA.
+        type.array.flags |= CN_TYPE_ARRAY_VARIABLE;
+        return cn__ast_add_type_if_not((Cn_Type *)&type);
     }
  
     if (any.type->kind != CN_INTEGER) {
@@ -9919,7 +10145,6 @@ CNDEF Cn_Type *cn__analyze_type_apply_array(Cn_Type *result, Cn_Ast_Node *dd) {
  
     type.array.length = length;
     type.array.size = length * result->size;
-    type.array.align = result->align;
  
     return cn__ast_add_type_if_not((Cn_Type *)&type);
  
@@ -9929,13 +10154,22 @@ error:
 }
  
 /**
- * Wraps 'result' in one function layer described by the function direct declarator
+ * Wraps `result` in one function layer described by the function direct declarator
  * at dd, converting each parameter declaration to a parameter type.
  *
- * RETURNS: The function wrapped type.
+ * RETURNS: The function wrapped type, or NULL on error.
  */
-CNDEF Cn_Type *cn__analyze_type_apply_function(Cn_Type *result, Cn_Ast_Node *dd) {
+CNDEF Cn_Type *cn__analyze_type_apply_function(Cn_Type *result, Cn_Ast_Node *dd, bool apply_parameter_adjustment) {
+
     Cn_Ast_Direct_Declarator_Function *fn = cn_ast_as(Direct_Declarator_Function, dd);
+
+    // Casting down to pointer type if adjusting parameter.
+    if (apply_parameter_adjustment && (fn->direct_declarator == NULL || fn->direct_declarator->kind == CN_AST_IDENTIFIER)) {
+        Cn_Type ptr_type = cn_type_make_pointer(result);
+        result = cn__ast_add_type_if_not((Cn_Type *)&ptr_type);
+        return result;
+    }
+
     Cn_Type type = {0};
  
     type.function.kind = CN_FUNCTION;
@@ -9945,37 +10179,72 @@ CNDEF Cn_Type *cn__analyze_type_apply_function(Cn_Type *result, Cn_Ast_Node *dd)
     type.function.is_variadic = (fn->flags & CN_AST_DIRECT_DECLARATOR_FUNCTION_IS_VARIADIC) != 0;
     type.function.params_length = fn->parameter_declarations.length;
  
+
     if (type.function.params_length > 0) {
+        // This requires some explanation.
+        // Basically C tracks all parameter scopes.
+        // That means that parameter names matter, for example:
+        //
+        //  void foo(int n, int arr[n]);
+        //                          ^~~~~~ If `int n` parameter is not tracked,
+        //                                 the error `unknown primary identifer`
+        //                                 will occure.
+        //                                 
+        // And the awful part is that since VLA's exist in parameter declarations, 
+        // we are required to check whether certain constant expression is
+        // valid whenever we analyze the type, 
+        // so we must bind all parameters whenver we are deriving function type.
+        //
+        // It is not necessarely slow to push and pop stack each type function 
+        // type is encountered. But it is defenitely  extra work, 
+        // that I was not able to forsee, when thinking through this type system.
+        cn_scope_stack_push();
+
+        // Because if not, then VLA's would error on unknown names, example:
+        //      void foo(int n, int arr[n]);
         type.function.params = cn_chained_arena_alloc(&cn__tu_data->type_children_arena, sizeof(Cn_Type_Function_Param) * type.function.params_length);
  
         for (int64_t i = 0; i < fn->parameter_declarations.length; i++) {
             Cn_Ast_Parameter_Declaration *p = cn_ast_as(Parameter_Declaration, fn->parameter_declarations.ptrs[i]);
             Cn_Ast_Declaration_Specifiers *decl_spec = p->declaration_specifiers;
-            Cn_Type *param_type = cn_analyze_to_type(decl_spec->qualifiers, decl_spec->type_specifier, p->declarator);
+
+            // Analyzing new parameter declaration.
+            bool ok = cn_analyze_declaration(decl_spec, .declarator = p->declarator, .flags = CN_APPLY_PARAMETER_ADJUSTMENT);
+            if (!ok) goto error;
+
+
+            Cn_Type *param_type = cn_analyze_to_type(decl_spec->qualifiers, decl_spec->type_specifier, p->declarator, CN_APPLY_PARAMETER_ADJUSTMENT);
  
             type.function.params[i] = (Cn_Type_Function_Param) {
                 .type = param_type,
             };
         }
+        
+        // Popping parameter scope.
+        cn_scope_stack_pop();
+        
     }
  
     return cn__ast_add_type_if_not((Cn_Type *)&type);
+
+error:
+    CN__TRACE_ERROR
+    return NULL;
 }
  
 /**
- * Walks the declarator chain, wrapping 'result' in pointer, array or function layers
+ * Walks the declarator chain, wrapping `result` in pointer, array or function layers
  * and descending into grouped declarators until each direct declarator bottoms
  * out at the identifier or an abstract end.
  *
  * RETURNS: The fully wrapped type, or NULL on error.
  */
-CNDEF Cn_Type *cn__analyze_type_apply_declarator(Cn_Type *result, Cn_Ast_Node *declarator) {
+CNDEF Cn_Type *cn__analyze_type_apply_declarator(Cn_Type *result, Cn_Ast_Node *declarator, Cn_Analyze_Flags flags) {
     Cn_Ast_Node *declarator_chain = declarator;
- 
+
     while (declarator_chain != NULL) {
         Cn_Ast_Declarator *decl = cn_ast_as(Declarator, declarator_chain);
  
-        // Pointer layers first.
         result = cn__analyze_type_apply_pointers(result, decl->pointer);
  
         // Direct declarator: array/function layers until the identifier, an
@@ -9995,13 +10264,13 @@ CNDEF Cn_Type *cn__analyze_type_apply_declarator(Cn_Type *result, Cn_Ast_Node *d
  
             switch (dd->kind) {
                 case CN_AST_DIRECT_DECLARATOR_ARRAY:
-                    result = cn__analyze_type_apply_array(result, dd);
+                    result = cn__analyze_type_apply_array(result, dd, flags & CN_APPLY_PARAMETER_ADJUSTMENT);
                     if (result == NULL) goto error;
                     dd = ((Cn_Ast_Direct_Declarator_Array *)dd)->direct_declarator;
                     break;
  
                 case CN_AST_DIRECT_DECLARATOR_FUNCTION:
-                    result = cn__analyze_type_apply_function(result, dd);
+                    result = cn__analyze_type_apply_function(result, dd, flags & CN_APPLY_PARAMETER_ADJUSTMENT);
                     if (result == NULL) goto error;
                     dd = ((Cn_Ast_Direct_Declarator_Function *)dd)->direct_declarator;
                     break;
@@ -10023,19 +10292,19 @@ error:
     return NULL;
 }
  
-CNDEF Cn_Type *cn_analyze_to_type(Cn_Ast_Qualifier_Flags flags, void * type_specifier, void * declarator) {
+CNDEF Cn_Type *cn_analyze_to_type(Cn_Ast_Qualifier_Flags qualifier, void *type_specifier, void *declarator, Cn_Analyze_Flags flags) {
     // Base type named by the specifier.
     Cn_Type *result = cn__analyze_base_type_from_specifier(type_specifier);
     if (result == NULL) goto error;
  
     // Qualifiers on the base type itself.
-    if (flags != 0) {
-        Cn_Type type = cn_type_make_qualified(cn_ast_qualifier_flags_to_type(flags), result);
+    if (qualifier != 0) {
+        Cn_Type type = cn_type_make_qualified(cn_ast_qualifier_flags_to_type(qualifier), result);
         result = cn__ast_add_type_if_not((Cn_Type *)&type);
     }
  
     // Declarator layers (* [] ()).
-    result = cn__analyze_type_apply_declarator(result, declarator);
+    result = cn__analyze_type_apply_declarator(result, declarator, flags);
     if (result == NULL) goto error;
  
     return result;
@@ -10408,16 +10677,19 @@ CNDEF Cn_Type *cn__analyze_typecheck_call(Cn_Ast_Node *node) {
     // A function itself or a pointer to function may be called. Getting function type itself.
     Cn_Type *fn = callee;
     if (fn->kind == CN_POINTER) fn = ((Cn_Type_Pointer *)fn)->ptr_to;
-
+    
     if (fn->kind != CN_FUNCTION) {
         cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, node, CN_DC_ILLEGAL_TYPE, "Called object is not a function or function pointer.");
         goto error;
     }
 
+
     Cn_Type_Function *func_type = (Cn_Type_Function *)fn;
 
     // Argument count must match parameter count.
-    // NOTE: variadics aren't tracked in Cn_Type_Function yet, so this is exact-match only.
+    // NOTE: variadics aren't tracked in Cn_Type_Function yet, 
+    // so this is exact-match only.
+    // TODO: ^^^ Is this still a thing?
     int64_t arg_count = cn_ast_as(Call, node)->arguments.length;
     if (func_type->is_variadic) {
         if (arg_count < func_type->params_length) {
@@ -10563,7 +10835,7 @@ CNDEF Cn_Type *cn__analyze_typecheck_cast(Cn_Ast_Node *node) {
     // Resolve the target type from the typename.
     Cn_Ast_Node *type_name = cn_ast_node((cn_ast_as(Cast, node)->type_name));
     Cn_Ast_Node *spec_qual = cn_ast_node((cn_ast_as(Type_Name, type_name)->specifier_qualifier));
-    Cn_Type *target = cn_analyze_to_type(cn_ast_as(Specifier_Qualifier, spec_qual)->qualifiers, cn_ast_as(Specifier_Qualifier, spec_qual)->type_specifier, cn_ast_as(Type_Name, type_name)->abstract_declarator);
+    Cn_Type *target = cn_analyze_to_type(cn_ast_as(Specifier_Qualifier, spec_qual)->qualifiers, cn_ast_as(Specifier_Qualifier, spec_qual)->type_specifier, cn_ast_as(Type_Name, type_name)->abstract_declarator, 0);
     if (target == NULL) goto error;
 
     Cn_Type *operand = cn_analyze_typecheck_expression(cn_ast_as(Cast, node)->expression);
@@ -10610,7 +10882,7 @@ CNDEF Cn_Type *cn__analyze_typecheck_compound(Cn_Ast_Node *node) {
     // Resolve the target type from the typename.
     Cn_Ast_Node *type_name = cn_ast_node((cn_ast_as(Compound, node)->type_name));
     Cn_Ast_Node *spec_qual = cn_ast_node((cn_ast_as(Type_Name, type_name)->specifier_qualifier));
-    Cn_Type *target = cn_analyze_to_type(cn_ast_as(Specifier_Qualifier, spec_qual)->qualifiers, cn_ast_as(Specifier_Qualifier, spec_qual)->type_specifier, cn_ast_as(Type_Name, type_name)->abstract_declarator);
+    Cn_Type *target = cn_analyze_to_type(cn_ast_as(Specifier_Qualifier, spec_qual)->qualifiers, cn_ast_as(Specifier_Qualifier, spec_qual)->type_specifier, cn_ast_as(Type_Name, type_name)->abstract_declarator, 0);
     if (target == NULL) goto error;
 
     if (!(cn_type_unqualified(target)->flags & CN_TYPE_COMPLETE)) {
@@ -10641,7 +10913,9 @@ CNDEF Cn_Type *cn__analyze_typecheck_sizeof(Cn_Ast_Node *node) {
         operand = cn_analyze_to_type(
             spec_qual->qualifiers,
             spec_qual->type_specifier,
-            cn_ast_as(Type_Name, child)->abstract_declarator);
+            cn_ast_as(Type_Name, child)->abstract_declarator,
+            0
+            );
     } else {
         // Case: sizeof expr, operand is not evaluated; only its type is needed.
         operand = cn_analyze_typecheck_expression(cn_ast_as(Sizeof, node)->target);
@@ -11353,7 +11627,7 @@ CNDEF Cn_Any cn__analyze_evaluate_sizeof(Cn_Ast_Node *node, void *buffer) {
     Cn_Type *operand_type;
     if (child->kind == CN_AST_TYPE_NAME) {
         Cn_Ast_Node *sq = cn_ast_node((cn_ast_as(Type_Name, child)->specifier_qualifier));
-        operand_type = cn_analyze_to_type(cn_ast_as(Specifier_Qualifier, sq)->qualifiers, cn_ast_as(Specifier_Qualifier, sq)->type_specifier, cn_ast_as(Type_Name, child)->abstract_declarator);
+        operand_type = cn_analyze_to_type(cn_ast_as(Specifier_Qualifier, sq)->qualifiers, cn_ast_as(Specifier_Qualifier, sq)->type_specifier, cn_ast_as(Type_Name, child)->abstract_declarator, 0);
     } else {
         // The operand of sizeof is unevaluated, only its type is needed.
         operand_type = cn_get_expression_type(cn_ast_as(Sizeof, node)->target);
@@ -11466,8 +11740,9 @@ CNDEF Cn_Any cn__analyze_evaluate_primary(Cn_Ast_Node *node, void *buffer) {
     return any;
 }
 
-CNDEF Cn_Any cn_analyze_evaluate_expression(void * expression, void *buffer) {
-    CN_ASSERT(expression != NULL);
+CNDEF Cn_Any cn_analyze_evaluate_expression(void *expression, void *buffer) {
+    if (expression == NULL) return (Cn_Any) {0};
+
     Cn_Ast_Node *node = expression;
 
     switch(node->kind) {
@@ -12943,7 +13218,7 @@ CNDEF Cn_Ast_Node *cn_parse_function_or_declaration(Cn_Lexer *lexer) {
         node.declaration_specifiers = declaration_specifiers;
 
         // New types can be made, even in empty declaration.
-        ok = cn_analyze_declaration(node.declaration_specifiers, (Cn_Ast_Nodes) {0});
+        ok = cn_analyze_declaration(node.declaration_specifiers);
         if (!ok) goto error;
 
         Cn_Ast_Node *parent = cn_ast_new(node);
@@ -13002,15 +13277,15 @@ CNDEF Cn_Ast_Node *cn_parse_function_or_declaration(Cn_Lexer *lexer) {
 
         node.attribute_specifiers = attribute_specifiers;
         node.declaration_specifiers = declaration_specifiers;
-        node.init_declarators = cn_parse_finish_init_declarators(lexer, declarator, &ok);
+        node.init_declarators = cn_parse_finish_init_declarators(lexer, declarator, &ok, node.declaration_specifiers);
         if (!ok) goto error;
 
         // ';' at the end check.
         if (!cn_parse_expect(lexer, CN_TOKEN_SEMICOLON)) goto error;
 
-        // Adding types that are used by declarators.
-        ok = cn_analyze_declaration(node.declaration_specifiers, node.init_declarators);
-        if (!ok) goto error;
+        // // Adding types that are used by declarators.
+        // ok = cn_analyze_declaration(node.declaration_specifiers, node.init_declarators);
+        // if (!ok) goto error;
 
         Cn_Ast_Node *idx = cn_ast_new(node);
         return idx;
@@ -13049,7 +13324,7 @@ CNDEF Cn_Ast_Node *cn_parse_finish_declaration(Cn_Lexer *lexer, Cn_Ast_Nodes att
         node.flags |= CN_AST_DECLARATION_IS_EMPTY;
 
         // New types can be made, even in empty declaration.
-        ok = cn_analyze_declaration(node.declaration_specifiers, (Cn_Ast_Nodes) {0});
+        ok = cn_analyze_declaration(node.declaration_specifiers);
         if (!ok) goto error;
 
         Cn_Ast_Node *parent = cn_ast_new(node);
@@ -13062,12 +13337,12 @@ CNDEF Cn_Ast_Node *cn_parse_finish_declaration(Cn_Lexer *lexer, Cn_Ast_Nodes att
         goto error;
     }
     
-    node.init_declarators = cn_parse_finish_init_declarators(lexer, declarator, &ok);
+    node.init_declarators = cn_parse_finish_init_declarators(lexer, declarator, &ok, node.declaration_specifiers);
     if (!ok) goto error;
 
-    // Adding types that are used by declarators.
-    ok = cn_analyze_declaration(node.declaration_specifiers, node.init_declarators);
-    if (!ok) goto error;
+    //     // Adding types that are used by declarators.
+    //     // ok = cn_analyze_declaration(node.declaration_specifiers, node.init_declarators);
+    //     // if (!ok) goto error;
 
     Cn_Ast_Node *parent = cn_ast_new(node);
     return parent;
@@ -14033,12 +14308,12 @@ error:
     return NULL;
 }
 
-CNDEF Cn_Ast_Nodes cn_parse_finish_init_declarators(Cn_Lexer *lexer, void * declarator, bool *ok) {
+CNDEF Cn_Ast_Nodes cn_parse_finish_init_declarators(Cn_Lexer *lexer, void * declarator, bool *ok, void *declaration_specifiers) {
     Cn_Lexer original_state = *lexer;
 
     int64_t mark = cn_ast_stack_mark();
 
-    Cn_Ast_Init_Declarator *child = cn_parse_finish_init_declarator(lexer, declarator);
+    Cn_Ast_Init_Declarator *child = cn_parse_finish_init_declarator(lexer, declarator, declaration_specifiers);
 
     while (true) {
         if (child == NULL) goto error;
@@ -14047,7 +14322,7 @@ CNDEF Cn_Ast_Nodes cn_parse_finish_init_declarators(Cn_Lexer *lexer, void * decl
         if (!cn_lexer_expect(lexer, CN_TOKEN_COMMA)) break;
         cn_lexer_next_token(lexer);
 
-        child = cn_parse_init_declarator(lexer);
+        child = cn_parse_init_declarator(lexer, declaration_specifiers);
     }
 
     *ok = true;
@@ -14060,7 +14335,7 @@ error:
     return (Cn_Ast_Nodes) {0};
 }
 
-CNDEF Cn_Ast_Nodes cn_parse_init_declarators(Cn_Lexer *lexer, bool *ok) {
+CNDEF Cn_Ast_Nodes cn_parse_init_declarators(Cn_Lexer *lexer, bool *ok, void *declaration_specifiers) {
     Cn_Lexer original_state = *lexer;
 
     bool decl_ok;
@@ -14072,7 +14347,7 @@ CNDEF Cn_Ast_Nodes cn_parse_init_declarators(Cn_Lexer *lexer, bool *ok) {
         goto error;
     }
 
-    return cn_parse_finish_init_declarators(lexer, declarator, ok);
+    return cn_parse_finish_init_declarators(lexer, declarator, ok, declaration_specifiers);
 
 error:
     CN__TRACE_ERROR
@@ -14081,7 +14356,7 @@ error:
     return (Cn_Ast_Nodes) {0};
 }
 
-CNDEF Cn_Ast_Init_Declarator *cn_parse_finish_init_declarator(Cn_Lexer *lexer, Cn_Ast_Declarator *declarator) {
+CNDEF Cn_Ast_Init_Declarator *cn_parse_finish_init_declarator(Cn_Lexer *lexer, Cn_Ast_Declarator *declarator, void *declaration_specifiers) {
     Cn_Lexer original_state = *lexer;
 
     Cn_Ast_Init_Declarator node = { .kind = CN_AST_INIT_DECLARATOR, .loc = ((Cn_Ast_Node *)declarator)->loc, .src = ((Cn_Ast_Node *)declarator)->src };
@@ -14106,6 +14381,11 @@ CNDEF Cn_Ast_Init_Declarator *cn_parse_finish_init_declarator(Cn_Lexer *lexer, C
         node.initializer = initializer;
     }
 
+
+    // Creating binding from the finished init declarator.
+    ok = cn_analyze_declaration(declaration_specifiers, .declarator = node.declarator, .initializer = node.initializer);
+    if (!ok) goto error;
+
     Cn_Ast_Init_Declarator *parent = cn_ast_new(node);
     return parent;
     
@@ -14115,7 +14395,7 @@ error:
     return NULL;
 }
 
-CNDEF Cn_Ast_Init_Declarator *cn_parse_init_declarator(Cn_Lexer *lexer) {
+CNDEF Cn_Ast_Init_Declarator *cn_parse_init_declarator(Cn_Lexer *lexer, void *declaration_specifiers) {
     Cn_Lexer original_state = *lexer;
 
     bool ok;
@@ -14127,7 +14407,7 @@ CNDEF Cn_Ast_Init_Declarator *cn_parse_init_declarator(Cn_Lexer *lexer) {
         goto error;
     }
 
-    return cn_parse_finish_init_declarator(lexer, declarator);
+    return cn_parse_finish_init_declarator(lexer, declarator, declaration_specifiers);
     
 error:
     CN__TRACE_ERROR
@@ -15088,6 +15368,10 @@ CNDEF Cn_Ast_Nodes cn_parse_parameter_declarations(Cn_Lexer *lexer, bool *variad
     *variadic = false;
     int64_t mark = cn_ast_stack_mark();
 
+    // Pushing new scope, this is known as parameter scope in C.
+    // It contains parameters as they are declared. After all parameters are parsed it is popped.
+    cn_scope_stack_push();
+
     while (true) {
         // Checking if '...'.
         if (cn_lexer_expect(lexer, CN_TOKEN_ELLIPSIS)) {
@@ -15105,6 +15389,9 @@ CNDEF Cn_Ast_Nodes cn_parse_parameter_declarations(Cn_Lexer *lexer, bool *variad
 
         cn_lexer_next_token(lexer);
     }
+
+    // Popping parameter scope.
+    cn_scope_stack_pop();
 
     *ok = true;
     return cn_ast_stack_finalize(mark);
@@ -15125,7 +15412,11 @@ CNDEF Cn_Ast_Parameter_Declaration *cn_parse_parameter_declaration(Cn_Lexer *lex
     if (node.declaration_specifiers == NULL) goto error;
 
     bool ok;
+
     node.declarator = cn_parse_declarator(lexer, &ok);
+    if (!ok) goto error;
+
+    ok = cn_analyze_declaration(node.declaration_specifiers, .declarator = node.declarator, .flags = CN_APPLY_PARAMETER_ADJUSTMENT);
     if (!ok) goto error;
 
     Cn_Ast_Parameter_Declaration *idx = cn_ast_new(node);
