@@ -7040,45 +7040,62 @@ CNDEF uint64_t cn_type_hash(const Cn_Type *type) {
     hash = cn_hash_mix(hash, cn_hash_u64(type->align));
 
     switch (type->kind) {
-        case CN_INTEGER: {
-            const Cn_Type_Integer *ti = (const Cn_Type_Integer *)type;
-            hash = cn_hash_mix(hash, cn_hash_u64(ti->is_signed));
-        } break;
-        case CN_POINTER: {
-            const Cn_Type_Pointer *tp = (const Cn_Type_Pointer *)type;
-            hash = cn_hash_mix(hash, cn_hash_ptr(tp->ptr_to));
-        } break;
-        case CN_FUNCTION: {
-            const Cn_Type_Function *tf = (const Cn_Type_Function *)type;
-            hash = cn_hash_mix(hash, cn_hash_ptr(tf->return_type));
-            hash = cn_hash_mix(hash, cn_hash_u64(tf->params_length));
-            for (int64_t i = 0; i < tf->params_length; i++) {
-                hash = cn_hash_mix(hash, cn_hash_ptr(tf->params[i].type));
-            }
-        } break;
-        case CN_ARRAY: {
-            const Cn_Type_Array *ta = (const Cn_Type_Array *)type;
-            hash = cn_hash_mix(hash, cn_hash_ptr(ta->element_type));
-            hash = cn_hash_mix(hash, cn_hash_u64(ta->length));
-        } break;
-        case CN_STRUCT: {
-            const Cn_Type_Struct *ts = (const Cn_Type_Struct *)type;
-            hash = cn_hash_mix(hash, cn_str_hash(&ts->tag));
-            hash = cn_hash_mix(hash, cn_hash_u64(ts->members_length));
-            for (int64_t i = 0; i < ts->members_length; i++) {
-                hash = cn_hash_mix(hash, cn_hash_ptr(ts->members[i].type));
-            }
-        } break;
-        case CN_ENUM:
-            CN_TODO("Implement hash for enum type.");
-            break;
+        case CN_INTEGER: 
+            {
+                const Cn_Type_Integer *ti = (const Cn_Type_Integer *)type;
+                hash = cn_hash_mix(hash, cn_hash_u64(ti->is_signed));
+                break;
+            } 
+        case CN_POINTER: 
+            {
+                const Cn_Type_Pointer *tp = (const Cn_Type_Pointer *)type;
+                hash = cn_hash_mix(hash, cn_hash_ptr(tp->ptr_to));
+                break;
+            } 
+        case CN_FUNCTION: 
+            {
+                const Cn_Type_Function *tf = (const Cn_Type_Function *)type;
+                hash = cn_hash_mix(hash, cn_hash_ptr(tf->return_type));
+                hash = cn_hash_mix(hash, cn_hash_u64(tf->params_length));
+                for (int64_t i = 0; i < tf->params_length; i++) {
+                    hash = cn_hash_mix(hash, cn_hash_ptr(tf->params[i].type));
+                }
+                break;
+            } 
+        case CN_ARRAY: 
+            {
+                const Cn_Type_Array *ta = (const Cn_Type_Array *)type;
+                hash = cn_hash_mix(hash, cn_hash_ptr(ta->element_type));
+                hash = cn_hash_mix(hash, cn_hash_u64(ta->length));
+                break;
+            } 
+        case CN_STRUCT: 
+            {
+                const Cn_Type_Struct *ts = (const Cn_Type_Struct *)type;
+                hash = cn_hash_mix(hash, cn_str_hash(&ts->tag));
+                hash = cn_hash_mix(hash, cn_hash_u64(ts->members_length));
+                for (int64_t i = 0; i < ts->members_length; i++) {
+                    hash = cn_hash_mix(hash, cn_hash_ptr(ts->members[i].type));
+                }
+                break;
+            } 
+        case CN_ENUM: 
+            {
+                const Cn_Type_Enum *te = (const Cn_Type_Enum *)type;
+                hash = cn_hash_mix(hash, cn_str_hash(&te->tag));
+                break;
+            } 
         case CN_UNION:
-            CN_TODO("Implement union for enum type.");
-            break;
-        case CN_QUALIFIED: {
-            const Cn_Type_Qualified *tq = (const Cn_Type_Qualified *)type;
-            hash = cn_hash_mix(hash, cn_hash_ptr(tq->base_type));
-        } break;
+            {
+                CN_TODO("Implement union for enum type.");
+                break;
+            }
+        case CN_QUALIFIED: 
+            {
+                const Cn_Type_Qualified *tq = (const Cn_Type_Qualified *)type;
+                hash = cn_hash_mix(hash, cn_hash_ptr(tq->base_type));
+                break;
+            } 
         default:
             break;
     }
