@@ -7352,7 +7352,8 @@ CNDEF Cn_Type *cn_type_unqualified(const Cn_Type *type) {
 }
 
 CNDEF bool cn_type_is_arithmetic(const Cn_Type *type) {
-    return type->kind == CN_INTEGER || type->kind == CN_FLOAT || type->kind == CN_ENUM;
+    // _Bool is unsigned integer type in C. 
+    return type->kind == CN_INTEGER || type->kind == CN_FLOAT || type->kind == CN_ENUM || type->kind == CN_BOOL;
 }
 
 CNDEF bool cn_type_is_assignable(const Cn_Type *to, const Cn_Type *from) {
@@ -7365,28 +7366,45 @@ CNDEF bool cn_type_is_assignable(const Cn_Type *to, const Cn_Type *from) {
     if (to->kind == CN_OPAQUE || from->kind == CN_OPAQUE)
         return true;
 
+    // Any pointer can be assigned to bool.
+    if (to->kind == CN_BOOL && from->kind == CN_POINTER) return true;
+
     if (cn_type_is_arithmetic(to) && cn_type_is_arithmetic(from)) return true;
 
     // If to is pointer.
-    if (to->kind == CN_POINTER && from->kind == CN_POINTER) {
-        const Cn_Type_Pointer *to_ptr = (const Cn_Type_Pointer *)to;
-        const Cn_Type_Pointer *from_ptr = (const Cn_Type_Pointer *)from;
-        // Void pointers can be assigned in either direction without explicit casting.
-        if (to_ptr->ptr_to->kind == CN_VOID || from_ptr->ptr_to->kind == CN_VOID) return true;
+    if (to->kind == CN_POINTER) {
 
-        return cn_type_is_compatible_no_qualifiers(to_ptr->ptr_to, from_ptr->ptr_to);
+        // If from is pointer.
+        if (from->kind == CN_POINTER) {
+            const Cn_Type_Pointer *to_ptr = (const Cn_Type_Pointer *)to;
+            const Cn_Type_Pointer *from_ptr = (const Cn_Type_Pointer *)from;
+            // Void pointers can be assigned in either direction without explicit casting.
+            if (cn_type_unqualified(to_ptr->ptr_to)->kind == CN_VOID || cn_type_unqualified(from_ptr->ptr_to)->kind == CN_VOID) return true;
+
+            return cn_type_is_compatible_no_qualifiers(to_ptr->ptr_to, from_ptr->ptr_to);
+        }
+
+        // If from is an array of same base type. 
+        if (from->kind == CN_ARRAY) {
+            const Cn_Type_Pointer *to_ptr = (const Cn_Type_Pointer *)to;
+            const Cn_Type_Array *from_arr = (const Cn_Type_Array *)from;
+
+            // Any array to void pointer can be assigned without explicit casting.
+            if (cn_type_unqualified(to_ptr->ptr_to)->kind == CN_VOID) return true;
+
+            return cn_type_is_compatible_no_qualifiers(to_ptr->ptr_to, from_arr->element_type);
+        }
+
+        // If from is a function, then it decays to the pointer to the function type.
+        if (from->kind == CN_FUNCTION) {
+            const Cn_Type_Pointer *to_ptr = (const Cn_Type_Pointer *)to;
+
+            if (cn_type_unqualified(to_ptr->ptr_to)->kind == CN_VOID) return true;
+
+            return cn_type_is_compatible_no_qualifiers(to_ptr->ptr_to, from);
+        }
     }
 
-    // If to is pointer and from is array of same base type. 
-    if (to->kind == CN_POINTER && from->kind == CN_ARRAY) {
-        const Cn_Type_Pointer *to_ptr = (const Cn_Type_Pointer *)to;
-        const Cn_Type_Array *from_arr = (const Cn_Type_Array *)from;
-
-        // Any array to void pointer can be assigned without explicit casting.
-        if (to_ptr->ptr_to->kind == CN_VOID) return true;
-        
-        return cn_type_is_compatible_no_qualifiers(to_ptr->ptr_to, from_arr->element_type);
-    }
 
     return false;
 }
@@ -7454,8 +7472,9 @@ CNDEF bool cn_type_is_compatible(const Cn_Type *a, const Cn_Type *b) {
         case CN_ARRAY: {
             if (!cn_type_is_compatible(a->array.element_type, b->array.element_type)) return false;
             // Incomplete array is compatible with any length.
-            // TODO: VLA is also compatible with any length, once it is represented.
-            if (!(a->flags & CN_TYPE_COMPLETE) || !(b->flags & CN_TYPE_COMPLETE)) return true;
+            // VLA is also compatible with any length, once it is represented.
+            if (!(a->flags & CN_TYPE_COMPLETE) || (a->flags & CN_TYPE_ARRAY_VARIABLE) || !(b->flags & CN_TYPE_COMPLETE) || (b->flags & CN_TYPE_ARRAY_VARIABLE)) return true;
+
             return a->array.length == b->array.length;
         }
 
@@ -7511,7 +7530,9 @@ CNDEF Cn_Type *cn_type_greatest_arithmetic_rank(const Cn_Type *a, const Cn_Type 
 }
 
 CNDEF bool cn_type_is_scalar(Cn_Type *type) {
-    return cn_type_is_arithmetic(type) || type->kind == CN_POINTER || type->kind == CN_BOOL;
+    // Opaque is trusted to be a scalar, 
+    // for example `__builtin_mul_overflow` used as a condition.
+    return cn_type_is_arithmetic(type) || type->kind == CN_POINTER || type->kind == CN_OPAQUE;
 }
 
 /**
@@ -8750,7 +8771,7 @@ CNDEF bool cn_get_function_declarator_info(Cn_Ast_Declarator *declarator, Cn_Ast
 
                 // If followed by identifier, then return true, and get all outputs.
                 if (next != NULL && next->kind == CN_AST_IDENTIFIER) {
-                    *function_direct_declarator = dd;
+                    if (function_direct_declarator != NULL) *function_direct_declarator = dd;
                     *last_declarator = next;
                     return true;
                 }
@@ -9508,6 +9529,16 @@ CNDEF bool cn__analyze_declaration_opt(void *declaration_specifiers, Cn_Analyze_
     if (identifier->kind == CN_AST_IDENTIFIER) {
         Cn_String name = cn_ast_as(Identifier, identifier)->name;
 
+        // Typedef declaration case.
+        // IMPORTANT: Checked before everything else, since typedef NAMES a type.
+        // For example: `typedef int fn_t(int);` if typdef case is not first,
+        // the function `fn_t` would be declared and typedef would be ignored.
+        if (decl_spec->storage_specifiers & CN_AST_STORAGE_SPECIFIER_TYPEDEF) {
+            if (cn_binding_declare_typedef(name, identifier, type) == CN_BINDING_NIL_IDX) return false;
+
+            return true;
+        }
+
         // Function declaration case.
         if (type->kind == CN_FUNCTION) {
             Cn_Ast_Node *parameter_type_list;
@@ -9530,13 +9561,6 @@ CNDEF bool cn__analyze_declaration_opt(void *declaration_specifiers, Cn_Analyze_
                         parameter_declarations,
                         false
                         ) == CN_BINDING_NIL_IDX) return false;
-
-            return true;
-        }
-
-        // Typedef declaration case.
-        if (decl_spec->storage_specifiers & CN_AST_STORAGE_SPECIFIER_TYPEDEF) {
-            if (cn_binding_declare_typedef(name, identifier, type) == CN_BINDING_NIL_IDX) return false;
 
             return true;
         }
@@ -10180,12 +10204,6 @@ CNDEF Cn_Type *cn__analyze_type_apply_function(Cn_Type *result, Cn_Ast_Node *dd,
 
     Cn_Ast_Direct_Declarator_Function *fn = cn_ast_as(Direct_Declarator_Function, dd);
 
-    // Casting down to pointer type if adjusting parameter.
-    if (apply_parameter_adjustment && (fn->direct_declarator == NULL || fn->direct_declarator->kind == CN_AST_IDENTIFIER)) {
-        Cn_Type ptr_type = cn_type_make_pointer(result);
-        result = cn__ast_add_type_if_not((Cn_Type *)&ptr_type);
-        return result;
-    }
 
     Cn_Type type = {0};
  
@@ -10241,8 +10259,16 @@ CNDEF Cn_Type *cn__analyze_type_apply_function(Cn_Type *result, Cn_Ast_Node *dd,
         cn_scope_stack_pop();
         
     }
+
+    result = cn__ast_add_type_if_not((Cn_Type *)&type);
+    
+    // Casting up to pointer type if adjusting parameter.
+    if (apply_parameter_adjustment && (fn->direct_declarator == NULL || fn->direct_declarator->kind == CN_AST_IDENTIFIER)) {
+        Cn_Type ptr_type = cn_type_make_pointer(result);
+        result = cn__ast_add_type_if_not((Cn_Type *)&ptr_type);
+    }
  
-    return cn__ast_add_type_if_not((Cn_Type *)&type);
+    return result;
 
 error:
     CN__TRACE_ERROR
@@ -14083,7 +14109,8 @@ CNDEF Cn_Ast_Node *cn_parse_expression_increasing_precedence(Cn_Lexer *lexer, vo
         Cn_Ast_Binary node = { .kind = CN_AST_BINARY, .loc = cn_lexer_token(lexer).loc, .src = cn_lexer_token(lexer).src };
 
         if (cn_parse_optional(lexer, CN_TOKEN_SQR_BRACES_OPEN)) {
-            Cn_Ast_Node *right = cn_parse_expression(lexer, precedence, flags);
+            // nocheck
+            Cn_Ast_Node *right = cn_parse_expression(lexer, -1, flags);
             if (right == NULL) goto error;
 
             if (!cn_parse_expect(lexer, CN_TOKEN_SQR_BRACES_CLOSE)) goto error;

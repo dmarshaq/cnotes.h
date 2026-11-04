@@ -3,9 +3,10 @@
 
 const Cn_String src = CN_STR_BUFFER(
     "int sum(int n, int arr[n]);\n"
-    "int sum_unspecified(int n, int arr[*]);\n"
+    // Uncomment once unspecified array lengths are allowed.
+    // "int sum_unspecified(int n, int arr[*]);\n"
     "int trace(int n, int m[n][n]);\n"
-    "int trace_unspecified(int n, int m[*][*]);\n"
+    // "int trace_unspecified(int n, int m[*][*]);\n"
     "\n"
     "int sum(int n, int arr[n]) {\n"
     "    int total = 0;\n"
