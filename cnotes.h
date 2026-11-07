@@ -3697,7 +3697,9 @@ CNDEF Cn_Ast_Integer *cn_parse_integer(Cn_Lexer *lexer);
 CNDEF Cn_Ast_Float *cn_parse_float(Cn_Lexer *lexer);
 
 /**
- * Parses code starting of with lexer current token as char.
+ * Parses code starting of with lexer current token as character literal.
+ *
+ * IMPORTANT: Parses the value of the char, so any escape sequence char is converted.
  */
 CNDEF Cn_Ast_Char *cn_parse_character(Cn_Lexer *lexer);
 
@@ -14893,6 +14895,7 @@ CNDEF Cn_Ast_String *cn_parse_string(Cn_Lexer *lexer) {
         str.length -= 2;
 
         if (!cn_str_is_empty(str)) {
+            // TODO: Parse string here.
             cn_sb_append_str(&sb, str);
         }
 
