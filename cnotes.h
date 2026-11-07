@@ -2270,11 +2270,11 @@ struct cn_ast_identifier { CN_AST_BASE;
 };
 
 struct cn_ast_integer { CN_AST_BASE;
-    Cn_String value;
+    uint64_t value;
 };
 
 struct cn_ast_flt { CN_AST_BASE;
-    Cn_String value;
+    double value;
 };
 
 struct cn_ast_character { CN_AST_BASE;
@@ -2851,6 +2851,7 @@ extern Cn_Message_Handler *cn_message_handler;
  * Flags to specify details on how certain analyze functions should work.
  */
 typedef enum {
+    CN_ANALYZE_NO_FLAGS           = 0x0,
     CN_APPLY_PARAMETER_ADJUSTMENT = 0x1,
 } Cn_Analyze_Flags;
 
@@ -4111,7 +4112,7 @@ CNDEF Cn_Ast_Identifier *cn__build_identifier(Cn_String name, Cn_Build_Opt opt);
  */
 #define cn_build_integer(value, ...) cn__build_integer(value, (Cn_Build_Opt) { .file = __FILE__, .line =__LINE__, __VA_ARGS__ })
 
-CNDEF Cn_Ast_Integer *cn__build_integer(Cn_String value, Cn_Build_Opt opt);
+CNDEF Cn_Ast_Integer *cn__build_integer(uint64_t value, Cn_Build_Opt opt);
 
 /**
  * Builds float with supplied value.
@@ -4120,7 +4121,7 @@ CNDEF Cn_Ast_Integer *cn__build_integer(Cn_String value, Cn_Build_Opt opt);
  */
 #define cn_build_float(value, ...) cn__build_float(value, (Cn_Build_Opt) { .file = __FILE__, .line =__LINE__, __VA_ARGS__ })
 
-CNDEF Cn_Ast_Float *cn__build_float(Cn_String value, Cn_Build_Opt opt);
+CNDEF Cn_Ast_Float *cn__build_float(double value, Cn_Build_Opt opt);
 
 /**
  * Builds string with supplied str.
@@ -7544,9 +7545,10 @@ CNDEF bool cn_type_is_scalar(Cn_Type *type) {
  */
 CNDEF int64_t cn_any_read_int(Cn_Any any) {
     Cn_Type *type = cn_type_unqualified(any.type);
+ 
     int64_t size = type->size;
     bool is_signed = (type->kind == CN_INTEGER) && ((Cn_Type_Integer *)type)->is_signed;
- 
+
     switch (size) {
         case 1:
             if (is_signed) { 
@@ -8156,10 +8158,10 @@ CNDEF void cn_ast_print(void * idx, int depth) {
             fprintf(stderr, " %.*s", CN_STR_UNPACK(cn_ast_as(Identifier, node)->name));
             break;
         case CN_AST_INTEGER:
-            fprintf(stderr, " %.*s", CN_STR_UNPACK(cn_ast_as(Integer, node)->value));
+            fprintf(stderr, " %lu", cn_ast_as(Integer, node)->value);
             break;
         case CN_AST_FLOAT:
-            fprintf(stderr, " %.*s", CN_STR_UNPACK(cn_ast_as(Float, node)->value));
+            fprintf(stderr, " %lf", cn_ast_as(Float, node)->value);
             break;
         case CN_AST_CHAR:
             fprintf(stderr, " %.*s", CN_STR_UNPACK(cn_ast_as(Char, node)->value));
@@ -10389,9 +10391,7 @@ CNDEF bool cn__analyze_is_null_pointer_constant(Cn_Ast_Node *expression) {
     if (node->kind == CN_AST_PRIMARY) {
         Cn_Ast_Integer *integer = cn_ast_as(Integer, node->literal);
         if (integer->kind == CN_AST_INTEGER) {
-            uint64_t value;
-            if (!cn_parse_int_literal(integer->value, &value)) return false;
-            return value == 0;
+            return integer->value == 0;
         }
     }
 
@@ -11737,22 +11737,12 @@ CNDEF Cn_Any cn__analyze_evaluate_primary(Cn_Ast_Node *node, void *buffer) {
     switch (literal->kind) {
         case CN_AST_INTEGER:
             {
-                uint64_t value;
-                if (!cn_parse_int_literal(cn_source_to_str( &node->src), &value)) {
-                    cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, node, CN_DC_INVALID_CONSTANT_EXPRESSION, "Invalid integer literal in primary expression.");
-                    return (Cn_Any) {0};
-                }
-                any = cn_any_write_int(any, (int64_t)value);
+                any = cn_any_write_int(any, cn_ast_as(Integer, literal)->value);
                 break;
             }
         case CN_AST_FLOAT:
             {
-                double value;
-                if (!cn_parse_float_literal(cn_source_to_str(&node->src), &value)) {
-                    cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, node, CN_DC_INVALID_CONSTANT_EXPRESSION, "Invalid float literal in primary expression.");
-                    return (Cn_Any) {0};
-                }
-                any = cn_any_write_float(any, value);
+                any = cn_any_write_float(any, cn_ast_as(Float, literal)->value);
                 break;
             }
         case CN_AST_STRING:
@@ -12089,6 +12079,37 @@ CNDEF void cn__emit_str(Cn_Emitter *e, Cn_String str) {
 }
 
 #define cn__emit_str_lit(e, lit) cn__emit_str(e, CN_STR_LIT(lit))
+
+/**
+ * Helper to format a string.
+ */
+CNDEF void cn__emit_vformat(Cn_Emitter *e, const char *fmt, va_list args) {
+    char stack_buf[256];
+
+    va_list args_copy;
+    va_copy(args_copy, args);
+    int n = vsnprintf(stack_buf, sizeof stack_buf, fmt, args_copy);
+    va_end(args_copy);
+
+    if (n < 0) {
+        cn_log(CN_ERROR, "Emitted format string hit formatting error.");
+        return; // Formatting error.
+    }
+
+    if ((size_t)n < sizeof stack_buf) {
+        cn__emit_str(e, (Cn_String){ .data = stack_buf, .length = (size_t)n });
+        return;
+    }
+
+    cn_log(CN_ERROR, "Emitted format string exceeds 256 bytes. Why? Don't do it.");
+}
+
+CNDEF void cn__emit_format(Cn_Emitter *e, const char *fmt, ...) {
+    va_list args;
+    va_start(args, fmt);
+    cn__emit_vformat(e, fmt, args);
+    va_end(args);
+}
 
 /**
  * Helper to emit indentation.
@@ -12817,11 +12838,11 @@ CNDEF void cn__emit_identifier(Cn_Emitter *e, Cn_Ast_Identifier *node) {
 }
 
 CNDEF void cn__emit_integer(Cn_Emitter *e, Cn_Ast_Integer *node) {
-    cn__emit_str(e, node->value);
+    cn__emit_format(e, "%ld", node->value);
 }
 
 CNDEF void cn__emit_flt(Cn_Emitter *e, Cn_Ast_Float *node) {
-    cn__emit_str(e, node->value);
+    cn__emit_format(e, "%lf", node->value);
 }
 
 CNDEF void cn__emit_character(Cn_Emitter *e, Cn_Ast_Char *node) {
@@ -14818,7 +14839,11 @@ CNDEF Cn_Ast_Integer *cn_parse_integer(Cn_Lexer *lexer) {
         goto error;
     }
 
-    node.value = cn_source_to_str(&cn_lexer_token(lexer).src);
+    bool ok = cn_parse_int_literal(cn_source_to_str(&cn_lexer_token(lexer).src), &node.value);
+    if (!ok) {
+        cn_diagnostic_src(CN_DIAGNOSTIC_ERROR, &cn_lexer_token(lexer).loc, &cn_lexer_token(lexer).src, CN_DC_EXPECTED_TOKEN, "Invalid integer literal.");
+        goto error;
+    }
 
     cn_lexer_next_token(lexer);
 
@@ -14840,7 +14865,11 @@ CNDEF Cn_Ast_Float *cn_parse_float(Cn_Lexer *lexer) {
         goto error;
     }
 
-    node.value = cn_source_to_str(&cn_lexer_token(lexer).src);
+    bool ok = cn_parse_float_literal(cn_source_to_str(&cn_lexer_token(lexer).src), &node.value);
+    if (!ok) {
+        cn_diagnostic_src(CN_DIAGNOSTIC_ERROR, &cn_lexer_token(lexer).loc, &cn_lexer_token(lexer).src, CN_DC_EXPECTED_TOKEN, "Invalid float literal.");
+        goto error;
+    }
 
     cn_lexer_next_token(lexer);
 
@@ -16226,34 +16255,26 @@ CNDEF Cn_Ast_Identifier *cn__build_identifier(Cn_String name, Cn_Build_Opt opt) 
     return cn_ast_new(node);
 }
 
-CNDEF Cn_Ast_Integer *cn__build_integer(Cn_String value, Cn_Build_Opt opt) {
+CNDEF Cn_Ast_Integer *cn__build_integer(uint64_t value, Cn_Build_Opt opt) {
     Cn_Ast_Integer node = {
         .kind = CN_AST_INTEGER,
         .flags = CN_AST_SYNTHETIC,
         .loc.file = cn__build_make_location(__FUNCTION__, opt.file, opt.line),
     };
 
-    if (opt.alloc) {
-        node.value = cn__ast_permanent_save_string(value);
-    } else {
-        node.value = value;
-    }
+    node.value = value;
 
     return cn_ast_new(node);
 }
 
-CNDEF Cn_Ast_Float *cn__build_float(Cn_String value, Cn_Build_Opt opt) {
+CNDEF Cn_Ast_Float *cn__build_float(double value, Cn_Build_Opt opt) {
     Cn_Ast_Float node = {
         .kind = CN_AST_FLOAT,
         .flags = CN_AST_SYNTHETIC,
         .loc.file = cn__build_make_location(__FUNCTION__, opt.file, opt.line),
     };
 
-    if (opt.alloc) {
-        node.value = cn__ast_permanent_save_string(value);
-    } else {
-        node.value = value;
-    }
+    node.value = value;
 
     return cn_ast_new(node);
 }
