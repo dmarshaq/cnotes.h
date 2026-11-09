@@ -305,6 +305,7 @@ bool confirm(const char *prompt) {
 #define OBJ_DIR         "obj"
 #define BIN_DIR         "bin"
 #define SRC_DIR         "src"
+#define DOC_DIR         "doc"
 #define TESTS_DIR       "tests"
 #define HOW_TO_DIR      "how_to"
 
@@ -595,6 +596,15 @@ bool how_to_execute_entry(Nob_Walk_Entry entry) {
 
 
 
+
+
+
+
+
+
+
+
+
 typedef int (Command_Func)(int *argc, char ***argv);
 
 typedef struct {
@@ -609,6 +619,7 @@ int test_command(int *argc, char ***argv);
 int record_command(int *argc, char ***argv);
 int clean_command(int *argc, char ***argv);
 int lib_command(int *argc, char ***argv);
+int doc_command(int *argc, char ***argv);
 int all_command(int *argc, char ***argv);
 
 const static Command commands[] = {
@@ -617,6 +628,7 @@ const static Command commands[] = {
     { "record",     "[FILE...]",    "Record file as a test and generate it's expected output.", record_command },
     { "clean",      "",             "Recursivly deletes "BUILD_DIR"/ and "BIN_DIR"/ directories.", clean_command },
     { "lib",        "",             "Will compile whole library into .o file and then produce static library.", lib_command },
+    { "doc",        "",             "Will run documentation renderer on whole library API.", doc_command },
     { "all",        "",             "Cleans, compiles library, runs tests, and uses library with compiler to run all examples.", all_command },
 };
 
@@ -806,6 +818,399 @@ int lib_command(int *argc, char ***argv) {
     compile_static_lib(&cmd);
     
     NOB_FREE(cmd.items);
+
+    return 0;
+}
+
+#define DOC_SV_LIT(literal)             ((Nob_String_View) {sizeof(literal) - 1, literal})
+#define DOC_SV_UNPACK(str)              (int)((str).count), (str).data
+
+Nob_String_View doc_trim_sv_till(Nob_String_View sv, Nob_String_View target) {
+    while (sv.count >= target.count) {
+        if (nob_sv_starts_with(sv, target)) return sv;
+
+        sv.count--;
+        sv.data++;
+    }
+
+    return (Nob_String_View) { 0, NULL };
+}
+
+Nob_String_View doc_get_sv_till(Nob_String_View sv, Nob_String_View target) {
+    return (Nob_String_View) { sv.count - doc_trim_sv_till(sv, target).count, sv.data };
+}
+
+void doc_print_json_string(FILE *f, Nob_String_View sv) {
+    fputc('"', f);
+    for (size_t i = 0; i < sv.count; i++) {
+        unsigned char c = (unsigned char)sv.data[i];
+        switch (c) {
+        case '"':  fputs("\\\"", f); break;
+        case '\\': fputs("\\\\", f); break;
+        case '\n': fputs("\\n",  f); break;
+        case '\r': fputs("\\r",  f); break;
+        case '\t': fputs("\\t",  f); break;
+        default:
+            if (c < 0x20) fprintf(f, "\\u%04x", c);
+            else          fputc(c, f);
+        }
+    }
+    fputc('"', f);
+}
+
+
+
+#define DOC_TAG_GEN_LIST(X)\
+    X(RETURNS,      Returns,    returns)\
+    X(PARAM,        Param,      param)\
+    X(OUTPUTS,      Outputs,    outputs)\
+    X(SINCE,        Since,      since)\
+    X(NOTE,         Note,       note)\
+    X(IMPORTANT,    Important,  important)\
+    X(AI,           AI,         ai)\
+    X(TODO,         Todo,       todo)\
+    X(LEAK,         Leak,       leak)\
+    X(TEMPORARY,    Temporary,  temporary)\
+    X(FIXME,        Fixme,      fixme)\
+
+typedef enum {
+#define X(K, T, m) K,
+    DOC_TAG_GEN_LIST(X)
+#undef X
+    UNKNOWN,
+} Doc_Tag_Kind;
+
+Doc_Tag_Kind doc_sv_to_tag(Nob_String_View sv) {
+#define X(K, T, m) if (nob_sv_eq(sv, DOC_SV_LIT(#K))) return K;
+    DOC_TAG_GEN_LIST(X)
+#undef X
+    return UNKNOWN;
+}
+
+const char *doc_tag_to_lit(Doc_Tag_Kind tag) {
+    switch (tag) {
+#define X(K, T, m) case K: return #K; break;
+    DOC_TAG_GEN_LIST(X)
+#undef X
+        default:
+            return "<UNKNOWN>";
+    }
+}
+
+typedef struct {
+    Doc_Tag_Kind    kind;
+    Nob_String_View text;
+} Doc_Tag;
+
+typedef struct {
+    Doc_Tag *items;
+    size_t count;
+    size_t capacity;
+} Doc_Tags;
+
+typedef struct {
+    Nob_String_View symbol;
+    Nob_String_View decl;
+    Nob_String_View summary;
+    Nob_String_View description;
+    Doc_Tags        tags;
+} Doc_Entry;
+
+/**
+ * Checks whether sv is a C identifier: letter or '_', followed by letters, digits or '_'.
+ */
+bool doc_sv_is_identifier(Nob_String_View sv) {
+    if (sv.count == 0 || !(isalpha((unsigned char)sv.data[0]) || sv.data[0] == '_')) return false;
+    for (size_t i = 1; i < sv.count; i++) {
+        if (!(isalnum((unsigned char)sv.data[i]) || sv.data[i] == '_')) return false;
+    }
+    return true;
+}
+
+typedef enum {
+    DOC_TARGET_NONE,
+    DOC_TARGET_SUMMARY,
+    DOC_TARGET_TAG,
+    DOC_TARGET_DESCRIPTION,
+} Doc_Target;
+
+/**
+ * Appends line to sb, separated by newline if text of the given count is not empty.
+ * Count of the text the line belongs to is advanced accordingly.
+ */
+void doc_append_line(Nob_String_Builder *sb, size_t *count, Nob_String_View line) {
+    if (*count > 0) {
+        nob_da_append(sb, '\n');
+        (*count)++;
+    }
+    nob_sb_append_buf(sb, line.data, line.count);
+    *count += line.count;
+}
+
+/**
+ * Appends line to whatever text target points to, target must be open.
+ */
+void doc_append_to_target(Doc_Entry *entry, Nob_String_Builder *text_sb, Nob_String_Builder *description_sb, Doc_Target target, Nob_String_View line) {
+    switch (target) {
+    case DOC_TARGET_SUMMARY:
+        doc_append_line(text_sb, &entry->summary.count, line);
+        break;
+
+    case DOC_TARGET_TAG:
+        doc_append_line(text_sb, &nob_da_last(&entry->tags).text.count, line);
+        break;
+
+    case DOC_TARGET_DESCRIPTION:
+        if (description_sb->count != 0) nob_da_append(description_sb, '\n');
+        nob_sb_append_buf(description_sb, line.data, line.count);
+        break;
+
+    case DOC_TARGET_NONE:
+        NOB_UNREACHABLE("doc_append_to_target");
+    }
+}
+
+
+void doc_print_json_entry(FILE *f, Doc_Entry *entry) {
+    fputs("  {\n", f);
+
+    fputs("    \"symbol\": ", f);
+    doc_print_json_string(f, entry->symbol);
+    fputs(",\n", f);
+
+    fputs("    \"decl\": ", f);
+    doc_print_json_string(f, entry->decl);
+    fputs(",\n", f);
+
+    fputs("    \"summary\": ", f);
+    doc_print_json_string(f, entry->summary);
+    fputs(",\n", f);
+
+    fputs("    \"description\": ", f);
+    doc_print_json_string(f, entry->description);
+    fputs(",\n", f);
+
+    fputs("    \"tags\": [", f);
+    for (size_t i = 0; i < entry->tags.count; i++) {
+        Doc_Tag *tag = &entry->tags.items[i];
+        fputs(i == 0 ? "\n" : ",\n", f);
+        fprintf(f, "      { \"kind\": \"%s\", \"text\": ", doc_tag_to_lit(tag->kind));
+        doc_print_json_string(f, tag->text);
+        fputs(" }", f);
+    }
+    fputs(entry->tags.count > 0 ? "\n    ]\n" : "]\n", f);
+
+    fputs("  }", f);
+}
+
+
+int doc_command(int *argc, char ***argv) {
+
+    Nob_String_Builder sb = {0};
+    if (!nob_read_entire_file("cnotes.h", &sb)) return 1;
+
+    if (!nob_mkdir_if_not_exists(DOC_DIR)) {
+        nob_sb_free(sb);
+        return 1;
+    }
+
+    const char *json_path = DOC_DIR"/doc.json";
+    FILE *json = fopen(json_path, "wb");
+    if (json == NULL) {
+        nob_log(NOB_ERROR, "Could not open '%s' for writing: %s", json_path, strerror(errno));
+        nob_sb_free(sb);
+        return 1;
+    }
+    fputs("[\n", json);
+    size_t entry_count = 0;
+
+    Nob_String_View content = nob_sb_to_sv(sb);
+
+
+    // Cutting content down to the needed size.
+    content = doc_get_sv_till(content, DOC_SV_LIT("#ifdef CN_IMPLEMENTATION"));
+
+    // Will be used on every doc. Cleared on every new doc.
+    Nob_String_Builder doc_text_sb = {0};           // Summary and tag texts, back to back.
+    Nob_String_Builder doc_description_sb = {0};
+    Doc_Entry doc_entry = {0};
+
+    while (true) {
+        // Getting doc comment.
+        content = doc_trim_sv_till(content, DOC_SV_LIT("/**"));
+        if (content.data == NULL) break;
+
+        // Chopping /** away.
+        nob_sv_chop_left(&content, 3);
+
+        // Getting doc text.
+        Nob_String_View doc = doc_get_sv_till(content, DOC_SV_LIT("*/"));
+        nob_sv_chop_left(&content, doc.count + 2); // +2 for "*/".
+
+        // Getting declaration.
+        Nob_String_View decl = content;
+        decl = nob_sv_trim_left(decl);  // Removing any white space (newline, etc...).
+
+        decl = doc_get_sv_till(decl, DOC_SV_LIT("\n"));
+
+        // Skipping declarations without CNDEF.
+        if (!nob_sv_starts_with(decl, DOC_SV_LIT("CNDEF"))) {
+            continue;
+        }
+
+        // Geting name based on `cn_` and detecting if it is a function, if not skipping it too.
+        // Internal `cn__` names are omitted too.
+        Nob_String_View symbol = decl;
+        symbol = doc_trim_sv_till(symbol, DOC_SV_LIT("cn_"));
+
+        // Gettting symbol based on prefix.
+        if (symbol.data == NULL) {
+            nob_log(NOB_WARNING, "Non-prefixed symbol name, is not detected in declaration: '%.*s'.", DOC_SV_UNPACK(decl));
+            continue;
+        }
+
+        // Internal declaration skipped.
+        if (symbol.count < 4 || symbol.data[3] == '_') {
+            continue;
+        }
+
+        // Getting end of the symbol.
+        Nob_String_View symbol_end = doc_trim_sv_till(symbol, DOC_SV_LIT("("));
+        if (symbol_end.data == NULL) {
+            symbol_end = doc_trim_sv_till(symbol, DOC_SV_LIT(";"));
+            if (symbol_end.data == NULL) {
+                nob_log(NOB_WARNING, "Unidentified symbol name, '(' or ';' is not detected in declaration: '%.*s'.", DOC_SV_UNPACK(decl));
+                continue;
+            }
+        }
+        symbol.count -= symbol_end.count;
+
+        
+        // Assembling doc entry, one at a time.
+        doc_entry.symbol = symbol;
+
+        // Signature for display: without CNDEF prefix and trailing ';'.
+        Nob_String_View signature = decl;
+        nob_sv_chop_left(&signature, DOC_SV_LIT("CNDEF").count);
+        signature = nob_sv_trim(signature);
+        if (signature.count > 0 && signature.data[signature.count - 1] == ';') signature.count--;
+        doc_entry.decl = nob_sv_trim_right(signature);
+        doc_entry.tags.count = 0;
+        doc_entry.summary = (Nob_String_View) {0};
+        doc_entry.description = (Nob_String_View) {0};
+
+        doc_text_sb.count = 0;
+        doc_description_sb.count = 0;
+
+        // Examining doc line by line.
+        // Consecutive lines are joined with '\n' into whatever is currently open: summary, tag or description.
+        // A blank line closes it. Text after a blank line goes to description, a tag line always opens a new tag.
+        // Inside ``` fences lines are kept verbatim: indentation and blank lines stay, tags are not detected.
+        Doc_Target target = DOC_TARGET_NONE;
+        bool has_content = false;
+        bool in_fence = false;
+
+        while (doc.count > 0) {
+            Nob_String_View raw = nob_sv_trim(nob_sv_chop_by_delim(&doc, '\n'));
+
+            // Removing leading "*" and only one space after it, so indentation inside fences survives.
+            if (nob_sv_starts_with(raw, DOC_SV_LIT("*"))) {
+                nob_sv_chop_left(&raw, 1);
+                if (nob_sv_starts_with(raw, DOC_SV_LIT(" "))) nob_sv_chop_left(&raw, 1);
+            }
+
+            Nob_String_View line = nob_sv_trim_left(raw);
+
+            // Fence line toggles fence, unless fence is also closed on the same line, like ```code```.
+            bool is_fence = nob_sv_starts_with(line, DOC_SV_LIT("```"));
+            bool toggles_fence = is_fence && doc_trim_sv_till(nob_sv_from_parts(line.data + 3, line.count - 3), DOC_SV_LIT("```")).data == NULL;
+
+            if (in_fence) {
+                // Target is always open here, opening fence line opened it.
+                if (toggles_fence) in_fence = false;
+                doc_append_to_target(&doc_entry, &doc_text_sb, &doc_description_sb, target, toggles_fence ? line : raw);
+                continue;
+            }
+
+            // Blank line closes current summary, tag or description paragraph.
+            if (line.count == 0) {
+                target = DOC_TARGET_NONE;
+                continue;
+            }
+
+            // Tag lines have priority, they are checked first.
+            Nob_String_View tag_sv = doc_get_sv_till(line, DOC_SV_LIT(":"));
+            size_t tag_length = tag_sv.count + 1; // +1 for ':'.
+
+            // "PARAM name: text", name of the parameter is kept in the text as "name: text".
+            if (nob_sv_starts_with(tag_sv, DOC_SV_LIT("PARAM ")) && doc_sv_is_identifier(nob_sv_from_parts(tag_sv.data + 6, tag_sv.count - 6))) {
+                tag_sv.count = 5;
+                tag_length = 6;
+            }
+
+            Doc_Tag_Kind tag_kind = is_fence ? UNKNOWN : doc_sv_to_tag(tag_sv);
+            if (tag_kind != UNKNOWN) {
+                Doc_Tag tag = { .kind = tag_kind };
+                nob_da_append(&doc_entry.tags, tag);
+
+                // Removing tag from the line to just add text.
+                nob_sv_chop_left(&line, tag_length);
+                line = nob_sv_trim_left(line);
+                doc_append_line(&doc_text_sb, &nob_da_last(&doc_entry.tags).text.count, line);
+
+                target = DOC_TARGET_TAG;
+                has_content = true;
+                continue;
+            }
+
+            if (target == DOC_TARGET_NONE) {
+                if (!has_content) {
+                    // Summary only starts from the very first line, if it is tagged summary is skipped.
+                    target = DOC_TARGET_SUMMARY;
+                } else {
+                    // New description paragraph. Together with '\n' added on append,
+                    // paragraphs end up separated by blank line, same as in markdown.
+                    if (doc_description_sb.count != 0) nob_da_append(&doc_description_sb, '\n');
+                    target = DOC_TARGET_DESCRIPTION;
+                }
+            }
+
+            if (toggles_fence) in_fence = true;
+            doc_append_to_target(&doc_entry, &doc_text_sb, &doc_description_sb, target, line);
+            has_content = true;
+        }
+
+        if (in_fence) {
+            nob_log(NOB_WARNING, "Unclosed ``` code block in documentation of '%.*s'.", DOC_SV_UNPACK(symbol));
+        }
+
+        // Summary and tag texts are stored back to back in doc_text_sb, only counts were recorded,
+        // since sb might have been reallocated while appending. Now pointing views into final buffer.
+        const char *text_cursor = doc_text_sb.items;
+        doc_entry.summary.data = text_cursor;
+        text_cursor += doc_entry.summary.count;
+        nob_da_foreach(Doc_Tag, tag, &doc_entry.tags) {
+            tag->text.data = text_cursor;
+            text_cursor += tag->text.count;
+        }
+
+        doc_entry.description = nob_sb_to_sv(doc_description_sb);
+
+
+        if (entry_count > 0) fputs(",\n", json);
+        doc_print_json_entry(json, &doc_entry);
+        entry_count++;
+    }
+
+    fputs(entry_count > 0 ? "\n]\n" : "]\n", json);
+    fclose(json);
+    nob_log(NOB_INFO, "Wrote %zu documentation entries to '%s'.", entry_count, json_path);
+
+    nob_da_free(doc_entry.tags);
+    nob_sb_free(doc_text_sb);
+    nob_sb_free(doc_description_sb);
+
+    nob_sb_free(sb);
 
     return 0;
 }
