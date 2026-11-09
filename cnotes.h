@@ -1568,6 +1568,7 @@ union cn_type {
 
 extern const Cn_Type CN_TYPE_INT;
 extern const Cn_Type CN_TYPE_FLOAT;
+extern const Cn_Type CN_TYPE_DOUBLE;
 extern const Cn_Type CN_TYPE_CHAR;
 extern const Cn_Type CN_TYPE_VOID;
 extern const Cn_Type CN_TYPE_PTRDIFF;
@@ -2469,7 +2470,8 @@ struct cn_ast_declarator { CN_AST_BASE;
 
 struct cn_ast_pointer { CN_AST_BASE;
     Cn_Ast_Qualifier_Flags qualifiers;
-    Cn_Ast_Pointer    *pointer;     // Can be NULL.
+    Cn_Ast_Nodes           gnu_attribute_specifiers; // List of Cn_Ast_Gnu_Attribute_Specifier.
+    Cn_Ast_Pointer        *pointer;     // Can be NULL.
 };
 
 struct cn_ast_direct_declarator_grouped { CN_AST_BASE;
@@ -4013,7 +4015,7 @@ CNDEF Cn_Ast_Declarator *cn_parse_declarator(Cn_Lexer *lexer, bool *ok);
  *
  * ```
  *  pointer
- *          : '*' qualifier* pointer?
+ *          : '*' (qualifier | gnu_attribute_specifier)* pointer?
  *          ;
  * ```
  *
@@ -4303,7 +4305,7 @@ CNDEF Cn_Ast_Node *cn_parse_struct_or_union_specifier(Cn_Lexer *lexer);
  *
  * ```
  *  member_declaration
- *          : attribute_specifiers specifier_qualifier member_declarators ';'
+ *          : '__extension__'? attribute_specifiers specifier_qualifier member_declarators ';'
  *          ;
  * ```
  *
@@ -6712,6 +6714,7 @@ const Cn_Token_Literal CN_KEYWORD_TOKENS[] = {
     { CN_TOKEN_RESTRICT,        CN_STR_BUFFER("restrict") },
     { CN_TOKEN_RESTRICT,        CN_STR_BUFFER("__restrict") },
     { CN_TOKEN_VOLATILE,        CN_STR_BUFFER("volatile") },
+    { CN_TOKEN_VOLATILE,        CN_STR_BUFFER("__volatile__") },
     { CN_TOKEN_ATOMIC,          CN_STR_BUFFER("_Atomic") },
     { CN_TOKEN_STATIC,          CN_STR_BUFFER("static") },
     { CN_TOKEN_EXTERN,          CN_STR_BUFFER("extern") },
@@ -6746,6 +6749,7 @@ const Cn_Token_Literal CN_KEYWORD_TOKENS[] = {
     { CN_TOKEN_SIZEOF,          CN_STR_BUFFER("sizeof") },
     { CN_TOKEN_INLINE,          CN_STR_BUFFER("inline") },
     { CN_TOKEN_INLINE,          CN_STR_BUFFER("__inline") },
+    { CN_TOKEN_INLINE,          CN_STR_BUFFER("__inline__") },
     { CN_TOKEN_NORETURN,        CN_STR_BUFFER("_Noreturn") },
     { CN_TOKEN_ASM,             CN_STR_BUFFER("asm") },
     { CN_TOKEN_ASM,             CN_STR_BUFFER("__asm__") },
@@ -7439,6 +7443,13 @@ const Cn_Type CN_TYPE_FLOAT = {
     .kind = CN_FLOAT,
 };
 
+const Cn_Type CN_TYPE_DOUBLE = { 
+    .flags = CN_TYPE_COMPLETE,
+    .size = sizeof(double), 
+    .align = sizeof(double), 
+    .kind = CN_FLOAT,
+};
+
 const Cn_Type CN_TYPE_CHAR = { 
     .integer.flags = CN_TYPE_COMPLETE,
     .integer.size = sizeof(char), 
@@ -7873,7 +7884,7 @@ CNDEF Cn_Type *cn_type_unqualified(const Cn_Type *type) {
 
 CNDEF bool cn_type_is_arithmetic(const Cn_Type *type) {
     // _Bool is unsigned integer type in C. 
-    return type->kind == CN_INTEGER || type->kind == CN_FLOAT || type->kind == CN_ENUM || type->kind == CN_BOOL;
+    return type->kind == CN_INTEGER || type->kind == CN_FLOAT || type->kind == CN_ENUM || type->kind == CN_BOOL || type->kind == CN_OPAQUE;
 }
 
 CNDEF bool cn_type_is_assignable(const Cn_Type *to, const Cn_Type *from) {
@@ -10037,7 +10048,16 @@ CNDEF bool cn__analyze_declaration_opt(void *declaration_specifiers, Cn_Analyze_
 
     // No declarator, then just analyzing declaration specifiers.
     if (decl == NULL) {
+        // In the case of attribute only declarations we just let it pass by for now. 
+        // Later they can be utilized to generate type by meta program that user made. 
+        // But for now they are not analyzed for any type information.
+        if (decl_spec->type_specifier == NULL) return true;
+            
         return cn_analyze_to_type(decl_spec->qualifiers, decl_spec->type_specifier, NULL, 0) != NULL;
+    }
+
+    if (decl_spec->type_specifier == NULL) {
+        cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, decl_spec, CN_DC_MISSING_DECLARATION_SPECIFIER, "Type specifier must be present in analyzed declaration.");
     }
 
     // Getting type.
@@ -10864,7 +10884,9 @@ error:
 }
  
 CNDEF Cn_Type *cn_analyze_to_type(Cn_Ast_Qualifier_Flags qualifier, void *type_specifier, void *declarator, Cn_Analyze_Flags flags) {
+
     // Base type named by the specifier.
+    CN_ASSERT(type_specifier != NULL);
     Cn_Type *result = cn__analyze_base_type_from_specifier(type_specifier);
     if (result == NULL) goto error;
  
@@ -11191,40 +11213,50 @@ CNDEF Cn_Type *cn__analyze_typecheck_access(Cn_Ast_Node *node) {
     // Removing qualifiers from base type here, won't need them.
     base = cn_type_unqualified(base);
 
-    Cn_Type *struct_type;
+    Cn_Type *struct_or_union_type;
     if (cn_ast_as(Access, node)->pointer) {
         // '->' : operand must be a pointer to a struct/union.
         if (base->kind != CN_POINTER) {
             cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, node, CN_DC_ILLEGAL_TYPE, "'->' requires a pointer operand.");
             goto error;
         }
-        struct_type = ((Cn_Type_Pointer *)base)->ptr_to;
+        struct_or_union_type = ((Cn_Type_Pointer *)base)->ptr_to;
     } else {
         // '.' : operand must be a struct/union directly.
-        struct_type = base;
+        struct_or_union_type = base;
     }
 
     // Stripping qualifiers because, we won't need them in following checks.
-    struct_type = cn_type_unqualified(struct_type);
+    struct_or_union_type = cn_type_unqualified(struct_or_union_type);
 
-    // TODO: Allow CN_UNION once union types are implemented.
-    if (struct_type->kind != CN_STRUCT) {
-        cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, node, CN_DC_ILLEGAL_TYPE, "Member access on non-struct type.");
+    if (struct_or_union_type->kind != CN_STRUCT && struct_or_union_type->kind != CN_UNION) {
+        cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, node, CN_DC_ILLEGAL_TYPE, "Member access on non-struct or non-union type.");
         goto error;
     }
 
-    if (!(struct_type->flags & CN_TYPE_COMPLETE)) {
+    if (!(struct_or_union_type->flags & CN_TYPE_COMPLETE)) {
         cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, node, CN_DC_INCOMPLETE_TYPE, "Cannot access member of incomplete type.");
         goto error;
     }
 
     Cn_Ast_Identifier *ident = (cn_ast_as(Access, node)->member);
-    Cn_Type_Struct *ts = (Cn_Type_Struct *)struct_type;
-    for (int64_t i = 0; i < ts->members_length; i++) {
-        if (cn_str_equals(&ts->members[i].name, &ident->name)) {
-            return ts->members[i].type;
+    
+    if (struct_or_union_type->kind == CN_STRUCT) {
+        Cn_Type_Struct *ts = (Cn_Type_Struct *)struct_or_union_type;
+        for (int64_t i = 0; i < ts->members_length; i++) {
+            if (cn_str_equals(&ts->members[i].name, &ident->name)) {
+                return ts->members[i].type;
+            }
+        }
+    } else {
+        Cn_Type_Union *tu = (Cn_Type_Union *)struct_or_union_type;
+        for (int64_t i = 0; i < tu->members_length; i++) {
+            if (cn_str_equals(&tu->members[i].name, &ident->name)) {
+                return tu->members[i].type;
+            }
         }
     }
+
 
     cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, node, CN_DC_INVALID_SYMBOL, "No member named '%.*s' in struct.", CN_STR_UNPACK(ident->name));
     goto error;
@@ -12195,8 +12227,8 @@ CNDEF Cn_Any cn__analyze_evaluate_sizeof(Cn_Ast_Node *node, void *buffer) {
 
     Cn_Type *operand_type;
     if (child->kind == CN_AST_TYPE_NAME) {
-        Cn_Ast_Node *sq = cn_ast_node((cn_ast_as(Type_Name, child)->specifier_qualifier));
-        operand_type = cn_analyze_to_type(cn_ast_as(Specifier_Qualifier, sq)->qualifiers, cn_ast_as(Specifier_Qualifier, sq)->type_specifier, cn_ast_as(Type_Name, child)->abstract_declarator, 0);
+        Cn_Ast_Specifier_Qualifier *sq = (Cn_Ast_Specifier_Qualifier *)cn_ast_node((cn_ast_as(Type_Name, child)->specifier_qualifier));
+        operand_type    = cn_analyze_to_type(cn_ast_as(Specifier_Qualifier, sq)->qualifiers, cn_ast_as(Specifier_Qualifier, sq)->type_specifier, cn_ast_as(Type_Name, child)->abstract_declarator, 0);
     } else {
         // The operand of sizeof is unevaluated, only its type is needed.
         operand_type = cn_get_expression_type(cn_ast_as(Sizeof, node)->target);
@@ -13058,10 +13090,11 @@ CNDEF void cn__emit_call(Cn_Emitter *e, Cn_Ast_Call *node) {
 }
 
 CNDEF void cn__emit_cast(Cn_Emitter *e, Cn_Ast_Cast *node) {
-    cn__emit_str_lit(e, "(");
+    cn__emit_str_lit(e, "((");
     cn_emit(e, node->type_name);
     cn__emit_str_lit(e, ")");
     cn_emit(e, node->expression);
+    cn__emit_str_lit(e, ")");
 }
 
 CNDEF void cn__emit_compound(Cn_Emitter *e, Cn_Ast_Compound *node) {
@@ -13577,6 +13610,226 @@ CNDEF bool cn_parse_optional(Cn_Lexer *lexer, Cn_Token_Type type) {
     return false;
 }
 
+
+const char *const CN_OPAQUE_BUILTINS[] = {
+    // ---- varargs ----
+    "__builtin_va_start", "__builtin_va_end", "__builtin_va_copy",
+    "__builtin_c23_va_start", "__builtin_va_arg_pack", "__builtin_va_arg_pack_len",
+    "__builtin_apply_args", "__builtin_apply", "__builtin_return",
+
+    // ---- bit manipulation ----
+    "__builtin_clz", "__builtin_clzl", "__builtin_clzll", "__builtin_clzg",
+    "__builtin_ctz", "__builtin_ctzl", "__builtin_ctzll", "__builtin_ctzg",
+    "__builtin_clrsb", "__builtin_clrsbl", "__builtin_clrsbll", "__builtin_clrsbg",
+    "__builtin_ffs", "__builtin_ffsl", "__builtin_ffsll", "__builtin_ffsg",
+    "__builtin_popcount", "__builtin_popcountl", "__builtin_popcountll", "__builtin_popcountg",
+    "__builtin_parity", "__builtin_parityl", "__builtin_parityll", "__builtin_parityg",
+    "__builtin_bswap16", "__builtin_bswap32", "__builtin_bswap64", "__builtin_bswap128",
+    "__builtin_bitreverse8", "__builtin_bitreverse16", "__builtin_bitreverse32", "__builtin_bitreverse64",
+    "__builtin_rotateleft8", "__builtin_rotateleft16", "__builtin_rotateleft32", "__builtin_rotateleft64",
+    "__builtin_rotateright8", "__builtin_rotateright16", "__builtin_rotateright32", "__builtin_rotateright64",
+
+    // ---- C23 <stdbit.h> (GCC 14+) ----
+    "__builtin_stdc_bit_ceil", "__builtin_stdc_bit_floor", "__builtin_stdc_bit_width",
+    "__builtin_stdc_count_ones", "__builtin_stdc_count_zeros",
+    "__builtin_stdc_first_leading_one", "__builtin_stdc_first_leading_zero",
+    "__builtin_stdc_first_trailing_one", "__builtin_stdc_first_trailing_zero",
+    "__builtin_stdc_has_single_bit",
+    "__builtin_stdc_leading_ones", "__builtin_stdc_leading_zeros",
+    "__builtin_stdc_trailing_ones", "__builtin_stdc_trailing_zeros",
+    "__builtin_stdc_rotate_left", "__builtin_stdc_rotate_right",
+
+    // ---- overflow-checked arithmetic ----
+    "__builtin_add_overflow", "__builtin_sub_overflow", "__builtin_mul_overflow",
+    "__builtin_add_overflow_p", "__builtin_sub_overflow_p", "__builtin_mul_overflow_p",
+    "__builtin_sadd_overflow", "__builtin_saddl_overflow", "__builtin_saddll_overflow",
+    "__builtin_ssub_overflow", "__builtin_ssubl_overflow", "__builtin_ssubll_overflow",
+    "__builtin_smul_overflow", "__builtin_smull_overflow", "__builtin_smulll_overflow",
+    "__builtin_uadd_overflow", "__builtin_uaddl_overflow", "__builtin_uaddll_overflow",
+    "__builtin_usub_overflow", "__builtin_usubl_overflow", "__builtin_usubll_overflow",
+    "__builtin_umul_overflow", "__builtin_umull_overflow", "__builtin_umulll_overflow",
+    "__builtin_addc", "__builtin_addcl", "__builtin_addcll",
+    "__builtin_subc", "__builtin_subcl", "__builtin_subcll",
+
+    // ---- compiler hints / control ----
+    "__builtin_expect", "__builtin_expect_with_probability",
+    "__builtin_unreachable", "__builtin_trap", "__builtin_debugtrap", "__builtin_assume",
+    "__builtin_assume_aligned", "__builtin_assume_separate_storage",
+    "__builtin_prefetch", "__builtin_constant_p", "__builtin_is_constant_evaluated",
+    "__builtin_object_size", "__builtin_dynamic_object_size",
+    "__builtin_classify_type", "__builtin_speculation_safe_value",
+    "__builtin_clear_padding", "__builtin_launder", "__builtin_addressof",
+    "__builtin_complex", "__builtin_shuffle", "__builtin_shufflevector",
+    "__builtin_LINE", "__builtin_FILE", "__builtin_FUNCTION",
+    "__builtin_frame_address", "__builtin_return_address", "__builtin_extract_return_addr",
+    "__builtin_frob_return_addr", "__builtin_extend_pointer",
+    "__builtin_alloca", "__builtin_alloca_with_align", "__builtin_alloca_with_align_and_max",
+    "__builtin_setjmp", "__builtin_longjmp",
+    "__builtin___clear_cache", "__builtin_eh_return_data_regno",
+    "__builtin_cpu_init", "__builtin_cpu_is", "__builtin_cpu_supports",
+
+    // ---- floating point classification / constants ----
+    "__builtin_huge_val", "__builtin_huge_valf", "__builtin_huge_vall", "__builtin_huge_valf128",
+    "__builtin_inf", "__builtin_inff", "__builtin_infl", "__builtin_inff128",
+    "__builtin_nan", "__builtin_nanf", "__builtin_nanl", "__builtin_nanf128",
+    "__builtin_nans", "__builtin_nansf", "__builtin_nansl", "__builtin_nansf128",
+    "__builtin_isnan", "__builtin_isinf", "__builtin_isinf_sign", "__builtin_isfinite",
+    "__builtin_isnormal", "__builtin_issubnormal", "__builtin_iszero", "__builtin_issignaling",
+    "__builtin_signbit", "__builtin_signbitf", "__builtin_signbitl",
+    "__builtin_fpclassify", "__builtin_isfpclass",
+    "__builtin_isgreater", "__builtin_isgreaterequal", "__builtin_isless",
+    "__builtin_islessequal", "__builtin_islessgreater", "__builtin_isunordered",
+    "__builtin_iseqsig", "__builtin_flt_rounds",
+
+    // ---- libm wrappers commonly seen in headers ----
+    "__builtin_fabs", "__builtin_fabsf", "__builtin_fabsl", "__builtin_fabsf128",
+    "__builtin_copysign", "__builtin_copysignf", "__builtin_copysignl", "__builtin_copysignf128",
+    "__builtin_sqrt", "__builtin_sqrtf", "__builtin_sqrtl",
+    "__builtin_fmax", "__builtin_fmaxf", "__builtin_fmaxl",
+    "__builtin_fmin", "__builtin_fminf", "__builtin_fminl",
+    "__builtin_fma", "__builtin_fmaf", "__builtin_fmal",
+    "__builtin_floor", "__builtin_floorf", "__builtin_floorl",
+    "__builtin_ceil", "__builtin_ceilf", "__builtin_ceill",
+    "__builtin_trunc", "__builtin_truncf", "__builtin_truncl",
+    "__builtin_round", "__builtin_roundf", "__builtin_roundl",
+    "__builtin_rint", "__builtin_rintf", "__builtin_rintl",
+    "__builtin_lrint", "__builtin_lrintf", "__builtin_llrint", "__builtin_llrintf",
+    "__builtin_lround", "__builtin_lroundf", "__builtin_llround", "__builtin_llroundf",
+
+    // ---- libc wrappers (string.h / stdlib.h / _FORTIFY_SOURCE) ----
+    "__builtin_memcpy", "__builtin_memmove", "__builtin_memset", "__builtin_memcmp",
+    "__builtin_memchr", "__builtin_mempcpy", "__builtin_bcmp", "__builtin_bzero",
+    "__builtin_strlen", "__builtin_strnlen", "__builtin_strcmp", "__builtin_strncmp",
+    "__builtin_strcpy", "__builtin_strncpy", "__builtin_stpcpy", "__builtin_stpncpy",
+    "__builtin_strcat", "__builtin_strncat", "__builtin_strchr", "__builtin_strrchr",
+    "__builtin_strstr", "__builtin_strdup", "__builtin_strndup",
+    "__builtin_abort", "__builtin_exit", "__builtin__exit", "__builtin_malloc",
+    "__builtin_calloc", "__builtin_free", "__builtin_realloc",
+    "__builtin_abs", "__builtin_labs", "__builtin_llabs",
+    "__builtin_printf", "__builtin_sprintf", "__builtin_snprintf",
+    "__builtin_vsprintf", "__builtin_vsnprintf", "__builtin_puts", "__builtin_putchar",
+    "__builtin___memcpy_chk", "__builtin___memmove_chk", "__builtin___memset_chk",
+    "__builtin___mempcpy_chk", "__builtin___strcpy_chk", "__builtin___stpcpy_chk",
+    "__builtin___strncpy_chk", "__builtin___stpncpy_chk",
+    "__builtin___strcat_chk", "__builtin___strncat_chk",
+    "__builtin___sprintf_chk", "__builtin___snprintf_chk",
+    "__builtin___vsprintf_chk", "__builtin___vsnprintf_chk",
+    "__builtin___printf_chk", "__builtin___fprintf_chk",
+    "__builtin___vprintf_chk", "__builtin___vfprintf_chk",
+
+    // ---- __atomic_* (GCC/Clang) ----
+    "__atomic_load", "__atomic_load_n", "__atomic_store", "__atomic_store_n",
+    "__atomic_exchange", "__atomic_exchange_n",
+    "__atomic_compare_exchange", "__atomic_compare_exchange_n",
+    "__atomic_add_fetch", "__atomic_sub_fetch", "__atomic_and_fetch",
+    "__atomic_xor_fetch", "__atomic_or_fetch", "__atomic_nand_fetch",
+    "__atomic_fetch_add", "__atomic_fetch_sub", "__atomic_fetch_and",
+    "__atomic_fetch_xor", "__atomic_fetch_or", "__atomic_fetch_nand",
+    "__atomic_fetch_min", "__atomic_fetch_max",
+    "__atomic_test_and_set", "__atomic_clear",
+    "__atomic_thread_fence", "__atomic_signal_fence",
+    "__atomic_always_lock_free", "__atomic_is_lock_free",
+
+    // ---- __c11_atomic_* (Clang <stdatomic.h>) ----
+    "__c11_atomic_init", "__c11_atomic_load", "__c11_atomic_store",
+    "__c11_atomic_exchange",
+    "__c11_atomic_compare_exchange_strong", "__c11_atomic_compare_exchange_weak",
+    "__c11_atomic_fetch_add", "__c11_atomic_fetch_sub", "__c11_atomic_fetch_and",
+    "__c11_atomic_fetch_or", "__c11_atomic_fetch_xor", "__c11_atomic_fetch_nand",
+    "__c11_atomic_fetch_min", "__c11_atomic_fetch_max",
+    "__c11_atomic_thread_fence", "__c11_atomic_signal_fence", "__c11_atomic_is_lock_free",
+
+    // ---- legacy __sync_* ----
+    "__sync_fetch_and_add", "__sync_fetch_and_sub", "__sync_fetch_and_or",
+    "__sync_fetch_and_and", "__sync_fetch_and_xor", "__sync_fetch_and_nand",
+    "__sync_add_and_fetch", "__sync_sub_and_fetch", "__sync_or_and_fetch",
+    "__sync_and_and_fetch", "__sync_xor_and_fetch", "__sync_nand_and_fetch",
+    "__sync_bool_compare_and_swap", "__sync_val_compare_and_swap",
+    "__sync_synchronize", "__sync_lock_test_and_set", "__sync_lock_release",
+
+    // ---- x86_64 (scalar / system; from x86gprintrin.h, ia32intrin.h, etc.) ----
+    "__builtin_ia32_bsrsi", "__builtin_ia32_bsrdi",
+    "__builtin_ia32_crc32qi", "__builtin_ia32_crc32hi",
+    "__builtin_ia32_crc32si", "__builtin_ia32_crc32di",
+    "__builtin_ia32_rdpmc", "__builtin_ia32_rdtsc", "__builtin_ia32_rdtscp",
+    "__builtin_ia32_rolqi", "__builtin_ia32_rolhi",
+    "__builtin_ia32_rorqi", "__builtin_ia32_rorhi",
+    "__builtin_ia32_pause",
+    "__builtin_ia32_readeflags_u32", "__builtin_ia32_readeflags_u64",
+    "__builtin_ia32_writeeflags_u32", "__builtin_ia32_writeeflags_u64",
+    "__builtin_ia32_sbb_u32", "__builtin_ia32_sbb_u64",
+    "__builtin_ia32_addcarryx_u32", "__builtin_ia32_addcarryx_u64",
+    "__builtin_ia32_subborrow_u32", "__builtin_ia32_subborrow_u64",
+    "__builtin_ia32_lzcnt_u16", "__builtin_ia32_lzcnt_u32", "__builtin_ia32_lzcnt_u64",
+    "__builtin_ia32_tzcnt_u16", "__builtin_ia32_tzcnt_u32", "__builtin_ia32_tzcnt_u64",
+    "__builtin_ia32_bextr_u32", "__builtin_ia32_bextr_u64",
+    "__builtin_ia32_bextri_u32", "__builtin_ia32_bextri_u64",
+    "__builtin_ia32_bzhi_si", "__builtin_ia32_bzhi_di",
+    "__builtin_ia32_pdep_si", "__builtin_ia32_pdep_di",
+    "__builtin_ia32_pext_si", "__builtin_ia32_pext_di",
+    "__builtin_ia32_rdrand16_step", "__builtin_ia32_rdrand32_step", "__builtin_ia32_rdrand64_step",
+    "__builtin_ia32_rdseed_hi_step", "__builtin_ia32_rdseed_si_step", "__builtin_ia32_rdseed_di_step",
+    "__builtin_ia32_rdseed16_step", "__builtin_ia32_rdseed32_step", "__builtin_ia32_rdseed64_step",
+    "__builtin_ia32_rdpid", "__builtin_ia32_rdpkru", "__builtin_ia32_wrpkru",
+    "__builtin_ia32_rdfsbase32", "__builtin_ia32_rdfsbase64",
+    "__builtin_ia32_rdgsbase32", "__builtin_ia32_rdgsbase64",
+    "__builtin_ia32_wrfsbase32", "__builtin_ia32_wrfsbase64",
+    "__builtin_ia32_wrgsbase32", "__builtin_ia32_wrgsbase64",
+    "__builtin_ia32_sfence", "__builtin_ia32_lfence", "__builtin_ia32_mfence",
+    "__builtin_ia32_clflush", "__builtin_ia32_clflushopt", "__builtin_ia32_clwb",
+    "__builtin_ia32_cldemote", "__builtin_ia32_serialize",
+    "__builtin_ia32_wbinvd", "__builtin_ia32_wbnoinvd",
+    "__builtin_ia32_monitor", "__builtin_ia32_mwait",
+    "__builtin_ia32_monitorx", "__builtin_ia32_mwaitx", "__builtin_ia32_clzero",
+    "__builtin_ia32_umonitor", "__builtin_ia32_umwait", "__builtin_ia32_tpause",
+    "__builtin_ia32_ldmxcsr", "__builtin_ia32_stmxcsr", "__builtin_ia32_emms",
+    "__builtin_ia32_xbegin", "__builtin_ia32_xend", "__builtin_ia32_xabort", "__builtin_ia32_xtest",
+    "__builtin_ia32_xsusldtrk", "__builtin_ia32_xresldtrk",
+    "__builtin_ia32_xgetbv", "__builtin_ia32_xsetbv",
+    "__builtin_ia32_fxsave", "__builtin_ia32_fxrstor",
+    "__builtin_ia32_fxsave64", "__builtin_ia32_fxrstor64",
+    "__builtin_ia32_xsave", "__builtin_ia32_xrstor",
+    "__builtin_ia32_xsave64", "__builtin_ia32_xrstor64",
+    "__builtin_ia32_xsaveopt", "__builtin_ia32_xsaveopt64",
+    "__builtin_ia32_xsavec", "__builtin_ia32_xsavec64",
+    "__builtin_ia32_xsaves", "__builtin_ia32_xsaves64",
+    "__builtin_ia32_xrstors", "__builtin_ia32_xrstors64",
+    "__builtin_ia32_ptwrite32", "__builtin_ia32_ptwrite64",
+    "__builtin_ia32_incsspd", "__builtin_ia32_incsspq",
+    "__builtin_ia32_rdsspd", "__builtin_ia32_rdsspq",
+    "__builtin_ia32_saveprevssp", "__builtin_ia32_rstorssp",
+    "__builtin_ia32_wrssd", "__builtin_ia32_wrssq",
+    "__builtin_ia32_wrussd", "__builtin_ia32_wrussq",
+    "__builtin_ia32_setssbsy", "__builtin_ia32_clrssbsy",
+    "__builtin_ia32_movdir64b", "__builtin_ia32_directstoreu_u32", "__builtin_ia32_directstoreu_u64",
+    "__builtin_ia32_enqcmd", "__builtin_ia32_enqcmds",
+    "__builtin_ia32_senduipi", "__builtin_ia32_testui", "__builtin_ia32_clui",
+    "__builtin_ia32_stui", "__builtin_ia32_uiret",
+    "__builtin_ia32_hreset",
+    // AMD LWP (lwpintrin.h)
+    "__builtin_ia32_llwpcb", "__builtin_ia32_slwpcb",
+    "__builtin_ia32_lwpval32", "__builtin_ia32_lwpval64",
+    "__builtin_ia32_lwpins32", "__builtin_ia32_lwpins64",
+    // AMD misc (rdpruintrin.h, invlpgbintrin.h)
+    "__builtin_ia32_rdpru", "__builtin_ia32_invlpgb", "__builtin_ia32_tlbsync",
+    // Intel CMPCCXADD, RAO-INT, USER_MSR, MSRLIST/WRMSRNS, PREFETCHI
+    "__builtin_ia32_cmpccxadd32", "__builtin_ia32_cmpccxadd64",
+    "__builtin_ia32_aadd32", "__builtin_ia32_aadd64",
+    "__builtin_ia32_aand32", "__builtin_ia32_aand64",
+    "__builtin_ia32_aor32", "__builtin_ia32_aor64",
+    "__builtin_ia32_axor32", "__builtin_ia32_axor64",
+    "__builtin_ia32_urdmsr", "__builtin_ia32_uwrmsr",
+    "__builtin_ia32_rdmsrlist", "__builtin_ia32_wrmsrlist", "__builtin_ia32_wrmsrns",
+    "__builtin_ia32_prefetchi",
+    // Intel Key Locker (keylockerintrin.h)
+    "__builtin_ia32_loadiwkey",
+    "__builtin_ia32_encodekey128_u32", "__builtin_ia32_encodekey256_u32",
+    "__builtin_ia32_aesenc128kl_u8", "__builtin_ia32_aesdec128kl_u8",
+    "__builtin_ia32_aesenc256kl_u8", "__builtin_ia32_aesdec256kl_u8",
+    "__builtin_ia32_aesencwide128kl_u8", "__builtin_ia32_aesdecwide128kl_u8",
+    "__builtin_ia32_aesencwide256kl_u8", "__builtin_ia32_aesdecwide256kl_u8",
+};
+
 CNDEF Cn_Ast_Translation_Unit *cn_parse_translation_unit(Cn_Lexer *lexer) {
     Cn_Lexer original_state = *lexer;
 
@@ -13590,12 +13843,14 @@ CNDEF Cn_Ast_Translation_Unit *cn_parse_translation_unit(Cn_Lexer *lexer) {
         Cn_Type *opaque = cn__ast_add_type_if_not((Cn_Type *)&CN_TYPE_OPAQUE);
 
         cn_binding_declare_typedef(CN_STR_LIT("__builtin_va_list"),              NULL, opaque);
-        cn_binding_declare_function(CN_STR_LIT("__builtin___sprintf_chk"),       NULL, 0, 0, opaque, NULL, false);
-        cn_binding_declare_function(CN_STR_LIT("__builtin___snprintf_chk"),      NULL, 0, 0, opaque, NULL, false);
-        cn_binding_declare_function(CN_STR_LIT("__builtin___vsprintf_chk"),      NULL, 0, 0, opaque, NULL, false);
-        cn_binding_declare_function(CN_STR_LIT("__builtin___vsnprintf_chk"),     NULL, 0, 0, opaque, NULL, false);
-        cn_binding_declare_function(CN_STR_LIT("__builtin_va_arg_pack"),         NULL, 0, 0, opaque, NULL, false);
-        cn_binding_declare_function(CN_STR_LIT("__builtin_dynamic_object_size"), NULL, 0, 0, opaque, NULL, false);
+
+        // Very stupid solution for __builtin_ for now.
+        // Potential better solution is to recognize __builtin_ prefix
+        // and automatically create opaque binding.
+        for (size_t i = 0; i < CN_ARRAY_LENGTH(CN_OPAQUE_BUILTINS); i++) {
+            const char *name = CN_OPAQUE_BUILTINS[i];
+            cn_binding_declare_function(CN_STR(strlen(name), name), NULL, 0, 0, opaque, NULL, false);
+        }
     }
 
     int64_t mark = cn_ast_stack_mark();
@@ -15209,14 +15464,25 @@ CNDEF Cn_Ast_Pointer *cn_parse_pointer(Cn_Lexer *lexer) {
     
     if (!cn_parse_expect(lexer, CN_TOKEN_ASTERISK)) goto error;
     
+    int64_t gnu_attr_mark = cn_ast_stack_mark();
+
     int ok;
     while (true) {
         ok = cn_parse_try_qualifier(lexer, &node.qualifiers);
         if (ok == 0) continue;
         if (ok == 2) goto error;
 
+        if (cn_lexer_expect(lexer, CN_TOKEN_GNU_ATTRIBUTE)) {
+            Cn_Ast_Gnu_Attribute_Specifier *gnu_attribute_specifier = cn_parse_gnu_attribute_specifier(lexer);
+            if (gnu_attribute_specifier == NULL) goto error;
+            cn_ast_stack_push(gnu_attribute_specifier);
+            continue;
+        }
+
         break;
     }
+
+    node.gnu_attribute_specifiers = cn_ast_stack_finalize(gnu_attr_mark);
 
     if (cn_lexer_expect(lexer, CN_TOKEN_ASTERISK)) {
         Cn_Ast_Node *child;
@@ -15964,7 +16230,6 @@ CNDEF Cn_Ast_Specifier_Qualifier *cn_parse_specifier_qualifier(Cn_Lexer *lexer) 
     if (primitive_info.kind != CN_AST_TYPE_NONE || primitive_info.width != CN_AST_TYPE_WIDTH_NONE || primitive_info.sign != CN_AST_TYPE_SIGN_NONE) {
         node.type_specifier = (Cn_Ast_Node *) cn__parse_primitive_info_to_type_specifier(&primitive_info, &cn_lexer_token(lexer).loc, &cn_lexer_token(lexer).src);
     }
-
     Cn_Ast_Specifier_Qualifier *idx = cn_ast_new(node);
     return idx;
 
@@ -16142,6 +16407,11 @@ CNDEF Cn_Ast_Member_Declaration *cn_parse_member_declaration(Cn_Lexer *lexer) {
     Cn_Ast_Member_Declaration node = { .kind = CN_AST_MEMBER_DECLARATION, .loc = cn_lexer_token(lexer).loc, .src = cn_lexer_token(lexer).src };
 
     bool ok;
+
+    // Optional '__extension__' symbol.
+    if (cn_lexer_token(lexer).type == CN_TOKEN_GNU_EXTENSION) {
+        cn_lexer_next_token(lexer);
+    }
 
     node.attribute_specifiers = cn_parse_attribute_specifiers(lexer, &ok);
     if (!ok) goto error;
