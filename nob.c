@@ -1053,8 +1053,8 @@ int doc_command(int *argc, char ***argv) {
 
         decl = doc_get_sv_till(decl, DOC_SV_LIT("\n"));
 
-        // Skipping declarations without CNDEF.
-        if (!nob_sv_starts_with(decl, DOC_SV_LIT("CNDEF"))) {
+        // Skipping declarations without CNDEF, #define.
+        if (!nob_sv_starts_with(decl, DOC_SV_LIT("CNDEF")) && !nob_sv_starts_with(decl, DOC_SV_LIT("#define"))) {
             continue;
         }
 
@@ -1091,7 +1091,6 @@ int doc_command(int *argc, char ***argv) {
 
         // Signature for display: without CNDEF prefix and trailing ';'.
         Nob_String_View signature = decl;
-        nob_sv_chop_left(&signature, DOC_SV_LIT("CNDEF").count);
         signature = nob_sv_trim(signature);
         if (signature.count > 0 && signature.data[signature.count - 1] == ';') signature.count--;
         doc_entry.decl = nob_sv_trim_right(signature);

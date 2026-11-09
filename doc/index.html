@@ -9,33 +9,14 @@
 </head>
 <body>
     <header class="topbar">
-        <a class="brand" href="#">
-            <span class="brand-name">cnotes.h</span>
-            <span class="brand-sub">API reference</span>
-        </a>
-
-        <div class="search">
-            <svg class="search-icon" viewBox="0 0 24 24" aria-hidden="true">
-                <circle cx="11" cy="11" r="7"></circle>
-                <path d="M20 20l-3.5-3.5"></path>
-            </svg>
-            <input id="search" type="text" placeholder="Search symbols, signatures, docs…"
-                   autocomplete="off" spellcheck="false" aria-label="Search documentation">
-            <button id="search-clear" class="search-clear" type="button" aria-label="Clear search" hidden>&times;</button>
-            <kbd class="search-hint" title="Press / to search">/</kbd>
-        </div>
-
-        <span id="result-count" class="count" aria-live="polite"></span>
+        <a class="brand" href="#">cnotes.h</a>
+        <input id="search" type="search" placeholder="Search  ( / )"
+               autocomplete="off" spellcheck="false" aria-label="Search documentation">
     </header>
 
     <div class="layout">
         <nav id="nav" class="sidebar" aria-label="Symbols"></nav>
-
-        <main class="content">
-            <div id="status" class="status">Loading documentation…</div>
-            <div id="entries"></div>
-            <div id="empty" class="empty" hidden></div>
-        </main>
+        <main id="page" class="content">Loading documentation…</main>
     </div>
 </body>
 </html>

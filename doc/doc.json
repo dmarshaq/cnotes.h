@@ -1,35 +1,35 @@
 [
   {
     "symbol": "cn_default_log_handler",
-    "decl": "Cn_Log_Handler cn_default_log_handler",
+    "decl": "CNDEF Cn_Log_Handler cn_default_log_handler",
     "summary": "Logs formatted message to `stderr`, prefixed with its log level.",
     "description": "",
     "tags": []
   },
   {
     "symbol": "cn_null_log_handler",
-    "decl": "Cn_Log_Handler cn_null_log_handler",
+    "decl": "CNDEF Cn_Log_Handler cn_null_log_handler",
     "summary": "Ignores all incoming logs, doesn't output anything anywhere.",
     "description": "",
     "tags": []
   },
   {
     "symbol": "cn_log",
-    "decl": "void cn_log(Cn_Log_Level level, const char *format, ...)",
+    "decl": "CNDEF void cn_log(Cn_Log_Level level, const char *format, ...)",
     "summary": "Passes formatted log message to the current log handler.",
     "description": "Message is printed by calling `cn_log_handler` with `level`, `format` and its arguments.",
     "tags": []
   },
   {
     "symbol": "cn_hash_u64",
-    "decl": "uint64_t cn_hash_u64(uint64_t value)",
+    "decl": "CNDEF uint64_t cn_hash_u64(uint64_t value)",
     "summary": "Hashes unsigned 64-bit integer using the splitmix64 algorithm.",
     "description": "",
     "tags": []
   },
   {
     "symbol": "cn_hash_ptr",
-    "decl": "uint64_t cn_hash_ptr(void *ptr)",
+    "decl": "CNDEF uint64_t cn_hash_ptr(void *ptr)",
     "summary": "Hashes the address of `ptr`.",
     "description": "",
     "tags": [
@@ -38,14 +38,14 @@
   },
   {
     "symbol": "cn_hash_bytes",
-    "decl": "uint64_t cn_hash_bytes(void *data, int64_t length)",
+    "decl": "CNDEF uint64_t cn_hash_bytes(void *data, int64_t length)",
     "summary": "Hashes sequence of `length` bytes using the FNV-1a algorithm.",
     "description": "",
     "tags": []
   },
   {
     "symbol": "cn_hash_mix",
-    "decl": "uint64_t cn_hash_mix(uint64_t a, uint64_t b)",
+    "decl": "CNDEF uint64_t cn_hash_mix(uint64_t a, uint64_t b)",
     "summary": "Mixes two hashes `a` and `b` into one.",
     "description": "",
     "tags": [
@@ -54,7 +54,7 @@
   },
   {
     "symbol": "cn_str_substring",
-    "decl": "Cn_String cn_str_substring(Cn_String str, int64_t start, int64_t end)",
+    "decl": "CNDEF Cn_String cn_str_substring(Cn_String str, int64_t start, int64_t end)",
     "summary": "Gets substring of `str` from index `start` up until index `end`.",
     "description": "",
     "tags": [
@@ -65,7 +65,7 @@
   },
   {
     "symbol": "cn_str_find_left",
-    "decl": "int64_t cn_str_find_left(Cn_String str, Cn_String search)",
+    "decl": "CNDEF int64_t cn_str_find_left(Cn_String str, Cn_String search)",
     "summary": "Linearly searches for the first occurrence of `search` in `str` from the left.",
     "description": "Strings are compared through `cn_str_equals`.",
     "tags": [
@@ -74,7 +74,7 @@
   },
   {
     "symbol": "cn_str_find_right",
-    "decl": "int64_t cn_str_find_right(Cn_String str, Cn_String search)",
+    "decl": "CNDEF int64_t cn_str_find_right(Cn_String str, Cn_String search)",
     "summary": "Linearly searches for the first occurrence of `search` in `str` from the right.",
     "description": "Strings are compared through `cn_str_equals`.",
     "tags": [
@@ -83,7 +83,7 @@
   },
   {
     "symbol": "cn_str_ends_with",
-    "decl": "bool cn_str_ends_with(Cn_String str, Cn_String end)",
+    "decl": "CNDEF bool cn_str_ends_with(Cn_String str, Cn_String end)",
     "summary": "Checks whether `str` ends with `end`.",
     "description": "",
     "tags": [
@@ -92,7 +92,7 @@
   },
   {
     "symbol": "cn_str_find_char_left",
-    "decl": "int64_t cn_str_find_char_left(Cn_String str, char symbol)",
+    "decl": "CNDEF int64_t cn_str_find_char_left(Cn_String str, char symbol)",
     "summary": "Linearly searches for the first occurrence of char `symbol` in `str` from the left.",
     "description": "",
     "tags": [
@@ -101,7 +101,7 @@
   },
   {
     "symbol": "cn_str_find_char_right",
-    "decl": "int64_t cn_str_find_char_right(Cn_String str, char symbol)",
+    "decl": "CNDEF int64_t cn_str_find_char_right(Cn_String str, char symbol)",
     "summary": "Linearly searches for the first occurrence of char `symbol` in `str` from the right.",
     "description": "",
     "tags": [
@@ -110,7 +110,7 @@
   },
   {
     "symbol": "cn_str_find_non_whitespace_left",
-    "decl": "int64_t cn_str_find_non_whitespace_left(Cn_String str)",
+    "decl": "CNDEF int64_t cn_str_find_non_whitespace_left(Cn_String str)",
     "summary": "Finds the first non-whitespace char in `str` from the left.",
     "description": "",
     "tags": [
@@ -119,7 +119,7 @@
   },
   {
     "symbol": "cn_str_find_non_whitespace_right",
-    "decl": "int64_t cn_str_find_non_whitespace_right(Cn_String str)",
+    "decl": "CNDEF int64_t cn_str_find_non_whitespace_right(Cn_String str)",
     "summary": "Finds the first non-whitespace char in `str` from the right.",
     "description": "",
     "tags": [
@@ -128,7 +128,7 @@
   },
   {
     "symbol": "cn_str_find_whitespace_left",
-    "decl": "int64_t cn_str_find_whitespace_left(Cn_String str)",
+    "decl": "CNDEF int64_t cn_str_find_whitespace_left(Cn_String str)",
     "summary": "Finds the first whitespace char in `str` from the left.",
     "description": "",
     "tags": [
@@ -137,7 +137,7 @@
   },
   {
     "symbol": "cn_str_find_whitespace_right",
-    "decl": "int64_t cn_str_find_whitespace_right(Cn_String str)",
+    "decl": "CNDEF int64_t cn_str_find_whitespace_right(Cn_String str)",
     "summary": "Finds the first whitespace char in `str` from the right.",
     "description": "",
     "tags": [
@@ -146,7 +146,7 @@
   },
   {
     "symbol": "cn_str_eat_chars",
-    "decl": "Cn_String cn_str_eat_chars(Cn_String str, int64_t count)",
+    "decl": "CNDEF Cn_String cn_str_eat_chars(Cn_String str, int64_t count)",
     "summary": "Shortens `str` by excluding `count` chars from the left.",
     "description": "",
     "tags": [
@@ -155,7 +155,7 @@
   },
   {
     "symbol": "cn_str_eat_spaces",
-    "decl": "Cn_String cn_str_eat_spaces(Cn_String str)",
+    "decl": "CNDEF Cn_String cn_str_eat_spaces(Cn_String str)",
     "summary": "Shortens `str` by excluding all whitespace chars from the left.",
     "description": "",
     "tags": [
@@ -164,7 +164,7 @@
   },
   {
     "symbol": "cn_str_eat_until_space",
-    "decl": "Cn_String cn_str_eat_until_space(Cn_String str)",
+    "decl": "CNDEF Cn_String cn_str_eat_until_space(Cn_String str)",
     "summary": "Shortens `str` by excluding chars from the left until it hits a whitespace.",
     "description": "The whitespace itself is not excluded.",
     "tags": [
@@ -173,7 +173,7 @@
   },
   {
     "symbol": "cn_str_get_chars",
-    "decl": "Cn_String cn_str_get_chars(Cn_String str, int64_t count)",
+    "decl": "CNDEF Cn_String cn_str_get_chars(Cn_String str, int64_t count)",
     "summary": "Gets first `count` chars of `str`.",
     "description": "",
     "tags": [
@@ -182,7 +182,7 @@
   },
   {
     "symbol": "cn_str_get_until_space",
-    "decl": "Cn_String cn_str_get_until_space(Cn_String str)",
+    "decl": "CNDEF Cn_String cn_str_get_until_space(Cn_String str)",
     "summary": "Gets everything in `str` until the first whitespace.",
     "description": "",
     "tags": [
@@ -191,7 +191,7 @@
   },
   {
     "symbol": "cn_str_is_symbol",
-    "decl": "bool cn_str_is_symbol(Cn_String str)",
+    "decl": "CNDEF bool cn_str_is_symbol(Cn_String str)",
     "summary": "Checks whether `str` is a valid symbol: a letter or `_`, followed by letters, digits or `_`.",
     "description": "",
     "tags": [
@@ -200,7 +200,7 @@
   },
   {
     "symbol": "cn_str_is_int",
-    "decl": "bool cn_str_is_int(Cn_String str)",
+    "decl": "CNDEF bool cn_str_is_int(Cn_String str)",
     "summary": "Checks whether `str` is an integer.",
     "description": "",
     "tags": [
@@ -209,7 +209,7 @@
   },
   {
     "symbol": "cn_str_is_float",
-    "decl": "bool cn_str_is_float(Cn_String str)",
+    "decl": "CNDEF bool cn_str_is_float(Cn_String str)",
     "summary": "Checks whether `str` is a float.",
     "description": "",
     "tags": [
@@ -218,7 +218,7 @@
   },
   {
     "symbol": "cn_str_parse_int",
-    "decl": "int64_t cn_str_parse_int(Cn_String str)",
+    "decl": "CNDEF int64_t cn_str_parse_int(Cn_String str)",
     "summary": "Parses integer from `str`.",
     "description": "",
     "tags": [
@@ -227,7 +227,7 @@
   },
   {
     "symbol": "cn_str_parse_float",
-    "decl": "float cn_str_parse_float(Cn_String str)",
+    "decl": "CNDEF float cn_str_parse_float(Cn_String str)",
     "summary": "Parses float from `str`.",
     "description": "",
     "tags": [
@@ -236,7 +236,7 @@
   },
   {
     "symbol": "cn_str_count_chars",
-    "decl": "int64_t cn_str_count_chars(Cn_String str, char c)",
+    "decl": "CNDEF int64_t cn_str_count_chars(Cn_String str, char c)",
     "summary": "Counts occurrences of char `c` in `str`.",
     "description": "",
     "tags": [
@@ -245,7 +245,7 @@
   },
   {
     "symbol": "cn_str_copy_to",
-    "decl": "void *cn_str_copy_to(Cn_String str, void *buffer)",
+    "decl": "CNDEF void *cn_str_copy_to(Cn_String str, void *buffer)",
     "summary": "Copies contents of `str` into `buffer`.",
     "description": "",
     "tags": [
@@ -255,7 +255,7 @@
   },
   {
     "symbol": "cn_str_format",
-    "decl": "Cn_String cn_str_format(Cn_String buffer, char *format, ...)",
+    "decl": "CNDEF Cn_String cn_str_format(Cn_String buffer, char *format, ...)",
     "summary": "Formats string and outputs it into the memory of `buffer`.",
     "description": "",
     "tags": [
@@ -265,7 +265,7 @@
   },
   {
     "symbol": "cn_str_is_empty",
-    "decl": "bool cn_str_is_empty(Cn_String str)",
+    "decl": "CNDEF bool cn_str_is_empty(Cn_String str)",
     "summary": "Checks whether `str` is empty, by checking whether its length is `0`.",
     "description": "",
     "tags": [
@@ -274,7 +274,7 @@
   },
   {
     "symbol": "cn_str_is",
-    "decl": "bool cn_str_is(Cn_String str1, Cn_String str2)",
+    "decl": "CNDEF bool cn_str_is(Cn_String str1, Cn_String str2)",
     "summary": "Compares `str1` and `str2`, checking for length equality first and then comparing char by char.",
     "description": "",
     "tags": [
@@ -283,7 +283,7 @@
   },
   {
     "symbol": "cn_str_equals",
-    "decl": "bool cn_str_equals(const Cn_String *str1, const Cn_String *str2)",
+    "decl": "CNDEF bool cn_str_equals(const Cn_String *str1, const Cn_String *str2)",
     "summary": "Compares `str1` and `str2`, checking for length equality first and then comparing char by char.",
     "description": "",
     "tags": [
@@ -293,7 +293,7 @@
   },
   {
     "symbol": "cn_str_hash",
-    "decl": "uint64_t cn_str_hash(const Cn_String *str)",
+    "decl": "CNDEF uint64_t cn_str_hash(const Cn_String *str)",
     "summary": "Hashes contents of `str`.",
     "description": "",
     "tags": [
@@ -302,57 +302,66 @@
     ]
   },
   {
+    "symbol": "cn_sb_make",
+    "decl": "#define cn_sb_make(cap) ((cap) <= CN_SB_STACK_STORAGE_CAP ? ((Cn_String_Builder) { CN_SB_STACK_STORAGE_CAP, 0, (char *)(char[CN_SB_STACK_STORAGE_CAP]){}}) : cn__sb_make(cap))",
+    "summary": "Makes new `Cn_String_Builder` on the stack if `cap` is small enough, otherwise on the heap.",
+    "description": "Stack storage is used when `cap` is not bigger than `CN_SB_STACK_STORAGE_CAP`.",
+    "tags": [
+      { "kind": "IMPORTANT", "text": "Lifetime of stack allocated string builder ends with the enclosing block.\nIf longer lifetime is needed, make sure to heap allocate the string builder,\nor make sure it is resized to be heap allocated." }
+    ]
+  },
+  {
     "symbol": "cn_sb_free",
-    "decl": "void cn_sb_free(Cn_String_Builder *sb)",
+    "decl": "CNDEF void cn_sb_free(Cn_String_Builder *sb)",
     "summary": "Frees heap memory occupied by `sb`.",
     "description": "Memory is freed only if capacity is bigger than `CN_SB_STACK_STORAGE_CAP`.",
     "tags": []
   },
   {
     "symbol": "cn_sb_clear",
-    "decl": "void cn_sb_clear(Cn_String_Builder *sb)",
+    "decl": "CNDEF void cn_sb_clear(Cn_String_Builder *sb)",
     "summary": "Clears all contents of `sb`, by setting its length to `0`.",
     "description": "Doesn't allocate or free any memory.",
     "tags": []
   },
   {
     "symbol": "cn_sb_append_char",
-    "decl": "void cn_sb_append_char(Cn_String_Builder *sb, char c)",
+    "decl": "CNDEF void cn_sb_append_char(Cn_String_Builder *sb, char c)",
     "summary": "Appends char `c` to `sb`.",
     "description": "",
     "tags": []
   },
   {
     "symbol": "cn_sb_append_str",
-    "decl": "void cn_sb_append_str(Cn_String_Builder *sb, Cn_String str)",
+    "decl": "CNDEF void cn_sb_append_str(Cn_String_Builder *sb, Cn_String str)",
     "summary": "Appends `str` to `sb`.",
     "description": "",
     "tags": []
   },
   {
     "symbol": "cn_sb_prepend_str",
-    "decl": "void cn_sb_prepend_str(Cn_String_Builder *sb, Cn_String str)",
+    "decl": "CNDEF void cn_sb_prepend_str(Cn_String_Builder *sb, Cn_String str)",
     "summary": "Inserts `str` at the front of `sb`, shifting existing contents to the right.",
     "description": "",
     "tags": []
   },
   {
     "symbol": "cn_sb_append_format",
-    "decl": "void cn_sb_append_format(Cn_String_Builder *sb, char *format, ...)",
+    "decl": "CNDEF void cn_sb_append_format(Cn_String_Builder *sb, char *format, ...)",
     "summary": "Formats string and appends the output to `sb`.",
     "description": "",
     "tags": []
   },
   {
     "symbol": "cn_sb_reverse",
-    "decl": "void cn_sb_reverse(Cn_String_Builder *sb)",
+    "decl": "CNDEF void cn_sb_reverse(Cn_String_Builder *sb)",
     "summary": "Reverses contents of `sb`.",
     "description": "",
     "tags": []
   },
   {
     "symbol": "cn_sb_to_str",
-    "decl": "Cn_String cn_sb_to_str(Cn_String_Builder *sb)",
+    "decl": "CNDEF Cn_String cn_sb_to_str(Cn_String_Builder *sb)",
     "summary": "Converts string builder to string that points to the memory used by `sb`.",
     "description": "",
     "tags": [
@@ -363,7 +372,7 @@
   },
   {
     "symbol": "cn_arena_make",
-    "decl": "Cn_Arena cn_arena_make(size_t capacity)",
+    "decl": "CNDEF Cn_Arena cn_arena_make(size_t capacity)",
     "summary": "Constructs arena and allocates `capacity` bytes of memory for it.",
     "description": "",
     "tags": [
@@ -372,7 +381,7 @@
   },
   {
     "symbol": "cn_arena_alloc",
-    "decl": "void *cn_arena_alloc(Cn_Arena *arena, size_t size)",
+    "decl": "CNDEF void *cn_arena_alloc(Cn_Arena *arena, size_t size)",
     "summary": "Allocates next chunk of `size` bytes from `arena`.",
     "description": "",
     "tags": [
@@ -381,7 +390,7 @@
   },
   {
     "symbol": "cn_arena_realloc",
-    "decl": "void *cn_arena_realloc(Cn_Arena *arena, void *mem, size_t new_size)",
+    "decl": "CNDEF void *cn_arena_realloc(Cn_Arena *arena, void *mem, size_t new_size)",
     "summary": "Reallocates chunk of memory `mem` from `arena`.",
     "description": "Allocates new chunk of `new_size` bytes through `cn_arena_alloc`.",
     "tags": [
@@ -391,7 +400,7 @@
   },
   {
     "symbol": "cn_arena_free",
-    "decl": "void cn_arena_free(Cn_Arena *arena, void *mem)",
+    "decl": "CNDEF void cn_arena_free(Cn_Arena *arena, void *mem)",
     "summary": "Stubbed out, since arena cannot free previously allocated memory.",
     "description": "",
     "tags": [
@@ -400,28 +409,28 @@
   },
   {
     "symbol": "cn_arena_free_all",
-    "decl": "void cn_arena_free_all(Cn_Arena *arena)",
+    "decl": "CNDEF void cn_arena_free_all(Cn_Arena *arena)",
     "summary": "Releases all allocations of `arena` at once, by resetting it to the beginning of its memory.",
     "description": "Arena memory itself stays allocated and can be reused.",
     "tags": []
   },
   {
     "symbol": "cn_arena_destroy",
-    "decl": "void cn_arena_destroy(Cn_Arena *arena)",
+    "decl": "CNDEF void cn_arena_destroy(Cn_Arena *arena)",
     "summary": "Completely destroys `arena` and frees all memory occupied by it.",
     "description": "",
     "tags": []
   },
   {
     "symbol": "cn_chained_arena_make",
-    "decl": "Cn_Chained_Arena cn_chained_arena_make(size_t block_capacity)",
+    "decl": "CNDEF Cn_Chained_Arena cn_chained_arena_make(size_t block_capacity)",
     "summary": "Constructs chained arena, allocating its first block of `block_capacity` bytes.",
     "description": "",
     "tags": []
   },
   {
     "symbol": "cn_chained_arena_alloc",
-    "decl": "void *cn_chained_arena_alloc(Cn_Chained_Arena *arena, size_t size)",
+    "decl": "CNDEF void *cn_chained_arena_alloc(Cn_Chained_Arena *arena, size_t size)",
     "summary": "Allocates `size` bytes from `arena`.",
     "description": "",
     "tags": [
@@ -431,7 +440,7 @@
   },
   {
     "symbol": "cn_chained_arena_realloc",
-    "decl": "void *cn_chained_arena_realloc(Cn_Chained_Arena *arena, void *mem, size_t new_size)",
+    "decl": "CNDEF void *cn_chained_arena_realloc(Cn_Chained_Arena *arena, void *mem, size_t new_size)",
     "summary": "Reallocates chunk of memory `mem` from `arena`.",
     "description": "Allocates new chunk of `new_size` bytes through `cn_chained_arena_alloc`.",
     "tags": [
@@ -441,7 +450,7 @@
   },
   {
     "symbol": "cn_chained_arena_free",
-    "decl": "void cn_chained_arena_free(Cn_Chained_Arena *arena, void *mem)",
+    "decl": "CNDEF void cn_chained_arena_free(Cn_Chained_Arena *arena, void *mem)",
     "summary": "Stubbed out, since arena cannot free previously allocated memory.",
     "description": "",
     "tags": [
@@ -450,21 +459,21 @@
   },
   {
     "symbol": "cn_chained_arena_free_all",
-    "decl": "void cn_chained_arena_free_all(Cn_Chained_Arena *arena)",
+    "decl": "CNDEF void cn_chained_arena_free_all(Cn_Chained_Arena *arena)",
     "summary": "Releases all allocations of `arena` at once, by resetting every block and returning to the first one.",
     "description": "Blocks themselves stay allocated and are reused by later allocations.",
     "tags": []
   },
   {
     "symbol": "cn_chained_arena_dealloc",
-    "decl": "void cn_chained_arena_dealloc(Cn_Chained_Arena *arena, size_t size)",
+    "decl": "CNDEF void cn_chained_arena_dealloc(Cn_Chained_Arena *arena, size_t size)",
     "summary": "Deallocates last `size` bytes allocated from `arena`.",
     "description": "If `size` covers a whole block, arena moves back to the previous block.\nEmptied blocks stay allocated and are reused by later allocations.",
     "tags": []
   },
   {
     "symbol": "cn_chained_arena_allocation_info",
-    "decl": "int64_t cn_chained_arena_allocation_info(Cn_Chained_Arena *arena, void *allocation_ptr, size_t *offset)",
+    "decl": "CNDEF int64_t cn_chained_arena_allocation_info(Cn_Chained_Arena *arena, void *allocation_ptr, size_t *offset)",
     "summary": "Finds the block and offset of memory allocated by `arena`.",
     "description": "Given chained arena and pointer allocated by it, computes index of the block\nit was allocated in, and byte offset from the beginning of that block to the allocated memory.",
     "tags": [
@@ -475,7 +484,7 @@
   },
   {
     "symbol": "cn_chained_arena_allocated",
-    "decl": "size_t cn_chained_arena_allocated(Cn_Chained_Arena *arena)",
+    "decl": "CNDEF size_t cn_chained_arena_allocated(Cn_Chained_Arena *arena)",
     "summary": "Computes total size allocated by `arena`.",
     "description": "",
     "tags": [
@@ -484,14 +493,24 @@
   },
   {
     "symbol": "cn_chained_arena_destroy",
-    "decl": "void cn_chained_arena_destroy(Cn_Chained_Arena *arena)",
+    "decl": "CNDEF void cn_chained_arena_destroy(Cn_Chained_Arena *arena)",
     "summary": "Completely destroys `arena` and frees all memory occupied by it.",
     "description": "",
     "tags": []
   },
   {
+    "symbol": "cn_pool_make",
+    "decl": "#define cn_pool_make(...) cn__pool_make((size_t []) { __VA_ARGS__ }, (sizeof((size_t []) { __VA_ARGS__ }) / sizeof(size_t)))",
+    "summary": "Constructs pool and allocates one block per supplied capacity.",
+    "description": "",
+    "tags": [
+      { "kind": "IMPORTANT", "text": "Capacities must be strictly ascending, multiples of `CN_POOL_BLOCK_MIN_CAPACITY`,\nand not bigger than `CN_POOL_BLOCK_MAX_CAPACITY`." },
+      { "kind": "IMPORTANT", "text": "Assumes `sizeof(size_t) == sizeof(void *)`, because it reuses the supplied array of capacities." }
+    ]
+  },
+  {
     "symbol": "cn_pool_alloc",
-    "decl": "void *cn_pool_alloc(Cn_Pool *pool, size_t size)",
+    "decl": "CNDEF void *cn_pool_alloc(Cn_Pool *pool, size_t size)",
     "summary": "Allocates next free slot of memory from `pool`.",
     "description": "Slot is taken from the smallest size class that fits the requested `size`.",
     "tags": [
@@ -500,7 +519,7 @@
   },
   {
     "symbol": "cn_pool_realloc",
-    "decl": "void *cn_pool_realloc(Cn_Pool *pool, void *mem, size_t new_size)",
+    "decl": "CNDEF void *cn_pool_realloc(Cn_Pool *pool, void *mem, size_t new_size)",
     "summary": "Reallocates slot of memory `mem` from `pool`.",
     "description": "If `new_size` still fits the slot, same memory is returned.\nIf `mem` is `NULL`, works like `cn_pool_alloc`.",
     "tags": [
@@ -509,7 +528,7 @@
   },
   {
     "symbol": "cn_pool_free",
-    "decl": "void cn_pool_free(Cn_Pool *pool, void *mem)",
+    "decl": "CNDEF void cn_pool_free(Cn_Pool *pool, void *mem)",
     "summary": "Frees slot of memory `mem` from `pool`.",
     "description": "",
     "tags": [
@@ -518,14 +537,14 @@
   },
   {
     "symbol": "cn_pool_free_all",
-    "decl": "void cn_pool_free_all(Cn_Pool *pool)",
+    "decl": "CNDEF void cn_pool_free_all(Cn_Pool *pool)",
     "summary": "Marks every slot of every block as free, keeping the blocks themselves allocated.",
     "description": "",
     "tags": []
   },
   {
     "symbol": "cn_pool_allocation_info",
-    "decl": "Cn_Pool_Block *cn_pool_allocation_info(Cn_Pool *pool, void *allocation_ptr, size_t *slot)",
+    "decl": "CNDEF Cn_Pool_Block *cn_pool_allocation_info(Cn_Pool *pool, void *allocation_ptr, size_t *slot)",
     "summary": "Finds the block and slot of memory allocated by `pool`.",
     "description": "Given pool and pointer allocated by it, finds the block the pointer was\nallocated from, and index of the slot it occupies in that block.",
     "tags": [
@@ -536,7 +555,7 @@
   },
   {
     "symbol": "cn_pool_destroy",
-    "decl": "void cn_pool_destroy(Cn_Pool *pool)",
+    "decl": "CNDEF void cn_pool_destroy(Cn_Pool *pool)",
     "summary": "Completely destroys `pool` and frees all memory occupied by it.",
     "description": "",
     "tags": [
@@ -545,7 +564,7 @@
   },
   {
     "symbol": "cn_alloc",
-    "decl": "void *cn_alloc(Cn_Allocator *allocator, size_t size)",
+    "decl": "CNDEF void *cn_alloc(Cn_Allocator *allocator, size_t size)",
     "summary": "Calls `alloc` of `allocator`, passing the allocator itself as a parameter.",
     "description": "",
     "tags": [
@@ -554,7 +573,7 @@
   },
   {
     "symbol": "cn_realloc",
-    "decl": "void *cn_realloc(Cn_Allocator *allocator, void *mem, size_t size)",
+    "decl": "CNDEF void *cn_realloc(Cn_Allocator *allocator, void *mem, size_t size)",
     "summary": "Calls `realloc` of `allocator`, passing the allocator itself as a parameter.",
     "description": "",
     "tags": [
@@ -563,21 +582,21 @@
   },
   {
     "symbol": "cn_free",
-    "decl": "void cn_free(Cn_Allocator *allocator, void *mem)",
+    "decl": "CNDEF void cn_free(Cn_Allocator *allocator, void *mem)",
     "summary": "Calls `free` of `allocator`, passing the allocator itself as a parameter.",
     "description": "",
     "tags": []
   },
   {
     "symbol": "cn_free_all",
-    "decl": "void cn_free_all(Cn_Allocator *allocator)",
+    "decl": "CNDEF void cn_free_all(Cn_Allocator *allocator)",
     "summary": "Calls `free_all` of `allocator`, passing the allocator itself as a parameter.",
     "description": "",
     "tags": []
   },
   {
     "symbol": "cn_source_to_str",
-    "decl": "Cn_String cn_source_to_str(Cn_Source *src)",
+    "decl": "CNDEF Cn_String cn_source_to_str(Cn_Source *src)",
     "summary": "Gets string of the source code that `src` points to.",
     "description": "",
     "tags": [
@@ -587,7 +606,7 @@
   },
   {
     "symbol": "cn_source_dist",
-    "decl": "int64_t cn_source_dist(Cn_Source *a, Cn_Source *b)",
+    "decl": "CNDEF int64_t cn_source_dist(Cn_Source *a, Cn_Source *b)",
     "summary": "Computes signed distance between offsets of sources `a` and `b`.",
     "description": "",
     "tags": [
@@ -596,7 +615,7 @@
   },
   {
     "symbol": "cn_source_is_empty",
-    "decl": "int64_t cn_source_is_empty(Cn_Source *src)",
+    "decl": "CNDEF int64_t cn_source_is_empty(Cn_Source *src)",
     "summary": "Checks whether `src` is empty, meaning its length is `0`.",
     "description": "",
     "tags": [
@@ -604,29 +623,36 @@
     ]
   },
   {
+    "symbol": "cn_lexer_token",
+    "decl": "#define cn_lexer_token(lexer)   (lexer)->queue[(lexer)->current_idx]",
+    "summary": "Unwraps to the current token of `lexer`.",
+    "description": "Changes whenever `cn_lexer_next_token` is called.",
+    "tags": []
+  },
+  {
     "symbol": "cn_lexer_init",
-    "decl": "void cn_lexer_init(Cn_Lexer *lexer, Cn_String content, Cn_Lexer_Blacklist blacklist)",
+    "decl": "CNDEF void cn_lexer_init(Cn_Lexer *lexer, Cn_String content, Cn_Lexer_Blacklist blacklist)",
     "summary": "Initializes `lexer` with specific `content`, setting up queue and getting ready to output tokens.",
     "description": "Setting `blacklist` is optional, but if set, tokens from that list won't appear in the lexed output.",
     "tags": []
   },
   {
     "symbol": "cn_lexer_load_content",
-    "decl": "void cn_lexer_load_content(Cn_Lexer *lexer, Cn_String content)",
+    "decl": "CNDEF void cn_lexer_load_content(Cn_Lexer *lexer, Cn_String content)",
     "summary": "Loads new `content` into `lexer`, resetting queue cursor and everything else.",
     "description": "Compared to `cn_lexer_init`, only initializes content. It overwrites previous content\nand tokens that were enqueued in lexer, without touching `file`, `line` or `blacklist` values.",
     "tags": []
   },
   {
     "symbol": "cn_lexer_next_token",
-    "decl": "void cn_lexer_next_token(Cn_Lexer *lexer)",
+    "decl": "CNDEF void cn_lexer_next_token(Cn_Lexer *lexer)",
     "summary": "Advances `lexer` to the next token.",
     "description": "",
     "tags": []
   },
   {
     "symbol": "cn_lexer_expect",
-    "decl": "bool cn_lexer_expect(Cn_Lexer *lexer, Cn_Token_Type type)",
+    "decl": "CNDEF bool cn_lexer_expect(Cn_Lexer *lexer, Cn_Token_Type type)",
     "summary": "Checks whether current token of `lexer` matches expected `type`.",
     "description": "",
     "tags": [
@@ -635,7 +661,7 @@
   },
   {
     "symbol": "cn_lexer_peek",
-    "decl": "Cn_Token cn_lexer_peek(Cn_Lexer *lexer, int64_t offset)",
+    "decl": "CNDEF Cn_Token cn_lexer_peek(Cn_Lexer *lexer, int64_t offset)",
     "summary": "Peeks token based on its `offset` from the current token.",
     "description": "`offset == 0` peeks current token, `offset < 0` peeks past tokens.",
     "tags": [
@@ -645,14 +671,14 @@
   },
   {
     "symbol": "cn_lexer_log_tokens",
-    "decl": "void cn_lexer_log_tokens(Cn_Lexer *lexer, int64_t n)",
+    "decl": "CNDEF void cn_lexer_log_tokens(Cn_Lexer *lexer, int64_t n)",
     "summary": "Logs next `n` tokens from `lexer`, if `n == -1` logs all available tokens.",
     "description": "",
     "tags": []
   },
   {
     "symbol": "cn_token_kind_name",
-    "decl": "const char *cn_token_kind_name(Cn_Token_Type type)",
+    "decl": "CNDEF const char *cn_token_kind_name(Cn_Token_Type type)",
     "summary": "Gets name of the token `type`, used in messages.",
     "description": "",
     "tags": [
@@ -661,7 +687,7 @@
   },
   {
     "symbol": "cn_type_make_pointer",
-    "decl": "Cn_Type cn_type_make_pointer(const Cn_Type *type)",
+    "decl": "CNDEF Cn_Type cn_type_make_pointer(const Cn_Type *type)",
     "summary": "Makes pointer type that points to `type`.",
     "description": "",
     "tags": [
@@ -670,7 +696,7 @@
   },
   {
     "symbol": "cn_type_make_qualified",
-    "decl": "Cn_Type cn_type_make_qualified(Cn_Type_Flags flags, const Cn_Type *type)",
+    "decl": "CNDEF Cn_Type cn_type_make_qualified(Cn_Type_Flags flags, const Cn_Type *type)",
     "summary": "Makes qualified version of `type` with qualifier `flags`.",
     "description": "",
     "tags": [
@@ -679,7 +705,7 @@
   },
   {
     "symbol": "cn_type_equals",
-    "decl": "bool cn_type_equals(const Cn_Type *type1, const Cn_Type *type2)",
+    "decl": "CNDEF bool cn_type_equals(const Cn_Type *type1, const Cn_Type *type2)",
     "summary": "Checks whether `type1` equals `type2`.",
     "description": "",
     "tags": [
@@ -688,7 +714,7 @@
   },
   {
     "symbol": "cn_type_hash",
-    "decl": "uint64_t cn_type_hash(const Cn_Type *type)",
+    "decl": "CNDEF uint64_t cn_type_hash(const Cn_Type *type)",
     "summary": "Hashes `type`.",
     "description": "",
     "tags": [
@@ -697,7 +723,7 @@
   },
   {
     "symbol": "cn_type_stringify",
-    "decl": "Cn_String cn_type_stringify(Cn_String buffer, const Cn_Type *type, Cn_String identifier)",
+    "decl": "CNDEF Cn_String cn_type_stringify(Cn_String buffer, const Cn_Type *type, Cn_String identifier)",
     "summary": "Converts `type` to string and copies its contents into `buffer`.",
     "description": "",
     "tags": [
@@ -708,14 +734,14 @@
   },
   {
     "symbol": "cn_type_print",
-    "decl": "void cn_type_print(const Cn_Type *type)",
+    "decl": "CNDEF void cn_type_print(const Cn_Type *type)",
     "summary": "Prints `type` to `stderr`, using `cn_type_stringify`.",
     "description": "",
     "tags": []
   },
   {
     "symbol": "cn_type_is_constant",
-    "decl": "bool cn_type_is_constant(const Cn_Type *type)",
+    "decl": "CNDEF bool cn_type_is_constant(const Cn_Type *type)",
     "summary": "Checks whether `type` is constant.",
     "description": "",
     "tags": [
@@ -724,7 +750,7 @@
   },
   {
     "symbol": "cn_type_unqualified",
-    "decl": "Cn_Type *cn_type_unqualified(const Cn_Type *type)",
+    "decl": "CNDEF Cn_Type *cn_type_unqualified(const Cn_Type *type)",
     "summary": "Gets unqualified version of `type`.",
     "description": "",
     "tags": [
@@ -733,7 +759,7 @@
   },
   {
     "symbol": "cn_type_is_arithmetic",
-    "decl": "bool cn_type_is_arithmetic(const Cn_Type *type)",
+    "decl": "CNDEF bool cn_type_is_arithmetic(const Cn_Type *type)",
     "summary": "Checks whether `type` is arithmetic: integer or float, including complex.",
     "description": "",
     "tags": [
@@ -742,7 +768,7 @@
   },
   {
     "symbol": "cn_type_is_assignable",
-    "decl": "bool cn_type_is_assignable(const Cn_Type *to, const Cn_Type *from)",
+    "decl": "CNDEF bool cn_type_is_assignable(const Cn_Type *to, const Cn_Type *from)",
     "summary": "Checks whether value of type `from` can be assigned to value of type `to`.",
     "description": "",
     "tags": [
@@ -751,7 +777,7 @@
   },
   {
     "symbol": "cn_type_is_compatible",
-    "decl": "bool cn_type_is_compatible(const Cn_Type *a, const Cn_Type *b)",
+    "decl": "CNDEF bool cn_type_is_compatible(const Cn_Type *a, const Cn_Type *b)",
     "summary": "Checks whether types `a` and `b` are structurally compatible.",
     "description": "",
     "tags": [
@@ -760,7 +786,7 @@
   },
   {
     "symbol": "cn_type_is_compatible_no_qualifiers",
-    "decl": "bool cn_type_is_compatible_no_qualifiers(const Cn_Type *a, const Cn_Type *b)",
+    "decl": "CNDEF bool cn_type_is_compatible_no_qualifiers(const Cn_Type *a, const Cn_Type *b)",
     "summary": "Checks whether types `a` and `b` are structurally compatible, ignoring qualifiers.",
     "description": "",
     "tags": [
@@ -769,7 +795,7 @@
   },
   {
     "symbol": "cn_type_greatest_arithmetic_rank",
-    "decl": "Cn_Type *cn_type_greatest_arithmetic_rank(const Cn_Type *a, const Cn_Type *b)",
+    "decl": "CNDEF Cn_Type *cn_type_greatest_arithmetic_rank(const Cn_Type *a, const Cn_Type *b)",
     "summary": "Picks the type with greater arithmetic rank out of `a` and `b`.",
     "description": "",
     "tags": [
@@ -779,7 +805,7 @@
   },
   {
     "symbol": "cn_type_is_scalar",
-    "decl": "bool cn_type_is_scalar(Cn_Type *type)",
+    "decl": "CNDEF bool cn_type_is_scalar(Cn_Type *type)",
     "summary": "Checks whether `type` is scalar: arithmetic, pointer or `bool`.",
     "description": "",
     "tags": [
@@ -788,7 +814,7 @@
   },
   {
     "symbol": "cn_any_read_int",
-    "decl": "int64_t cn_any_read_int(Cn_Any any)",
+    "decl": "CNDEF int64_t cn_any_read_int(Cn_Any any)",
     "summary": "Reads contents of `any`, interpreting them as integer.",
     "description": "",
     "tags": [
@@ -797,7 +823,7 @@
   },
   {
     "symbol": "cn_any_read_float",
-    "decl": "double cn_any_read_float(Cn_Any any)",
+    "decl": "CNDEF double cn_any_read_float(Cn_Any any)",
     "summary": "Reads contents of `any`, interpreting them as floating point.",
     "description": "",
     "tags": [
@@ -806,7 +832,7 @@
   },
   {
     "symbol": "cn_any_write_int",
-    "decl": "Cn_Any cn_any_write_int(Cn_Any any, int64_t value)",
+    "decl": "CNDEF Cn_Any cn_any_write_int(Cn_Any any, int64_t value)",
     "summary": "Writes integer `value` to contents of `any`, using its type to properly size the integer.",
     "description": "",
     "tags": [
@@ -815,7 +841,7 @@
   },
   {
     "symbol": "cn_any_write_float",
-    "decl": "Cn_Any cn_any_write_float(Cn_Any any, double value)",
+    "decl": "CNDEF Cn_Any cn_any_write_float(Cn_Any any, double value)",
     "summary": "Writes floating point `value` to contents of `any`, using its type to properly size the floating point.",
     "description": "",
     "tags": [
@@ -824,7 +850,7 @@
   },
   {
     "symbol": "cn_any_is_zero",
-    "decl": "bool cn_any_is_zero(Cn_Any any)",
+    "decl": "CNDEF bool cn_any_is_zero(Cn_Any any)",
     "summary": "Checks whether value of `any` is zero.",
     "description": "",
     "tags": [
@@ -833,7 +859,7 @@
   },
   {
     "symbol": "cn_any_as_double",
-    "decl": "double cn_any_as_double(Cn_Any any)",
+    "decl": "CNDEF double cn_any_as_double(Cn_Any any)",
     "summary": "Converts `any` of any scalar type to `double`.",
     "description": "",
     "tags": [
@@ -843,7 +869,7 @@
   },
   {
     "symbol": "cn_double_to_int64",
-    "decl": "bool cn_double_to_int64(double d, int64_t *out)",
+    "decl": "CNDEF bool cn_double_to_int64(double d, int64_t *out)",
     "summary": "Safely converts `double` to `int64_t`, used by casts.",
     "description": "Rejects `NaN` and out of range values, whose conversion would be undefined.",
     "tags": [
@@ -853,7 +879,7 @@
   },
   {
     "symbol": "cn_any_convert",
-    "decl": "Cn_Any cn_any_convert(Cn_Any src, Cn_Type *target, void *buffer)",
+    "decl": "CNDEF Cn_Any cn_any_convert(Cn_Any src, Cn_Type *target, void *buffer)",
     "summary": "Converts already evaluated scalar value `src` to `target` type, used by casts.",
     "description": "",
     "tags": [
@@ -863,7 +889,7 @@
   },
   {
     "symbol": "cn_any_is_empty",
-    "decl": "bool cn_any_is_empty(Cn_Any any)",
+    "decl": "CNDEF bool cn_any_is_empty(Cn_Any any)",
     "summary": "Checks whether `any` is empty, meaning its data and type are both `NULL`.",
     "description": "",
     "tags": [
@@ -871,8 +897,15 @@
     ]
   },
   {
+    "symbol": "cn_array_list_length",
+    "decl": "#define CN_SCOPE_STACK_CURRENT_IDX (cn_array_list_length(&cn__tu_data->scope_stack) - 1)",
+    "summary": "Index of the currently active scope.",
+    "description": "",
+    "tags": []
+  },
+  {
     "symbol": "cn_scope_stack_peek",
-    "decl": "Cn_Scope *cn_scope_stack_peek()",
+    "decl": "CNDEF Cn_Scope *cn_scope_stack_peek()",
     "summary": "Peeks scope at the top of the scope stack.",
     "description": "",
     "tags": [
@@ -881,21 +914,30 @@
   },
   {
     "symbol": "cn_scope_stack_push",
-    "decl": "void cn_scope_stack_push()",
+    "decl": "CNDEF void cn_scope_stack_push()",
     "summary": "Pushes new scope to the top of the scope stack.",
     "description": "",
     "tags": []
   },
   {
     "symbol": "cn_scope_stack_pop",
-    "decl": "void cn_scope_stack_pop()",
+    "decl": "CNDEF void cn_scope_stack_pop()",
     "summary": "Pops scope from the top of the scope stack.",
     "description": "",
     "tags": []
   },
   {
+    "symbol": "cn_ast_counter_next",
+    "decl": "#define cn_ast_counter_next() (cn__tu_data->counter++)",
+    "summary": "Gets next fresh counter value, incrementing the counter.",
+    "description": "",
+    "tags": [
+      { "kind": "RETURNS", "text": "Counter value before increment." }
+    ]
+  },
+  {
     "symbol": "cn_ast_type_ptr_equals",
-    "decl": "bool cn_ast_type_ptr_equals(const Cn_Type **type1_ptr, const Cn_Type **type2_ptr)",
+    "decl": "CNDEF bool cn_ast_type_ptr_equals(const Cn_Type **type1_ptr, const Cn_Type **type2_ptr)",
     "summary": "Compares types that `type1_ptr` and `type2_ptr` point to, wrapping around `cn_type_equals`.",
     "description": "Used in a set that holds pointers to the types,\nso that actual type data stays at the same memory addresses.",
     "tags": [
@@ -904,7 +946,7 @@
   },
   {
     "symbol": "cn_ast_type_ptr_hash",
-    "decl": "uint64_t cn_ast_type_ptr_hash(const Cn_Type **type_ptr)",
+    "decl": "CNDEF uint64_t cn_ast_type_ptr_hash(const Cn_Type **type_ptr)",
     "summary": "Hashes type that `type_ptr` points to, wrapping around `cn_type_hash`.",
     "description": "Used in a set that holds pointers to the types,\nso that actual type data stays at the same memory addresses.",
     "tags": [
@@ -913,7 +955,7 @@
   },
   {
     "symbol": "cn_ast_is_binary_operator",
-    "decl": "Cn_Ast_Binary_Operator_Kind cn_ast_is_binary_operator(Cn_Lexer *lexer)",
+    "decl": "CNDEF Cn_Ast_Binary_Operator_Kind cn_ast_is_binary_operator(Cn_Lexer *lexer)",
     "summary": "Checks table whether current token of `lexer` is a binary operator.",
     "description": "",
     "tags": [
@@ -922,7 +964,7 @@
   },
   {
     "symbol": "cn_ast_is_unary_operator",
-    "decl": "Cn_Ast_Unary_Operator_Kind cn_ast_is_unary_operator(Cn_Lexer *lexer)",
+    "decl": "CNDEF Cn_Ast_Unary_Operator_Kind cn_ast_is_unary_operator(Cn_Lexer *lexer)",
     "summary": "Checks table whether current token of `lexer` is a unary operator.",
     "description": "",
     "tags": [
@@ -931,7 +973,7 @@
   },
   {
     "symbol": "cn_ast_is_assignment_operator",
-    "decl": "Cn_Ast_Assignment_Operator_Kind cn_ast_is_assignment_operator(Cn_Lexer *lexer)",
+    "decl": "CNDEF Cn_Ast_Assignment_Operator_Kind cn_ast_is_assignment_operator(Cn_Lexer *lexer)",
     "summary": "Checks table whether current token of `lexer` is an assignment operator.",
     "description": "",
     "tags": [
@@ -940,7 +982,7 @@
   },
   {
     "symbol": "cn_ast_is_postfix_operator",
-    "decl": "Cn_Ast_Postfix_Operator_Kind cn_ast_is_postfix_operator(Cn_Lexer *lexer)",
+    "decl": "CNDEF Cn_Ast_Postfix_Operator_Kind cn_ast_is_postfix_operator(Cn_Lexer *lexer)",
     "summary": "Checks table whether current token of `lexer` is a postfix operator.",
     "description": "",
     "tags": [
@@ -948,8 +990,39 @@
     ]
   },
   {
+    "symbol": "cn_ast_as",
+    "decl": "#define cn_ast_as(T, p) ((Cn_Ast_##T *)(p))",
+    "summary": "Downcasts generic node pointer `p` to a concrete node type.",
+    "description": "`T` is the type name column of `CN_AST_GEN_LIST`, e.g. `cn_ast_as(Function, node)`.",
+    "tags": []
+  },
+  {
+    "symbol": "cn_ast_node",
+    "decl": "#define cn_ast_node(p) ((Cn_Ast_Node *)(p))",
+    "summary": "Upcasts concrete node pointer `p` to the generic `Cn_Ast_Node *`.",
+    "description": "Every `Cn_Ast_...` struct starts with `CN_AST_BASE`, so this is always valid.",
+    "tags": []
+  },
+  {
+    "symbol": "cn_ast_##m Cn_Ast_##T",
+    "decl": "#define X(K, T, m) typedef struct cn_ast_##m Cn_Ast_##T",
+    "summary": "Forward declaration of every concrete node type, so that node structs\ncan reference each other, and themselves, by pointer regardless of the\norder they are defined in below.",
+    "description": "",
+    "tags": []
+  },
+  {
+    "symbol": "cn_ast_new",
+    "decl": "#define cn_ast_new(...) cn__ast_new(&(__VA_ARGS__.base), sizeof(__VA_ARGS__))",
+    "summary": "Allocates a copy of any `Cn_Ast_...` struct in the ast arena.",
+    "description": "Only `sizeof(node)` bytes are allocated, so small nodes stay small.",
+    "tags": [
+      { "kind": "RETURNS", "text": "`void *`, so the result can be assigned to any concrete `Cn_Ast_...` pointer\nwithout a cast." },
+      { "kind": "NOTE", "text": "Variadic, so a compound literal with commas can be passed directly." }
+    ]
+  },
+  {
     "symbol": "cn_ast_print",
-    "decl": "void cn_ast_print(void * idx, int depth)",
+    "decl": "CNDEF void cn_ast_print(void * idx, int depth)",
     "summary": "Recursively prints ast tree of `idx` to `stdout`.",
     "description": "",
     "tags": [
@@ -958,7 +1031,7 @@
   },
   {
     "symbol": "cn_ast_node_kind_name",
-    "decl": "const char *cn_ast_node_kind_name(Cn_Ast_Kind kind)",
+    "decl": "CNDEF const char *cn_ast_node_kind_name(Cn_Ast_Kind kind)",
     "summary": "Gets enum name of the node `kind`, used in messages.",
     "description": "",
     "tags": [
@@ -967,7 +1040,7 @@
   },
   {
     "symbol": "cn_ast_node_size",
-    "decl": "size_t cn_ast_node_size(Cn_Ast_Kind kind)",
+    "decl": "CNDEF size_t cn_ast_node_size(Cn_Ast_Kind kind)",
     "summary": "Gets size of the concrete node struct for the given `kind`.",
     "description": "Nodes are allocated at their own size, so anything that copies or moves a\nnode generically needs this.",
     "tags": [
@@ -976,7 +1049,7 @@
   },
   {
     "symbol": "cn_ast_is_primary",
-    "decl": "bool cn_ast_is_primary(void * node)",
+    "decl": "CNDEF bool cn_ast_is_primary(void * node)",
     "summary": "Checks whether `node` is primary: identifier, integer, float or string.",
     "description": "",
     "tags": [
@@ -984,8 +1057,36 @@
     ]
   },
   {
+    "symbol": "cn_ast_stack_mark",
+    "decl": "#define cn_ast_stack_mark() cn_array_list_length(&cn__tu_data->ptr_stack)",
+    "summary": "Gets current `ptr_stack` length, used to mark start of a list.",
+    "description": "",
+    "tags": []
+  },
+  {
+    "symbol": "cn_ast_stack_push",
+    "decl": "#define cn_ast_stack_push(ptr) cn_array_list_append(&cn__tu_data->ptr_stack, cn_ast_node(ptr))",
+    "summary": "Pushes `ptr` onto the `ptr_stack`.",
+    "description": "",
+    "tags": []
+  },
+  {
+    "symbol": "cn_ast_stack_prepend",
+    "decl": "#define cn_ast_stack_prepend(ptr, mark) cn_array_list_add(&cn__tu_data->ptr_stack, (mark), cn_ast_node(ptr))",
+    "summary": "Inserts `ptr` into the `ptr_stack` at `mark`.",
+    "description": "",
+    "tags": []
+  },
+  {
+    "symbol": "cn_ast_stack_discard",
+    "decl": "#define cn_ast_stack_discard(mark) cn_array_list_pop_multiple(&cn__tu_data->ptr_stack, cn_array_list_length(&cn__tu_data->ptr_stack) - (mark))",
+    "summary": "Discards all pointers added after `mark`, by returning the `ptr_stack` to it.",
+    "description": "",
+    "tags": []
+  },
+  {
     "symbol": "cn_ast_stack_finalize",
-    "decl": "Cn_Ast_Nodes cn_ast_stack_finalize(int64_t mark)",
+    "decl": "CNDEF Cn_Ast_Nodes cn_ast_stack_finalize(int64_t mark)",
     "summary": "Finalizes range of the `ptr_stack`, from `mark` to the end, into `Cn_Ast_Nodes`.",
     "description": "Finalized pointers are popped from the stack.",
     "tags": [
@@ -994,7 +1095,7 @@
   },
   {
     "symbol": "cn_ast_remove_from_list",
-    "decl": "Cn_Ast_Node *cn_ast_remove_from_list(Cn_Ast_Nodes *list, int64_t index)",
+    "decl": "CNDEF Cn_Ast_Node *cn_ast_remove_from_list(Cn_Ast_Nodes *list, int64_t index)",
     "summary": "Removes entry at `index` from `list`, keeping order of the remaining entries.",
     "description": "Length of the list is decreased for good.",
     "tags": [
@@ -1003,7 +1104,7 @@
   },
   {
     "symbol": "cn_ast_copy_list",
-    "decl": "Cn_Ast_Nodes cn_ast_copy_list(Cn_Ast_Nodes list)",
+    "decl": "CNDEF Cn_Ast_Nodes cn_ast_copy_list(Cn_Ast_Nodes list)",
     "summary": "Deep copies `list`, allocating memory for every node branch.",
     "description": "",
     "tags": [
@@ -1013,7 +1114,7 @@
   },
   {
     "symbol": "cn_ast_copy",
-    "decl": "void *cn_ast_copy(void *node)",
+    "decl": "CNDEF void *cn_ast_copy(void *node)",
     "summary": "Deep copies `node`, allocating memory for the whole branch.",
     "description": "",
     "tags": [
@@ -1023,7 +1124,7 @@
   },
   {
     "symbol": "cn_ast_remove_attribute",
-    "decl": "bool cn_ast_remove_attribute(void *target, Cn_String attribute_name)",
+    "decl": "CNDEF bool cn_ast_remove_attribute(void *target, Cn_String attribute_name)",
     "summary": "Removes attribute `attribute_name` from attribute list of `target`.",
     "description": "",
     "tags": [
@@ -1032,7 +1133,7 @@
   },
   {
     "symbol": "cn_get_declarator_info",
-    "decl": "void cn_get_declarator_info(Cn_Ast_Declarator *declarator, Cn_Ast_Node **last_declarator)",
+    "decl": "CNDEF void cn_get_declarator_info(Cn_Ast_Declarator *declarator, Cn_Ast_Node **last_declarator)",
     "summary": "Traverses declarator nodes to get declarator identifier.",
     "description": "",
     "tags": [
@@ -1042,7 +1143,7 @@
   },
   {
     "symbol": "cn_get_function_declarator_info",
-    "decl": "bool cn_get_function_declarator_info(Cn_Ast_Declarator *declarator, Cn_Ast_Node **function_direct_declarator, Cn_Ast_Node **last_declarator)",
+    "decl": "CNDEF bool cn_get_function_declarator_info(Cn_Ast_Declarator *declarator, Cn_Ast_Node **function_direct_declarator, Cn_Ast_Node **last_declarator)",
     "summary": "Traverses declarator nodes to get function declarator identifier and other information.",
     "description": "",
     "tags": [
@@ -1054,7 +1155,7 @@
   },
   {
     "symbol": "cn_get_attribute_info",
-    "decl": "Cn_Ast_Attribute *cn_get_attribute_info(void *target, Cn_String attribute_name, Cn_Ast_Attribute_Specifier **owner, int64_t *index)",
+    "decl": "CNDEF Cn_Ast_Attribute *cn_get_attribute_info(void *target, Cn_String attribute_name, Cn_Ast_Attribute_Specifier **owner, int64_t *index)",
     "summary": "Finds attribute `attribute_name` on `target` node.",
     "description": "",
     "tags": [
@@ -1065,7 +1166,7 @@
   },
   {
     "symbol": "cn_get_attribute",
-    "decl": "Cn_Ast_Attribute *cn_get_attribute(void *target, Cn_String attribute_name)",
+    "decl": "CNDEF Cn_Ast_Attribute *cn_get_attribute(void *target, Cn_String attribute_name)",
     "summary": "Finds attribute `attribute_name` on `target` node.",
     "description": "",
     "tags": [
@@ -1075,7 +1176,7 @@
   },
   {
     "symbol": "cn_get_expression_type",
-    "decl": "Cn_Type *cn_get_expression_type(void * expression)",
+    "decl": "CNDEF Cn_Type *cn_get_expression_type(void * expression)",
     "summary": "Gets resulting type of `expression`.",
     "description": "",
     "tags": [
@@ -1085,14 +1186,21 @@
   },
   {
     "symbol": "cn_diagnostic_node",
-    "decl": "void cn_diagnostic_node(Cn_Diagnostic_Level level, void * idx, Cn_Diagnostic_Code code, const char *format, ...)",
+    "decl": "CNDEF void cn_diagnostic_node(Cn_Diagnostic_Level level, void * idx, Cn_Diagnostic_Code code, const char *format, ...)",
     "summary": "Reports diagnostic per node.",
     "description": "If node was modified or replaced, multiple diagnostics eventually\npointing to the same source location will be emitted.",
     "tags": []
   },
   {
+    "symbol": "cn_binding_get",
+    "decl": "#define cn_binding_get(idx)    (cn__tu_data->binding_list + (idx))",
+    "summary": "Gets binding based on its `idx`.",
+    "description": "",
+    "tags": []
+  },
+  {
     "symbol": "cn_binding_table_put",
-    "decl": "Cn_Binding_Idx cn_binding_table_put(Cn_Binding binding, Cn_Binding_Idx **binding_table)",
+    "decl": "CNDEF Cn_Binding_Idx cn_binding_table_put(Cn_Binding binding, Cn_Binding_Idx **binding_table)",
     "summary": "Adds `binding` to the binding list, and puts its index into `binding_table` under its name.",
     "description": "",
     "tags": [
@@ -1101,7 +1209,7 @@
   },
   {
     "symbol": "cn_binding_table_get",
-    "decl": "Cn_Binding_Idx cn_binding_table_get(Cn_String name, Cn_Binding_Idx **binding_table)",
+    "decl": "CNDEF Cn_Binding_Idx cn_binding_table_get(Cn_String name, Cn_Binding_Idx **binding_table)",
     "summary": "Looks up binding `name` in `binding_table`.",
     "description": "",
     "tags": [
@@ -1110,7 +1218,7 @@
   },
   {
     "symbol": "cn_binding_declare_function",
-    "decl": "Cn_Binding_Idx cn_binding_declare_function(Cn_String name, void * source, Cn_Ast_Storage_Specifier_Flags storage_flags, Cn_Ast_Function_Specifier_Flags function_flags, Cn_Type *type, Cn_Ast_Nodes *parameter_declarations, bool is_definition)",
+    "decl": "CNDEF Cn_Binding_Idx cn_binding_declare_function(Cn_String name, void * source, Cn_Ast_Storage_Specifier_Flags storage_flags, Cn_Ast_Function_Specifier_Flags function_flags, Cn_Type *type, Cn_Ast_Nodes *parameter_declarations, bool is_definition)",
     "summary": "Adds new function binding to the current scope.",
     "description": "If same binding already exists, handles redeclaration and redefinition of the binding.",
     "tags": [
@@ -1119,7 +1227,7 @@
   },
   {
     "symbol": "cn_binding_declare_variable",
-    "decl": "Cn_Binding_Idx cn_binding_declare_variable(Cn_String name, void * source, Cn_Ast_Storage_Specifier_Flags storage_flags, Cn_Type *type, bool is_definition)",
+    "decl": "CNDEF Cn_Binding_Idx cn_binding_declare_variable(Cn_String name, void * source, Cn_Ast_Storage_Specifier_Flags storage_flags, Cn_Type *type, bool is_definition)",
     "summary": "Adds new variable binding to the current scope.",
     "description": "If same binding already exists, handles redeclaration and redefinition of the binding.",
     "tags": [
@@ -1128,7 +1236,7 @@
   },
   {
     "symbol": "cn_binding_declare_typedef",
-    "decl": "Cn_Binding_Idx cn_binding_declare_typedef(Cn_String name, void * source, Cn_Type *type)",
+    "decl": "CNDEF Cn_Binding_Idx cn_binding_declare_typedef(Cn_String name, void * source, Cn_Type *type)",
     "summary": "Adds new typedef binding to the current scope.",
     "description": "If same binding already exists, handles redeclaration and redefinition of the binding.",
     "tags": [
@@ -1137,7 +1245,7 @@
   },
   {
     "symbol": "cn_binding_declare_enum_constant",
-    "decl": "Cn_Binding_Idx cn_binding_declare_enum_constant(Cn_String name, void * source, Cn_Type *type, int64_t value)",
+    "decl": "CNDEF Cn_Binding_Idx cn_binding_declare_enum_constant(Cn_String name, void * source, Cn_Type *type, int64_t value)",
     "summary": "Adds new enum constant binding to the current scope.",
     "description": "If same binding already exists, handles redeclaration and redefinition of the binding.",
     "tags": [
@@ -1146,7 +1254,7 @@
   },
   {
     "symbol": "cn_binding_declare_tag",
-    "decl": "Cn_Binding_Idx cn_binding_declare_tag(Cn_String tag, Cn_Type_Kind kind)",
+    "decl": "CNDEF Cn_Binding_Idx cn_binding_declare_tag(Cn_String tag, Cn_Type_Kind kind)",
     "summary": "Declares new tag binding in the current scope.",
     "description": "If same binding already exists, handles redeclaration:\n\n- If binding exists and is complete in any scope, including current scope,\nthat binding is returned.\n\n- If binding exists but is not complete in a different scope,\nnew binding is declared in current scope.\n\n- If binding exists but is not complete in current scope,\nthat declaration is referenced.\n\n- If binding doesn't exist, new binding is declared in current scope.",
     "tags": [
@@ -1155,7 +1263,7 @@
   },
   {
     "symbol": "cn_binding_declare_label",
-    "decl": "Cn_Binding_Idx cn_binding_declare_label(Cn_String name, void * source)",
+    "decl": "CNDEF Cn_Binding_Idx cn_binding_declare_label(Cn_String name, void * source)",
     "summary": "Declares new label binding in the current function scope.",
     "description": "",
     "tags": [
@@ -1164,7 +1272,7 @@
   },
   {
     "symbol": "cn_binding_declare_function_arguments",
-    "decl": "bool cn_binding_declare_function_arguments(Cn_Binding_Idx function_binding_idx)",
+    "decl": "CNDEF bool cn_binding_declare_function_arguments(Cn_Binding_Idx function_binding_idx)",
     "summary": "Binds parameters of function definition `function_binding_idx` as arguments in the current scope.",
     "description": "",
     "tags": [
@@ -1172,8 +1280,17 @@
     ]
   },
   {
+    "symbol": "cn_analyze_declaration",
+    "decl": "#define cn_analyze_declaration(declaration_specifiers, ...) cn__analyze_declaration_opt(declaration_specifiers, (Cn_Analyze_Declaration_Opt) { __VA_ARGS__ })",
+    "summary": "Analyzes already constructed specifiers, declarator and initializer as one binding.",
+    "description": "Modifies the global state, by recording new binding from the given ast nodes.\nInitializer can be passed as `NULL` if binding doesn't contain a definition.\nDeclarator itself can also be passed as `NULL`, in that case only declaration specifiers are checked.\n\nPerforms typechecking, can error if the binding is illegal in the current context,\nor if there is any type mismatch, or undefined names.",
+    "tags": [
+      { "kind": "RETURNS", "text": "`true` on success, `false` if any errors occurred." }
+    ]
+  },
+  {
     "symbol": "cn_analyze_function_definition",
-    "decl": "bool cn_analyze_function_definition(void *declaration_specifiers, void *declarator, Cn_Binding_Idx *function_binding_idx)",
+    "decl": "CNDEF bool cn_analyze_function_definition(void *declaration_specifiers, void *declarator, Cn_Binding_Idx *function_binding_idx)",
     "summary": "Analyzes already constructed ast nodes as function definition, adding proper function binding.",
     "description": "Modifies the global state and performs typechecking.",
     "tags": [
@@ -1183,7 +1300,7 @@
   },
   {
     "symbol": "cn_analyze_to_type",
-    "decl": "Cn_Type *cn_analyze_to_type(Cn_Ast_Qualifier_Flags qualifier, void *type_specifier, void *declarator, Cn_Analyze_Flags flags)",
+    "decl": "CNDEF Cn_Type *cn_analyze_to_type(Cn_Ast_Qualifier_Flags qualifier, void *type_specifier, void *declarator, Cn_Analyze_Flags flags)",
     "summary": "Converts `qualifier`, `type_specifier` and `declarator` triple into a resolved `Cn_Type`.",
     "description": "Type specifier gives the base type, qualifiers are applied to it,\nand declarator wraps it in pointer, array or function layers.",
     "tags": [
@@ -1193,7 +1310,7 @@
   },
   {
     "symbol": "cn_analyze_typecheck_expression",
-    "decl": "Cn_Type *cn_analyze_typecheck_expression(void *expression)",
+    "decl": "CNDEF Cn_Type *cn_analyze_typecheck_expression(void *expression)",
     "summary": "Typechecks `expression`, assigning appropriate type to every node.",
     "description": "Recursively traverses ast nodes from the bottom up.",
     "tags": [
@@ -1203,7 +1320,7 @@
   },
   {
     "symbol": "cn_analyze_evaluate_expression",
-    "decl": "Cn_Any cn_analyze_evaluate_expression(void *expression, void *buffer)",
+    "decl": "CNDEF Cn_Any cn_analyze_evaluate_expression(void *expression, void *buffer)",
     "summary": "Evaluates `expression`, using supplied `buffer` to store data.",
     "description": "",
     "tags": [
@@ -1215,7 +1332,7 @@
   },
   {
     "symbol": "cn_analyze_typecheck_designations",
-    "decl": "bool cn_analyze_typecheck_designations(Cn_Ast_Nodes designations, Cn_Type *type)",
+    "decl": "CNDEF bool cn_analyze_typecheck_designations(Cn_Ast_Nodes designations, Cn_Type *type)",
     "summary": "Typechecks `designations` against known `type`, recursively.",
     "description": "",
     "tags": [
@@ -1224,7 +1341,7 @@
   },
   {
     "symbol": "cn_analyze_typecheck_initializer",
-    "decl": "bool cn_analyze_typecheck_initializer(void *initializer, Cn_Type *type)",
+    "decl": "CNDEF bool cn_analyze_typecheck_initializer(void *initializer, Cn_Type *type)",
     "summary": "Typechecks `initializer` against known `type`, recursively.",
     "description": "",
     "tags": [
@@ -1234,14 +1351,14 @@
   },
   {
     "symbol": "cn_emit",
-    "decl": "void cn_emit(Cn_Emitter *e, void * node_ptr)",
+    "decl": "CNDEF void cn_emit(Cn_Emitter *e, void * node_ptr)",
     "summary": "Emits C source code of `node_ptr` to the output of `e`.",
     "description": "Reconstructs valid C source code from the ast representation.",
     "tags": []
   },
   {
     "symbol": "cn_parse_expect",
-    "decl": "bool cn_parse_expect(Cn_Lexer *lexer, Cn_Token_Type type)",
+    "decl": "CNDEF bool cn_parse_expect(Cn_Lexer *lexer, Cn_Token_Type type)",
     "summary": "Parses single token of expected `type`, reporting error diagnostic if token doesn't match.",
     "description": "",
     "tags": [
@@ -1250,7 +1367,7 @@
   },
   {
     "symbol": "cn_parse_optional",
-    "decl": "bool cn_parse_optional(Cn_Lexer *lexer, Cn_Token_Type type)",
+    "decl": "CNDEF bool cn_parse_optional(Cn_Lexer *lexer, Cn_Token_Type type)",
     "summary": "Parses single token of `type` if it is present, without reporting any error otherwise.",
     "description": "",
     "tags": [
@@ -1259,7 +1376,7 @@
   },
   {
     "symbol": "cn_parse_translation_unit",
-    "decl": "Cn_Ast_Translation_Unit *cn_parse_translation_unit(Cn_Lexer *lexer)",
+    "decl": "CNDEF Cn_Ast_Translation_Unit *cn_parse_translation_unit(Cn_Lexer *lexer)",
     "summary": "Parses translation unit from the current token of `lexer`.",
     "description": "```\n translation_unit\n         : external_declaration* EOF\n         ;\n```",
     "tags": [
@@ -1268,7 +1385,7 @@
   },
   {
     "symbol": "cn_parse_external_declaration",
-    "decl": "Cn_Ast_External_Declaration *cn_parse_external_declaration(Cn_Lexer *lexer)",
+    "decl": "CNDEF Cn_Ast_External_Declaration *cn_parse_external_declaration(Cn_Lexer *lexer)",
     "summary": "Parses external declaration from the current token of `lexer`.",
     "description": "```\n external_declaration\n         : '__extension__'? (\n             ';'                         // Stray ';'\n             | function\n             | declaration ';'\n             )\n         ;\n```",
     "tags": [
@@ -1277,7 +1394,7 @@
   },
   {
     "symbol": "cn_parse_function_or_declaration",
-    "decl": "Cn_Ast_Node *cn_parse_function_or_declaration(Cn_Lexer *lexer)",
+    "decl": "CNDEF Cn_Ast_Node *cn_parse_function_or_declaration(Cn_Lexer *lexer)",
     "summary": "Parses function definition or declaration from the current token of `lexer`.",
     "description": "It can't be known for certain which one it is, until the ast structure is parsed far enough.\nUltimately, existence of a function body at the end of the declaration signifies that the\ndeclaration is a function definition.\n\nThe deciding logic is to first try to parse a single declarator, and if it is followed by a function\nbody, then it is a function definition.\n\n```\n declaration ';'\n         : attribute_specifiers declaration_specifiers init_declarators? ';'\n         ;\n\n function\n         : attribute_specifiers declaration_specifiers declarator block\n         ;\n```",
     "tags": [
@@ -1287,7 +1404,7 @@
   },
   {
     "symbol": "cn_parse_finish_declaration",
-    "decl": "Cn_Ast_Node *cn_parse_finish_declaration(Cn_Lexer *lexer, Cn_Ast_Nodes attribute_specifiers)",
+    "decl": "CNDEF Cn_Ast_Node *cn_parse_finish_declaration(Cn_Lexer *lexer, Cn_Ast_Nodes attribute_specifiers)",
     "summary": "Finishes parsing declaration from the current token of `lexer`, using already parsed\n`attribute_specifiers`.",
     "description": "```\n declaration\n         : attribute_specifiers declaration_specifiers init_declarators? gnu_attribute_specifiers\n         ;\n```",
     "tags": [
@@ -1296,7 +1413,7 @@
   },
   {
     "symbol": "cn_parse_starts_declaration",
-    "decl": "bool cn_parse_starts_declaration(Cn_Lexer *lexer)",
+    "decl": "CNDEF bool cn_parse_starts_declaration(Cn_Lexer *lexer)",
     "summary": "Determines whether tokens of `lexer` indicate start of a declaration.",
     "description": "Used to distinguish between declaration and statement before parsing them.",
     "tags": [
@@ -1306,7 +1423,7 @@
   },
   {
     "symbol": "cn_parse_starts_type",
-    "decl": "bool cn_parse_starts_type(Cn_Lexer *lexer)",
+    "decl": "CNDEF bool cn_parse_starts_type(Cn_Lexer *lexer)",
     "summary": "Determines whether tokens of `lexer` indicate start of a type.",
     "description": "Used to distinguish type cast during parsing of an expression.",
     "tags": [
@@ -1316,7 +1433,7 @@
   },
   {
     "symbol": "cn_parse_statement",
-    "decl": "Cn_Ast_Node *cn_parse_statement(Cn_Lexer *lexer)",
+    "decl": "CNDEF Cn_Ast_Node *cn_parse_statement(Cn_Lexer *lexer)",
     "summary": "Parses statement from the current token of `lexer`.",
     "description": "There is no single statement node kind, instead one of the following statement nodes is returned.\n\n```\n statement\n         : block\n         | selection_statement\n         | iteration_statement\n         | jump_statement\n         | labeled_statement\n         | expression_statement\n         ;\n```",
     "tags": [
@@ -1325,7 +1442,7 @@
   },
   {
     "symbol": "cn_parse_finish_statement",
-    "decl": "Cn_Ast_Node *cn_parse_finish_statement(Cn_Lexer *lexer, Cn_Ast_Nodes attribute_specifiers)",
+    "decl": "CNDEF Cn_Ast_Node *cn_parse_finish_statement(Cn_Lexer *lexer, Cn_Ast_Nodes attribute_specifiers)",
     "summary": "Finishes parsing statement from the current token of `lexer`, using already parsed\n`attribute_specifiers`.",
     "description": "There is no single statement node kind, instead one of the following statement nodes is returned.\n\n```\n statement\n         : block\n         | selection_statement\n         | iteration_statement\n         | jump_statement\n         | labeled_statement\n         | expression_statement\n         ;\n```",
     "tags": [
@@ -1334,7 +1451,7 @@
   },
   {
     "symbol": "cn_parse_block",
-    "decl": "Cn_Ast_Block *cn_parse_block(Cn_Lexer *lexer, bool use_current_scope)",
+    "decl": "CNDEF Cn_Ast_Block *cn_parse_block(Cn_Lexer *lexer, bool use_current_scope)",
     "summary": "Parses block from the current token of `lexer`.",
     "description": "Block introduces new scope, unless `use_current_scope` is set.\n\n```\n block\n         : '{' block_item* '}'\n         ;\n```",
     "tags": [
@@ -1344,7 +1461,7 @@
   },
   {
     "symbol": "cn_parse_block_item",
-    "decl": "Cn_Ast_Block_Item *cn_parse_block_item(Cn_Lexer *lexer)",
+    "decl": "CNDEF Cn_Ast_Block_Item *cn_parse_block_item(Cn_Lexer *lexer)",
     "summary": "Parses block item from the current token of `lexer`.",
     "description": "```\n block_item\n         : declaration ';'\n         | statement\n         ;\n```",
     "tags": [
@@ -1353,7 +1470,7 @@
   },
   {
     "symbol": "cn_parse_if_statement",
-    "decl": "Cn_Ast_Node *cn_parse_if_statement(Cn_Lexer *lexer)",
+    "decl": "CNDEF Cn_Ast_Node *cn_parse_if_statement(Cn_Lexer *lexer)",
     "summary": "Parses `if` statement from the current token of `lexer`.",
     "description": "```\n if_statement\n         : 'if' '(' expression ')' statement ('else' statement)?\n         ;\n```",
     "tags": [
@@ -1362,7 +1479,7 @@
   },
   {
     "symbol": "cn_parse_switch_statement",
-    "decl": "Cn_Ast_Node *cn_parse_switch_statement(Cn_Lexer *lexer)",
+    "decl": "CNDEF Cn_Ast_Node *cn_parse_switch_statement(Cn_Lexer *lexer)",
     "summary": "Parses `switch` statement from the current token of `lexer`.",
     "description": "```\n switch_statement\n         : 'switch' '(' expression ')' statement\n         ;\n```",
     "tags": [
@@ -1371,7 +1488,7 @@
   },
   {
     "symbol": "cn_parse_while_statement",
-    "decl": "Cn_Ast_Node *cn_parse_while_statement(Cn_Lexer *lexer)",
+    "decl": "CNDEF Cn_Ast_Node *cn_parse_while_statement(Cn_Lexer *lexer)",
     "summary": "Parses `while` statement from the current token of `lexer`.",
     "description": "```\n while_statement\n         : 'while' '(' expression ')' statement\n         ;\n```",
     "tags": [
@@ -1380,7 +1497,7 @@
   },
   {
     "symbol": "cn_parse_do_while",
-    "decl": "Cn_Ast_Node *cn_parse_do_while(Cn_Lexer *lexer)",
+    "decl": "CNDEF Cn_Ast_Node *cn_parse_do_while(Cn_Lexer *lexer)",
     "summary": "Parses `do while` statement from the current token of `lexer`.",
     "description": "```\n do_while\n         : 'do' statement 'while' '(' expression ')' ';'\n         ;\n```",
     "tags": [
@@ -1389,7 +1506,7 @@
   },
   {
     "symbol": "cn_parse_for_statement",
-    "decl": "Cn_Ast_Node *cn_parse_for_statement(Cn_Lexer *lexer)",
+    "decl": "CNDEF Cn_Ast_Node *cn_parse_for_statement(Cn_Lexer *lexer)",
     "summary": "Parses `for` statement from the current token of `lexer`.",
     "description": "```\n for_statement\n         : 'for' '(' (declaration | expression)? ';' expression? ';' expression? ')' statement\n         ;\n```",
     "tags": [
@@ -1398,7 +1515,7 @@
   },
   {
     "symbol": "cn_parse_goto_statement",
-    "decl": "Cn_Ast_Node *cn_parse_goto_statement(Cn_Lexer *lexer)",
+    "decl": "CNDEF Cn_Ast_Node *cn_parse_goto_statement(Cn_Lexer *lexer)",
     "summary": "Parses `goto` statement from the current token of `lexer`.",
     "description": "```\n goto_statement\n         : 'goto' identifier ';'\n         ;\n```",
     "tags": [
@@ -1407,7 +1524,7 @@
   },
   {
     "symbol": "cn_parse_return_statement",
-    "decl": "Cn_Ast_Node *cn_parse_return_statement(Cn_Lexer *lexer)",
+    "decl": "CNDEF Cn_Ast_Node *cn_parse_return_statement(Cn_Lexer *lexer)",
     "summary": "Parses `return` statement from the current token of `lexer`.",
     "description": "```\n return_statement\n         : 'return' expression? ';'\n         ;\n```",
     "tags": [
@@ -1416,7 +1533,7 @@
   },
   {
     "symbol": "cn_parse_break_statement",
-    "decl": "Cn_Ast_Node *cn_parse_break_statement(Cn_Lexer *lexer)",
+    "decl": "CNDEF Cn_Ast_Node *cn_parse_break_statement(Cn_Lexer *lexer)",
     "summary": "Parses `break` statement from the current token of `lexer`.",
     "description": "```\n break_statement\n         : 'break' ';'\n         ;\n```",
     "tags": [
@@ -1425,7 +1542,7 @@
   },
   {
     "symbol": "cn_parse_continue_statement",
-    "decl": "Cn_Ast_Node *cn_parse_continue_statement(Cn_Lexer *lexer)",
+    "decl": "CNDEF Cn_Ast_Node *cn_parse_continue_statement(Cn_Lexer *lexer)",
     "summary": "Parses `continue` statement from the current token of `lexer`.",
     "description": "```\n continue_statement\n         : 'continue' ';'\n         ;\n```",
     "tags": [
@@ -1434,7 +1551,7 @@
   },
   {
     "symbol": "cn_parse_label",
-    "decl": "Cn_Ast_Node *cn_parse_label(Cn_Lexer *lexer)",
+    "decl": "CNDEF Cn_Ast_Node *cn_parse_label(Cn_Lexer *lexer)",
     "summary": "Parses label from the current token of `lexer`.",
     "description": "```\n label\n         : (identifier | ('case' expression) | 'default') ':' statement\n         ;\n```",
     "tags": [
@@ -1444,7 +1561,7 @@
   },
   {
     "symbol": "cn_parse_expression_statement",
-    "decl": "Cn_Ast_Node *cn_parse_expression_statement(Cn_Lexer *lexer)",
+    "decl": "CNDEF Cn_Ast_Node *cn_parse_expression_statement(Cn_Lexer *lexer)",
     "summary": "Parses expression statement from the current token of `lexer`.",
     "description": "```\n expression_statement\n         : expression? ';'\n         ;\n```",
     "tags": [
@@ -1453,7 +1570,7 @@
   },
   {
     "symbol": "cn_parse_arguments",
-    "decl": "Cn_Ast_Nodes cn_parse_arguments(Cn_Lexer *lexer, bool *ok)",
+    "decl": "CNDEF Cn_Ast_Nodes cn_parse_arguments(Cn_Lexer *lexer, bool *ok)",
     "summary": "Parses argument list from the current token of `lexer`.",
     "description": "```\n argument_list\n         : expression (',' expression)*\n         ;\n```",
     "tags": [
@@ -1463,7 +1580,7 @@
   },
   {
     "symbol": "cn_parse_expression",
-    "decl": "Cn_Ast_Node *cn_parse_expression(Cn_Lexer *lexer, int min_precedence, Cn_Parse_Expression_Flags flags)",
+    "decl": "CNDEF Cn_Ast_Node *cn_parse_expression(Cn_Lexer *lexer, int min_precedence, Cn_Parse_Expression_Flags flags)",
     "summary": "Parses expression from the current token of `lexer`.",
     "description": "First parses left leaf, and then calls increasing precedence parsing until it returns left leaf,\nutilizing the following precedence table as a guide to properly structure ast nodes in order.\n\n```\n C OPERATOR PRECEDENCE TABLE highest (14) to lowest (0)\n ===============================================================\n\n 14                              Associativity: Left-to-right\n ---------------------------------------------------------------\n   ++  --        Postfix increment/decrement\n   ()            Function call\n   []            Array subscript\n   .             Member access\n   ->            Member access through pointer\n   (type){...}   Compound literal\n\n 13                              Associativity: Right-to-left\n ---------------------------------------------------------------\n   ++  --        Prefix increment/decrement\n   +   -         Unary plus/minus\n   !   ~         Logical NOT, bitwise NOT\n   (type)        Cast\n   *             Dereference\n   &             Address-of\n   sizeof        Size-of\n\n 12                              Associativity: Left-to-right\n ---------------------------------------------------------------\n   *   /   %     Multiplication, division, remainder\n\n 11                              Associativity: Left-to-right\n ---------------------------------------------------------------\n   +   -         Addition, subtraction\n\n 10                              Associativity: Left-to-right\n ---------------------------------------------------------------\n   <<  >>        Bitwise left/right shift\n\n 9                               Associativity: Left-to-right\n ---------------------------------------------------------------\n   <   <=        Less than, less-or-equal\n   >   >=        Greater than, greater-or-equal\n\n 8                               Associativity: Left-to-right\n ---------------------------------------------------------------\n   ==  !=        Equal, not equal\n\n 7                               Associativity: Left-to-right\n ---------------------------------------------------------------\n   &             Bitwise AND\n\n 6                               Associativity: Left-to-right\n ---------------------------------------------------------------\n   ^             Bitwise XOR\n\n 5                               Associativity: Left-to-right\n ---------------------------------------------------------------\n   |             Bitwise OR\n\n 4                               Associativity: Left-to-right\n ---------------------------------------------------------------\n   &&            Logical AND\n\n 3                               Associativity: Left-to-right\n ---------------------------------------------------------------\n   ||            Logical OR\n\n 2                               Associativity: Right-to-left\n ---------------------------------------------------------------\n   ? :           Ternary conditional\n\n 1                               Associativity: Right-to-left\n ---------------------------------------------------------------\n   =             Simple assignment\n   +=  -=        Compound assignment (additive)\n   *=  /=  %=    Compound assignment (multiplicative)\n   <<=  >>=      Compound assignment (shift)\n   &=  ^=  |=    Compound assignment (bitwise)\n\n 0                               Associativity: Left-to-right\n ---------------------------------------------------------------\n   ,             Comma\n```\n\nFollowing grammar rules group expressions into certain kinds, but in reality all parsing is based\non the precedence table. Grammar rules only show the general logic, and which specific tokens\nparser might expect in certain expressions.\n\n```\n expression\n         : binary_expression\n         | function_expression\n         | access_expression\n         | unary_expression\n         | cast_expression\n         | compound_literal\n         | sizeof_expression\n         | primary_expression\n         | ternary_expression\n         | assignment_expression\n         | postfix_expression\n         ;\n\n binary_expression\n         : expression binary_operator expression\n         | expression '[' expression ']'\n         | function_expression\n         | access_expression\n         ;\n\n function_expression\n         : expression '(' argument_list? ')'\n         ;\n\n access_expression\n         : expression '.' identifier\n         | expression '->' identifier\n         ;\n\n unary_expression\n         : cast_expression\n         | '(' expression ')'\n         | sizeof_expression\n         | unary_operator expression\n         ;\n\n cast_expression\n         : '(' type_name ')' expression\n         | compound\n         ;\n\n compound\n         : '(' type_name ')' designations\n         ;\n\n sizeof_expression\n         : 'sizeof' expression\n         | 'sizeof' '(' type_name ')'\n         ;\n\n primary_expression\n         : identifier\n         | integer\n         | float\n         | string\n         ;\n\n ternary_expression\n         : expression '?' expression ':' expression\n         ;\n\n assignment_expression\n         : expression assignment_operator expression\n         ;\n\n postfix_expression\n         : expression '++'\n         | expression '--'\n         ;\n```",
     "tags": [
@@ -1473,7 +1590,7 @@
   },
   {
     "symbol": "cn_parse_expression_increasing_precedence",
-    "decl": "Cn_Ast_Node *cn_parse_expression_increasing_precedence(Cn_Lexer *lexer, void * left, int min_precedence, Cn_Parse_Expression_Flags flags)",
+    "decl": "CNDEF Cn_Ast_Node *cn_parse_expression_increasing_precedence(Cn_Lexer *lexer, void * left, int min_precedence, Cn_Parse_Expression_Flags flags)",
     "summary": "Continues parsing binary expression after already parsed `left` leaf.",
     "description": "Constructs right leaning tree if next binary operator has increasing precedence,\notherwise just returns `left` leaf. Recursively calls `cn_parse_expression` to get right leaf.\n\nExample of `a + b * c`, strictly increasing precedence results in right leaning tree:\n\n```\n   +\n  /\n a\n\n   +\n  / \\\n a   *\n    /\n   b\n\n   +\n  / \\\n a   *\n    / \\\n   b   c\n```\n\nBut there is also a situation where left leaning tree must be constructed.\nExample of `a + b - c`, same precedence results in left leaning tree:\n\n```\n   +\n  /\n a\n\n     -\n    /\n   +\n  / \\\n a   b\n\n     -\n    / \\\n   +   c\n  / \\\n a   b\n```\n\nA more sophisticated example, `a + b * c + d` is parsed like `((a + (b * c)) + d)`:\n\n```\nparse0 min_prec -1:\n\n  +\n / \\\na   parse1\n\nparse1 min_prec 11:\n\n  *\n / \\\nb   parse2\n\nparse2 min_prec 12:\n\nc\n\nRETURNING\n\nparse1 min_prec 11:\n\n  *\n / \\\nb   c\n\nparse0 min_prec -1:\n\n  +\n / \\\na   *\n   / \\\n  b   c\n\nparse0 min_prec -1:\n\n    +\n   / \\\n  +   parse3\n / \\\na   *\n   / \\\n  b   c\n\nparse3 min_prec 11:\n\nd\n\nRETURNING\n\nparse0 min_prec -1:\n\n    +\n   / \\\n  +   d\n / \\\na   *\n   / \\\n  b   c\n\nNO MORE INPUT, STOP.\n```",
     "tags": [
@@ -1483,7 +1600,7 @@
   },
   {
     "symbol": "cn_parse_expression_leaf",
-    "decl": "Cn_Ast_Node *cn_parse_expression_leaf(Cn_Lexer *lexer, Cn_Parse_Expression_Flags flags)",
+    "decl": "CNDEF Cn_Ast_Node *cn_parse_expression_leaf(Cn_Lexer *lexer, Cn_Parse_Expression_Flags flags)",
     "summary": "Parses non-binary leaf expression from the current token of `lexer`.",
     "description": "Detects and parses unary operators, but doesn't parse binary or postfix expressions.",
     "tags": [
@@ -1492,7 +1609,7 @@
   },
   {
     "symbol": "cn_parse_finish_init_declarators",
-    "decl": "Cn_Ast_Nodes cn_parse_finish_init_declarators(Cn_Lexer *lexer, void *declarator, bool *ok, void *declaration_specifiers)",
+    "decl": "CNDEF Cn_Ast_Nodes cn_parse_finish_init_declarators(Cn_Lexer *lexer, void *declarator, bool *ok, void *declaration_specifiers)",
     "summary": "Finishes parsing init declarator list from the current token of `lexer`, using already parsed\n`declarator` as the first init declarator.",
     "description": "```\n init_declarators\n         : init_declarator (',' init_declarator)*\n         ;\n```",
     "tags": [
@@ -1502,7 +1619,7 @@
   },
   {
     "symbol": "cn_parse_init_declarators",
-    "decl": "Cn_Ast_Nodes cn_parse_init_declarators(Cn_Lexer *lexer, bool *ok, void *declaration_specifiers)",
+    "decl": "CNDEF Cn_Ast_Nodes cn_parse_init_declarators(Cn_Lexer *lexer, bool *ok, void *declaration_specifiers)",
     "summary": "Parses init declarator list from the current token of `lexer`.",
     "description": "```\n init_declarators\n         : init_declarator (',' init_declarator)*\n         ;\n```",
     "tags": [
@@ -1512,7 +1629,7 @@
   },
   {
     "symbol": "cn_parse_finish_init_declarator",
-    "decl": "Cn_Ast_Init_Declarator *cn_parse_finish_init_declarator(Cn_Lexer *lexer, Cn_Ast_Declarator *declarator, void *declaration_specifiers)",
+    "decl": "CNDEF Cn_Ast_Init_Declarator *cn_parse_finish_init_declarator(Cn_Lexer *lexer, Cn_Ast_Declarator *declarator, void *declaration_specifiers)",
     "summary": "Finishes parsing init declarator from the current token of `lexer`, using already parsed\n`declarator`.",
     "description": "```\n init_declarator\n         : declarator gnu_attribute_specifiers gnu_asm_label? ('=' initializer)?\n         ;\n```",
     "tags": [
@@ -1521,7 +1638,7 @@
   },
   {
     "symbol": "cn_parse_init_declarator",
-    "decl": "Cn_Ast_Init_Declarator *cn_parse_init_declarator(Cn_Lexer *lexer, void *declaration_specifiers)",
+    "decl": "CNDEF Cn_Ast_Init_Declarator *cn_parse_init_declarator(Cn_Lexer *lexer, void *declaration_specifiers)",
     "summary": "Parses init declarator from the current token of `lexer`.",
     "description": "```\n init_declarator\n         : declarator gnu_attribute_specifiers gnu_asm_label? ('=' initializer)?\n         ;\n```",
     "tags": [
@@ -1530,7 +1647,7 @@
   },
   {
     "symbol": "cn_parse_initializer",
-    "decl": "Cn_Ast_Initializer *cn_parse_initializer(Cn_Lexer *lexer)",
+    "decl": "CNDEF Cn_Ast_Initializer *cn_parse_initializer(Cn_Lexer *lexer)",
     "summary": "Parses initializer from the current token of `lexer`.",
     "description": "```\n initializer\n         : expression\n         | designations\n         ;\n```",
     "tags": [
@@ -1539,7 +1656,7 @@
   },
   {
     "symbol": "cn_parse_designations",
-    "decl": "Cn_Ast_Nodes cn_parse_designations(Cn_Lexer *lexer, bool *ok)",
+    "decl": "CNDEF Cn_Ast_Nodes cn_parse_designations(Cn_Lexer *lexer, bool *ok)",
     "summary": "Parses designations from the current token of `lexer`.",
     "description": "```\n designations\n         : '{' ( designation (',' designation)* )? ','? '}'\n         ;\n```",
     "tags": [
@@ -1549,7 +1666,7 @@
   },
   {
     "symbol": "cn_parse_designation",
-    "decl": "Cn_Ast_Designation *cn_parse_designation(Cn_Lexer *lexer)",
+    "decl": "CNDEF Cn_Ast_Designation *cn_parse_designation(Cn_Lexer *lexer)",
     "summary": "Parses designation from the current token of `lexer`.",
     "description": "```\n designation\n         : (designators '=')? initializer\n         ;\n```",
     "tags": [
@@ -1558,7 +1675,7 @@
   },
   {
     "symbol": "cn_parse_designators",
-    "decl": "Cn_Ast_Nodes cn_parse_designators(Cn_Lexer *lexer, bool *ok)",
+    "decl": "CNDEF Cn_Ast_Nodes cn_parse_designators(Cn_Lexer *lexer, bool *ok)",
     "summary": "Parses designators from the current token of `lexer`.",
     "description": "```\n designators\n         : designator+\n         ;\n```",
     "tags": [
@@ -1568,7 +1685,7 @@
   },
   {
     "symbol": "cn_parse_designator",
-    "decl": "Cn_Ast_Designator *cn_parse_designator(Cn_Lexer *lexer)",
+    "decl": "CNDEF Cn_Ast_Designator *cn_parse_designator(Cn_Lexer *lexer)",
     "summary": "Parses designator from the current token of `lexer`.",
     "description": "```\n designator\n         : '.' identifier\n         | '[' expression ']'\n         | '[' expression '...' expression ']'\n         ;\n```",
     "tags": [
@@ -1577,7 +1694,7 @@
   },
   {
     "symbol": "cn_parse_starts_designator",
-    "decl": "bool cn_parse_starts_designator(Cn_Lexer *lexer)",
+    "decl": "CNDEF bool cn_parse_starts_designator(Cn_Lexer *lexer)",
     "summary": "Determines whether tokens of `lexer` indicate start of a designator.",
     "description": "Used to distinguish between designator and initializer before parsing them.",
     "tags": [
@@ -1587,7 +1704,7 @@
   },
   {
     "symbol": "cn_parse_declarator",
-    "decl": "Cn_Ast_Declarator *cn_parse_declarator(Cn_Lexer *lexer, bool *ok)",
+    "decl": "CNDEF Cn_Ast_Declarator *cn_parse_declarator(Cn_Lexer *lexer, bool *ok)",
     "summary": "Parses declarator from the current token of `lexer`.",
     "description": "```\n declarator\n         : pointer? direct_declarator\n         ;\n```",
     "tags": [
@@ -1598,7 +1715,7 @@
   },
   {
     "symbol": "cn_parse_pointer",
-    "decl": "Cn_Ast_Pointer *cn_parse_pointer(Cn_Lexer *lexer)",
+    "decl": "CNDEF Cn_Ast_Pointer *cn_parse_pointer(Cn_Lexer *lexer)",
     "summary": "Parses pointer from the current token of `lexer`.",
     "description": "```\n pointer\n         : '*' qualifier* pointer?\n         ;\n```",
     "tags": [
@@ -1607,7 +1724,7 @@
   },
   {
     "symbol": "cn_parse_direct_declarator",
-    "decl": "Cn_Ast_Node *cn_parse_direct_declarator(Cn_Lexer *lexer, bool *is_abstract)",
+    "decl": "CNDEF Cn_Ast_Node *cn_parse_direct_declarator(Cn_Lexer *lexer, bool *is_abstract)",
     "summary": "Parses direct declarator from the current token of `lexer`.",
     "description": "```\n direct_declarator\n         : identifier\n         | '(' declarator ')'\n         | direct_declarator '[' expression? ']'\n         | direct_declarator '(' ('void' | parameter_type_list)? ')'\n         ;\n```",
     "tags": [
@@ -1617,7 +1734,7 @@
   },
   {
     "symbol": "cn_parse_identifier",
-    "decl": "Cn_Ast_Identifier *cn_parse_identifier(Cn_Lexer *lexer)",
+    "decl": "CNDEF Cn_Ast_Identifier *cn_parse_identifier(Cn_Lexer *lexer)",
     "summary": "Parses identifier from the current token of `lexer`.",
     "description": "",
     "tags": [
@@ -1626,7 +1743,7 @@
   },
   {
     "symbol": "cn_parse_integer",
-    "decl": "Cn_Ast_Integer *cn_parse_integer(Cn_Lexer *lexer)",
+    "decl": "CNDEF Cn_Ast_Integer *cn_parse_integer(Cn_Lexer *lexer)",
     "summary": "Parses integer from the current token of `lexer`.",
     "description": "",
     "tags": [
@@ -1635,7 +1752,7 @@
   },
   {
     "symbol": "cn_parse_float",
-    "decl": "Cn_Ast_Float *cn_parse_float(Cn_Lexer *lexer)",
+    "decl": "CNDEF Cn_Ast_Float *cn_parse_float(Cn_Lexer *lexer)",
     "summary": "Parses float from the current token of `lexer`.",
     "description": "",
     "tags": [
@@ -1644,7 +1761,7 @@
   },
   {
     "symbol": "cn_parse_character",
-    "decl": "Cn_Ast_Char *cn_parse_character(Cn_Lexer *lexer)",
+    "decl": "CNDEF Cn_Ast_Char *cn_parse_character(Cn_Lexer *lexer)",
     "summary": "Parses character from the current token of `lexer`.",
     "description": "",
     "tags": [
@@ -1654,7 +1771,7 @@
   },
   {
     "symbol": "cn_parse_string",
-    "decl": "Cn_Ast_String *cn_parse_string(Cn_Lexer *lexer)",
+    "decl": "CNDEF Cn_Ast_String *cn_parse_string(Cn_Lexer *lexer)",
     "summary": "Parses string from the current token of `lexer`.",
     "description": "",
     "tags": [
@@ -1664,7 +1781,7 @@
   },
   {
     "symbol": "cn_parse_declaration_specifiers",
-    "decl": "Cn_Ast_Declaration_Specifiers *cn_parse_declaration_specifiers(Cn_Lexer *lexer)",
+    "decl": "CNDEF Cn_Ast_Declaration_Specifiers *cn_parse_declaration_specifiers(Cn_Lexer *lexer)",
     "summary": "Parses declaration specifiers from the current token of `lexer`.",
     "description": "```\n declaration_specifiers\n         : (\n             storage_specifier\n             | qualifier\n             | function_specifier\n             | gnu_attribute_specifier\n             | type_specifier\n             )+\n         ;\n```",
     "tags": [
@@ -1673,7 +1790,7 @@
   },
   {
     "symbol": "cn_parse_try_storage_specifier",
-    "decl": "int cn_parse_try_storage_specifier(Cn_Lexer *lexer, Cn_Ast_Storage_Specifier_Flags *output)",
+    "decl": "CNDEF int cn_parse_try_storage_specifier(Cn_Lexer *lexer, Cn_Ast_Storage_Specifier_Flags *output)",
     "summary": "Tries to parse storage specifier from the current token of `lexer`.",
     "description": "```\n storage_specifier\n         : 'static'\n         | 'extern'\n         | 'register'\n         | 'auto'\n         | 'typedef'\n         ;\n```",
     "tags": [
@@ -1683,7 +1800,7 @@
   },
   {
     "symbol": "cn_parse_try_qualifier",
-    "decl": "int cn_parse_try_qualifier(Cn_Lexer *lexer, Cn_Ast_Qualifier_Flags *output)",
+    "decl": "CNDEF int cn_parse_try_qualifier(Cn_Lexer *lexer, Cn_Ast_Qualifier_Flags *output)",
     "summary": "Tries to parse qualifier from the current token of `lexer`.",
     "description": "```\n qualifier\n         : 'const'\n         | 'restrict'\n         | 'volatile'\n         | '_Atomic'\n         ;\n```",
     "tags": [
@@ -1693,7 +1810,7 @@
   },
   {
     "symbol": "cn_parse_try_function_specifier",
-    "decl": "int cn_parse_try_function_specifier(Cn_Lexer *lexer, Cn_Ast_Function_Specifier_Flags *output)",
+    "decl": "CNDEF int cn_parse_try_function_specifier(Cn_Lexer *lexer, Cn_Ast_Function_Specifier_Flags *output)",
     "summary": "Tries to parse function specifier from the current token of `lexer`.",
     "description": "```\n function_specifier\n         : 'inline'\n         | '_Noreturn'\n         ;\n```",
     "tags": [
@@ -1703,7 +1820,7 @@
   },
   {
     "symbol": "cn_parse_gnu_typeof",
-    "decl": "Cn_Ast_Gnu_Typeof *cn_parse_gnu_typeof(Cn_Lexer *lexer)",
+    "decl": "CNDEF Cn_Ast_Gnu_Typeof *cn_parse_gnu_typeof(Cn_Lexer *lexer)",
     "summary": "Parses GNU `typeof` specifier from the current token of `lexer`.",
     "description": "```\n gnu_typeof_specifier\n         : 'typeof' '(' type_name ')'\n         | 'typeof' '(' expression ')'\n         ;\n```",
     "tags": [
@@ -1712,7 +1829,7 @@
   },
   {
     "symbol": "cn_parse_try_type_specifier",
-    "decl": "int cn_parse_try_type_specifier(Cn_Lexer *lexer, Cn_Primitive_Type_Info *primitive_info, Cn_Ast_Node **type_specifier)",
+    "decl": "CNDEF int cn_parse_try_type_specifier(Cn_Lexer *lexer, Cn_Primitive_Type_Info *primitive_info, Cn_Ast_Node **type_specifier)",
     "summary": "Tries to parse type specifier from the current token of `lexer`.",
     "description": "```\n type_specifier\n         : 'void'\n         | 'char'\n         | 'short'\n         | 'int'\n         | 'long'\n         | 'float'\n         | 'double'\n         | 'signed'\n         | 'unsigned'\n         | '_Bool'\n         | '_Complex'\n         | atomic_type_specifier\n         | struct_specifier\n         | union_specifier\n         | enum_specifier\n         | typedef\n         | gnu_typeof\n         ;\n```",
     "tags": [
@@ -1725,7 +1842,7 @@
   },
   {
     "symbol": "cn_parse_type_name",
-    "decl": "Cn_Ast_Type_Name *cn_parse_type_name(Cn_Lexer *lexer)",
+    "decl": "CNDEF Cn_Ast_Type_Name *cn_parse_type_name(Cn_Lexer *lexer)",
     "summary": "Parses type name from the current token of `lexer`.",
     "description": "```\n type_name\n         : specifier_qualifier abstract_declarator\n         ;\n```",
     "tags": [
@@ -1734,7 +1851,7 @@
   },
   {
     "symbol": "cn_parse_specifier_qualifier",
-    "decl": "Cn_Ast_Specifier_Qualifier *cn_parse_specifier_qualifier(Cn_Lexer *lexer)",
+    "decl": "CNDEF Cn_Ast_Specifier_Qualifier *cn_parse_specifier_qualifier(Cn_Lexer *lexer)",
     "summary": "Parses specifier qualifier from the current token of `lexer`.",
     "description": "```\n specifier_qualifier\n         : gnu_attribute_specifiers (qualifier | type_specifier)+\n         ;\n```",
     "tags": [
@@ -1743,7 +1860,7 @@
   },
   {
     "symbol": "cn_parse_parameter_declarations",
-    "decl": "Cn_Ast_Nodes cn_parse_parameter_declarations(Cn_Lexer *lexer, bool *variadic, bool *ok)",
+    "decl": "CNDEF Cn_Ast_Nodes cn_parse_parameter_declarations(Cn_Lexer *lexer, bool *variadic, bool *ok)",
     "summary": "Parses parameter type list from the current token of `lexer`.",
     "description": "```\n parameter_type_list\n         : '...'\n         | parameter_declaration_list (',' '...')?\n         ;\n\n parameter_declaration_list\n         : parameter_declaration (',' parameter_declaration)*\n         ;\n```",
     "tags": [
@@ -1754,7 +1871,7 @@
   },
   {
     "symbol": "cn_parse_parameter_declaration",
-    "decl": "Cn_Ast_Parameter_Declaration *cn_parse_parameter_declaration(Cn_Lexer *lexer)",
+    "decl": "CNDEF Cn_Ast_Parameter_Declaration *cn_parse_parameter_declaration(Cn_Lexer *lexer)",
     "summary": "Parses parameter declaration from the current token of `lexer`.",
     "description": "```\n parameter_declaration\n         : declaration_specifiers declarator\n         ;\n```",
     "tags": [
@@ -1763,7 +1880,7 @@
   },
   {
     "symbol": "cn_parse_struct_or_union_specifier",
-    "decl": "Cn_Ast_Node *cn_parse_struct_or_union_specifier(Cn_Lexer *lexer)",
+    "decl": "CNDEF Cn_Ast_Node *cn_parse_struct_or_union_specifier(Cn_Lexer *lexer)",
     "summary": "Parses `struct` or `union` specifier from the current token of `lexer`.",
     "description": "```\n struct_specifier\n         : 'struct' attribute_specifiers gnu_attribute_specifiers\n         ( identifier? '{' member_declaration* '}' )\n         | identifier\n         ;\n\n union_specifier\n         : 'union' attribute_specifiers gnu_attribute_specifiers\n         ( identifier? '{' member_declaration* '}' )\n         | identifier\n         ;\n```",
     "tags": [
@@ -1772,7 +1889,7 @@
   },
   {
     "symbol": "cn_parse_member_declaration",
-    "decl": "Cn_Ast_Member_Declaration *cn_parse_member_declaration(Cn_Lexer *lexer)",
+    "decl": "CNDEF Cn_Ast_Member_Declaration *cn_parse_member_declaration(Cn_Lexer *lexer)",
     "summary": "Parses member declaration from the current token of `lexer`.",
     "description": "```\n member_declaration\n         : attribute_specifiers specifier_qualifier member_declarators ';'\n         ;\n```",
     "tags": [
@@ -1781,7 +1898,7 @@
   },
   {
     "symbol": "cn_parse_member_declarators",
-    "decl": "Cn_Ast_Nodes cn_parse_member_declarators(Cn_Lexer *lexer, bool *ok)",
+    "decl": "CNDEF Cn_Ast_Nodes cn_parse_member_declarators(Cn_Lexer *lexer, bool *ok)",
     "summary": "Parses member declarator list from the current token of `lexer`.",
     "description": "```\n member_declarators\n         : member_declarator (',' member_declarator)*\n         ;\n```",
     "tags": [
@@ -1791,7 +1908,7 @@
   },
   {
     "symbol": "cn_parse_member_declarator",
-    "decl": "Cn_Ast_Member_Declarator *cn_parse_member_declarator(Cn_Lexer *lexer)",
+    "decl": "CNDEF Cn_Ast_Member_Declarator *cn_parse_member_declarator(Cn_Lexer *lexer)",
     "summary": "Parses member declarator from the current token of `lexer`.",
     "description": "```\n member_declarator\n         : declarator gnu_attribute_specifiers\n         | declarator? ':' expression gnu_attribute_specifiers\n         ;\n```",
     "tags": [
@@ -1800,7 +1917,7 @@
   },
   {
     "symbol": "cn_parse_enum_specifier",
-    "decl": "Cn_Ast_Node *cn_parse_enum_specifier(Cn_Lexer *lexer)",
+    "decl": "CNDEF Cn_Ast_Node *cn_parse_enum_specifier(Cn_Lexer *lexer)",
     "summary": "Parses `enum` specifier from the current token of `lexer`.",
     "description": "```\n enum_specifier\n         : 'enum' attribute_specifiers gnu_attribute_specifiers\n         ( identifier? (':' specifier_qualifier)? '{' ( enumerator (',' enumerator)* ','? )? '}' )\n         | identifier  (':' specifier_qualifier)?\n         ;\n```",
     "tags": [
@@ -1809,7 +1926,7 @@
   },
   {
     "symbol": "cn_parse_enumerator",
-    "decl": "Cn_Ast_Enumerator *cn_parse_enumerator(Cn_Lexer *lexer)",
+    "decl": "CNDEF Cn_Ast_Enumerator *cn_parse_enumerator(Cn_Lexer *lexer)",
     "summary": "Parses enumerator from the current token of `lexer`.",
     "description": "```\n enumerator\n         : identifier attribute_specifiers gnu_attribute_specifiers ('=' expression)?\n         ;\n```",
     "tags": [
@@ -1818,7 +1935,7 @@
   },
   {
     "symbol": "cn_parse_attribute_specifiers",
-    "decl": "Cn_Ast_Nodes cn_parse_attribute_specifiers(Cn_Lexer *lexer, bool *ok)",
+    "decl": "CNDEF Cn_Ast_Nodes cn_parse_attribute_specifiers(Cn_Lexer *lexer, bool *ok)",
     "summary": "Parses attribute specifier sequence from the current token of `lexer`.",
     "description": "```\n attribute_specifiers\n         : attribute_specifier*\n         ;\n```",
     "tags": [
@@ -1828,7 +1945,7 @@
   },
   {
     "symbol": "cn_parse_attribute_specifier",
-    "decl": "Cn_Ast_Attribute_Specifier *cn_parse_attribute_specifier(Cn_Lexer *lexer)",
+    "decl": "CNDEF Cn_Ast_Attribute_Specifier *cn_parse_attribute_specifier(Cn_Lexer *lexer)",
     "summary": "Parses attribute specifier from the current token of `lexer`.",
     "description": "```\n attribute_specifier\n         : '[' '[' attribute_list? ']' ']'\n         ;\n```",
     "tags": [
@@ -1837,7 +1954,7 @@
   },
   {
     "symbol": "cn_parse_attributes",
-    "decl": "Cn_Ast_Nodes cn_parse_attributes(Cn_Lexer *lexer, bool *ok)",
+    "decl": "CNDEF Cn_Ast_Nodes cn_parse_attributes(Cn_Lexer *lexer, bool *ok)",
     "summary": "Parses attribute list from the current token of `lexer`.",
     "description": "```\n attributes\n         : attribute (',' attribute)*\n         ;\n```",
     "tags": [
@@ -1847,7 +1964,7 @@
   },
   {
     "symbol": "cn_parse_attribute",
-    "decl": "Cn_Ast_Attribute *cn_parse_attribute(Cn_Lexer *lexer)",
+    "decl": "CNDEF Cn_Ast_Attribute *cn_parse_attribute(Cn_Lexer *lexer)",
     "summary": "Parses attribute from the current token of `lexer`.",
     "description": "```\n attribute\n         : ( identifier ':' ':' )? identifier ( '(' arguments ')' )?\n         ;\n```",
     "tags": [
@@ -1856,7 +1973,7 @@
   },
   {
     "symbol": "cn_parse_gnu_attribute_specifiers",
-    "decl": "Cn_Ast_Nodes cn_parse_gnu_attribute_specifiers(Cn_Lexer *lexer, bool *ok)",
+    "decl": "CNDEF Cn_Ast_Nodes cn_parse_gnu_attribute_specifiers(Cn_Lexer *lexer, bool *ok)",
     "summary": "Parses GNU attribute specifier sequence from the current token of `lexer`.",
     "description": "```\n gnu_attribute_specifiers\n         : gnu_attribute_specifier*\n         ;\n```",
     "tags": [
@@ -1866,7 +1983,7 @@
   },
   {
     "symbol": "cn_parse_gnu_attribute_specifier",
-    "decl": "Cn_Ast_Gnu_Attribute_Specifier *cn_parse_gnu_attribute_specifier(Cn_Lexer *lexer)",
+    "decl": "CNDEF Cn_Ast_Gnu_Attribute_Specifier *cn_parse_gnu_attribute_specifier(Cn_Lexer *lexer)",
     "summary": "Parses GNU attribute specifier from the current token of `lexer`.",
     "description": "```\n gnu_attribute_specifier\n         : '__attribute__' '(' '(' gnu_attribute_list? ')' ')'\n         ;\n```",
     "tags": [
@@ -1875,7 +1992,7 @@
   },
   {
     "symbol": "cn_parse_gnu_attributes",
-    "decl": "Cn_Ast_Nodes cn_parse_gnu_attributes(Cn_Lexer *lexer, bool *ok)",
+    "decl": "CNDEF Cn_Ast_Nodes cn_parse_gnu_attributes(Cn_Lexer *lexer, bool *ok)",
     "summary": "Parses GNU attribute list from the current token of `lexer`.",
     "description": "```\n gnu_attributes\n         : gnu_attribute (',' gnu_attribute)*\n         ;\n```",
     "tags": [
@@ -1885,7 +2002,7 @@
   },
   {
     "symbol": "cn_parse_gnu_attribute",
-    "decl": "Cn_Ast_Gnu_Attribute *cn_parse_gnu_attribute(Cn_Lexer *lexer)",
+    "decl": "CNDEF Cn_Ast_Gnu_Attribute *cn_parse_gnu_attribute(Cn_Lexer *lexer)",
     "summary": "Parses GNU attribute from the current token of `lexer`.",
     "description": "```\n gnu_attribute\n         : identifier ( '(' arguments ')' )?\n         ;\n```",
     "tags": [
@@ -1894,7 +2011,7 @@
   },
   {
     "symbol": "cn_parse_gnu_asm_label",
-    "decl": "Cn_Ast_Gnu_Asm_Label *cn_parse_gnu_asm_label(Cn_Lexer *lexer)",
+    "decl": "CNDEF Cn_Ast_Gnu_Asm_Label *cn_parse_gnu_asm_label(Cn_Lexer *lexer)",
     "summary": "Parses GNU `asm` label from the current token of `lexer`.",
     "description": "```\n gnu_asm_label\n         : '__asm__' '(' string* ')'\n         ;\n```",
     "tags": [
@@ -1903,7 +2020,7 @@
   },
   {
     "symbol": "cn_parse_int_literal",
-    "decl": "bool cn_parse_int_literal(Cn_String literal, uint64_t *out)",
+    "decl": "CNDEF bool cn_parse_int_literal(Cn_String literal, uint64_t *out)",
     "summary": "Parses integer literal into its magnitude.",
     "description": "Accepts decimal, octal and `0x` hex literals, with optional `u`, `U`, `l` or `L` suffix.\nNo leading sign is accepted, since unary minus is its own ast node.",
     "tags": [
@@ -1913,7 +2030,7 @@
   },
   {
     "symbol": "cn_parse_float_literal",
-    "decl": "bool cn_parse_float_literal(Cn_String literal, double *out)",
+    "decl": "CNDEF bool cn_parse_float_literal(Cn_String literal, double *out)",
     "summary": "Parses float literal.",
     "description": "Accepts mantissa with optional exponent and optional `f`, `F`, `l` or `L` suffix.\nRounding is not bit exact.",
     "tags": [
@@ -1924,7 +2041,7 @@
   },
   {
     "symbol": "cn_parse_char_literal",
-    "decl": "bool cn_parse_char_literal(Cn_String literal, uint64_t *out, int *unit_count_out)",
+    "decl": "CNDEF bool cn_parse_char_literal(Cn_String literal, uint64_t *out, int *unit_count_out)",
     "summary": "Parses char literal into its numeric value.",
     "description": "Accepts single characters and escape sequences.",
     "tags": [
@@ -1935,8 +2052,26 @@
     ]
   },
   {
+    "symbol": "cn_build_format",
+    "decl": "#define cn_build_format(...) cn__build_format(__FILE__, __LINE__, __VA_ARGS__)",
+    "summary": "Builds code ast node that contains formatted text.",
+    "description": "Once reparsed, the node is expanded and parsed into actual ast nodes.",
+    "tags": [
+      { "kind": "RETURNS", "text": "Built code node." }
+    ]
+  },
+  {
+    "symbol": "cn_build_list",
+    "decl": "#define cn_build_list(...) cn_build_list_from((void *[]) { __VA_ARGS__ }, sizeof((void *[]) { __VA_ARGS__ }) / sizeof(void *))",
+    "summary": "Builds list out of supplied nodes, passed as variadic arguments in order.",
+    "description": "",
+    "tags": [
+      { "kind": "RETURNS", "text": "List composed of supplied nodes, allocated internally in arena." }
+    ]
+  },
+  {
     "symbol": "cn_build_list_from",
-    "decl": "Cn_Ast_Nodes cn_build_list_from(void *ptrs[], int64_t length)",
+    "decl": "CNDEF Cn_Ast_Nodes cn_build_list_from(void *ptrs[], int64_t length)",
     "summary": "Builds list out of `length` nodes in `ptrs`.",
     "description": "",
     "tags": [
@@ -1944,8 +2079,222 @@
     ]
   },
   {
+    "symbol": "cn_build_identifier",
+    "decl": "#define cn_build_identifier(name, ...) cn__build_identifier(name, (Cn_Build_Opt) { .file = __FILE__, .line =__LINE__, __VA_ARGS__ })",
+    "summary": "Builds identifier with supplied `name`.",
+    "description": "",
+    "tags": [
+      { "kind": "RETURNS", "text": "Built identifier." }
+    ]
+  },
+  {
+    "symbol": "cn_build_integer",
+    "decl": "#define cn_build_integer(value, ...) cn__build_integer(value, (Cn_Build_Opt) { .file = __FILE__, .line =__LINE__, __VA_ARGS__ })",
+    "summary": "Builds integer with supplied `value`.",
+    "description": "",
+    "tags": [
+      { "kind": "RETURNS", "text": "Built integer." }
+    ]
+  },
+  {
+    "symbol": "cn_build_float",
+    "decl": "#define cn_build_float(value, ...) cn__build_float(value, (Cn_Build_Opt) { .file = __FILE__, .line =__LINE__, __VA_ARGS__ })",
+    "summary": "Builds float with supplied `value`.",
+    "description": "",
+    "tags": [
+      { "kind": "RETURNS", "text": "Built float." }
+    ]
+  },
+  {
+    "symbol": "cn_build_string",
+    "decl": "#define cn_build_string(str, ...) cn__build_string(str, (Cn_Build_Opt) { .file = __FILE__, .line =__LINE__, __VA_ARGS__ })",
+    "summary": "Builds string with supplied `str`.",
+    "description": "",
+    "tags": [
+      { "kind": "RETURNS", "text": "Built string." }
+    ]
+  },
+  {
+    "symbol": "cn_build_binary",
+    "decl": "#define cn_build_binary(op, left, right, ...) cn__build_binary(op, left, right, (Cn_Build_Opt) { .file = __FILE__, .line =__LINE__, __VA_ARGS__ })",
+    "summary": "Builds binary expression with operator `op`.",
+    "description": "",
+    "tags": [
+      { "kind": "RETURNS", "text": "Built binary expression." },
+      { "kind": "IMPORTANT", "text": "`left` and `right` must be valid built nodes." }
+    ]
+  },
+  {
+    "symbol": "cn_build_assign",
+    "decl": "#define cn_build_assign(op, left, right, ...) cn__build_assign(op, left, right, (Cn_Build_Opt) { .file = __FILE__, .line =__LINE__, __VA_ARGS__ })",
+    "summary": "Builds assignment expression with operator `op`.",
+    "description": "",
+    "tags": [
+      { "kind": "RETURNS", "text": "Built assignment expression." },
+      { "kind": "IMPORTANT", "text": "`left` and `right` must be valid built nodes." }
+    ]
+  },
+  {
+    "symbol": "cn_build_unary",
+    "decl": "#define cn_build_unary(op, expression, ...) cn__build_unary(op, expression, (Cn_Build_Opt) { .file = __FILE__, .line =__LINE__, __VA_ARGS__ })",
+    "summary": "Builds unary expression with operator `op`.",
+    "description": "",
+    "tags": [
+      { "kind": "RETURNS", "text": "Built unary expression." },
+      { "kind": "IMPORTANT", "text": "`expression` must be a valid built node." }
+    ]
+  },
+  {
+    "symbol": "cn_build_func_call",
+    "decl": "#define cn_build_func_call(callee, arguments, ...) cn__build_func_call(callee, arguments, (Cn_Build_Opt) { .file = __FILE__, .line =__LINE__, __VA_ARGS__ })",
+    "summary": "Builds function call expression.",
+    "description": "",
+    "tags": [
+      { "kind": "RETURNS", "text": "Built function call expression." },
+      { "kind": "IMPORTANT", "text": "`callee` must be a valid built node, and `arguments` must be constructed beforehand\nwith appropriate expression children." }
+    ]
+  },
+  {
+    "symbol": "cn_build_expr_statement",
+    "decl": "#define cn_build_expr_statement(expression, ...) cn__build_expr_statement(expression, (Cn_Build_Opt) { .file = __FILE__, .line =__LINE__, __VA_ARGS__ })",
+    "summary": "Builds expression statement.",
+    "description": "",
+    "tags": [
+      { "kind": "RETURNS", "text": "Built expression statement." },
+      { "kind": "IMPORTANT", "text": "`expression` must be a valid built node." }
+    ]
+  },
+  {
+    "symbol": "cn_build_goto_statement",
+    "decl": "#define cn_build_goto_statement(identifier, ...) cn__build_goto_statement(identifier, (Cn_Build_Opt) { .file = __FILE__, .line =__LINE__, __VA_ARGS__ })",
+    "summary": "Builds `goto` statement.",
+    "description": "",
+    "tags": [
+      { "kind": "RETURNS", "text": "Built `goto` statement." },
+      { "kind": "IMPORTANT", "text": "`identifier` must be a valid built node." }
+    ]
+  },
+  {
+    "symbol": "cn_build_return_statement",
+    "decl": "#define cn_build_return_statement(expression, ...) cn__build_return_statement(expression, (Cn_Build_Opt) { .file = __FILE__, .line =__LINE__, __VA_ARGS__ })",
+    "summary": "Builds `return` statement.",
+    "description": "",
+    "tags": [
+      { "kind": "RETURNS", "text": "Built `return` statement." },
+      { "kind": "IMPORTANT", "text": "`expression` must be a valid built node." }
+    ]
+  },
+  {
+    "symbol": "cn_build_label",
+    "decl": "#define cn_build_label(identifier, statement, ...) cn__build_label(identifier, statement, (Cn_Build_Opt) { .file = __FILE__, .line =__LINE__, __VA_ARGS__ })",
+    "summary": "Builds label.",
+    "description": "",
+    "tags": [
+      { "kind": "RETURNS", "text": "Built label." },
+      { "kind": "IMPORTANT", "text": "`identifier` and `statement` must be valid built nodes." }
+    ]
+  },
+  {
+    "symbol": "cn_build_block_item",
+    "decl": "#define cn_build_block_item(declaration_or_statement, ...) cn__build_block_item(declaration_or_statement, (Cn_Build_Opt) { .file = __FILE__, .line =__LINE__, __VA_ARGS__ })",
+    "summary": "Builds block item.",
+    "description": "",
+    "tags": [
+      { "kind": "RETURNS", "text": "Built block item." },
+      { "kind": "IMPORTANT", "text": "`declaration_or_statement` must be a valid built node." }
+    ]
+  },
+  {
+    "symbol": "cn_build_pointer",
+    "decl": "#define cn_build_pointer(qualifiers, pointer, ...) cn__build_pointer(qualifiers, pointer, (Cn_Build_Opt) { .file = __FILE__, .line =__LINE__, __VA_ARGS__ })",
+    "summary": "Builds pointer with supplied `qualifiers`.",
+    "description": "Chains `pointer` that stands closer to the declared name. As in `char * const * name`,\nwhere outer built pointer holds `const` qualifier and chains the inner one.",
+    "tags": [
+      { "kind": "RETURNS", "text": "Built pointer." },
+      { "kind": "IMPORTANT", "text": "`pointer` must be `NIL` or a valid built pointer." }
+    ]
+  },
+  {
+    "symbol": "cn_build_direct_declarator_grouped",
+    "decl": "#define cn_build_direct_declarator_grouped(declarator, ...) cn__build_direct_declarator_grouped(declarator, (Cn_Build_Opt) { .file = __FILE__, .line =__LINE__, __VA_ARGS__ })",
+    "summary": "Builds grouped direct declarator `'(' declarator ')'`.",
+    "description": "",
+    "tags": [
+      { "kind": "RETURNS", "text": "Built grouped direct declarator." },
+      { "kind": "IMPORTANT", "text": "`declarator` must be a valid built node." },
+      { "kind": "NOTE", "text": "Identifier direct declarator variation has no dedicated build function,\nplain `cn_build_identifier` result is used in its place." }
+    ]
+  },
+  {
+    "symbol": "cn_build_direct_declarator_array",
+    "decl": "#define cn_build_direct_declarator_array(direct_declarator, expression, ...) cn__build_direct_declarator_array(direct_declarator, expression, (Cn_Build_Opt) { .file = __FILE__, .line =__LINE__, __VA_ARGS__ })",
+    "summary": "Builds array direct declarator `direct_declarator '[' expression? ']'`.",
+    "description": "",
+    "tags": [
+      { "kind": "PARAM", "text": "direct_declarator: Valid built node, or `NIL` if array declarator is abstract." },
+      { "kind": "PARAM", "text": "expression: Can be `NIL` to build unsized `[]` array." },
+      { "kind": "RETURNS", "text": "Built array direct declarator." }
+    ]
+  },
+  {
+    "symbol": "cn_build_direct_declarator_function",
+    "decl": "#define cn_build_direct_declarator_function(direct_declarator, parameter_declarations, variadic, ...) cn__build_direct_declarator_function(direct_declarator, parameter_declarations, variadic, (Cn_Build_Opt) { .file = __FILE__, .line =__LINE__, __VA_ARGS__ })",
+    "summary": "Builds function direct declarator `direct_declarator '(' parameter_declarations? ')'`.",
+    "description": "",
+    "tags": [
+      { "kind": "PARAM", "text": "direct_declarator: Valid built node, or `NIL` if function declarator is abstract." },
+      { "kind": "PARAM", "text": "parameter_declarations: Must be constructed beforehand with appropriate parameter\ndeclaration children, empty list builds `(void)`." },
+      { "kind": "PARAM", "text": "variadic: Marks declarator as ending with `...`." },
+      { "kind": "RETURNS", "text": "Built function direct declarator." }
+    ]
+  },
+  {
+    "symbol": "cn_build_declarator",
+    "decl": "#define cn_build_declarator(pointer, direct_declarator, ...) cn__build_declarator(pointer, direct_declarator, (Cn_Build_Opt) { .file = __FILE__, .line =__LINE__, __VA_ARGS__ })",
+    "summary": "Builds declarator.",
+    "description": "",
+    "tags": [
+      { "kind": "PARAM", "text": "pointer: Can be `NIL` if declarator is not wrapped with pointers." },
+      { "kind": "PARAM", "text": "direct_declarator: Can be `NIL` only if declarator is abstract." },
+      { "kind": "RETURNS", "text": "Built declarator." },
+      { "kind": "NOTE", "text": "`CN_AST_DECLARATOR_IS_ABSTRACT` flag is deduced from supplied direct declarator chain,\ndeclarator is abstract when that chain carries no identifier." }
+    ]
+  },
+  {
+    "symbol": "cn_build_init_declarator",
+    "decl": "#define cn_build_init_declarator(declarator, initializer, ...) cn__build_init_declarator(declarator, initializer, (Cn_Build_Opt) { .file = __FILE__, .line =__LINE__, __VA_ARGS__ })",
+    "summary": "Builds init declarator.",
+    "description": "",
+    "tags": [
+      { "kind": "PARAM", "text": "initializer: Can be `NIL` if declared name is left uninitialized." },
+      { "kind": "RETURNS", "text": "Built init declarator." },
+      { "kind": "IMPORTANT", "text": "`declarator` must be a valid non-abstract built node." }
+    ]
+  },
+  {
+    "symbol": "cn_build_declaration",
+    "decl": "#define cn_build_declaration(declaration_specifiers, init_declarators, ...) cn__build_declaration(declaration_specifiers, init_declarators, (Cn_Build_Opt) { .file = __FILE__, .line =__LINE__, __VA_ARGS__ })",
+    "summary": "Builds declaration.",
+    "description": "",
+    "tags": [
+      { "kind": "PARAM", "text": "init_declarators: Must be constructed beforehand with appropriate init declarator children,\nempty list builds empty declaration." },
+      { "kind": "RETURNS", "text": "Built declaration." },
+      { "kind": "IMPORTANT", "text": "`declaration_specifiers` must be a valid built node." }
+    ]
+  },
+  {
+    "symbol": "cn_tu_init",
+    "decl": "#define cn_tu_init(tu, intermidiate_path, ...) cn__tu_init_opt(tu, intermidiate_path, (Cn_Tu_Make_Opt) { __VA_ARGS__ })",
+    "summary": "Initializes translation unit `tu` from the pre-processed file at `intermidiate_path`.",
+    "description": "Translation unit represents classic C translation unit, in which all lexing, parsing,\ninferring and modification occurs.\n\nPath must point to an `.i` file, that is the intermediate pre-processed representation of\na translation unit. Simply, it is a `.c` file that has all macros expanded and is ready to be\nsent to the compiler. In `gcc` it would be generated by executing the following:\n\n```\n$ gcc -E -o file.i file.c\n```",
+    "tags": [
+      { "kind": "RETURNS", "text": "`true` on success, `false` on error." },
+      { "kind": "IMPORTANT", "text": "Supplying `.c` files with macros that are not expanded results in an error,\nmake sure to pass the `.c` file through the compiler's pre-processor first." }
+    ]
+  },
+  {
     "symbol": "cn_tu_process",
-    "decl": "int cn_tu_process(Cn_Translation_Unit *tu)",
+    "decl": "CNDEF int cn_tu_process(Cn_Translation_Unit *tu)",
     "summary": "Processes translation unit `tu` from top to bottom.",
     "description": "Translation unit passes through Infer and Size stages. Meaning ast is built, type and symbol\ntables are constructed, and sizes of the types are calculated too.\n\nThroughout the processing, various messages are sent, which can be intercepted to introspect\nand modify code, state, etc. This can be done by setting `cn_message_handler`.\nSee `Message` section for more info.",
     "tags": [
@@ -1954,7 +2303,7 @@
   },
   {
     "symbol": "cn_tu_free",
-    "decl": "void cn_tu_free(Cn_Translation_Unit *tu)",
+    "decl": "CNDEF void cn_tu_free(Cn_Translation_Unit *tu)",
     "summary": "Frees all memory used by translation unit `tu`, including closing previously opened file.",
     "description": "",
     "tags": []
