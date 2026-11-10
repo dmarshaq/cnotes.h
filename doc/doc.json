@@ -91,6 +91,15 @@
     ]
   },
   {
+    "symbol": "cn_str_starts_with",
+    "decl": "CNDEF bool cn_str_starts_with(Cn_String str, Cn_String start)",
+    "summary": "Checks whether `str` starts with `start`.",
+    "description": "",
+    "tags": [
+      { "kind": "RETURNS", "text": "`true` if `str` starts with `start`, `false` otherwise." }
+    ]
+  },
+  {
     "symbol": "cn_str_find_char_left",
     "decl": "CNDEF int64_t cn_str_find_char_left(Cn_String str, char symbol)",
     "summary": "Linearly searches for the first occurrence of char `symbol` in `str` from the left.",
@@ -1271,6 +1280,17 @@
     ]
   },
   {
+    "symbol": "cn_binding_declare_builtin",
+    "decl": "CNDEF Cn_Binding_Idx cn_binding_declare_builtin(Cn_String name, void *source)",
+    "summary": "Adds new builtin binding to the current scope.",
+    "description": "If same binding already exists, errors.",
+    "tags": [
+      { "kind": "PARAM", "text": "source: Only used to print error diagnostics of the source location." },
+      { "kind": "RETURNS", "text": "Binding index on success, `NIL` if an error occurred." },
+      { "kind": "NOTE", "text": "Builtin's don't have source location,\nthey are names that are only binded to `CN_OPAQUE` type." }
+    ]
+  },
+  {
     "symbol": "cn_binding_declare_function_arguments",
     "decl": "CNDEF bool cn_binding_declare_function_arguments(Cn_Binding_Idx function_binding_idx)",
     "summary": "Binds parameters of function definition `function_binding_idx` as arguments in the current scope.",
@@ -1717,7 +1737,7 @@
     "symbol": "cn_parse_pointer",
     "decl": "CNDEF Cn_Ast_Pointer *cn_parse_pointer(Cn_Lexer *lexer)",
     "summary": "Parses pointer from the current token of `lexer`.",
-    "description": "```\n pointer\n         : '*' qualifier* pointer?\n         ;\n```",
+    "description": "```\n pointer\n         : '*' (qualifier | gnu_attribute_specifier)* pointer?\n         ;\n```",
     "tags": [
       { "kind": "RETURNS", "text": "Parsed pointer, `NULL` on error." }
     ]
@@ -1891,7 +1911,7 @@
     "symbol": "cn_parse_member_declaration",
     "decl": "CNDEF Cn_Ast_Member_Declaration *cn_parse_member_declaration(Cn_Lexer *lexer)",
     "summary": "Parses member declaration from the current token of `lexer`.",
-    "description": "```\n member_declaration\n         : attribute_specifiers specifier_qualifier member_declarators ';'\n         ;\n```",
+    "description": "```\n member_declaration\n         : '__extension__'? attribute_specifiers specifier_qualifier member_declarators ';'\n         ;\n```",
     "tags": [
       { "kind": "RETURNS", "text": "Parsed member declaration, `NULL` on error." }
     ]

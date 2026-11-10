@@ -333,6 +333,13 @@ CNDEF int64_t cn_str_find_right(Cn_String str, Cn_String search);
 CNDEF bool cn_str_ends_with(Cn_String str, Cn_String end);
 
 /**
+ * Checks whether `str` starts with `start`.
+ *
+ * RETURNS: `true` if `str` starts with `start`, `false` otherwise.
+ */
+CNDEF bool cn_str_starts_with(Cn_String str, Cn_String start);
+
+/**
  * Linearly searches for the first occurrence of char `symbol` in `str` from the left.
  *
  * RETURNS: Index of the occurrence, otherwise `-1`.
@@ -2834,6 +2841,7 @@ typedef enum : uint8_t {
     CN_BINDING_TYPEDEF,
     CN_BINDING_ENUM_CONSTANT,
     CN_BINDING_LABEL,
+    CN_BINDING_BUILTIN,
 } Cn_Binding_Kind;
 
 typedef struct {
@@ -2978,6 +2986,20 @@ CNDEF Cn_Binding_Idx cn_binding_declare_tag(Cn_String tag, Cn_Type_Kind kind);
  * RETURNS: Binding index on success, `NIL` if an error occurred.
  */
 CNDEF Cn_Binding_Idx cn_binding_declare_label(Cn_String name, void * source);
+
+/**
+ * Adds new builtin binding to the current scope.
+ *
+ * If same binding already exists, errors.
+ *
+ * PARAM source: Only used to print error diagnostics of the source location.
+ *
+ * RETURNS: Binding index on success, `NIL` if an error occurred.
+ *
+ * NOTE: Builtin's don't have source location, 
+ * they are names that are only binded to `CN_OPAQUE` type.
+ */
+CNDEF Cn_Binding_Idx cn_binding_declare_builtin(Cn_String name, void *source);
 
 /**
  * Binds parameters of function definition `function_binding_idx` as arguments in the current scope.
@@ -5225,6 +5247,12 @@ CNDEF bool cn_str_ends_with(Cn_String str, Cn_String end) {
     if (index == -1) return false;
 
     return str.length - end.length == index;
+}
+
+CNDEF bool cn_str_starts_with(Cn_String str, Cn_String start) {
+    if (str.length == 0 && start.length == 0) return true;
+
+    return cn_str_find_left(str, start) == 0;
 }
 
 CNDEF int64_t cn_str_find_char_left(Cn_String str, char symbol) {
@@ -8331,23 +8359,38 @@ CNDEF void cn_scope_stack_pop() {
         exit(1);
     }
 
-    for (int i = scope->binding_idx; i < cn_array_list_length(&cn__tu_data->binding_list); i++) {
-        // Resolve each binding, properly dispose each binding.
-        if (cn__tu_data->binding_list[i].kind == CN_BINDING_TAG) {
-            if (cn__tu_data->binding_list[i].next_idx == CN_BINDING_NIL_IDX) {
-                cn_hash_table_remove(&cn__tu_data->tag_binding_table, &cn__tu_data->binding_list[i].name);
-            } else {
-                cn_hash_table_put(&cn__tu_data->tag_binding_table, cn__tu_data->binding_list[i].next_idx, &cn__tu_data->binding_list[i].name);
-            }
+    int64_t binding_list_length = cn_array_list_length(&cn__tu_data->binding_list);
+
+    // AI: Assisted.
+    // Undo bindings newest-first, so the restored next_idx values are always valid.
+    for (int64_t i = binding_list_length - 1; i >= scope->binding_idx; i--) {
+        Cn_Binding *b = &cn__tu_data->binding_list[i];
+        if (b->kind == CN_BINDING_BUILTIN) continue;
+
+        Cn_Binding_Idx **table = (b->kind == CN_BINDING_TAG)
+            ? &cn__tu_data->tag_binding_table
+            : &cn__tu_data->symbol_binding_table;
+
+        if (b->next_idx == CN_BINDING_NIL_IDX) {
+            cn_hash_table_remove(table, &b->name);
         } else {
-            if (cn__tu_data->binding_list[i].next_idx == CN_BINDING_NIL_IDX) {
-                cn_hash_table_remove(&cn__tu_data->symbol_binding_table, &cn__tu_data->binding_list[i].name);
-            } else {
-                cn_hash_table_put(&cn__tu_data->symbol_binding_table, cn__tu_data->binding_list[i].next_idx, &cn__tu_data->binding_list[i].name);
-            }
+            cn_hash_table_put(table, b->next_idx, &b->name);
         }
     }
-    cn_array_list_pop_multiple(&cn__tu_data->binding_list, cn_array_list_length(&cn__tu_data->binding_list) - scope->binding_idx);
+
+    // AI: Assisted.
+    // Builtins are never removed once added, instead they live through the stack pop.
+    // Compact them to the front of this scope's region and re-point the table at their new indices.
+    int64_t preserved_builtin_offset = 0;
+    for (int64_t i = scope->binding_idx; i < binding_list_length; i++) {
+        if (cn__tu_data->binding_list[i].kind != CN_BINDING_BUILTIN) continue;
+
+        int64_t dst = scope->binding_idx + preserved_builtin_offset++;
+        cn__tu_data->binding_list[dst] = cn__tu_data->binding_list[i];
+        cn_hash_table_put(&cn__tu_data->symbol_binding_table, dst, &cn__tu_data->binding_list[dst].name);
+    }
+
+    cn_array_list_pop_multiple(&cn__tu_data->binding_list, binding_list_length - (scope->binding_idx + preserved_builtin_offset));
 
     if (CN_SCOPE_STACK_CURRENT_IDX == cn__tu_data->function_scope_idx) {
 
@@ -10009,6 +10052,28 @@ CNDEF Cn_Binding_Idx cn_binding_declare_label(Cn_String name, void * source) {
     binding.next_idx = current_idx;
     return cn_binding_table_put(binding, &cn__tu_data->label_binding_table);
 }
+
+CNDEF Cn_Binding_Idx cn_binding_declare_builtin(Cn_String name, void *source) {
+    CN_ASSERT(!cn_str_is_empty(name));
+
+    Cn_Type *opaque = cn__ast_add_type_if_not((Cn_Type *)&CN_TYPE_OPAQUE);
+
+    Cn_Binding binding = { 
+        .kind = CN_BINDING_BUILTIN,
+        .scope_idx = CN_SCOPE_FILE_IDX,
+        .type = opaque,
+    };
+
+    Cn_Binding_Idx current_idx = cn_binding_table_get(name, &cn__tu_data->symbol_binding_table);
+    if (current_idx != CN_BINDING_NIL_IDX) {
+        cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, source, CN_DC_ILLEGAL_BINDING, "'%.*s' builtin redifinition.", CN_STR_UNPACK(name));
+        return CN_BINDING_NIL_IDX;
+    }
+
+    binding.name = cn__ast_permanent_save_string(name);
+    return cn_binding_table_put(binding, &cn__tu_data->symbol_binding_table);
+}
+
 
 CNDEF bool cn_binding_declare_function_arguments(Cn_Binding_Idx function_binding_idx) {
     Cn_Binding *function_binding = cn_binding_get(function_binding_idx);
@@ -11803,8 +11868,16 @@ CNDEF Cn_Type *cn_analyze_typecheck_expression(void * expression) {
                             Cn_Binding_Idx idx = cn_binding_table_get(cn_ast_as(Identifier, literal)->name, &cn__tu_data->symbol_binding_table);
 
                             if (idx == CN_BINDING_NIL_IDX) {
-                                cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, literal, CN_DC_INVALID_SYMBOL, "Primary expression identifier is not a known symbol.");
-                                goto error;
+                                
+                                // Hook to detect and handle builtins as they appear.
+                                Cn_String name = cn_ast_as(Identifier, literal)->name;
+                                if (cn_str_starts_with(name, CN_STR_LIT("__builtin_"))) {
+                                    idx = cn_binding_declare_builtin(name, literal);
+                                    if (idx == CN_BINDING_NIL_IDX) goto error;
+                                } else {
+                                    cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, literal, CN_DC_INVALID_SYMBOL, "Primary expression identifier is not a known symbol.");
+                                    goto error;
+                                }
                             }
 
                             Cn_Binding *binding = cn__tu_data->binding_list + idx;
@@ -13610,226 +13683,6 @@ CNDEF bool cn_parse_optional(Cn_Lexer *lexer, Cn_Token_Type type) {
     return false;
 }
 
-
-const char *const CN_OPAQUE_BUILTINS[] = {
-    // ---- varargs ----
-    "__builtin_va_start", "__builtin_va_end", "__builtin_va_copy",
-    "__builtin_c23_va_start", "__builtin_va_arg_pack", "__builtin_va_arg_pack_len",
-    "__builtin_apply_args", "__builtin_apply", "__builtin_return",
-
-    // ---- bit manipulation ----
-    "__builtin_clz", "__builtin_clzl", "__builtin_clzll", "__builtin_clzg",
-    "__builtin_ctz", "__builtin_ctzl", "__builtin_ctzll", "__builtin_ctzg",
-    "__builtin_clrsb", "__builtin_clrsbl", "__builtin_clrsbll", "__builtin_clrsbg",
-    "__builtin_ffs", "__builtin_ffsl", "__builtin_ffsll", "__builtin_ffsg",
-    "__builtin_popcount", "__builtin_popcountl", "__builtin_popcountll", "__builtin_popcountg",
-    "__builtin_parity", "__builtin_parityl", "__builtin_parityll", "__builtin_parityg",
-    "__builtin_bswap16", "__builtin_bswap32", "__builtin_bswap64", "__builtin_bswap128",
-    "__builtin_bitreverse8", "__builtin_bitreverse16", "__builtin_bitreverse32", "__builtin_bitreverse64",
-    "__builtin_rotateleft8", "__builtin_rotateleft16", "__builtin_rotateleft32", "__builtin_rotateleft64",
-    "__builtin_rotateright8", "__builtin_rotateright16", "__builtin_rotateright32", "__builtin_rotateright64",
-
-    // ---- C23 <stdbit.h> (GCC 14+) ----
-    "__builtin_stdc_bit_ceil", "__builtin_stdc_bit_floor", "__builtin_stdc_bit_width",
-    "__builtin_stdc_count_ones", "__builtin_stdc_count_zeros",
-    "__builtin_stdc_first_leading_one", "__builtin_stdc_first_leading_zero",
-    "__builtin_stdc_first_trailing_one", "__builtin_stdc_first_trailing_zero",
-    "__builtin_stdc_has_single_bit",
-    "__builtin_stdc_leading_ones", "__builtin_stdc_leading_zeros",
-    "__builtin_stdc_trailing_ones", "__builtin_stdc_trailing_zeros",
-    "__builtin_stdc_rotate_left", "__builtin_stdc_rotate_right",
-
-    // ---- overflow-checked arithmetic ----
-    "__builtin_add_overflow", "__builtin_sub_overflow", "__builtin_mul_overflow",
-    "__builtin_add_overflow_p", "__builtin_sub_overflow_p", "__builtin_mul_overflow_p",
-    "__builtin_sadd_overflow", "__builtin_saddl_overflow", "__builtin_saddll_overflow",
-    "__builtin_ssub_overflow", "__builtin_ssubl_overflow", "__builtin_ssubll_overflow",
-    "__builtin_smul_overflow", "__builtin_smull_overflow", "__builtin_smulll_overflow",
-    "__builtin_uadd_overflow", "__builtin_uaddl_overflow", "__builtin_uaddll_overflow",
-    "__builtin_usub_overflow", "__builtin_usubl_overflow", "__builtin_usubll_overflow",
-    "__builtin_umul_overflow", "__builtin_umull_overflow", "__builtin_umulll_overflow",
-    "__builtin_addc", "__builtin_addcl", "__builtin_addcll",
-    "__builtin_subc", "__builtin_subcl", "__builtin_subcll",
-
-    // ---- compiler hints / control ----
-    "__builtin_expect", "__builtin_expect_with_probability",
-    "__builtin_unreachable", "__builtin_trap", "__builtin_debugtrap", "__builtin_assume",
-    "__builtin_assume_aligned", "__builtin_assume_separate_storage",
-    "__builtin_prefetch", "__builtin_constant_p", "__builtin_is_constant_evaluated",
-    "__builtin_object_size", "__builtin_dynamic_object_size",
-    "__builtin_classify_type", "__builtin_speculation_safe_value",
-    "__builtin_clear_padding", "__builtin_launder", "__builtin_addressof",
-    "__builtin_complex", "__builtin_shuffle", "__builtin_shufflevector",
-    "__builtin_LINE", "__builtin_FILE", "__builtin_FUNCTION",
-    "__builtin_frame_address", "__builtin_return_address", "__builtin_extract_return_addr",
-    "__builtin_frob_return_addr", "__builtin_extend_pointer",
-    "__builtin_alloca", "__builtin_alloca_with_align", "__builtin_alloca_with_align_and_max",
-    "__builtin_setjmp", "__builtin_longjmp",
-    "__builtin___clear_cache", "__builtin_eh_return_data_regno",
-    "__builtin_cpu_init", "__builtin_cpu_is", "__builtin_cpu_supports",
-
-    // ---- floating point classification / constants ----
-    "__builtin_huge_val", "__builtin_huge_valf", "__builtin_huge_vall", "__builtin_huge_valf128",
-    "__builtin_inf", "__builtin_inff", "__builtin_infl", "__builtin_inff128",
-    "__builtin_nan", "__builtin_nanf", "__builtin_nanl", "__builtin_nanf128",
-    "__builtin_nans", "__builtin_nansf", "__builtin_nansl", "__builtin_nansf128",
-    "__builtin_isnan", "__builtin_isinf", "__builtin_isinf_sign", "__builtin_isfinite",
-    "__builtin_isnormal", "__builtin_issubnormal", "__builtin_iszero", "__builtin_issignaling",
-    "__builtin_signbit", "__builtin_signbitf", "__builtin_signbitl",
-    "__builtin_fpclassify", "__builtin_isfpclass",
-    "__builtin_isgreater", "__builtin_isgreaterequal", "__builtin_isless",
-    "__builtin_islessequal", "__builtin_islessgreater", "__builtin_isunordered",
-    "__builtin_iseqsig", "__builtin_flt_rounds",
-
-    // ---- libm wrappers commonly seen in headers ----
-    "__builtin_fabs", "__builtin_fabsf", "__builtin_fabsl", "__builtin_fabsf128",
-    "__builtin_copysign", "__builtin_copysignf", "__builtin_copysignl", "__builtin_copysignf128",
-    "__builtin_sqrt", "__builtin_sqrtf", "__builtin_sqrtl",
-    "__builtin_fmax", "__builtin_fmaxf", "__builtin_fmaxl",
-    "__builtin_fmin", "__builtin_fminf", "__builtin_fminl",
-    "__builtin_fma", "__builtin_fmaf", "__builtin_fmal",
-    "__builtin_floor", "__builtin_floorf", "__builtin_floorl",
-    "__builtin_ceil", "__builtin_ceilf", "__builtin_ceill",
-    "__builtin_trunc", "__builtin_truncf", "__builtin_truncl",
-    "__builtin_round", "__builtin_roundf", "__builtin_roundl",
-    "__builtin_rint", "__builtin_rintf", "__builtin_rintl",
-    "__builtin_lrint", "__builtin_lrintf", "__builtin_llrint", "__builtin_llrintf",
-    "__builtin_lround", "__builtin_lroundf", "__builtin_llround", "__builtin_llroundf",
-
-    // ---- libc wrappers (string.h / stdlib.h / _FORTIFY_SOURCE) ----
-    "__builtin_memcpy", "__builtin_memmove", "__builtin_memset", "__builtin_memcmp",
-    "__builtin_memchr", "__builtin_mempcpy", "__builtin_bcmp", "__builtin_bzero",
-    "__builtin_strlen", "__builtin_strnlen", "__builtin_strcmp", "__builtin_strncmp",
-    "__builtin_strcpy", "__builtin_strncpy", "__builtin_stpcpy", "__builtin_stpncpy",
-    "__builtin_strcat", "__builtin_strncat", "__builtin_strchr", "__builtin_strrchr",
-    "__builtin_strstr", "__builtin_strdup", "__builtin_strndup",
-    "__builtin_abort", "__builtin_exit", "__builtin__exit", "__builtin_malloc",
-    "__builtin_calloc", "__builtin_free", "__builtin_realloc",
-    "__builtin_abs", "__builtin_labs", "__builtin_llabs",
-    "__builtin_printf", "__builtin_sprintf", "__builtin_snprintf",
-    "__builtin_vsprintf", "__builtin_vsnprintf", "__builtin_puts", "__builtin_putchar",
-    "__builtin___memcpy_chk", "__builtin___memmove_chk", "__builtin___memset_chk",
-    "__builtin___mempcpy_chk", "__builtin___strcpy_chk", "__builtin___stpcpy_chk",
-    "__builtin___strncpy_chk", "__builtin___stpncpy_chk",
-    "__builtin___strcat_chk", "__builtin___strncat_chk",
-    "__builtin___sprintf_chk", "__builtin___snprintf_chk",
-    "__builtin___vsprintf_chk", "__builtin___vsnprintf_chk",
-    "__builtin___printf_chk", "__builtin___fprintf_chk",
-    "__builtin___vprintf_chk", "__builtin___vfprintf_chk",
-
-    // ---- __atomic_* (GCC/Clang) ----
-    "__atomic_load", "__atomic_load_n", "__atomic_store", "__atomic_store_n",
-    "__atomic_exchange", "__atomic_exchange_n",
-    "__atomic_compare_exchange", "__atomic_compare_exchange_n",
-    "__atomic_add_fetch", "__atomic_sub_fetch", "__atomic_and_fetch",
-    "__atomic_xor_fetch", "__atomic_or_fetch", "__atomic_nand_fetch",
-    "__atomic_fetch_add", "__atomic_fetch_sub", "__atomic_fetch_and",
-    "__atomic_fetch_xor", "__atomic_fetch_or", "__atomic_fetch_nand",
-    "__atomic_fetch_min", "__atomic_fetch_max",
-    "__atomic_test_and_set", "__atomic_clear",
-    "__atomic_thread_fence", "__atomic_signal_fence",
-    "__atomic_always_lock_free", "__atomic_is_lock_free",
-
-    // ---- __c11_atomic_* (Clang <stdatomic.h>) ----
-    "__c11_atomic_init", "__c11_atomic_load", "__c11_atomic_store",
-    "__c11_atomic_exchange",
-    "__c11_atomic_compare_exchange_strong", "__c11_atomic_compare_exchange_weak",
-    "__c11_atomic_fetch_add", "__c11_atomic_fetch_sub", "__c11_atomic_fetch_and",
-    "__c11_atomic_fetch_or", "__c11_atomic_fetch_xor", "__c11_atomic_fetch_nand",
-    "__c11_atomic_fetch_min", "__c11_atomic_fetch_max",
-    "__c11_atomic_thread_fence", "__c11_atomic_signal_fence", "__c11_atomic_is_lock_free",
-
-    // ---- legacy __sync_* ----
-    "__sync_fetch_and_add", "__sync_fetch_and_sub", "__sync_fetch_and_or",
-    "__sync_fetch_and_and", "__sync_fetch_and_xor", "__sync_fetch_and_nand",
-    "__sync_add_and_fetch", "__sync_sub_and_fetch", "__sync_or_and_fetch",
-    "__sync_and_and_fetch", "__sync_xor_and_fetch", "__sync_nand_and_fetch",
-    "__sync_bool_compare_and_swap", "__sync_val_compare_and_swap",
-    "__sync_synchronize", "__sync_lock_test_and_set", "__sync_lock_release",
-
-    // ---- x86_64 (scalar / system; from x86gprintrin.h, ia32intrin.h, etc.) ----
-    "__builtin_ia32_bsrsi", "__builtin_ia32_bsrdi",
-    "__builtin_ia32_crc32qi", "__builtin_ia32_crc32hi",
-    "__builtin_ia32_crc32si", "__builtin_ia32_crc32di",
-    "__builtin_ia32_rdpmc", "__builtin_ia32_rdtsc", "__builtin_ia32_rdtscp",
-    "__builtin_ia32_rolqi", "__builtin_ia32_rolhi",
-    "__builtin_ia32_rorqi", "__builtin_ia32_rorhi",
-    "__builtin_ia32_pause",
-    "__builtin_ia32_readeflags_u32", "__builtin_ia32_readeflags_u64",
-    "__builtin_ia32_writeeflags_u32", "__builtin_ia32_writeeflags_u64",
-    "__builtin_ia32_sbb_u32", "__builtin_ia32_sbb_u64",
-    "__builtin_ia32_addcarryx_u32", "__builtin_ia32_addcarryx_u64",
-    "__builtin_ia32_subborrow_u32", "__builtin_ia32_subborrow_u64",
-    "__builtin_ia32_lzcnt_u16", "__builtin_ia32_lzcnt_u32", "__builtin_ia32_lzcnt_u64",
-    "__builtin_ia32_tzcnt_u16", "__builtin_ia32_tzcnt_u32", "__builtin_ia32_tzcnt_u64",
-    "__builtin_ia32_bextr_u32", "__builtin_ia32_bextr_u64",
-    "__builtin_ia32_bextri_u32", "__builtin_ia32_bextri_u64",
-    "__builtin_ia32_bzhi_si", "__builtin_ia32_bzhi_di",
-    "__builtin_ia32_pdep_si", "__builtin_ia32_pdep_di",
-    "__builtin_ia32_pext_si", "__builtin_ia32_pext_di",
-    "__builtin_ia32_rdrand16_step", "__builtin_ia32_rdrand32_step", "__builtin_ia32_rdrand64_step",
-    "__builtin_ia32_rdseed_hi_step", "__builtin_ia32_rdseed_si_step", "__builtin_ia32_rdseed_di_step",
-    "__builtin_ia32_rdseed16_step", "__builtin_ia32_rdseed32_step", "__builtin_ia32_rdseed64_step",
-    "__builtin_ia32_rdpid", "__builtin_ia32_rdpkru", "__builtin_ia32_wrpkru",
-    "__builtin_ia32_rdfsbase32", "__builtin_ia32_rdfsbase64",
-    "__builtin_ia32_rdgsbase32", "__builtin_ia32_rdgsbase64",
-    "__builtin_ia32_wrfsbase32", "__builtin_ia32_wrfsbase64",
-    "__builtin_ia32_wrgsbase32", "__builtin_ia32_wrgsbase64",
-    "__builtin_ia32_sfence", "__builtin_ia32_lfence", "__builtin_ia32_mfence",
-    "__builtin_ia32_clflush", "__builtin_ia32_clflushopt", "__builtin_ia32_clwb",
-    "__builtin_ia32_cldemote", "__builtin_ia32_serialize",
-    "__builtin_ia32_wbinvd", "__builtin_ia32_wbnoinvd",
-    "__builtin_ia32_monitor", "__builtin_ia32_mwait",
-    "__builtin_ia32_monitorx", "__builtin_ia32_mwaitx", "__builtin_ia32_clzero",
-    "__builtin_ia32_umonitor", "__builtin_ia32_umwait", "__builtin_ia32_tpause",
-    "__builtin_ia32_ldmxcsr", "__builtin_ia32_stmxcsr", "__builtin_ia32_emms",
-    "__builtin_ia32_xbegin", "__builtin_ia32_xend", "__builtin_ia32_xabort", "__builtin_ia32_xtest",
-    "__builtin_ia32_xsusldtrk", "__builtin_ia32_xresldtrk",
-    "__builtin_ia32_xgetbv", "__builtin_ia32_xsetbv",
-    "__builtin_ia32_fxsave", "__builtin_ia32_fxrstor",
-    "__builtin_ia32_fxsave64", "__builtin_ia32_fxrstor64",
-    "__builtin_ia32_xsave", "__builtin_ia32_xrstor",
-    "__builtin_ia32_xsave64", "__builtin_ia32_xrstor64",
-    "__builtin_ia32_xsaveopt", "__builtin_ia32_xsaveopt64",
-    "__builtin_ia32_xsavec", "__builtin_ia32_xsavec64",
-    "__builtin_ia32_xsaves", "__builtin_ia32_xsaves64",
-    "__builtin_ia32_xrstors", "__builtin_ia32_xrstors64",
-    "__builtin_ia32_ptwrite32", "__builtin_ia32_ptwrite64",
-    "__builtin_ia32_incsspd", "__builtin_ia32_incsspq",
-    "__builtin_ia32_rdsspd", "__builtin_ia32_rdsspq",
-    "__builtin_ia32_saveprevssp", "__builtin_ia32_rstorssp",
-    "__builtin_ia32_wrssd", "__builtin_ia32_wrssq",
-    "__builtin_ia32_wrussd", "__builtin_ia32_wrussq",
-    "__builtin_ia32_setssbsy", "__builtin_ia32_clrssbsy",
-    "__builtin_ia32_movdir64b", "__builtin_ia32_directstoreu_u32", "__builtin_ia32_directstoreu_u64",
-    "__builtin_ia32_enqcmd", "__builtin_ia32_enqcmds",
-    "__builtin_ia32_senduipi", "__builtin_ia32_testui", "__builtin_ia32_clui",
-    "__builtin_ia32_stui", "__builtin_ia32_uiret",
-    "__builtin_ia32_hreset",
-    // AMD LWP (lwpintrin.h)
-    "__builtin_ia32_llwpcb", "__builtin_ia32_slwpcb",
-    "__builtin_ia32_lwpval32", "__builtin_ia32_lwpval64",
-    "__builtin_ia32_lwpins32", "__builtin_ia32_lwpins64",
-    // AMD misc (rdpruintrin.h, invlpgbintrin.h)
-    "__builtin_ia32_rdpru", "__builtin_ia32_invlpgb", "__builtin_ia32_tlbsync",
-    // Intel CMPCCXADD, RAO-INT, USER_MSR, MSRLIST/WRMSRNS, PREFETCHI
-    "__builtin_ia32_cmpccxadd32", "__builtin_ia32_cmpccxadd64",
-    "__builtin_ia32_aadd32", "__builtin_ia32_aadd64",
-    "__builtin_ia32_aand32", "__builtin_ia32_aand64",
-    "__builtin_ia32_aor32", "__builtin_ia32_aor64",
-    "__builtin_ia32_axor32", "__builtin_ia32_axor64",
-    "__builtin_ia32_urdmsr", "__builtin_ia32_uwrmsr",
-    "__builtin_ia32_rdmsrlist", "__builtin_ia32_wrmsrlist", "__builtin_ia32_wrmsrns",
-    "__builtin_ia32_prefetchi",
-    // Intel Key Locker (keylockerintrin.h)
-    "__builtin_ia32_loadiwkey",
-    "__builtin_ia32_encodekey128_u32", "__builtin_ia32_encodekey256_u32",
-    "__builtin_ia32_aesenc128kl_u8", "__builtin_ia32_aesdec128kl_u8",
-    "__builtin_ia32_aesenc256kl_u8", "__builtin_ia32_aesdec256kl_u8",
-    "__builtin_ia32_aesencwide128kl_u8", "__builtin_ia32_aesdecwide128kl_u8",
-    "__builtin_ia32_aesencwide256kl_u8", "__builtin_ia32_aesdecwide256kl_u8",
-};
-
 CNDEF Cn_Ast_Translation_Unit *cn_parse_translation_unit(Cn_Lexer *lexer) {
     Cn_Lexer original_state = *lexer;
 
@@ -13843,14 +13696,6 @@ CNDEF Cn_Ast_Translation_Unit *cn_parse_translation_unit(Cn_Lexer *lexer) {
         Cn_Type *opaque = cn__ast_add_type_if_not((Cn_Type *)&CN_TYPE_OPAQUE);
 
         cn_binding_declare_typedef(CN_STR_LIT("__builtin_va_list"),              NULL, opaque);
-
-        // Very stupid solution for __builtin_ for now.
-        // Potential better solution is to recognize __builtin_ prefix
-        // and automatically create opaque binding.
-        for (size_t i = 0; i < CN_ARRAY_LENGTH(CN_OPAQUE_BUILTINS); i++) {
-            const char *name = CN_OPAQUE_BUILTINS[i];
-            cn_binding_declare_function(CN_STR(strlen(name), name), NULL, 0, 0, opaque, NULL, false);
-        }
     }
 
     int64_t mark = cn_ast_stack_mark();
@@ -17527,6 +17372,9 @@ CNDEF void cn_tu_log_bindings() {
                     break;
                 case CN_BINDING_TAG:
                     fputs("TAG         ", stderr);
+                    break;
+                case CN_BINDING_BUILTIN:
+                    fputs("BUILTIN     ", stderr);
                     break;
                 default:
                     break;
