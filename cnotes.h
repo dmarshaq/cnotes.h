@@ -1,4 +1,4 @@
-/*  cnotes - v0.1.1 - MIT License - https://github.com/dmarshaq/cnotes.h
+/*  cnotes - v0.2.0 - MIT License - https://github.com/dmarshaq/cnotes.h
 
     A header-only library for building C meta programs, static analysis tools, 
     and source transformation pipelines - operating directly on pre-processed .i files.
@@ -18453,7 +18453,18 @@ CNDEF void cn_tu_free(Cn_Translation_Unit *tu) {
 
 /* 
     Revision history:
-        0.1.1 (2026-08-10) Fix how_to/005_defer CN_MESSAGE_RESPONSE_NONE to CN_MESSAGE_RESPONSE_MODIFIED.
+        0.2.0 (2026-11-11) Added variable length array support, as well as incomplete array support.
+                           Added parameter adjustments in to type conversions from AST.
+                           Added basic char parsing, typechecking and evaluation.
+                           Added `__builtin_*` auto-detection and handling.
+                           Added GNU inline assembly support.
+                           Added more GNU `__extension__` parsing in grammar.
+                           Fixed `OPAQUE` typechecking bugs, including.
+                           Fixed type conversions between pointer and array types.
+                           Fixed cast expression precedence when emitting C code.
+                           Added `DOCUMENTATION.md` to keep clear documentation standard.
+                           Added `nob doc` command to scan API for documentation and output it into its own web page.
+        0.1.1 (2026-08-10) Fixed how_to/005_defer CN_MESSAGE_RESPONSE_NONE to CN_MESSAGE_RESPONSE_MODIFIED.
         0.1.0 (2026-08-04) Initial development first release.
 */
 

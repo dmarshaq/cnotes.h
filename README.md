@@ -42,14 +42,11 @@ Following is the list of features that are still not implemented, but will be in
 > [!NOTE]
 > This list might NOT include every feature that was not implemented, and can be added to as they are discovered or suggested.
 
- -  **VLA, variable length arrays support.**
  -  **Struct and Union empty member declarations.**
  -  **Tag type same name proper shadowing.**
- -  **ASM definitions.**
  -  **K&R-style function definitions.**
  -  **_Atomic specifiers.**
  -  **_Complex types.**
- -  **Char literals.**
  -  **HEX float literals.**
  -  **Binary integer literals.**
  -  **Label + goto correctness checking.**
