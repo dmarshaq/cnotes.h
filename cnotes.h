@@ -1674,6 +1674,8 @@ CNDEF bool cn_type_is_compatible_no_qualifiers(const Cn_Type *a, const Cn_Type *
  * RETURNS: Type that has the greater arithmetic rank.
  *
  * IMPORTANT: Expects `a` and `b` to be arithmetic types.
+ *
+ * NOTE: If either type is `CN_OPAQUE`, opaque type is returned, since its rank is unknown.
  */
 CNDEF Cn_Type *cn_type_greatest_arithmetic_rank(const Cn_Type *a, const Cn_Type *b);
 
@@ -2201,8 +2203,10 @@ typedef enum : uint8_t {
 
 typedef enum {
     CN_AST_SYNTHETIC                    = 0x4,
-
-    CN_AST_EXTERNAL_DECLARATION_HAS_EXTENSION     = 0x100,
+    // AI: Generated.
+    // Node is preceded by one or more '__extension__' keywords, applicable to any node.
+    // See `cn_parse_gnu_extensions`.
+    CN_AST_GNU_EXTENSION                = 0x8,
 
     CN_AST_DECLARATOR_IS_ABSTRACT                 = 0x100,
 
@@ -3283,8 +3287,9 @@ CNDEF Cn_Ast_Translation_Unit *cn_parse_translation_unit(Cn_Lexer *lexer);
  *
  * ```
  *  external_declaration
- *          : '__extension__'? (
+ *          : gnu_extensions (
  *              ';'                         // Stray ';'
+ *              | gnu_asm_statement         // File-scope basic asm, without qualifiers.
  *              | function
  *              | declaration ';'
  *              )
@@ -3292,6 +3297,8 @@ CNDEF Cn_Ast_Translation_Unit *cn_parse_translation_unit(Cn_Lexer *lexer);
  * ```
  *
  * RETURNS: Parsed external declaration, `NULL` on error.
+ *
+ * NOTE: If `gnu_extensions` are present, `CN_AST_GNU_EXTENSION` flag is set on the external declaration.
  */
 CNDEF Cn_Ast_External_Declaration *cn_parse_external_declaration(Cn_Lexer *lexer);
 
@@ -3421,12 +3428,16 @@ CNDEF Cn_Ast_Block *cn_parse_block(Cn_Lexer *lexer, bool use_current_scope);
  *
  * ```
  *  block_item
- *          : declaration ';'
+ *          : gnu_extensions declaration ';'
  *          | statement
  *          ;
  * ```
  *
  * RETURNS: Parsed block item, `NULL` on error.
+ *
+ * NOTE: If `gnu_extensions` are present, `CN_AST_GNU_EXTENSION` flag is set on the declaration.
+ * If `gnu_extensions` aren't followed by a declaration, item is parsed as a statement, where they
+ * are a part of the expression, see `cn_parse_expression`.
  */
 CNDEF Cn_Ast_Block_Item *cn_parse_block_item(Cn_Lexer *lexer);
 
@@ -3487,11 +3498,15 @@ CNDEF Cn_Ast_Node *cn_parse_do_while(Cn_Lexer *lexer);
  *
  * ```
  *  for_statement
- *          : 'for' '(' (declaration | expression)? ';' expression? ';' expression? ')' statement
+ *          : 'for' '(' (gnu_extensions declaration | expression)? ';' expression? ';' expression? ')' statement
  *          ;
  * ```
  *
  * RETURNS: Parsed `for` statement, `NULL` on error.
+ *
+ * NOTE: If `gnu_extensions` are present, `CN_AST_GNU_EXTENSION` flag is set on the initialization
+ * declaration. If `gnu_extensions` aren't followed by a declaration, they are a part of the
+ * initialization expression, see `cn_parse_expression`.
  */
 CNDEF Cn_Ast_Node *cn_parse_for_statement(Cn_Lexer *lexer);
 
@@ -3732,6 +3747,7 @@ typedef enum : uint8_t {
  *          | '(' expression ')'
  *          | sizeof_expression
  *          | unary_operator expression
+ *          | gnu_extensions expression
  *          ;
  *
  *  cast_expression
@@ -3772,6 +3788,9 @@ typedef enum : uint8_t {
  * PARAM min_precedence: Lowest precedence of binary operators that are parsed, `-1` to parse all of them.
  *
  * RETURNS: Parsed expression, `NULL` on error.
+ *
+ * NOTE: `gnu_extensions expression` binds as a unary operator, but doesn't produce its own node,
+ * instead `CN_AST_GNU_EXTENSION` flag is set on the operand expression.
  */
 CNDEF Cn_Ast_Node *cn_parse_expression(Cn_Lexer *lexer, int min_precedence, Cn_Parse_Expression_Flags flags);
 
@@ -3898,6 +3917,9 @@ CNDEF Cn_Ast_Node *cn_parse_expression_increasing_precedence(Cn_Lexer *lexer, vo
  * Detects and parses unary operators, but doesn't parse binary or postfix expressions.
  *
  * RETURNS: Parsed expression, `NULL` on error.
+ *
+ * NOTE: Leading `gnu_extensions` are parsed as a unary operator, setting `CN_AST_GNU_EXTENSION`
+ * flag on the operand expression.
  */
 CNDEF Cn_Ast_Node *cn_parse_expression_leaf(Cn_Lexer *lexer, Cn_Parse_Expression_Flags flags);
 
@@ -4356,11 +4378,13 @@ CNDEF Cn_Ast_Node *cn_parse_struct_or_union_specifier(Cn_Lexer *lexer);
  *
  * ```
  *  member_declaration
- *          : '__extension__'? attribute_specifiers specifier_qualifier member_declarators ';'
+ *          : gnu_extensions attribute_specifiers specifier_qualifier member_declarators ';'
  *          ;
  * ```
  *
  * RETURNS: Parsed member declaration, `NULL` on error.
+ *
+ * NOTE: If `gnu_extensions` are present, `CN_AST_GNU_EXTENSION` flag is set on the member declaration.
  */
 CNDEF Cn_Ast_Member_Declaration *cn_parse_member_declaration(Cn_Lexer *lexer);
 
@@ -4491,6 +4515,28 @@ CNDEF Cn_Ast_Attribute *cn_parse_attribute(Cn_Lexer *lexer);
  * OUTPUTS: `true` on success, `false` on error, written to `ok`.
  */
 CNDEF Cn_Ast_Nodes cn_parse_gnu_attribute_specifiers(Cn_Lexer *lexer, bool *ok);
+
+/**
+ * Parses GNU `__extension__` keywords from the current token of `lexer`.
+ *
+ * ```
+ *  gnu_extensions
+ *          : '__extension__'*
+ *          ;
+ * ```
+ *
+ * RETURNS: `true` if at least one keyword was parsed, `false` otherwise.
+ *
+ * NOTE: Keyword only disables pedantic diagnostics in GCC, so repeated keywords are collapsed
+ * into a single `CN_AST_GNU_EXTENSION` flag, set by the caller on the node that follows.
+ *
+ * NOTE: Allowed only at the start of an external declaration, block item declaration, `for`
+ * initialization declaration, member declaration, and as a unary operator in expressions.
+ * Never after attribute specifiers, same as GCC.
+ *
+ * AI: Generated.
+ */
+CNDEF bool cn_parse_gnu_extensions(Cn_Lexer *lexer);
 
 /**
  * Parses GNU attribute specifier from the current token of `lexer`.
@@ -8228,6 +8274,11 @@ CNDEF bool cn_type_is_compatible_no_qualifiers(const Cn_Type *a, const Cn_Type *
 }
 
 CNDEF Cn_Type *cn_type_greatest_arithmetic_rank(const Cn_Type *a, const Cn_Type *b) {
+    // AI: Generated.
+    // Opaque rank is unknown, so result is trusted to be opaque.
+    if (a->kind == CN_OPAQUE) return (Cn_Type *)a;
+    if (b->kind == CN_OPAQUE) return (Cn_Type *)b;
+
     // Float cases:
     if (a->kind == CN_FLOAT && (b->kind == CN_INTEGER || a->size >= b->size)) {
         return (Cn_Type *)a;
@@ -10289,6 +10340,17 @@ Cn_Message_Handler *cn_message_handler = NULL;
  */
 
 
+// AI: Generated.
+/**
+ * Helper function, opaque type is trusted by every typecheck, to be whatever makes the checked
+ * construct valid. Typecheck only errors if non-opaque operands make it invalid on their own.
+ *
+ * RETURNS: `true` if `type` is opaque, ignoring qualifiers.
+ */
+CNDEF bool cn__analyze_is_opaque(Cn_Type *type) {
+    return cn_type_unqualified(type)->kind == CN_OPAQUE;
+}
+
 CNDEF bool cn__analyze_declaration_opt(void *declaration_specifiers, Cn_Analyze_Declaration_Opt opt) {
     Cn_Ast_Declaration_Specifiers *decl_spec = declaration_specifiers;
     Cn_Ast_Declarator *decl = opt.declarator;
@@ -10819,12 +10881,24 @@ CNDEF Cn_Type *cn__analyze_type_from_enum(Cn_Ast_Node *ts) {
                 Cn_Type *type = cn_analyze_typecheck_expression(enumerator->expression);
                 if (type == NULL) goto error;
 
-                if (type->kind != CN_INTEGER) {
+                // AI: Generated (opaque case).
+                if (type->kind != CN_INTEGER && !cn__analyze_is_opaque(type)) {
                     cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, enumerator->expression, CN_DC_INVALID_CONSTANT_EXPRESSION, "Expected integer result from constant expression in enumerator.");
                     goto error;
                 } 
 
                 Cn_Any result = cn_analyze_evaluate_expression(enumerator->expression, buffer);
+
+                // AI: Generated.
+                // Enumerator value must be known, opaque type is trusted, but its value can't be evaluated.
+                if (cn_any_is_empty(result)) {
+                    if (cn__analyze_is_opaque(type)) {
+                        cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, enumerator->expression, CN_DC_INVALID_CONSTANT_EXPRESSION, "Value of opaque expression in enumerator can't be evaluated.");
+                    } else {
+                        cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, enumerator->expression, CN_DC_INVALID_CONSTANT_EXPRESSION, "Invalid constant expression in enumerator.");
+                    }
+                    goto error;
+                }
 
                 enum_counter = cn_any_read_int(result);
             }
@@ -11269,6 +11343,8 @@ CNDEF bool cn__analyze_is_modifiable_lvalue(Cn_Ast_Node *expression) {
 
             Cn_Type *p = cn_get_expression_type(cn_ast_as(Access, node)->expression);
             p = cn_type_unqualified(p);
+            // AI: Generated.
+            if (p->kind == CN_OPAQUE) return true;
             if (p->kind != CN_POINTER) return false;
             if (cn_type_is_constant(((Cn_Type_Pointer *)p)->ptr_to)) return false;
 
@@ -11304,6 +11380,11 @@ CNDEF Cn_Type *cn__analyze_typecheck_binary(Cn_Ast_Node *node) {
     left = cn_type_unqualified(left);
     right = cn_type_unqualified(right);
 
+    // AI: Generated.
+    // Opaque operands are trusted, see `cn__analyze_is_opaque`.
+    bool left_opaque  = left->kind  == CN_OPAQUE;
+    bool right_opaque = right->kind == CN_OPAQUE;
+
     switch (cn_ast_as(Binary, node)->operator) {
         case CN_AST_BINARY_OP_ADDITION: 
             {
@@ -11313,7 +11394,9 @@ CNDEF Cn_Type *cn__analyze_typecheck_binary(Cn_Ast_Node *node) {
                 if (left->kind == CN_POINTER || right->kind == CN_POINTER) {
                     Cn_Type *ptr_type   = left->kind == CN_POINTER ? left  : right;
                     Cn_Type *other_type = left->kind == CN_POINTER ? right : left;
-                    if (other_type->kind != CN_INTEGER) {
+                    // AI: Generated.
+                    // Opaque is trusted to be an integer.
+                    if (other_type->kind != CN_INTEGER && other_type->kind != CN_OPAQUE) {
                         cn__analyze_error_illegal_binary(node, left, right, "pointer addition");
                         goto error;
                     }
@@ -11331,6 +11414,13 @@ CNDEF Cn_Type *cn__analyze_typecheck_binary(Cn_Ast_Node *node) {
                 if (left->kind == CN_POINTER || right->kind == CN_POINTER) {
                     Cn_Type *ptr_type   = left->kind == CN_POINTER ? left  : right;
                     Cn_Type *other_type = left->kind == CN_POINTER ? right : left;
+                    // AI: Generated.
+                    // 'p - opaque' is either a pointer or a difference, so result is opaque.
+                    // 'opaque - p' is only valid as a difference of two pointers.
+                    if (other_type->kind == CN_OPAQUE) {
+                        if (left->kind == CN_POINTER) return other_type;
+                        return cn__ast_add_type_if_not((Cn_Type *)&CN_TYPE_PTRDIFF);
+                    }
                     if (other_type->kind != CN_INTEGER) {
                         if (other_type->kind == CN_POINTER) {
                             return cn__ast_add_type_if_not((Cn_Type *)&CN_TYPE_PTRDIFF);
@@ -11346,14 +11436,18 @@ CNDEF Cn_Type *cn__analyze_typecheck_binary(Cn_Ast_Node *node) {
 
         case CN_AST_BINARY_OP_ARRAY_SUB: 
             {
-                if (left->kind != CN_POINTER && left->kind != CN_ARRAY) {
+                // AI: Generated (opaque cases).
+                if (left->kind != CN_POINTER && left->kind != CN_ARRAY && !left_opaque) {
                     cn__analyze_error_illegal_binary(node, left, right, "array subscript (left operand must be a pointer or array)");
                     goto error;
                 }
-                if (right->kind != CN_INTEGER) {
+                if (right->kind != CN_INTEGER && !right_opaque) {
                     cn__analyze_error_illegal_binary(node, left, right, "array subscript (subscript must be an integer)");
                     goto error;
                 }
+
+                // Element type of opaque is unknown.
+                if (left_opaque) return left;
 
                 return left->kind == CN_POINTER ? left->pointer.ptr_to : left->array.element_type;
             }
@@ -11377,7 +11471,8 @@ CNDEF Cn_Type *cn__analyze_typecheck_binary(Cn_Ast_Node *node) {
         case CN_AST_BINARY_OP_BIT_XOR:
         case CN_AST_BINARY_OP_BIT_OR: 
             {
-                if (left->kind == CN_INTEGER && right->kind == CN_INTEGER) {
+                // AI: Generated (opaque cases).
+                if ((left->kind == CN_INTEGER || left_opaque) && (right->kind == CN_INTEGER || right_opaque)) {
                     return cn__analyze_usual_arithmetic_conversion(left, right);
                 }
                 cn__analyze_error_illegal_binary(node, left, right, "integer operation");
@@ -11389,7 +11484,9 @@ CNDEF Cn_Type *cn__analyze_typecheck_binary(Cn_Ast_Node *node) {
         case CN_AST_BINARY_OP_LSHIFT:
         case CN_AST_BINARY_OP_RSHIFT: 
             {
-                if (left->kind == CN_INTEGER && right->kind == CN_INTEGER) {
+                // AI: Generated (opaque cases).
+                // Opaque left operand stays opaque after promotion.
+                if ((left->kind == CN_INTEGER || left_opaque) && (right->kind == CN_INTEGER || right_opaque)) {
                     return cn__analyze_integer_promote(left);
                 }
                 cn__analyze_error_illegal_binary(node, left, right, "shift");
@@ -11402,8 +11499,12 @@ CNDEF Cn_Type *cn__analyze_typecheck_binary(Cn_Ast_Node *node) {
         case CN_AST_BINARY_OP_GREATER:
         case CN_AST_BINARY_OP_GREATER_EQ: 
             {
+                // AI: Generated (opaque cases).
+                // Arithmetic covers opaque, so only pointer vs opaque is added.
                 bool ok = (cn_type_is_arithmetic(left) && cn_type_is_arithmetic(right))
-                    || (left->kind == CN_POINTER && right->kind == CN_POINTER);
+                    || (left->kind == CN_POINTER && right->kind == CN_POINTER)
+                    || (left->kind == CN_POINTER && right_opaque)
+                    || (left_opaque && right->kind == CN_POINTER);
                 if (!ok) {
                     cn__analyze_error_illegal_binary(node, left, right, "relational comparison");
                     goto error;
@@ -11415,10 +11516,14 @@ CNDEF Cn_Type *cn__analyze_typecheck_binary(Cn_Ast_Node *node) {
         case CN_AST_BINARY_OP_EQ:
         case CN_AST_BINARY_OP_NOT_EQ: 
             {
+                // AI: Generated (opaque cases).
+                // Arithmetic covers opaque, so only pointer vs opaque is added.
                 bool ok = (cn_type_is_arithmetic(left) && cn_type_is_arithmetic(right))
                     || (left->kind == CN_POINTER && right->kind == CN_POINTER)
                     || (left->kind == CN_POINTER && right->kind == CN_INTEGER)
-                    || (left->kind == CN_INTEGER && right->kind == CN_POINTER);
+                    || (left->kind == CN_INTEGER && right->kind == CN_POINTER)
+                    || (left->kind == CN_POINTER && right_opaque)
+                    || (left_opaque && right->kind == CN_POINTER);
                 if (!ok) {
                     cn__analyze_error_illegal_binary(node, left, right, "equality comparison");
                     goto error;
@@ -11460,6 +11565,10 @@ CNDEF Cn_Type *cn__analyze_typecheck_access(Cn_Ast_Node *node) {
     // Removing qualifiers from base type here, won't need them.
     base = cn_type_unqualified(base);
 
+    // AI: Generated.
+    // Opaque base is trusted to have the member, its type is unknown.
+    if (base->kind == CN_OPAQUE) return base;
+
     Cn_Type *struct_or_union_type;
     if (cn_ast_as(Access, node)->pointer) {
         // '->' : operand must be a pointer to a struct/union.
@@ -11475,6 +11584,10 @@ CNDEF Cn_Type *cn__analyze_typecheck_access(Cn_Ast_Node *node) {
 
     // Stripping qualifiers because, we won't need them in following checks.
     struct_or_union_type = cn_type_unqualified(struct_or_union_type);
+
+    // AI: Generated.
+    // Pointer to opaque, same as opaque base.
+    if (struct_or_union_type->kind == CN_OPAQUE) return struct_or_union_type;
 
     if (struct_or_union_type->kind != CN_STRUCT && struct_or_union_type->kind != CN_UNION) {
         cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, node, CN_DC_ILLEGAL_TYPE, "Member access on non-struct or non-union type.");
@@ -11519,12 +11632,19 @@ CNDEF Cn_Type *cn__analyze_typecheck_call(Cn_Ast_Node *node) {
     Cn_Type *callee = cn_analyze_typecheck_expression(cn_ast_as(Call, node)->expression);
     if (callee == NULL) goto error;
 
-    // If opaque, ignore type checking for this function, completely.
-    if (callee->kind == CN_OPAQUE) return callee;
-
     // A function itself or a pointer to function may be called. Getting function type itself.
     Cn_Type *fn = callee;
     if (fn->kind == CN_POINTER) fn = ((Cn_Type_Pointer *)fn)->ptr_to;
+
+    // AI: Generated.
+    // If opaque, or pointer to opaque, call is trusted, arguments can't be checked against parameters.
+    // But arguments themselves are still typechecked, so their symbols are resolved and types are known.
+    if (cn__analyze_is_opaque(fn)) {
+        for (int64_t i = 0; i < cn_ast_as(Call, node)->arguments.length; i++) {
+            if (cn_analyze_typecheck_expression(cn_ast_as(Call, node)->arguments.ptrs[i]) == NULL) goto error;
+        }
+        return fn;
+    }
     
     if (fn->kind != CN_FUNCTION) {
         cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, node, CN_DC_ILLEGAL_TYPE, "Called object is not a function or function pointer.");
@@ -11619,7 +11739,8 @@ CNDEF Cn_Type *cn__analyze_typecheck_unary(Cn_Ast_Node *node) {
         // ~x : integer operand; result is integer-promoted.
         case CN_AST_UNARY_OP_BIT_NOT: 
             {
-                if (operand->kind != CN_INTEGER) {
+                // AI: Generated (opaque case).
+                if (operand->kind != CN_INTEGER && !cn__analyze_is_opaque(operand)) {
                     cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, node, CN_DC_ILLEGAL_TYPE, "Operand of '~' must be of integer type.");
                     goto error;
                 }
@@ -11639,6 +11760,10 @@ CNDEF Cn_Type *cn__analyze_typecheck_unary(Cn_Ast_Node *node) {
         // *x : pointer operand; result is the pointed-to type (an lvalue).
         case CN_AST_UNARY_OP_DEREF:
             {
+                // AI: Generated.
+                // Opaque is trusted to be a pointer, pointed-to type is unknown.
+                if (cn__analyze_is_opaque(operand)) return operand;
+
                 if (operand->kind != CN_POINTER) {
                     cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, node, CN_DC_ILLEGAL_TYPE, "Cannot dereference a non-pointer type.");
                     goto error;
@@ -11816,6 +11941,11 @@ CNDEF Cn_Type *cn__analyze_typecheck_ternary(Cn_Ast_Node *node) {
     Cn_Type *b = cn_analyze_typecheck_expression(cn_ast_as(Ternary, node)->if_false);
     if (b == NULL) goto error;
 
+    // AI: Generated.
+    // Opaque operand is trusted to have a common type with the other operand, which is unknown.
+    if (cn__analyze_is_opaque(a)) return a;
+    if (cn__analyze_is_opaque(b)) return b;
+
     // Both arithmetic.
     if (cn_type_is_arithmetic(a) && cn_type_is_arithmetic(b)) {
         return cn__analyze_usual_arithmetic_conversion(a, b);
@@ -11904,7 +12034,8 @@ CNDEF Cn_Type *cn__analyze_typecheck_assignment(Cn_Ast_Node *node) {
         case CN_AST_ASSIGNMENT_OP_MINUS: 
             {
                 if (cn_type_is_arithmetic(left) && cn_type_is_arithmetic(right)) return left;
-                if (left->kind == CN_POINTER && right->kind == CN_INTEGER)       return left;
+                // AI: Generated (opaque case).
+                if (left->kind == CN_POINTER && (right->kind == CN_INTEGER || right->kind == CN_OPAQUE)) return left;
                 cn__analyze_error_illegal_binary(node, left, right, cn_ast_as(Assign, node)->operator == CN_AST_ASSIGNMENT_OP_PLUS ? "'+=' assignment" : "'-=' assignment");
                 goto error;
             }
@@ -11926,7 +12057,8 @@ CNDEF Cn_Type *cn__analyze_typecheck_assignment(Cn_Ast_Node *node) {
         case CN_AST_ASSIGNMENT_OP_BIT_XOR:
         case CN_AST_ASSIGNMENT_OP_BIT_OR: 
             {
-                if (left->kind == CN_INTEGER && right->kind == CN_INTEGER) return left;
+                // AI: Generated (opaque cases).
+                if ((left->kind == CN_INTEGER || left->kind == CN_OPAQUE) && (right->kind == CN_INTEGER || right->kind == CN_OPAQUE)) return left;
                 cn__analyze_error_illegal_binary(node, left, right, "integer assignment");
                 goto error;
             }
@@ -12497,6 +12629,10 @@ CNDEF Cn_Any cn__analyze_evaluate_sizeof(Cn_Ast_Node *node, void *buffer) {
 
     operand_type = cn_type_unqualified(operand_type);
 
+    // AI: Generated.
+    // Size of opaque is unknown, so it is not a constant.
+    if (operand_type->kind == CN_OPAQUE) return (Cn_Any) {0};
+
     if (!(operand_type->flags & CN_TYPE_COMPLETE) || operand_type->size < 0) return (Cn_Any) {0};      
 
     Cn_Any result = { 
@@ -12771,6 +12907,16 @@ CNDEF Cn_Type *cn__analyze_typecheck_designator(Cn_Ast_Designator *designator, C
                 cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, designator, CN_DC_ILLEGAL_TYPE, "No member %.*s in union specified by identifier designator.", CN_STR_UNPACK(identifier->name));
                 goto error;
             }
+        // AI: Generated.
+        // Opaque is trusted to be designated by any designator, designated type is unknown.
+        // Array designator expressions are still typechecked, but not evaluated, since bounds are unknown.
+        case CN_OPAQUE:
+            {
+                if (designator->expression != NULL && cn_analyze_typecheck_expression(designator->expression) == NULL) goto error;
+                if (designator->expression_range_end != NULL && cn_analyze_typecheck_expression(designator->expression_range_end) == NULL) goto error;
+
+                return type;
+            }
         default:
             cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, designator, CN_DC_ILLEGAL_TYPE, "Designator used on non-compound type.");
             goto error;
@@ -12785,9 +12931,13 @@ CNDEF bool cn__analyze_typecheck_designation(Cn_Ast_Designation *designation, Cn
 
     if (designation->designators.length != 0) {
         type = cn__analyze_typecheck_designator(cn_ast_as(Designator, designation->designators.ptrs[0]), type, ordinal);
+        // AI: Generated.
+        if (type == NULL) goto error;
 
         for (int64_t i = 1; i < designation->designators.length; i++) {
             type = cn__analyze_typecheck_designator(cn_ast_as(Designator, designation->designators.ptrs[i]), type, NULL);
+            // AI: Generated.
+            if (type == NULL) goto error;
         }
 
     } else {
@@ -12979,10 +13129,6 @@ CNDEF void cn__emit_translation_unit(Cn_Emitter *e, Cn_Ast_Translation_Unit *nod
 }
 
 CNDEF void cn__emit_external_declaration(Cn_Emitter *e, Cn_Ast_External_Declaration *node) {
-    if (node->flags & CN_AST_EXTERNAL_DECLARATION_HAS_EXTENSION) {
-        cn__emit_str_lit(e, "__extension__ ");
-    }
-
     if (node->child == NULL) {
         cn__emit_str_lit(e, ";");
         cn__emit_newline(e);
@@ -13683,6 +13829,10 @@ CNDEF void cn__emit_string(Cn_Emitter *e, Cn_Ast_String *node) {
 CNDEF void cn__emit_member_declaration(Cn_Emitter *e, Cn_Ast_Member_Declaration *node) {
     cn__emit_newline(e);
 
+    // AI: Generated.
+    // Emitted here instead of `cn_emit`, so it is placed after the newline.
+    if (node->flags & CN_AST_GNU_EXTENSION) cn__emit_str_lit(e, "__extension__ ");
+
     cn__emit_attribute_specifiers(e, node->attribute_specifiers);
 
     cn_emit(e, node->specifier_qualifier);
@@ -13885,6 +14035,18 @@ CNDEF void cn_emit(Cn_Emitter *e, void * node_ptr) {
     if (node_ptr == NULL) return;
 
     Cn_Ast_Node *node = node_ptr;
+
+    // AI: Generated.
+    // Any node can be preceded by '__extension__', except member declaration, which emits it itself.
+    // Expression is parenthesized, so '__extension__' stays on the same operand when parsed back,
+    // e.g. `(__extension__ f)(1)` instead of `__extension__ f(1)`, which would flag the call.
+    // Expression kinds are contiguous in `CN_AST_GEN_LIST`, from `BINARY` to `PRIMARY`.
+    bool gnu_extension = (node->flags & CN_AST_GNU_EXTENSION) && node->kind != CN_AST_MEMBER_DECLARATION;
+    bool gnu_extension_expression = gnu_extension && node->kind >= CN_AST_BINARY && node->kind <= CN_AST_PRIMARY;
+
+    if (gnu_extension_expression) cn__emit_str_lit(e, "(");
+    if (gnu_extension) cn__emit_str_lit(e, "__extension__ ");
+
     switch (node->kind) {
 #define X(K, T, m) case CN_AST_##K: cn__emit_##m(e, (Cn_Ast_##T *)node); break;
     CN_AST_GEN_LIST(X)
@@ -13899,6 +14061,9 @@ CNDEF void cn_emit(Cn_Emitter *e, void * node_ptr) {
             }
             break;
     }
+
+    // AI: Generated.
+    if (gnu_extension_expression) cn__emit_str_lit(e, ")");
 }
 
 
@@ -14043,11 +14208,9 @@ CNDEF Cn_Ast_External_Declaration *cn_parse_external_declaration(Cn_Lexer *lexer
 
     Cn_Ast_External_Declaration node = { .kind = CN_AST_EXTERNAL_DECLARATION, .loc = cn_lexer_token(lexer).loc, .src = cn_lexer_token(lexer).src };
 
-    // Optional '__extension__' symbol.
-    if (cn_lexer_token(lexer).type == CN_TOKEN_GNU_EXTENSION) {
-        node.flags |= CN_AST_EXTERNAL_DECLARATION_HAS_EXTENSION;
-        cn_lexer_next_token(lexer);
-    }
+    // AI: Generated.
+    // Optional '__extension__' keywords.
+    if (cn_parse_gnu_extensions(lexer)) node.flags |= CN_AST_GNU_EXTENSION;
 
     // If stray ';' case.
     if (cn_lexer_token(lexer).type == CN_TOKEN_SEMICOLON) {
@@ -14534,6 +14697,12 @@ CNDEF Cn_Ast_Block_Item *cn_parse_block_item(Cn_Lexer *lexer) {
 
     Cn_Ast_Block_Item node = { .kind = CN_AST_BLOCK_ITEM, .loc = cn_lexer_token(lexer).loc, .src = cn_lexer_token(lexer).src };
 
+    // AI: Generated.
+    // Optional '__extension__' keywords, they only belong to the block item if declaration follows,
+    // otherwise they are a unary operator of the expression statement, so lexer is restored.
+    Cn_Lexer before_gnu_extensions = *lexer;
+    bool has_gnu_extensions = cn_parse_gnu_extensions(lexer);
+
     // Parsing attribute specifiers here in order to get to the tokens that would 
     // disambiguate delcaration vs statement situation.
     bool ok;
@@ -14544,8 +14713,16 @@ CNDEF Cn_Ast_Block_Item *cn_parse_block_item(Cn_Lexer *lexer) {
 
     if (cn_parse_starts_declaration(lexer)) {
         declaration_or_statement = cn_parse_finish_declaration(lexer, attribute_specifiers);
+        if (declaration_or_statement == NULL) goto error;
+        if (has_gnu_extensions) declaration_or_statement->flags |= CN_AST_GNU_EXTENSION;
         if (!cn_parse_expect(lexer, CN_TOKEN_SEMICOLON)) goto error;
     } else {
+        // AI: Generated.
+        if (has_gnu_extensions) {
+            *lexer = before_gnu_extensions;
+            attribute_specifiers = (Cn_Ast_Nodes) {0};
+        }
+
         declaration_or_statement = cn_parse_finish_statement(lexer, attribute_specifiers);
     }
 
@@ -14713,6 +14890,12 @@ CNDEF Cn_Ast_Node *cn_parse_for_statement(Cn_Lexer *lexer) {
     cn_scope_stack_push();
     
     if (!cn_parse_optional(lexer, CN_TOKEN_SEMICOLON)) {
+        // AI: Generated.
+        // Optional '__extension__' keywords, same as in block item, they only belong to the
+        // declaration, otherwise they are a unary operator of the expression, so lexer is restored.
+        Cn_Lexer before_gnu_extensions = *lexer;
+        bool has_gnu_extensions = cn_parse_gnu_extensions(lexer);
+
         bool ok;
         Cn_Ast_Nodes attribute_specifiers = cn_parse_attribute_specifiers(lexer, &ok);
         if (!ok) goto error;
@@ -14720,7 +14903,15 @@ CNDEF Cn_Ast_Node *cn_parse_for_statement(Cn_Lexer *lexer) {
         Cn_Ast_Node *declaration_or_expression;
         if (cn_parse_starts_declaration(lexer)) {
             declaration_or_expression = cn_parse_finish_declaration(lexer, attribute_specifiers);
+            // AI: Generated.
+            if (declaration_or_expression != NULL && has_gnu_extensions) declaration_or_expression->flags |= CN_AST_GNU_EXTENSION;
         } else {
+            // AI: Generated.
+            if (has_gnu_extensions) {
+                *lexer = before_gnu_extensions;
+                attribute_specifiers = (Cn_Ast_Nodes) {0};
+            }
+
             if (attribute_specifiers.length > 0) {
                 cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, attribute_specifiers.ptrs[0], CN_DC_ILLEGAL_ATTRIBUTE, "Attribute can't appear in here.");
                 goto error;
@@ -15228,6 +15419,16 @@ CNDEF Cn_Ast_Node *cn_parse_expression_leaf(Cn_Lexer *lexer, Cn_Parse_Expression
 
         Cn_Ast_Node *parent = cn_ast_new(node);
         return parent;
+    }
+
+    // AI: Generated.
+    // Handling '__extension__' unary operator, no node is made for it, operand is flagged instead.
+    if (cn_parse_gnu_extensions(lexer)) {
+        Cn_Ast_Node *expression = cn_parse_expression(lexer, CN_AST_UNARY_OPERATOR_PRECEDENCE, flags);
+        if (expression == NULL) goto error;
+
+        expression->flags |= CN_AST_GNU_EXTENSION;
+        return expression;
     }
 
     // Handling unary expression.
@@ -16534,10 +16735,9 @@ CNDEF Cn_Ast_Member_Declaration *cn_parse_member_declaration(Cn_Lexer *lexer) {
 
     bool ok;
 
-    // Optional '__extension__' symbol.
-    if (cn_lexer_token(lexer).type == CN_TOKEN_GNU_EXTENSION) {
-        cn_lexer_next_token(lexer);
-    }
+    // AI: Generated.
+    // Optional '__extension__' keywords.
+    if (cn_parse_gnu_extensions(lexer)) node.flags |= CN_AST_GNU_EXTENSION;
 
     node.attribute_specifiers = cn_parse_attribute_specifiers(lexer, &ok);
     if (!ok) goto error;
@@ -16852,6 +17052,13 @@ error:
     CN__TRACE_ERROR
     *lexer = original_state;
     return NULL;
+}
+
+// AI: Generated.
+CNDEF bool cn_parse_gnu_extensions(Cn_Lexer *lexer) {
+    bool parsed = false;
+    while (cn_parse_optional(lexer, CN_TOKEN_GNU_EXTENSION)) parsed = true;
+    return parsed;
 }
 
 CNDEF Cn_Ast_Nodes cn_parse_gnu_attribute_specifiers(Cn_Lexer *lexer, bool *ok) {

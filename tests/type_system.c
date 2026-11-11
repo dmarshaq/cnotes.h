@@ -115,6 +115,13 @@ int main(void) {
         // int > char (typically)
         result = cn_type_greatest_arithmetic_rank(&CN_TYPE_INT, &CN_TYPE_CHAR);
         CN_ASSERT(cn_type_equals(result, &CN_TYPE_INT));
+
+        // AI: Generated.
+        // opaque rank is unknown, opaque is returned on either side.
+        result = cn_type_greatest_arithmetic_rank(&CN_TYPE_OPAQUE, &CN_TYPE_DOUBLE);
+        CN_ASSERT(result->kind == CN_OPAQUE);
+        result = cn_type_greatest_arithmetic_rank(&CN_TYPE_INT, &CN_TYPE_OPAQUE);
+        CN_ASSERT(result->kind == CN_OPAQUE);
     }
 
     return 0;

@@ -809,7 +809,8 @@
     "description": "",
     "tags": [
       { "kind": "RETURNS", "text": "Type that has the greater arithmetic rank." },
-      { "kind": "IMPORTANT", "text": "Expects `a` and `b` to be arithmetic types." }
+      { "kind": "IMPORTANT", "text": "Expects `a` and `b` to be arithmetic types." },
+      { "kind": "NOTE", "text": "If either type is `CN_OPAQUE`, opaque type is returned, since its rank is unknown." }
     ]
   },
   {
@@ -1407,9 +1408,10 @@
     "symbol": "cn_parse_external_declaration",
     "decl": "CNDEF Cn_Ast_External_Declaration *cn_parse_external_declaration(Cn_Lexer *lexer)",
     "summary": "Parses external declaration from the current token of `lexer`.",
-    "description": "```\n external_declaration\n         : '__extension__'? (\n             ';'                         // Stray ';'\n             | function\n             | declaration ';'\n             )\n         ;\n```",
+    "description": "```\n external_declaration\n         : gnu_extensions (\n             ';'                         // Stray ';'\n             | gnu_asm_statement         // File-scope basic asm, without qualifiers.\n             | function\n             | declaration ';'\n             )\n         ;\n```",
     "tags": [
-      { "kind": "RETURNS", "text": "Parsed external declaration, `NULL` on error." }
+      { "kind": "RETURNS", "text": "Parsed external declaration, `NULL` on error." },
+      { "kind": "NOTE", "text": "If `gnu_extensions` are present, `CN_AST_GNU_EXTENSION` flag is set on the external declaration." }
     ]
   },
   {
@@ -1483,9 +1485,10 @@
     "symbol": "cn_parse_block_item",
     "decl": "CNDEF Cn_Ast_Block_Item *cn_parse_block_item(Cn_Lexer *lexer)",
     "summary": "Parses block item from the current token of `lexer`.",
-    "description": "```\n block_item\n         : declaration ';'\n         | statement\n         ;\n```",
+    "description": "```\n block_item\n         : gnu_extensions declaration ';'\n         | statement\n         ;\n```",
     "tags": [
-      { "kind": "RETURNS", "text": "Parsed block item, `NULL` on error." }
+      { "kind": "RETURNS", "text": "Parsed block item, `NULL` on error." },
+      { "kind": "NOTE", "text": "If `gnu_extensions` are present, `CN_AST_GNU_EXTENSION` flag is set on the declaration.\nIf `gnu_extensions` aren't followed by a declaration, item is parsed as a statement, where they\nare a part of the expression, see `cn_parse_expression`." }
     ]
   },
   {
@@ -1528,9 +1531,10 @@
     "symbol": "cn_parse_for_statement",
     "decl": "CNDEF Cn_Ast_Node *cn_parse_for_statement(Cn_Lexer *lexer)",
     "summary": "Parses `for` statement from the current token of `lexer`.",
-    "description": "```\n for_statement\n         : 'for' '(' (declaration | expression)? ';' expression? ';' expression? ')' statement\n         ;\n```",
+    "description": "```\n for_statement\n         : 'for' '(' (gnu_extensions declaration | expression)? ';' expression? ';' expression? ')' statement\n         ;\n```",
     "tags": [
-      { "kind": "RETURNS", "text": "Parsed `for` statement, `NULL` on error." }
+      { "kind": "RETURNS", "text": "Parsed `for` statement, `NULL` on error." },
+      { "kind": "NOTE", "text": "If `gnu_extensions` are present, `CN_AST_GNU_EXTENSION` flag is set on the initialization\ndeclaration. If `gnu_extensions` aren't followed by a declaration, they are a part of the\ninitialization expression, see `cn_parse_expression`." }
     ]
   },
   {
@@ -1602,10 +1606,11 @@
     "symbol": "cn_parse_expression",
     "decl": "CNDEF Cn_Ast_Node *cn_parse_expression(Cn_Lexer *lexer, int min_precedence, Cn_Parse_Expression_Flags flags)",
     "summary": "Parses expression from the current token of `lexer`.",
-    "description": "First parses left leaf, and then calls increasing precedence parsing until it returns left leaf,\nutilizing the following precedence table as a guide to properly structure ast nodes in order.\n\n```\n C OPERATOR PRECEDENCE TABLE highest (14) to lowest (0)\n ===============================================================\n\n 14                              Associativity: Left-to-right\n ---------------------------------------------------------------\n   ++  --        Postfix increment/decrement\n   ()            Function call\n   []            Array subscript\n   .             Member access\n   ->            Member access through pointer\n   (type){...}   Compound literal\n\n 13                              Associativity: Right-to-left\n ---------------------------------------------------------------\n   ++  --        Prefix increment/decrement\n   +   -         Unary plus/minus\n   !   ~         Logical NOT, bitwise NOT\n   (type)        Cast\n   *             Dereference\n   &             Address-of\n   sizeof        Size-of\n\n 12                              Associativity: Left-to-right\n ---------------------------------------------------------------\n   *   /   %     Multiplication, division, remainder\n\n 11                              Associativity: Left-to-right\n ---------------------------------------------------------------\n   +   -         Addition, subtraction\n\n 10                              Associativity: Left-to-right\n ---------------------------------------------------------------\n   <<  >>        Bitwise left/right shift\n\n 9                               Associativity: Left-to-right\n ---------------------------------------------------------------\n   <   <=        Less than, less-or-equal\n   >   >=        Greater than, greater-or-equal\n\n 8                               Associativity: Left-to-right\n ---------------------------------------------------------------\n   ==  !=        Equal, not equal\n\n 7                               Associativity: Left-to-right\n ---------------------------------------------------------------\n   &             Bitwise AND\n\n 6                               Associativity: Left-to-right\n ---------------------------------------------------------------\n   ^             Bitwise XOR\n\n 5                               Associativity: Left-to-right\n ---------------------------------------------------------------\n   |             Bitwise OR\n\n 4                               Associativity: Left-to-right\n ---------------------------------------------------------------\n   &&            Logical AND\n\n 3                               Associativity: Left-to-right\n ---------------------------------------------------------------\n   ||            Logical OR\n\n 2                               Associativity: Right-to-left\n ---------------------------------------------------------------\n   ? :           Ternary conditional\n\n 1                               Associativity: Right-to-left\n ---------------------------------------------------------------\n   =             Simple assignment\n   +=  -=        Compound assignment (additive)\n   *=  /=  %=    Compound assignment (multiplicative)\n   <<=  >>=      Compound assignment (shift)\n   &=  ^=  |=    Compound assignment (bitwise)\n\n 0                               Associativity: Left-to-right\n ---------------------------------------------------------------\n   ,             Comma\n```\n\nFollowing grammar rules group expressions into certain kinds, but in reality all parsing is based\non the precedence table. Grammar rules only show the general logic, and which specific tokens\nparser might expect in certain expressions.\n\n```\n expression\n         : binary_expression\n         | function_expression\n         | access_expression\n         | unary_expression\n         | cast_expression\n         | compound_literal\n         | sizeof_expression\n         | primary_expression\n         | ternary_expression\n         | assignment_expression\n         | postfix_expression\n         ;\n\n binary_expression\n         : expression binary_operator expression\n         | expression '[' expression ']'\n         | function_expression\n         | access_expression\n         ;\n\n function_expression\n         : expression '(' argument_list? ')'\n         ;\n\n access_expression\n         : expression '.' identifier\n         | expression '->' identifier\n         ;\n\n unary_expression\n         : cast_expression\n         | '(' expression ')'\n         | sizeof_expression\n         | unary_operator expression\n         ;\n\n cast_expression\n         : '(' type_name ')' expression\n         | compound\n         ;\n\n compound\n         : '(' type_name ')' designations\n         ;\n\n sizeof_expression\n         : 'sizeof' expression\n         | 'sizeof' '(' type_name ')'\n         ;\n\n primary_expression\n         : identifier\n         | integer\n         | float\n         | string\n         ;\n\n ternary_expression\n         : expression '?' expression ':' expression\n         ;\n\n assignment_expression\n         : expression assignment_operator expression\n         ;\n\n postfix_expression\n         : expression '++'\n         | expression '--'\n         ;\n```",
+    "description": "First parses left leaf, and then calls increasing precedence parsing until it returns left leaf,\nutilizing the following precedence table as a guide to properly structure ast nodes in order.\n\n```\n C OPERATOR PRECEDENCE TABLE highest (14) to lowest (0)\n ===============================================================\n\n 14                              Associativity: Left-to-right\n ---------------------------------------------------------------\n   ++  --        Postfix increment/decrement\n   ()            Function call\n   []            Array subscript\n   .             Member access\n   ->            Member access through pointer\n   (type){...}   Compound literal\n\n 13                              Associativity: Right-to-left\n ---------------------------------------------------------------\n   ++  --        Prefix increment/decrement\n   +   -         Unary plus/minus\n   !   ~         Logical NOT, bitwise NOT\n   (type)        Cast\n   *             Dereference\n   &             Address-of\n   sizeof        Size-of\n\n 12                              Associativity: Left-to-right\n ---------------------------------------------------------------\n   *   /   %     Multiplication, division, remainder\n\n 11                              Associativity: Left-to-right\n ---------------------------------------------------------------\n   +   -         Addition, subtraction\n\n 10                              Associativity: Left-to-right\n ---------------------------------------------------------------\n   <<  >>        Bitwise left/right shift\n\n 9                               Associativity: Left-to-right\n ---------------------------------------------------------------\n   <   <=        Less than, less-or-equal\n   >   >=        Greater than, greater-or-equal\n\n 8                               Associativity: Left-to-right\n ---------------------------------------------------------------\n   ==  !=        Equal, not equal\n\n 7                               Associativity: Left-to-right\n ---------------------------------------------------------------\n   &             Bitwise AND\n\n 6                               Associativity: Left-to-right\n ---------------------------------------------------------------\n   ^             Bitwise XOR\n\n 5                               Associativity: Left-to-right\n ---------------------------------------------------------------\n   |             Bitwise OR\n\n 4                               Associativity: Left-to-right\n ---------------------------------------------------------------\n   &&            Logical AND\n\n 3                               Associativity: Left-to-right\n ---------------------------------------------------------------\n   ||            Logical OR\n\n 2                               Associativity: Right-to-left\n ---------------------------------------------------------------\n   ? :           Ternary conditional\n\n 1                               Associativity: Right-to-left\n ---------------------------------------------------------------\n   =             Simple assignment\n   +=  -=        Compound assignment (additive)\n   *=  /=  %=    Compound assignment (multiplicative)\n   <<=  >>=      Compound assignment (shift)\n   &=  ^=  |=    Compound assignment (bitwise)\n\n 0                               Associativity: Left-to-right\n ---------------------------------------------------------------\n   ,             Comma\n```\n\nFollowing grammar rules group expressions into certain kinds, but in reality all parsing is based\non the precedence table. Grammar rules only show the general logic, and which specific tokens\nparser might expect in certain expressions.\n\n```\n expression\n         : binary_expression\n         | function_expression\n         | access_expression\n         | unary_expression\n         | cast_expression\n         | compound_literal\n         | sizeof_expression\n         | primary_expression\n         | ternary_expression\n         | assignment_expression\n         | postfix_expression\n         ;\n\n binary_expression\n         : expression binary_operator expression\n         | expression '[' expression ']'\n         | function_expression\n         | access_expression\n         ;\n\n function_expression\n         : expression '(' argument_list? ')'\n         ;\n\n access_expression\n         : expression '.' identifier\n         | expression '->' identifier\n         ;\n\n unary_expression\n         : cast_expression\n         | '(' expression ')'\n         | sizeof_expression\n         | unary_operator expression\n         | gnu_extensions expression\n         ;\n\n cast_expression\n         : '(' type_name ')' expression\n         | compound\n         ;\n\n compound\n         : '(' type_name ')' designations\n         ;\n\n sizeof_expression\n         : 'sizeof' expression\n         | 'sizeof' '(' type_name ')'\n         ;\n\n primary_expression\n         : identifier\n         | integer\n         | float\n         | string\n         ;\n\n ternary_expression\n         : expression '?' expression ':' expression\n         ;\n\n assignment_expression\n         : expression assignment_operator expression\n         ;\n\n postfix_expression\n         : expression '++'\n         | expression '--'\n         ;\n```",
     "tags": [
       { "kind": "PARAM", "text": "min_precedence: Lowest precedence of binary operators that are parsed, `-1` to parse all of them." },
-      { "kind": "RETURNS", "text": "Parsed expression, `NULL` on error." }
+      { "kind": "RETURNS", "text": "Parsed expression, `NULL` on error." },
+      { "kind": "NOTE", "text": "`gnu_extensions expression` binds as a unary operator, but doesn't produce its own node,\ninstead `CN_AST_GNU_EXTENSION` flag is set on the operand expression." }
     ]
   },
   {
@@ -1624,7 +1629,8 @@
     "summary": "Parses non-binary leaf expression from the current token of `lexer`.",
     "description": "Detects and parses unary operators, but doesn't parse binary or postfix expressions.",
     "tags": [
-      { "kind": "RETURNS", "text": "Parsed expression, `NULL` on error." }
+      { "kind": "RETURNS", "text": "Parsed expression, `NULL` on error." },
+      { "kind": "NOTE", "text": "Leading `gnu_extensions` are parsed as a unary operator, setting `CN_AST_GNU_EXTENSION`\nflag on the operand expression." }
     ]
   },
   {
@@ -1911,9 +1917,10 @@
     "symbol": "cn_parse_member_declaration",
     "decl": "CNDEF Cn_Ast_Member_Declaration *cn_parse_member_declaration(Cn_Lexer *lexer)",
     "summary": "Parses member declaration from the current token of `lexer`.",
-    "description": "```\n member_declaration\n         : '__extension__'? attribute_specifiers specifier_qualifier member_declarators ';'\n         ;\n```",
+    "description": "```\n member_declaration\n         : gnu_extensions attribute_specifiers specifier_qualifier member_declarators ';'\n         ;\n```",
     "tags": [
-      { "kind": "RETURNS", "text": "Parsed member declaration, `NULL` on error." }
+      { "kind": "RETURNS", "text": "Parsed member declaration, `NULL` on error." },
+      { "kind": "NOTE", "text": "If `gnu_extensions` are present, `CN_AST_GNU_EXTENSION` flag is set on the member declaration." }
     ]
   },
   {
@@ -1999,6 +2006,18 @@
     "tags": [
       { "kind": "RETURNS", "text": "Parsed list of GNU attribute specifiers." },
       { "kind": "OUTPUTS", "text": "`true` on success, `false` on error, written to `ok`." }
+    ]
+  },
+  {
+    "symbol": "cn_parse_gnu_extensions",
+    "decl": "CNDEF bool cn_parse_gnu_extensions(Cn_Lexer *lexer)",
+    "summary": "Parses GNU `__extension__` keywords from the current token of `lexer`.",
+    "description": "```\n gnu_extensions\n         : '__extension__'*\n         ;\n```",
+    "tags": [
+      { "kind": "RETURNS", "text": "`true` if at least one keyword was parsed, `false` otherwise." },
+      { "kind": "NOTE", "text": "Keyword only disables pedantic diagnostics in GCC, so repeated keywords are collapsed\ninto a single `CN_AST_GNU_EXTENSION` flag, set by the caller on the node that follows." },
+      { "kind": "NOTE", "text": "Allowed only at the start of an external declaration, block item declaration, `for`\ninitialization declaration, member declaration, and as a unary operator in expressions.\nNever after attribute specifiers, same as GCC." },
+      { "kind": "AI", "text": "Generated." }
     ]
   },
   {
