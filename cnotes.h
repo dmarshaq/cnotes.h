@@ -18462,7 +18462,7 @@ CNDEF void cn_tu_free(Cn_Translation_Unit *tu) {
                            Fixed `OPAQUE` typechecking bugs, including.
                            Fixed type conversions between pointer and array types.
                            Fixed cast expression precedence when emitting C code.
-                           Added `DOCUMENTATION.md` to keep clear documentation standard.
+                           Added `DEVELOPMENT.md` to keep clear development standard.
                            Added `nob doc` command to scan API for documentation and output it into its own web page.
         0.1.1 (2026-08-10) Fixed how_to/005_defer CN_MESSAGE_RESPONSE_NONE to CN_MESSAGE_RESPONSE_MODIFIED.
         0.1.0 (2026-08-04) Initial development first release.
