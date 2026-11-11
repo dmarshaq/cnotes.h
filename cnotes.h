@@ -2111,6 +2111,15 @@ typedef struct {
  */
 CNDEF Cn_Ast_Postfix_Operator_Kind cn_ast_is_postfix_operator(Cn_Lexer *lexer);
 
+
+typedef enum : uint8_t {
+    CN_AST_ASM_QUALIFIER_VOLATILE   = 0x01,
+    CN_AST_ASM_QUALIFIER_INLINE     = 0x02,
+    CN_AST_ASM_QUALIFIER_GOTO       = 0x04,
+} Cn_Ast_Gnu_Asm_Qualifier_Flags;
+
+
+
 #define CN_AST_GEN_LIST(X)\
     /* --- misc ----------------------------------------------------------- */                              \
     X(CODE,                             Code,                               code)                           \
@@ -2179,6 +2188,8 @@ CNDEF Cn_Ast_Postfix_Operator_Kind cn_ast_is_postfix_operator(Cn_Lexer *lexer);
     X(ATTRIBUTE,                        Attribute,                          attribute)                      \
     X(GNU_ATTRIBUTE_SPECIFIER,          Gnu_Attribute_Specifier,            gnu_attribute_specifier)        \
     X(GNU_ATTRIBUTE,                    Gnu_Attribute,                      gnu_attribute)                  \
+    X(GNU_ASM_STATEMENT,                Gnu_Asm_Statement,                  gnu_asm_statement)              \
+    X(GNU_ASM_OPERAND,                  Gnu_Asm_Operand,                    gnu_asm_operand)                \
     X(GNU_ASM_LABEL,                    Gnu_Asm_Label,                      gnu_asm_label)
 
 typedef enum : uint8_t {
@@ -2209,6 +2220,9 @@ typedef enum {
 
     CN_AST_LABEL_IS_CASE                          = 0x100,
     CN_AST_LABEL_IS_DEFAULT                       = 0x200,
+
+    // AI: Generated.
+    CN_AST_GNU_ASM_STATEMENT_IS_EXTENDED          = 0x100, // Set when at least one ':' section is present.
 } Cn_Ast_Flags;
 
 #define CN_AST_BASE_MEMBERS         \
@@ -2456,11 +2470,11 @@ struct cn_ast_init_declarator { CN_AST_BASE;
 
 struct cn_ast_initializer { CN_AST_BASE;
     Cn_Ast_Node *expression;  // Can be NULL if not single expression initializer.
-    Cn_Ast_Nodes  designations;   // Can be empty if not compound intializer '{' '}'.
+    Cn_Ast_Nodes designations;   // Can be empty if not compound intializer '{' '}'.
 };
 
 struct cn_ast_designation { CN_AST_BASE;
-    Cn_Ast_Nodes         designators;    // Can be empty. List of Cn_Ast_Designator.
+    Cn_Ast_Nodes        designators;    // Can be empty. List of Cn_Ast_Designator.
     Cn_Ast_Initializer *initializer;
 };
 
@@ -2533,43 +2547,43 @@ struct cn_ast_parameter_declaration { CN_AST_BASE;
 };
 
 struct cn_ast_struct_specifier { CN_AST_BASE;
-    Cn_Ast_Nodes        attribute_specifiers; // List of Cn_Ast_Attribute_Specifier.
-    Cn_Ast_Nodes        gnu_attribute_specifiers; // List of Cn_Ast_Gnu_Attribute_Specifier.
+    Cn_Ast_Nodes       attribute_specifiers; // List of Cn_Ast_Attribute_Specifier.
+    Cn_Ast_Nodes       gnu_attribute_specifiers; // List of Cn_Ast_Gnu_Attribute_Specifier.
     Cn_Ast_Identifier *identifier;
-    Cn_Ast_Nodes        member_declarations; // List of Cn_Ast_Member_Declaration.
+    Cn_Ast_Nodes       member_declarations; // List of Cn_Ast_Member_Declaration.
 };
 
 struct cn_ast_union_specifier { CN_AST_BASE;
-    Cn_Ast_Nodes        attribute_specifiers; // List of Cn_Ast_Attribute_Specifier.
-    Cn_Ast_Nodes        gnu_attribute_specifiers; // List of Cn_Ast_Gnu_Attribute_Specifier.
+    Cn_Ast_Nodes       attribute_specifiers; // List of Cn_Ast_Attribute_Specifier.
+    Cn_Ast_Nodes       gnu_attribute_specifiers; // List of Cn_Ast_Gnu_Attribute_Specifier.
     Cn_Ast_Identifier *identifier;
-    Cn_Ast_Nodes        member_declarations; // List of Cn_Ast_Member_Declaration.
+    Cn_Ast_Nodes       member_declarations; // List of Cn_Ast_Member_Declaration.
 };
 
 struct cn_ast_member_declaration { CN_AST_BASE;
-    Cn_Ast_Nodes                 attribute_specifiers; // List of Cn_Ast_Attribute_Specifier.
+    Cn_Ast_Nodes                attribute_specifiers; // List of Cn_Ast_Attribute_Specifier.
     Cn_Ast_Specifier_Qualifier *specifier_qualifier;
-    Cn_Ast_Nodes                 member_declarators; // List of Cn_Ast_Member_Declarator.
+    Cn_Ast_Nodes                member_declarators; // List of Cn_Ast_Member_Declarator.
 };
 
 struct cn_ast_member_declarator { CN_AST_BASE;
     Cn_Ast_Declarator *declarator;
     Cn_Ast_Node       *bitfield;
-    Cn_Ast_Nodes        gnu_attribute_specifiers; // List of Cn_Ast_Gnu_Attribute_Specifier.
+    Cn_Ast_Nodes       gnu_attribute_specifiers; // List of Cn_Ast_Gnu_Attribute_Specifier.
 };
 
 struct cn_ast_enum_specifier { CN_AST_BASE;
-    Cn_Ast_Nodes                 attribute_specifiers; // List of Cn_Ast_Attribute_Specifier.
-    Cn_Ast_Nodes                 gnu_attribute_specifiers; // List of Cn_Ast_Gnu_Attribute_Specifier.
+    Cn_Ast_Nodes                attribute_specifiers; // List of Cn_Ast_Attribute_Specifier.
+    Cn_Ast_Nodes                gnu_attribute_specifiers; // List of Cn_Ast_Gnu_Attribute_Specifier.
     Cn_Ast_Identifier          *identifier;
     Cn_Ast_Specifier_Qualifier *specifier_qualifier;
-    Cn_Ast_Nodes                 enumerators; // List of Cn_Ast_Enumerator.
+    Cn_Ast_Nodes                enumerators; // List of Cn_Ast_Enumerator.
 };
 
 struct cn_ast_enumerator { CN_AST_BASE;
     Cn_Ast_Identifier *identifier;
-    Cn_Ast_Nodes        attribute_specifiers; // List of Cn_Ast_Attribute_Specifier.
-    Cn_Ast_Nodes        gnu_attribute_specifiers; // List of Cn_Ast_Gnu_Attribute_Specifier.
+    Cn_Ast_Nodes       attribute_specifiers; // List of Cn_Ast_Attribute_Specifier.
+    Cn_Ast_Nodes       gnu_attribute_specifiers; // List of Cn_Ast_Gnu_Attribute_Specifier.
     Cn_Ast_Node       *expression;
 };
 
@@ -2580,7 +2594,7 @@ struct cn_ast_attribute_specifier { CN_AST_BASE;
 struct cn_ast_attribute { CN_AST_BASE;
     Cn_Ast_Identifier *vendor_identifier;
     Cn_Ast_Identifier *identifier;
-    Cn_Ast_Nodes        arguments;
+    Cn_Ast_Nodes       arguments;
 };
 
 struct cn_ast_gnu_attribute_specifier { CN_AST_BASE;
@@ -2589,7 +2603,22 @@ struct cn_ast_gnu_attribute_specifier { CN_AST_BASE;
 
 struct cn_ast_gnu_attribute { CN_AST_BASE;
     Cn_Ast_Identifier *identifier;
-    Cn_Ast_Nodes        arguments;
+    Cn_Ast_Nodes       arguments;
+};
+
+struct cn_ast_gnu_asm_statement { CN_AST_BASE;
+    Cn_Ast_Gnu_Asm_Qualifier_Flags qualifiers;
+    Cn_Ast_String *template;
+    Cn_Ast_Nodes   outputs;
+    Cn_Ast_Nodes   inputs;
+    Cn_Ast_Nodes   clobbers;
+    Cn_Ast_Nodes   goto_labels;
+};
+
+struct cn_ast_gnu_asm_operand { CN_AST_BASE;
+    Cn_Ast_Identifier *identifier;
+    Cn_Ast_String     *string;
+    Cn_Ast_Node       *expression;
 };
 
 struct cn_ast_gnu_asm_label { CN_AST_BASE;
@@ -4505,11 +4534,138 @@ CNDEF Cn_Ast_Nodes cn_parse_gnu_attributes(Cn_Lexer *lexer, bool *ok);
 CNDEF Cn_Ast_Gnu_Attribute *cn_parse_gnu_attribute(Cn_Lexer *lexer);
 
 /**
+ * Parses GNU `asm` statement from the current token of `lexer`.
+ *
+ * ```
+ *  gnu_asm_statement
+ *          : 'asm' gnu_asm_qualifier* '(' string gnu_asm_sections? ')' ';'
+ *          ;
+ *
+ *  gnu_asm_sections
+ *          : ':' gnu_asm_operands? ( ':' gnu_asm_operands? ( ':' gnu_asm_clobbers? ( ':' gnu_asm_goto_labels )? )? )?
+ *          ;
+ * ```
+ *
+ * RETURNS: Parsed GNU `asm` statement, `NULL` on error.
+ *
+ * NOTE: Without `gnu_asm_sections` the statement is basic asm, otherwise it is extended asm.
+ * First operand list holds outputs, second holds inputs. Lists that are not present are empty.
+ *
+ * NOTE: Constraints not expressed by the grammar, reported as errors:
+ *  - each qualifier may appear at most once, in any order,
+ *  - `goto` qualifier is not allowed in basic asm,
+ *  - `goto` qualifier requires the goto labels section, with at least one label,
+ *  - goto labels section is not allowed without `goto` qualifier.
+ *
+ * NOTE: Also used for file-scope asm, which is a basic asm statement appearing as an external
+ * declaration. Callers at file scope should reject extended asm and any qualifiers, GCC and Clang
+ * reject them too.
+ *
+ * AI: Generated.
+ */
+CNDEF Cn_Ast_Gnu_Asm_Statement *cn_parse_gnu_asm_statement(Cn_Lexer *lexer);
+
+/**
+ * Tries to parse GNU `asm` qualifier from the current token of `lexer`.
+ *
+ * ```
+ *  gnu_asm_qualifier
+ *          : 'volatile'
+ *          | 'inline'
+ *          | 'goto'
+ *          ;
+ * ```
+ *
+ * RETURNS: `0` on success, `1` if token wasn't accepted, `2` on error.
+ *
+ * OUTPUTS: Parsed qualifier, added to `output`.
+ *
+ * NOTE: Returns `2` if the qualifier is already set in `output`.
+ *
+ * AI: Generated.
+ */
+CNDEF int cn_parse_try_gnu_asm_qualifier(Cn_Lexer *lexer, Cn_Ast_Gnu_Asm_Qualifier_Flags *output);
+
+/**
+ * Parses GNU `asm` operand list from the current token of `lexer`.
+ *
+ * ```
+ *  gnu_asm_operands
+ *          : gnu_asm_operand (',' gnu_asm_operand)*
+ *          ;
+ * ```
+ *
+ * RETURNS: Parsed list of GNU `asm` operands.
+ *
+ * OUTPUTS: `true` on success, `false` on error, written to `ok`.
+ *
+ * NOTE: Returns an empty list without consuming tokens if current token is `:` or `)`,
+ * since operand lists may be empty.
+ *
+ * AI: Generated.
+ */
+CNDEF Cn_Ast_Nodes cn_parse_gnu_asm_operands(Cn_Lexer *lexer, bool *ok);
+
+/**
+ * Parses GNU `asm` operand from the current token of `lexer`.
+ *
+ * ```
+ *  gnu_asm_operand
+ *          : ('[' identifier ']')? string '(' expression ')'
+ *          ;
+ * ```
+ *
+ * RETURNS: Parsed GNU `asm` operand, `NULL` on error.
+ *
+ * NOTE: `string` is the constraint, e.g. `"=r"`, `"+m"`, `"i"`. Identifier is the optional
+ * symbolic name referenced from the template as `%[name]`.
+ *
+ * AI: Generated.
+ */
+CNDEF Cn_Ast_Gnu_Asm_Operand *cn_parse_gnu_asm_operand(Cn_Lexer *lexer);
+
+/**
+ * Parses GNU `asm` clobber list from the current token of `lexer`.
+ *
+ * ```
+ *  gnu_asm_clobbers
+ *          : string (',' string)*
+ *          ;
+ * ```
+ *
+ * RETURNS: Parsed list of clobber strings.
+ *
+ * OUTPUTS: `true` on success, `false` on error, written to `ok`.
+ *
+ * NOTE: Returns an empty list without consuming tokens if current token is `:` or `)`.
+ *
+ * AI: Generated.
+ */
+CNDEF Cn_Ast_Nodes cn_parse_gnu_asm_clobbers(Cn_Lexer *lexer, bool *ok);
+
+/**
+ * Parses GNU `asm goto` label list from the current token of `lexer`.
+ *
+ * ```
+ *  gnu_asm_goto_labels
+ *          : identifier (',' identifier)*
+ *          ;
+ * ```
+ *
+ * RETURNS: Parsed list of label identifiers.
+ *
+ * OUTPUTS: `true` on success, `false` on error, written to `ok`.
+ *
+ * AI: Generated.
+ */
+CNDEF Cn_Ast_Nodes cn_parse_gnu_asm_goto_labels(Cn_Lexer *lexer, bool *ok);
+
+/**
  * Parses GNU `asm` label from the current token of `lexer`.
  *
  * ```
  *  gnu_asm_label
- *          : '__asm__' '(' string* ')'
+ *          : 'asm' '(' string ')'
  *          ;
  * ```
  *
@@ -6781,6 +6937,7 @@ const Cn_Token_Literal CN_KEYWORD_TOKENS[] = {
     { CN_TOKEN_NORETURN,        CN_STR_BUFFER("_Noreturn") },
     { CN_TOKEN_ASM,             CN_STR_BUFFER("asm") },
     { CN_TOKEN_ASM,             CN_STR_BUFFER("__asm__") },
+    { CN_TOKEN_ASM,             CN_STR_BUFFER("__asm") },
     { CN_TOKEN_CASE,            CN_STR_BUFFER("case") },
     { CN_TOKEN_DEFAULT,         CN_STR_BUFFER("default") },
 };
@@ -8899,6 +9056,19 @@ CNDEF void cn_ast_print(void * idx, int depth) {
             ADD_IDX(&cn_ast_as(Gnu_Attribute, node)->identifier);
             ADD_LIST(&cn_ast_as(Gnu_Attribute, node)->arguments, "arguments");
             break;
+        case CN_AST_GNU_ASM_STATEMENT:
+            // TODO: Print qualifiers.
+            ADD_IDX(&cn_ast_as(Gnu_Asm_Statement, node)->template);
+            ADD_LIST(&cn_ast_as(Gnu_Asm_Statement, node)->outputs, "outputs");
+            ADD_LIST(&cn_ast_as(Gnu_Asm_Statement, node)->inputs, "inputs");
+            ADD_LIST(&cn_ast_as(Gnu_Asm_Statement, node)->clobbers, "clobbers");
+            ADD_LIST(&cn_ast_as(Gnu_Asm_Statement, node)->goto_labels, "goto_labels");
+            break;
+        case CN_AST_GNU_ASM_OPERAND:
+            ADD_IDX(&cn_ast_as(Gnu_Asm_Operand, node)->identifier);
+            ADD_IDX(&cn_ast_as(Gnu_Asm_Operand, node)->string);
+            ADD_IDX(&cn_ast_as(Gnu_Asm_Operand, node)->expression);
+            break;
         case CN_AST_GNU_ASM_LABEL:
             ADD_IDX(&cn_ast_as(Gnu_Asm_Label, node)->string);
             break;
@@ -9248,6 +9418,18 @@ CNDEF void *cn_ast_copy(void * idx) {
         case CN_AST_GNU_ATTRIBUTE:
             COPY_PTR(Gnu_Attribute, identifier);
             COPY_LIST(Gnu_Attribute, arguments);
+            return copy;
+        case CN_AST_GNU_ASM_STATEMENT:
+            COPY_PTR(Gnu_Asm_Statement, template);
+            COPY_LIST(Gnu_Asm_Statement, outputs);
+            COPY_LIST(Gnu_Asm_Statement, inputs);
+            COPY_LIST(Gnu_Asm_Statement, clobbers);
+            COPY_LIST(Gnu_Asm_Statement, goto_labels);
+            return copy;
+        case CN_AST_GNU_ASM_OPERAND:
+            COPY_PTR(Gnu_Asm_Operand, identifier);
+            COPY_PTR(Gnu_Asm_Operand, string);
+            COPY_PTR(Gnu_Asm_Operand, expression);
             return copy;
         case CN_AST_GNU_ASM_LABEL:
             COPY_PTR(Gnu_Asm_Label, string);
@@ -11512,6 +11694,10 @@ CNDEF Cn_Type *cn__analyze_typecheck_cast(Cn_Ast_Node *node) {
         return target;
     }
 
+    // Dropping qualifiers, as they are not needed for casting.
+    target = cn_type_unqualified(target);
+    operand = cn_type_unqualified(operand);
+
     // Target must be scalar.
     if (!cn_type_is_scalar(target)) {
         Cn_String t_str = cn_type_stringify(CN_STR_BUFFER_EMPTY(128), target, (Cn_String) {0});
@@ -13631,6 +13817,64 @@ CNDEF void cn__emit_attribute(Cn_Emitter *e, Cn_Ast_Attribute *node) {
     }
 }
 
+// AI: Generated.
+CNDEF void cn__emit_gnu_asm_qualifiers(Cn_Emitter *e, Cn_Ast_Gnu_Asm_Qualifier_Flags qualifiers) {
+    if (qualifiers & CN_AST_ASM_QUALIFIER_VOLATILE) cn__emit_str_lit(e, "volatile ");
+    if (qualifiers & CN_AST_ASM_QUALIFIER_INLINE)   cn__emit_str_lit(e, "inline ");
+    if (qualifiers & CN_AST_ASM_QUALIFIER_GOTO)     cn__emit_str_lit(e, "goto ");
+}
+
+// AI: Generated.
+CNDEF void cn__emit_gnu_asm_section(Cn_Emitter *e, Cn_Ast_Nodes list) {
+    cn__emit_str_lit(e, " :");
+    for (int64_t i = 0; i < list.length; i++) {
+        if (i > 0) cn__emit_str_lit(e, ",");
+        cn__emit_str_lit(e, " ");
+        cn_emit(e, list.ptrs[i]);
+    }
+}
+
+// AI: Generated.
+CNDEF void cn__emit_gnu_asm_statement(Cn_Emitter *e, Cn_Ast_Gnu_Asm_Statement *node) {
+    cn__emit_str_lit(e, "__asm__ ");
+    cn__emit_gnu_asm_qualifiers(e, node->qualifiers);
+
+    cn__emit_str_lit(e, "(");
+    cn_emit(e, node->template);
+
+    // Basic and extended asm differ semantically (e.g. '%' escaping in template), so
+    // an extended asm keeps at least one ':' even when all of its sections are empty.
+    // Trailing empty sections are omitted, but a section is always emitted if any later one is not empty.
+    int sections = 0;
+    if (node->goto_labels.length > 0)   sections = 4;
+    else if (node->clobbers.length > 0) sections = 3;
+    else if (node->inputs.length > 0)   sections = 2;
+    else if (node->outputs.length > 0 || (node->flags & CN_AST_GNU_ASM_STATEMENT_IS_EXTENDED)) sections = 1;
+
+    if (sections >= 1) cn__emit_gnu_asm_section(e, node->outputs);
+    if (sections >= 2) cn__emit_gnu_asm_section(e, node->inputs);
+    if (sections >= 3) cn__emit_gnu_asm_section(e, node->clobbers);
+    if (sections >= 4) cn__emit_gnu_asm_section(e, node->goto_labels);
+
+    cn__emit_str_lit(e, ");");
+    cn__emit_newline(e);
+}
+
+// AI: Generated.
+CNDEF void cn__emit_gnu_asm_operand(Cn_Emitter *e, Cn_Ast_Gnu_Asm_Operand *node) {
+    if (node->identifier != NULL) {
+        cn__emit_str_lit(e, "[");
+        cn_emit(e, node->identifier);
+        cn__emit_str_lit(e, "] ");
+    }
+
+    cn_emit(e, node->string);
+
+    cn__emit_str_lit(e, " (");
+    cn_emit(e, node->expression);
+    cn__emit_str_lit(e, ")");
+}
+
 CNDEF void cn__emit_gnu_asm_label(Cn_Emitter *e, Cn_Ast_Gnu_Asm_Label *node) {
     cn__emit_str_lit(e, "__asm__(");
     cn_emit(e, node->string);
@@ -13808,6 +14052,25 @@ CNDEF Cn_Ast_External_Declaration *cn_parse_external_declaration(Cn_Lexer *lexer
     // If stray ';' case.
     if (cn_lexer_token(lexer).type == CN_TOKEN_SEMICOLON) {
         cn_lexer_next_token(lexer);
+        return cn_ast_new(node);
+    }
+
+    // AI: Generated.
+    // File-scope asm, basic asm statement without qualifiers, same as GCC and Clang.
+    if (cn_lexer_token(lexer).type == CN_TOKEN_ASM) {
+        Cn_Ast_Gnu_Asm_Statement *gnu_asm_statement = cn_parse_gnu_asm_statement(lexer);
+        if (gnu_asm_statement == NULL) goto error;
+
+        if (gnu_asm_statement->flags & CN_AST_GNU_ASM_STATEMENT_IS_EXTENDED) {
+            cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, gnu_asm_statement, CN_DC_UNEXPECTED_TOKEN, "Extended asm is not allowed outside of function.");
+            goto error;
+        }
+        if (gnu_asm_statement->qualifiers != 0) {
+            cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, gnu_asm_statement, CN_DC_UNEXPECTED_TOKEN, "Asm qualifiers are not allowed outside of function.");
+            goto error;
+        }
+
+        node.child = cn_ast_node(gnu_asm_statement);
         return cn_ast_new(node);
     }
 
@@ -14203,7 +14466,19 @@ CNDEF Cn_Ast_Node *cn_parse_finish_statement(Cn_Lexer *lexer, Cn_Ast_Nodes attri
                 if (statement == NULL) goto error;
 
                 cn_ast_as(Continue, statement)->attribute_specifiers = attribute_specifiers;
-                
+
+                break;
+
+            // AI: Generated.
+            case CN_TOKEN_ASM:
+                // Asm statement has no attribute specifiers, same as GCC they are ignored.
+                if (attribute_specifiers.length > 0) {
+                    cn_diagnostic_node(CN_DIAGNOSTIC_WARNING, attribute_specifiers.ptrs[0], CN_DC_ILLEGAL_ATTRIBUTE, "Attributes on asm statement are ignored.");
+                }
+
+                statement = cn_ast_node(cn_parse_gnu_asm_statement(lexer));
+                if (statement == NULL) goto error;
+
                 break;
 
             default:
@@ -15580,9 +15855,15 @@ CNDEF Cn_Ast_String *cn_parse_string(Cn_Lexer *lexer) {
 
     node.str = cn_sb_to_str(&sb);
 
-    void *d = cn_chained_arena_alloc(&cn__tu_data->permanent_strings_arena, node.str.length);
-    cn_str_copy_to(node.str, d);
-    node.str.data = d;
+    // AI: Generated.
+    // Empty string literal "" has nothing to copy, and arena doesn't allow zero sized allocations.
+    if (node.str.length > 0) {
+        void *d = cn_chained_arena_alloc(&cn__tu_data->permanent_strings_arena, node.str.length);
+        cn_str_copy_to(node.str, d);
+        node.str.data = d;
+    } else {
+        node.str = (Cn_String) {0};
+    }
 
     cn_sb_free(&sb);
 
@@ -16674,6 +16955,239 @@ error:
     CN__TRACE_ERROR
     *lexer = original_state;
     return NULL;
+}
+
+CNDEF Cn_Ast_Gnu_Asm_Statement *cn_parse_gnu_asm_statement(Cn_Lexer *lexer) {
+    Cn_Lexer original_state = *lexer;
+
+    Cn_Ast_Gnu_Asm_Statement node = { .kind = CN_AST_GNU_ASM_STATEMENT, .loc = cn_lexer_token(lexer).loc, .src = cn_lexer_token(lexer).src };
+
+    if (!cn_parse_expect(lexer, CN_TOKEN_ASM)) goto error;
+
+    // Qualifiers, in any order, each at most once.
+    while (true) {
+        int result = cn_parse_try_gnu_asm_qualifier(lexer, &node.qualifiers);
+        if (result == 1) break;
+        if (result == 2) goto error;
+    }
+
+    if (!cn_parse_expect(lexer, CN_TOKEN_PARAN_OPEN)) goto error;
+
+    Cn_Ast_String *template = cn_parse_string(lexer);
+    if (template == NULL) goto error;
+    node.template = template;
+
+    // Sections, each one is only allowed after the previous one.
+    bool has_goto_labels = false;
+    bool ok;
+
+    if (cn_parse_optional(lexer, CN_TOKEN_COLON)) {
+        node.flags |= CN_AST_GNU_ASM_STATEMENT_IS_EXTENDED;
+
+        node.outputs = cn_parse_gnu_asm_operands(lexer, &ok);
+        if (!ok) goto error;
+
+        if (cn_parse_optional(lexer, CN_TOKEN_COLON)) {
+            node.inputs = cn_parse_gnu_asm_operands(lexer, &ok);
+            if (!ok) goto error;
+
+            if (cn_parse_optional(lexer, CN_TOKEN_COLON)) {
+                node.clobbers = cn_parse_gnu_asm_clobbers(lexer, &ok);
+                if (!ok) goto error;
+
+                if (cn_lexer_expect(lexer, CN_TOKEN_COLON)) {
+                    if (!(node.qualifiers & CN_AST_ASM_QUALIFIER_GOTO)) {
+                        cn_diagnostic_src(CN_DIAGNOSTIC_ERROR, &cn_lexer_token(lexer).loc, &cn_lexer_token(lexer).src, CN_DC_UNEXPECTED_TOKEN, "Goto labels section is not allowed without 'goto' asm qualifier.");
+                        goto error;
+                    }
+                    cn_lexer_next_token(lexer);
+
+                    node.goto_labels = cn_parse_gnu_asm_goto_labels(lexer, &ok);
+                    if (!ok) goto error;
+                    has_goto_labels = true;
+                }
+            }
+        }
+    }
+
+    if (node.qualifiers & CN_AST_ASM_QUALIFIER_GOTO) {
+        if (!(node.flags & CN_AST_GNU_ASM_STATEMENT_IS_EXTENDED)) {
+            cn_diagnostic_src(CN_DIAGNOSTIC_ERROR, &node.loc, &node.src, CN_DC_UNEXPECTED_TOKEN, "'goto' asm qualifier is not allowed in basic asm.");
+            goto error;
+        }
+        if (!has_goto_labels) {
+            cn_diagnostic_src(CN_DIAGNOSTIC_ERROR, &cn_lexer_token(lexer).loc, &cn_lexer_token(lexer).src, CN_DC_EXPECTED_TOKEN, "Expected goto labels section in 'asm goto'.");
+            goto error;
+        }
+    }
+
+    if (!cn_parse_expect(lexer, CN_TOKEN_PARAN_CLOSE)) goto error;
+    if (!cn_parse_expect(lexer, CN_TOKEN_SEMICOLON)) goto error;
+
+    Cn_Ast_Gnu_Asm_Statement *parent = cn_ast_new(node);
+    return parent;
+
+error:
+    CN__TRACE_ERROR
+    *lexer = original_state;
+    return NULL;
+}
+
+CNDEF int cn_parse_try_gnu_asm_qualifier(Cn_Lexer *lexer, Cn_Ast_Gnu_Asm_Qualifier_Flags *output) {
+    Cn_Lexer original_state = *lexer;
+
+    Cn_Ast_Gnu_Asm_Qualifier_Flags qualifier;
+
+    switch(cn_lexer_token(lexer).type) {
+        case CN_TOKEN_VOLATILE: qualifier = CN_AST_ASM_QUALIFIER_VOLATILE; break;
+        case CN_TOKEN_INLINE:   qualifier = CN_AST_ASM_QUALIFIER_INLINE;   break;
+        case CN_TOKEN_GOTO:     qualifier = CN_AST_ASM_QUALIFIER_GOTO;     break;
+        default:
+            return 1;
+    }
+
+    if (*output & qualifier) {
+        cn_diagnostic_src(CN_DIAGNOSTIC_ERROR, &cn_lexer_token(lexer).loc, &cn_lexer_token(lexer).src, CN_DC_UNEXPECTED_TOKEN, "Duplicate '%s' asm qualifier.", cn_token_kind_name(cn_lexer_token(lexer).type));
+        goto error;
+    }
+
+    *output |= qualifier;
+    cn_lexer_next_token(lexer);
+    return 0;
+
+error:
+    CN__TRACE_ERROR
+    *lexer = original_state;
+    return 2;
+}
+
+CNDEF Cn_Ast_Nodes cn_parse_gnu_asm_operands(Cn_Lexer *lexer, bool *ok) {
+    Cn_Lexer original_state = *lexer;
+
+    int64_t mark = cn_ast_stack_mark();
+
+    // Empty operand list.
+    if (cn_lexer_expect(lexer, CN_TOKEN_COLON) || cn_lexer_expect(lexer, CN_TOKEN_PARAN_CLOSE)) {
+        *ok = true;
+        return cn_ast_stack_finalize(mark);
+    }
+
+    Cn_Ast_Gnu_Asm_Operand *operand = cn_parse_gnu_asm_operand(lexer);
+    if (operand == NULL) goto error;
+    cn_ast_stack_push(operand);
+
+    while (cn_lexer_expect(lexer, CN_TOKEN_COMMA)) {
+        cn_lexer_next_token(lexer);
+
+        operand = cn_parse_gnu_asm_operand(lexer);
+        if (operand == NULL) goto error;
+        cn_ast_stack_push(operand);
+    }
+
+    *ok = true;
+    return cn_ast_stack_finalize(mark);
+
+error:
+    CN__TRACE_ERROR
+    *lexer = original_state;
+    *ok = false;
+    return (Cn_Ast_Nodes) {0};
+}
+
+CNDEF Cn_Ast_Gnu_Asm_Operand *cn_parse_gnu_asm_operand(Cn_Lexer *lexer) {
+    Cn_Lexer original_state = *lexer;
+
+    Cn_Ast_Gnu_Asm_Operand node = { .kind = CN_AST_GNU_ASM_OPERAND, .loc = cn_lexer_token(lexer).loc, .src = cn_lexer_token(lexer).src };
+
+    // Optional symbolic name.
+    if (cn_parse_optional(lexer, CN_TOKEN_SQR_BRACES_OPEN)) {
+        Cn_Ast_Identifier *identifier = cn_parse_identifier(lexer);
+        if (identifier == NULL) goto error;
+        node.identifier = identifier;
+
+        if (!cn_parse_expect(lexer, CN_TOKEN_SQR_BRACES_CLOSE)) goto error;
+    }
+
+    // Constraint.
+    Cn_Ast_String *string = cn_parse_string(lexer);
+    if (string == NULL) goto error;
+    node.string = string;
+
+    if (!cn_parse_expect(lexer, CN_TOKEN_PARAN_OPEN)) goto error;
+
+    Cn_Ast_Node *expression = cn_parse_expression(lexer, -1, 0);
+    if (expression == NULL) goto error;
+    node.expression = expression;
+
+    if (!cn_parse_expect(lexer, CN_TOKEN_PARAN_CLOSE)) goto error;
+
+    Cn_Ast_Gnu_Asm_Operand *parent = cn_ast_new(node);
+    return parent;
+
+error:
+    CN__TRACE_ERROR
+    *lexer = original_state;
+    return NULL;
+}
+
+CNDEF Cn_Ast_Nodes cn_parse_gnu_asm_clobbers(Cn_Lexer *lexer, bool *ok) {
+    Cn_Lexer original_state = *lexer;
+
+    int64_t mark = cn_ast_stack_mark();
+
+    // Empty clobber list.
+    if (cn_lexer_expect(lexer, CN_TOKEN_COLON) || cn_lexer_expect(lexer, CN_TOKEN_PARAN_CLOSE)) {
+        *ok = true;
+        return cn_ast_stack_finalize(mark);
+    }
+
+    Cn_Ast_String *clobber = cn_parse_string(lexer);
+    if (clobber == NULL) goto error;
+    cn_ast_stack_push(clobber);
+
+    while (cn_lexer_expect(lexer, CN_TOKEN_COMMA)) {
+        cn_lexer_next_token(lexer);
+
+        clobber = cn_parse_string(lexer);
+        if (clobber == NULL) goto error;
+        cn_ast_stack_push(clobber);
+    }
+
+    *ok = true;
+    return cn_ast_stack_finalize(mark);
+
+error:
+    CN__TRACE_ERROR
+    *lexer = original_state;
+    *ok = false;
+    return (Cn_Ast_Nodes) {0};
+}
+
+CNDEF Cn_Ast_Nodes cn_parse_gnu_asm_goto_labels(Cn_Lexer *lexer, bool *ok) {
+    Cn_Lexer original_state = *lexer;
+
+    int64_t mark = cn_ast_stack_mark();
+
+    Cn_Ast_Identifier *label = cn_parse_identifier(lexer);
+    if (label == NULL) goto error;
+    cn_ast_stack_push(label);
+
+    while (cn_lexer_expect(lexer, CN_TOKEN_COMMA)) {
+        cn_lexer_next_token(lexer);
+
+        label = cn_parse_identifier(lexer);
+        if (label == NULL) goto error;
+        cn_ast_stack_push(label);
+    }
+
+    *ok = true;
+    return cn_ast_stack_finalize(mark);
+
+error:
+    CN__TRACE_ERROR
+    *lexer = original_state;
+    *ok = false;
+    return (Cn_Ast_Nodes) {0};
 }
 
 CNDEF Cn_Ast_Gnu_Asm_Label *cn_parse_gnu_asm_label(Cn_Lexer *lexer) {

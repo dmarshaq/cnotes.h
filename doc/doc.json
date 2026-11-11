@@ -2030,10 +2030,81 @@
     ]
   },
   {
+    "symbol": "cn_parse_gnu_asm_statement",
+    "decl": "CNDEF Cn_Ast_Gnu_Asm_Statement *cn_parse_gnu_asm_statement(Cn_Lexer *lexer)",
+    "summary": "Parses GNU `asm` statement from the current token of `lexer`.",
+    "description": "```\n gnu_asm_statement\n         : 'asm' gnu_asm_qualifier* '(' string gnu_asm_sections? ')' ';'\n         ;\n\n gnu_asm_sections\n         : ':' gnu_asm_operands? ( ':' gnu_asm_operands? ( ':' gnu_asm_clobbers? ( ':' gnu_asm_goto_labels )? )? )?\n         ;\n```",
+    "tags": [
+      { "kind": "RETURNS", "text": "Parsed GNU `asm` statement, `NULL` on error." },
+      { "kind": "NOTE", "text": "Without `gnu_asm_sections` the statement is basic asm, otherwise it is extended asm.\nFirst operand list holds outputs, second holds inputs. Lists that are not present are empty." },
+      { "kind": "NOTE", "text": "Constraints not expressed by the grammar, reported as errors:\n- each qualifier may appear at most once, in any order,\n- `goto` qualifier is not allowed in basic asm,\n- `goto` qualifier requires the goto labels section, with at least one label,\n- goto labels section is not allowed without `goto` qualifier." },
+      { "kind": "NOTE", "text": "Also used for file-scope asm, which is a basic asm statement appearing as an external\ndeclaration. Callers at file scope should reject extended asm and any qualifiers, GCC and Clang\nreject them too." },
+      { "kind": "AI", "text": "Generated." }
+    ]
+  },
+  {
+    "symbol": "cn_parse_try_gnu_asm_qualifier",
+    "decl": "CNDEF int cn_parse_try_gnu_asm_qualifier(Cn_Lexer *lexer, Cn_Ast_Gnu_Asm_Qualifier_Flags *output)",
+    "summary": "Tries to parse GNU `asm` qualifier from the current token of `lexer`.",
+    "description": "```\n gnu_asm_qualifier\n         : 'volatile'\n         | 'inline'\n         | 'goto'\n         ;\n```",
+    "tags": [
+      { "kind": "RETURNS", "text": "`0` on success, `1` if token wasn't accepted, `2` on error." },
+      { "kind": "OUTPUTS", "text": "Parsed qualifier, added to `output`." },
+      { "kind": "NOTE", "text": "Returns `2` if the qualifier is already set in `output`." },
+      { "kind": "AI", "text": "Generated." }
+    ]
+  },
+  {
+    "symbol": "cn_parse_gnu_asm_operands",
+    "decl": "CNDEF Cn_Ast_Nodes cn_parse_gnu_asm_operands(Cn_Lexer *lexer, bool *ok)",
+    "summary": "Parses GNU `asm` operand list from the current token of `lexer`.",
+    "description": "```\n gnu_asm_operands\n         : gnu_asm_operand (',' gnu_asm_operand)*\n         ;\n```",
+    "tags": [
+      { "kind": "RETURNS", "text": "Parsed list of GNU `asm` operands." },
+      { "kind": "OUTPUTS", "text": "`true` on success, `false` on error, written to `ok`." },
+      { "kind": "NOTE", "text": "Returns an empty list without consuming tokens if current token is `:` or `)`,\nsince operand lists may be empty." },
+      { "kind": "AI", "text": "Generated." }
+    ]
+  },
+  {
+    "symbol": "cn_parse_gnu_asm_operand",
+    "decl": "CNDEF Cn_Ast_Gnu_Asm_Operand *cn_parse_gnu_asm_operand(Cn_Lexer *lexer)",
+    "summary": "Parses GNU `asm` operand from the current token of `lexer`.",
+    "description": "```\n gnu_asm_operand\n         : ('[' identifier ']')? string '(' expression ')'\n         ;\n```",
+    "tags": [
+      { "kind": "RETURNS", "text": "Parsed GNU `asm` operand, `NULL` on error." },
+      { "kind": "NOTE", "text": "`string` is the constraint, e.g. `\"=r\"`, `\"+m\"`, `\"i\"`. Identifier is the optional\nsymbolic name referenced from the template as `%[name]`." },
+      { "kind": "AI", "text": "Generated." }
+    ]
+  },
+  {
+    "symbol": "cn_parse_gnu_asm_clobbers",
+    "decl": "CNDEF Cn_Ast_Nodes cn_parse_gnu_asm_clobbers(Cn_Lexer *lexer, bool *ok)",
+    "summary": "Parses GNU `asm` clobber list from the current token of `lexer`.",
+    "description": "```\n gnu_asm_clobbers\n         : string (',' string)*\n         ;\n```",
+    "tags": [
+      { "kind": "RETURNS", "text": "Parsed list of clobber strings." },
+      { "kind": "OUTPUTS", "text": "`true` on success, `false` on error, written to `ok`." },
+      { "kind": "NOTE", "text": "Returns an empty list without consuming tokens if current token is `:` or `)`." },
+      { "kind": "AI", "text": "Generated." }
+    ]
+  },
+  {
+    "symbol": "cn_parse_gnu_asm_goto_labels",
+    "decl": "CNDEF Cn_Ast_Nodes cn_parse_gnu_asm_goto_labels(Cn_Lexer *lexer, bool *ok)",
+    "summary": "Parses GNU `asm goto` label list from the current token of `lexer`.",
+    "description": "```\n gnu_asm_goto_labels\n         : identifier (',' identifier)*\n         ;\n```",
+    "tags": [
+      { "kind": "RETURNS", "text": "Parsed list of label identifiers." },
+      { "kind": "OUTPUTS", "text": "`true` on success, `false` on error, written to `ok`." },
+      { "kind": "AI", "text": "Generated." }
+    ]
+  },
+  {
     "symbol": "cn_parse_gnu_asm_label",
     "decl": "CNDEF Cn_Ast_Gnu_Asm_Label *cn_parse_gnu_asm_label(Cn_Lexer *lexer)",
     "summary": "Parses GNU `asm` label from the current token of `lexer`.",
-    "description": "```\n gnu_asm_label\n         : '__asm__' '(' string* ')'\n         ;\n```",
+    "description": "```\n gnu_asm_label\n         : 'asm' '(' string ')'\n         ;\n```",
     "tags": [
       { "kind": "RETURNS", "text": "Parsed GNU `asm` label, `NULL` on error." }
     ]

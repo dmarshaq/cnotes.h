@@ -48,7 +48,12 @@ CNDEF void cn_test_diagnostic_handler(Cn_Diagnostic_Level level, Cn_Location *lo
     // Also using default diagnostic handler to print human readable diagnostic immediately.
     // Usefull in debuging why certain test fails on emitted diagnostic.
     // This output is in stderr so its not impacting anything.
-    cn_default_diagnostic_handler(level, loc, code, span, annotations, annotations_length, format, args);
+    // AI: Generated.
+    // Passing a copy, since default handler consumes `args` and they are formatted again below.
+    va_list args_copy;
+    va_copy(args_copy, args);
+    cn_default_diagnostic_handler(level, loc, code, span, annotations, annotations_length, format, args_copy);
+    va_end(args_copy);
 
     if (level < cn_min_diagnostic_level)
         return;
