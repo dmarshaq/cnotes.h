@@ -99,7 +99,8 @@ Cn_Message_Response defer_handler(Cn_Message *message) {
     Cn_Type_Function *type = (Cn_Type_Function *) cn_analyze_to_type(
             function->declaration_specifiers->qualifiers,
             function->declaration_specifiers->type_specifier,
-            function->declarator
+            function->declarator,
+            CN_ANALYZE_NO_FLAGS
             );
     CN_ASSERT(type->kind == CN_FUNCTION);
 

@@ -1,15 +1,15 @@
 // Test: Type stringification (cn_type_stringify)
 #include "../cnotes.h"
 
-// NOTE: Cn_Type is a union, so a designated initializer that touches two different
-// members clobbers the base. Everything below zero initializes first, then assigns
-// through a single member.
-static Cn_Type make_array(const Cn_Type *element, int64_t length) {
+static Cn_Type make_array(const Cn_Type *element, int64_t length, bool is_incomplete) {
     Cn_Type t = {0};
+
+    if (!is_incomplete) t.array.flags = CN_TYPE_COMPLETE;
+
     t.array.kind         = CN_ARRAY;
     t.array.element_type = (Cn_Type *)element;
     t.array.length       = length;
-    t.array.size         = length >= 0 ? length * element->size : 0;
+    t.array.size         = length * element->size;
     t.array.align        = element->align;
     return t;
 }
@@ -53,9 +53,9 @@ int main(void) {
 
     // Arrays: identifier goes between the base type and the bracket suffix.
     {
-        Cn_Type a10_int   = make_array(&CN_TYPE_INT, 10);
-        Cn_Type a_unsized = make_array(&CN_TYPE_INT, -1);
-        Cn_Type a5_p_int  = make_array(&p_int, 5);
+        Cn_Type a10_int   = make_array(&CN_TYPE_INT, 10, false);
+        Cn_Type a_unsized = make_array(&CN_TYPE_INT, 0, true);
+        Cn_Type a5_p_int  = make_array(&p_int, 5, false);
         Cn_Type p_a10_int = cn_type_make_pointer(&a10_int);
 
         CHECK(&a10_int,   CN_STR_LIT("a"),  "int a[10]");
@@ -66,9 +66,9 @@ int main(void) {
 
     // Multi dimensional arrays: outer dimension prints before inner ones.
     {
-        Cn_Type a4_int    = make_array(&CN_TYPE_INT, 4);
-        Cn_Type a3_a4_int = make_array(&a4_int, 3);
-        Cn_Type a2_a3_a4  = make_array(&a3_a4_int, 2);
+        Cn_Type a4_int    = make_array(&CN_TYPE_INT, 4, false);
+        Cn_Type a3_a4_int = make_array(&a4_int, 3, false);
+        Cn_Type a2_a3_a4  = make_array(&a3_a4_int, 2, false);
 
         CHECK(&a3_a4_int, CN_STR_LIT("m"),  "int m[3][4]");
         CHECK(&a2_a3_a4,  CN_STR_LIT("m3"), "int m3[2][3][4]");
@@ -96,13 +96,13 @@ int main(void) {
         Cn_Type_Function_Param params[1] = { { .type = (Cn_Type *)&CN_TYPE_INT } };
         Cn_Type fn       = make_function(&CN_TYPE_INT, params, 1);
         Cn_Type p_fn     = cn_type_make_pointer(&fn);
-        Cn_Type a3_p_fn  = make_array(&p_fn, 3);
+        Cn_Type a3_p_fn  = make_array(&p_fn, 3, false);
 
-        Cn_Type a4_int    = make_array(&CN_TYPE_INT, 4);
+        Cn_Type a4_int    = make_array(&CN_TYPE_INT, 4, false);
         Cn_Type p_a4_int  = cn_type_make_pointer(&a4_int);
-        Cn_Type a3_p_a4   = make_array(&p_a4_int, 3);
+        Cn_Type a3_p_a4   = make_array(&p_a4_int, 3, false);
 
-        Cn_Type a10_int   = make_array(&CN_TYPE_INT, 10);
+        Cn_Type a10_int   = make_array(&CN_TYPE_INT, 10, false);
         Cn_Type p_a10_int = cn_type_make_pointer(&a10_int);
         Cn_Type fn_ret_p_a10 = make_function(&p_a10_int, NULL, 0);
 
@@ -116,13 +116,13 @@ int main(void) {
 
     // Empty identifier keeps the plain type spelling used by diagnostics.
     {
-        Cn_Type a10_int   = make_array(&CN_TYPE_INT, 10);
+        Cn_Type a10_int   = make_array(&CN_TYPE_INT, 10, false);
         Cn_Type p_a10_int = cn_type_make_pointer(&a10_int);
 
         Cn_Type_Function_Param params[1] = { { .type = (Cn_Type *)&CN_TYPE_INT } };
         Cn_Type fn      = make_function(&CN_TYPE_INT, params, 1);
         Cn_Type p_fn    = cn_type_make_pointer(&fn);
-        Cn_Type a3_p_fn = make_array(&p_fn, 3);
+        Cn_Type a3_p_fn = make_array(&p_fn, 3, false);
 
         CHECK(&CN_TYPE_INT, NO_IDENTIFIER, "int");
         CHECK(&p_int,       NO_IDENTIFIER, "int *");

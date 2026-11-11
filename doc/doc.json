@@ -1,0 +1,2421 @@
+[
+  {
+    "symbol": "cn_default_log_handler",
+    "decl": "CNDEF Cn_Log_Handler cn_default_log_handler",
+    "summary": "Logs formatted message to `stderr`, prefixed with its log level.",
+    "description": "",
+    "tags": []
+  },
+  {
+    "symbol": "cn_null_log_handler",
+    "decl": "CNDEF Cn_Log_Handler cn_null_log_handler",
+    "summary": "Ignores all incoming logs, doesn't output anything anywhere.",
+    "description": "",
+    "tags": []
+  },
+  {
+    "symbol": "cn_log",
+    "decl": "CNDEF void cn_log(Cn_Log_Level level, const char *format, ...)",
+    "summary": "Passes formatted log message to the current log handler.",
+    "description": "Message is printed by calling `cn_log_handler` with `level`, `format` and its arguments.",
+    "tags": []
+  },
+  {
+    "symbol": "cn_hash_u64",
+    "decl": "CNDEF uint64_t cn_hash_u64(uint64_t value)",
+    "summary": "Hashes unsigned 64-bit integer using the splitmix64 algorithm.",
+    "description": "",
+    "tags": []
+  },
+  {
+    "symbol": "cn_hash_ptr",
+    "decl": "CNDEF uint64_t cn_hash_ptr(void *ptr)",
+    "summary": "Hashes the address of `ptr`.",
+    "description": "",
+    "tags": [
+      { "kind": "NOTE", "text": "Wraps around `cn_hash_u64`." }
+    ]
+  },
+  {
+    "symbol": "cn_hash_bytes",
+    "decl": "CNDEF uint64_t cn_hash_bytes(void *data, int64_t length)",
+    "summary": "Hashes sequence of `length` bytes using the FNV-1a algorithm.",
+    "description": "",
+    "tags": []
+  },
+  {
+    "symbol": "cn_hash_mix",
+    "decl": "CNDEF uint64_t cn_hash_mix(uint64_t a, uint64_t b)",
+    "summary": "Mixes two hashes `a` and `b` into one.",
+    "description": "",
+    "tags": [
+      { "kind": "NOTE", "text": "Order matters, bit shifts are used to ensure `cn_hash_mix(a, b) != cn_hash_mix(b, a)`." }
+    ]
+  },
+  {
+    "symbol": "cn_str_substring",
+    "decl": "CNDEF Cn_String cn_str_substring(Cn_String str, int64_t start, int64_t end)",
+    "summary": "Gets substring of `str` from index `start` up until index `end`.",
+    "description": "",
+    "tags": [
+      { "kind": "RETURNS", "text": "`Cn_String` that points to the memory of `str` at index `start`, with length up until index `end`." },
+      { "kind": "IMPORTANT", "text": "Doesn't copy memory. If `str` memory is freed later, returned string will no longer point to valid memory." },
+      { "kind": "NOTE", "text": "Character at index `end` is not included, domain of the resulting substring is always `[start, end)`." }
+    ]
+  },
+  {
+    "symbol": "cn_str_find_left",
+    "decl": "CNDEF int64_t cn_str_find_left(Cn_String str, Cn_String search)",
+    "summary": "Linearly searches for the first occurrence of `search` in `str` from the left.",
+    "description": "Strings are compared through `cn_str_equals`.",
+    "tags": [
+      { "kind": "RETURNS", "text": "Index of the first character of the occurrence, otherwise `-1`." }
+    ]
+  },
+  {
+    "symbol": "cn_str_find_right",
+    "decl": "CNDEF int64_t cn_str_find_right(Cn_String str, Cn_String search)",
+    "summary": "Linearly searches for the first occurrence of `search` in `str` from the right.",
+    "description": "Strings are compared through `cn_str_equals`.",
+    "tags": [
+      { "kind": "RETURNS", "text": "Index of the first character of the occurrence, otherwise `-1`." }
+    ]
+  },
+  {
+    "symbol": "cn_str_ends_with",
+    "decl": "CNDEF bool cn_str_ends_with(Cn_String str, Cn_String end)",
+    "summary": "Checks whether `str` ends with `end`.",
+    "description": "",
+    "tags": [
+      { "kind": "RETURNS", "text": "`true` if `str` ends with `end`, `false` otherwise." }
+    ]
+  },
+  {
+    "symbol": "cn_str_starts_with",
+    "decl": "CNDEF bool cn_str_starts_with(Cn_String str, Cn_String start)",
+    "summary": "Checks whether `str` starts with `start`.",
+    "description": "",
+    "tags": [
+      { "kind": "RETURNS", "text": "`true` if `str` starts with `start`, `false` otherwise." }
+    ]
+  },
+  {
+    "symbol": "cn_str_find_char_left",
+    "decl": "CNDEF int64_t cn_str_find_char_left(Cn_String str, char symbol)",
+    "summary": "Linearly searches for the first occurrence of char `symbol` in `str` from the left.",
+    "description": "",
+    "tags": [
+      { "kind": "RETURNS", "text": "Index of the occurrence, otherwise `-1`." }
+    ]
+  },
+  {
+    "symbol": "cn_str_find_char_right",
+    "decl": "CNDEF int64_t cn_str_find_char_right(Cn_String str, char symbol)",
+    "summary": "Linearly searches for the first occurrence of char `symbol` in `str` from the right.",
+    "description": "",
+    "tags": [
+      { "kind": "RETURNS", "text": "Index of the occurrence, otherwise `-1`." }
+    ]
+  },
+  {
+    "symbol": "cn_str_find_non_whitespace_left",
+    "decl": "CNDEF int64_t cn_str_find_non_whitespace_left(Cn_String str)",
+    "summary": "Finds the first non-whitespace char in `str` from the left.",
+    "description": "",
+    "tags": [
+      { "kind": "RETURNS", "text": "Index of the first non-whitespace char, otherwise `-1`." }
+    ]
+  },
+  {
+    "symbol": "cn_str_find_non_whitespace_right",
+    "decl": "CNDEF int64_t cn_str_find_non_whitespace_right(Cn_String str)",
+    "summary": "Finds the first non-whitespace char in `str` from the right.",
+    "description": "",
+    "tags": [
+      { "kind": "RETURNS", "text": "Index of the first non-whitespace char, otherwise `-1`." }
+    ]
+  },
+  {
+    "symbol": "cn_str_find_whitespace_left",
+    "decl": "CNDEF int64_t cn_str_find_whitespace_left(Cn_String str)",
+    "summary": "Finds the first whitespace char in `str` from the left.",
+    "description": "",
+    "tags": [
+      { "kind": "RETURNS", "text": "Index of the first whitespace char, otherwise `-1`." }
+    ]
+  },
+  {
+    "symbol": "cn_str_find_whitespace_right",
+    "decl": "CNDEF int64_t cn_str_find_whitespace_right(Cn_String str)",
+    "summary": "Finds the first whitespace char in `str` from the right.",
+    "description": "",
+    "tags": [
+      { "kind": "RETURNS", "text": "Index of the first whitespace char, otherwise `-1`." }
+    ]
+  },
+  {
+    "symbol": "cn_str_eat_chars",
+    "decl": "CNDEF Cn_String cn_str_eat_chars(Cn_String str, int64_t count)",
+    "summary": "Shortens `str` by excluding `count` chars from the left.",
+    "description": "",
+    "tags": [
+      { "kind": "RETURNS", "text": "Resulting string, pointing to the memory of `str`." }
+    ]
+  },
+  {
+    "symbol": "cn_str_eat_spaces",
+    "decl": "CNDEF Cn_String cn_str_eat_spaces(Cn_String str)",
+    "summary": "Shortens `str` by excluding all whitespace chars from the left.",
+    "description": "",
+    "tags": [
+      { "kind": "RETURNS", "text": "Resulting string, pointing to the memory of `str`." }
+    ]
+  },
+  {
+    "symbol": "cn_str_eat_until_space",
+    "decl": "CNDEF Cn_String cn_str_eat_until_space(Cn_String str)",
+    "summary": "Shortens `str` by excluding chars from the left until it hits a whitespace.",
+    "description": "The whitespace itself is not excluded.",
+    "tags": [
+      { "kind": "RETURNS", "text": "Resulting string, pointing to the memory of `str`." }
+    ]
+  },
+  {
+    "symbol": "cn_str_get_chars",
+    "decl": "CNDEF Cn_String cn_str_get_chars(Cn_String str, int64_t count)",
+    "summary": "Gets first `count` chars of `str`.",
+    "description": "",
+    "tags": [
+      { "kind": "RETURNS", "text": "String that contains `count` chars from the left, pointing to the memory of `str`." }
+    ]
+  },
+  {
+    "symbol": "cn_str_get_until_space",
+    "decl": "CNDEF Cn_String cn_str_get_until_space(Cn_String str)",
+    "summary": "Gets everything in `str` until the first whitespace.",
+    "description": "",
+    "tags": [
+      { "kind": "RETURNS", "text": "String that contains everything until a whitespace, not including the whitespace itself." }
+    ]
+  },
+  {
+    "symbol": "cn_str_is_symbol",
+    "decl": "CNDEF bool cn_str_is_symbol(Cn_String str)",
+    "summary": "Checks whether `str` is a valid symbol: a letter or `_`, followed by letters, digits or `_`.",
+    "description": "",
+    "tags": [
+      { "kind": "RETURNS", "text": "`true` if `str` contains only symbol chars, `false` otherwise." }
+    ]
+  },
+  {
+    "symbol": "cn_str_is_int",
+    "decl": "CNDEF bool cn_str_is_int(Cn_String str)",
+    "summary": "Checks whether `str` is an integer.",
+    "description": "",
+    "tags": [
+      { "kind": "RETURNS", "text": "`true` if `str` is an integer, `false` otherwise." }
+    ]
+  },
+  {
+    "symbol": "cn_str_is_float",
+    "decl": "CNDEF bool cn_str_is_float(Cn_String str)",
+    "summary": "Checks whether `str` is a float.",
+    "description": "",
+    "tags": [
+      { "kind": "RETURNS", "text": "`true` if `str` is a float, `false` otherwise." }
+    ]
+  },
+  {
+    "symbol": "cn_str_parse_int",
+    "decl": "CNDEF int64_t cn_str_parse_int(Cn_String str)",
+    "summary": "Parses integer from `str`.",
+    "description": "",
+    "tags": [
+      { "kind": "RETURNS", "text": "Integer parsed from the string." }
+    ]
+  },
+  {
+    "symbol": "cn_str_parse_float",
+    "decl": "CNDEF float cn_str_parse_float(Cn_String str)",
+    "summary": "Parses float from `str`.",
+    "description": "",
+    "tags": [
+      { "kind": "RETURNS", "text": "Float parsed from the string." }
+    ]
+  },
+  {
+    "symbol": "cn_str_count_chars",
+    "decl": "CNDEF int64_t cn_str_count_chars(Cn_String str, char c)",
+    "summary": "Counts occurrences of char `c` in `str`.",
+    "description": "",
+    "tags": [
+      { "kind": "RETURNS", "text": "Number of occurrences of `c` in the string." }
+    ]
+  },
+  {
+    "symbol": "cn_str_copy_to",
+    "decl": "CNDEF void *cn_str_copy_to(Cn_String str, void *buffer)",
+    "summary": "Copies contents of `str` into `buffer`.",
+    "description": "",
+    "tags": [
+      { "kind": "RETURNS", "text": "Pointer to `buffer`." },
+      { "kind": "IMPORTANT", "text": "`buffer` must have enough space to hold `str` data." }
+    ]
+  },
+  {
+    "symbol": "cn_str_format",
+    "decl": "CNDEF Cn_String cn_str_format(Cn_String buffer, char *format, ...)",
+    "summary": "Formats string and outputs it into the memory of `buffer`.",
+    "description": "",
+    "tags": [
+      { "kind": "RETURNS", "text": "String that corresponds to the formatted string, with `NULL` data if formatting failed." },
+      { "kind": "IMPORTANT", "text": "`buffer` must be big enough to hold the formatted string." }
+    ]
+  },
+  {
+    "symbol": "cn_str_is_empty",
+    "decl": "CNDEF bool cn_str_is_empty(Cn_String str)",
+    "summary": "Checks whether `str` is empty, by checking whether its length is `0`.",
+    "description": "",
+    "tags": [
+      { "kind": "RETURNS", "text": "`true` if string is empty, `false` otherwise." }
+    ]
+  },
+  {
+    "symbol": "cn_str_is",
+    "decl": "CNDEF bool cn_str_is(Cn_String str1, Cn_String str2)",
+    "summary": "Compares `str1` and `str2`, checking for length equality first and then comparing char by char.",
+    "description": "",
+    "tags": [
+      { "kind": "RETURNS", "text": "`true` if strings are identical, `false` otherwise." }
+    ]
+  },
+  {
+    "symbol": "cn_str_equals",
+    "decl": "CNDEF bool cn_str_equals(const Cn_String *str1, const Cn_String *str2)",
+    "summary": "Compares `str1` and `str2`, checking for length equality first and then comparing char by char.",
+    "description": "",
+    "tags": [
+      { "kind": "RETURNS", "text": "`true` if strings are identical, `false` otherwise." },
+      { "kind": "NOTE", "text": "Takes pointers to strings to be compatible with `Cn_Equals_Function`,\nwhich allows it to be used in hash table and hash set." }
+    ]
+  },
+  {
+    "symbol": "cn_str_hash",
+    "decl": "CNDEF uint64_t cn_str_hash(const Cn_String *str)",
+    "summary": "Hashes contents of `str`.",
+    "description": "",
+    "tags": [
+      { "kind": "RETURNS", "text": "Hash of the string." },
+      { "kind": "NOTE", "text": "Takes pointer to string to be compatible with `Cn_Hash_Function`,\nwhich allows it to be used in hash table and hash set." }
+    ]
+  },
+  {
+    "symbol": "cn_sb_make",
+    "decl": "#define cn_sb_make(cap) ((cap) <= CN_SB_STACK_STORAGE_CAP ? ((Cn_String_Builder) { CN_SB_STACK_STORAGE_CAP, 0, (char *)(char[CN_SB_STACK_STORAGE_CAP]){}}) : cn__sb_make(cap))",
+    "summary": "Makes new `Cn_String_Builder` on the stack if `cap` is small enough, otherwise on the heap.",
+    "description": "Stack storage is used when `cap` is not bigger than `CN_SB_STACK_STORAGE_CAP`.",
+    "tags": [
+      { "kind": "IMPORTANT", "text": "Lifetime of stack allocated string builder ends with the enclosing block.\nIf longer lifetime is needed, make sure to heap allocate the string builder,\nor make sure it is resized to be heap allocated." }
+    ]
+  },
+  {
+    "symbol": "cn_sb_free",
+    "decl": "CNDEF void cn_sb_free(Cn_String_Builder *sb)",
+    "summary": "Frees heap memory occupied by `sb`.",
+    "description": "Memory is freed only if capacity is bigger than `CN_SB_STACK_STORAGE_CAP`.",
+    "tags": []
+  },
+  {
+    "symbol": "cn_sb_clear",
+    "decl": "CNDEF void cn_sb_clear(Cn_String_Builder *sb)",
+    "summary": "Clears all contents of `sb`, by setting its length to `0`.",
+    "description": "Doesn't allocate or free any memory.",
+    "tags": []
+  },
+  {
+    "symbol": "cn_sb_append_char",
+    "decl": "CNDEF void cn_sb_append_char(Cn_String_Builder *sb, char c)",
+    "summary": "Appends char `c` to `sb`.",
+    "description": "",
+    "tags": []
+  },
+  {
+    "symbol": "cn_sb_append_str",
+    "decl": "CNDEF void cn_sb_append_str(Cn_String_Builder *sb, Cn_String str)",
+    "summary": "Appends `str` to `sb`.",
+    "description": "",
+    "tags": []
+  },
+  {
+    "symbol": "cn_sb_prepend_str",
+    "decl": "CNDEF void cn_sb_prepend_str(Cn_String_Builder *sb, Cn_String str)",
+    "summary": "Inserts `str` at the front of `sb`, shifting existing contents to the right.",
+    "description": "",
+    "tags": []
+  },
+  {
+    "symbol": "cn_sb_append_format",
+    "decl": "CNDEF void cn_sb_append_format(Cn_String_Builder *sb, char *format, ...)",
+    "summary": "Formats string and appends the output to `sb`.",
+    "description": "",
+    "tags": []
+  },
+  {
+    "symbol": "cn_sb_reverse",
+    "decl": "CNDEF void cn_sb_reverse(Cn_String_Builder *sb)",
+    "summary": "Reverses contents of `sb`.",
+    "description": "",
+    "tags": []
+  },
+  {
+    "symbol": "cn_sb_to_str",
+    "decl": "CNDEF Cn_String cn_sb_to_str(Cn_String_Builder *sb)",
+    "summary": "Converts string builder to string that points to the memory used by `sb`.",
+    "description": "",
+    "tags": [
+      { "kind": "RETURNS", "text": "String pointing to the contents of `sb`." },
+      { "kind": "IMPORTANT", "text": "If `sb` is freed or grows, memory pointed to by the string might be invalid." },
+      { "kind": "NOTE", "text": "Contents of the returned string can be copied elsewhere to prevent such invalidation." }
+    ]
+  },
+  {
+    "symbol": "cn_arena_make",
+    "decl": "CNDEF Cn_Arena cn_arena_make(size_t capacity)",
+    "summary": "Constructs arena and allocates `capacity` bytes of memory for it.",
+    "description": "",
+    "tags": [
+      { "kind": "RETURNS", "text": "New arena, zeroed out if memory couldn't be allocated." }
+    ]
+  },
+  {
+    "symbol": "cn_arena_alloc",
+    "decl": "CNDEF void *cn_arena_alloc(Cn_Arena *arena, size_t size)",
+    "summary": "Allocates next chunk of `size` bytes from `arena`.",
+    "description": "",
+    "tags": [
+      { "kind": "RETURNS", "text": "Pointer to the allocated memory, `NULL` if allocation exceeds arena's capacity." }
+    ]
+  },
+  {
+    "symbol": "cn_arena_realloc",
+    "decl": "CNDEF void *cn_arena_realloc(Cn_Arena *arena, void *mem, size_t new_size)",
+    "summary": "Reallocates chunk of memory `mem` from `arena`.",
+    "description": "Allocates new chunk of `new_size` bytes through `cn_arena_alloc`.",
+    "tags": [
+      { "kind": "RETURNS", "text": "Pointer to the new chunk of memory." },
+      { "kind": "IMPORTANT", "text": "Contents of `mem` are not copied into the new chunk." }
+    ]
+  },
+  {
+    "symbol": "cn_arena_free",
+    "decl": "CNDEF void cn_arena_free(Cn_Arena *arena, void *mem)",
+    "summary": "Stubbed out, since arena cannot free previously allocated memory.",
+    "description": "",
+    "tags": [
+      { "kind": "NOTE", "text": "Logs a warning when called, use `cn_arena_free_all` or `cn_arena_destroy` instead." }
+    ]
+  },
+  {
+    "symbol": "cn_arena_free_all",
+    "decl": "CNDEF void cn_arena_free_all(Cn_Arena *arena)",
+    "summary": "Releases all allocations of `arena` at once, by resetting it to the beginning of its memory.",
+    "description": "Arena memory itself stays allocated and can be reused.",
+    "tags": []
+  },
+  {
+    "symbol": "cn_arena_destroy",
+    "decl": "CNDEF void cn_arena_destroy(Cn_Arena *arena)",
+    "summary": "Completely destroys `arena` and frees all memory occupied by it.",
+    "description": "",
+    "tags": []
+  },
+  {
+    "symbol": "cn_chained_arena_make",
+    "decl": "CNDEF Cn_Chained_Arena cn_chained_arena_make(size_t block_capacity)",
+    "summary": "Constructs chained arena, allocating its first block of `block_capacity` bytes.",
+    "description": "",
+    "tags": []
+  },
+  {
+    "symbol": "cn_chained_arena_alloc",
+    "decl": "CNDEF void *cn_chained_arena_alloc(Cn_Chained_Arena *arena, size_t size)",
+    "summary": "Allocates `size` bytes from `arena`.",
+    "description": "",
+    "tags": [
+      { "kind": "RETURNS", "text": "Pointer to the allocated memory." },
+      { "kind": "NOTE", "text": "If `size` is bigger than the arena's `block_capacity`, an oversized block of exactly\nthat size is allocated to hold it, and a warning is logged." }
+    ]
+  },
+  {
+    "symbol": "cn_chained_arena_realloc",
+    "decl": "CNDEF void *cn_chained_arena_realloc(Cn_Chained_Arena *arena, void *mem, size_t new_size)",
+    "summary": "Reallocates chunk of memory `mem` from `arena`.",
+    "description": "Allocates new chunk of `new_size` bytes through `cn_chained_arena_alloc`.",
+    "tags": [
+      { "kind": "RETURNS", "text": "Pointer to the new chunk of memory." },
+      { "kind": "IMPORTANT", "text": "Contents of `mem` are not copied into the new chunk." }
+    ]
+  },
+  {
+    "symbol": "cn_chained_arena_free",
+    "decl": "CNDEF void cn_chained_arena_free(Cn_Chained_Arena *arena, void *mem)",
+    "summary": "Stubbed out, since arena cannot free previously allocated memory.",
+    "description": "",
+    "tags": [
+      { "kind": "NOTE", "text": "Use `cn_chained_arena_dealloc`, `cn_chained_arena_free_all` or `cn_chained_arena_destroy` instead." }
+    ]
+  },
+  {
+    "symbol": "cn_chained_arena_free_all",
+    "decl": "CNDEF void cn_chained_arena_free_all(Cn_Chained_Arena *arena)",
+    "summary": "Releases all allocations of `arena` at once, by resetting every block and returning to the first one.",
+    "description": "Blocks themselves stay allocated and are reused by later allocations.",
+    "tags": []
+  },
+  {
+    "symbol": "cn_chained_arena_dealloc",
+    "decl": "CNDEF void cn_chained_arena_dealloc(Cn_Chained_Arena *arena, size_t size)",
+    "summary": "Deallocates last `size` bytes allocated from `arena`.",
+    "description": "If `size` covers a whole block, arena moves back to the previous block.\nEmptied blocks stay allocated and are reused by later allocations.",
+    "tags": []
+  },
+  {
+    "symbol": "cn_chained_arena_allocation_info",
+    "decl": "CNDEF int64_t cn_chained_arena_allocation_info(Cn_Chained_Arena *arena, void *allocation_ptr, size_t *offset)",
+    "summary": "Finds the block and offset of memory allocated by `arena`.",
+    "description": "Given chained arena and pointer allocated by it, computes index of the block\nit was allocated in, and byte offset from the beginning of that block to the allocated memory.",
+    "tags": [
+      { "kind": "RETURNS", "text": "Index of the block, `-1` if `allocation_ptr` doesn't point to the allocated memory." },
+      { "kind": "OUTPUTS", "text": "Byte offset to the allocated memory from the beginning of the block, written to `offset`." },
+      { "kind": "NOTE", "text": "Returns properly whenever `allocation_ptr` points to memory held by the arena,\neven if it isn't the exact address returned by an allocation." }
+    ]
+  },
+  {
+    "symbol": "cn_chained_arena_allocated",
+    "decl": "CNDEF size_t cn_chained_arena_allocated(Cn_Chained_Arena *arena)",
+    "summary": "Computes total size allocated by `arena`.",
+    "description": "",
+    "tags": [
+      { "kind": "RETURNS", "text": "Total allocated size in bytes." }
+    ]
+  },
+  {
+    "symbol": "cn_chained_arena_destroy",
+    "decl": "CNDEF void cn_chained_arena_destroy(Cn_Chained_Arena *arena)",
+    "summary": "Completely destroys `arena` and frees all memory occupied by it.",
+    "description": "",
+    "tags": []
+  },
+  {
+    "symbol": "cn_pool_make",
+    "decl": "#define cn_pool_make(...) cn__pool_make((size_t []) { __VA_ARGS__ }, (sizeof((size_t []) { __VA_ARGS__ }) / sizeof(size_t)))",
+    "summary": "Constructs pool and allocates one block per supplied capacity.",
+    "description": "",
+    "tags": [
+      { "kind": "IMPORTANT", "text": "Capacities must be strictly ascending, multiples of `CN_POOL_BLOCK_MIN_CAPACITY`,\nand not bigger than `CN_POOL_BLOCK_MAX_CAPACITY`." },
+      { "kind": "IMPORTANT", "text": "Assumes `sizeof(size_t) == sizeof(void *)`, because it reuses the supplied array of capacities." }
+    ]
+  },
+  {
+    "symbol": "cn_pool_alloc",
+    "decl": "CNDEF void *cn_pool_alloc(Cn_Pool *pool, size_t size)",
+    "summary": "Allocates next free slot of memory from `pool`.",
+    "description": "Slot is taken from the smallest size class that fits the requested `size`.",
+    "tags": [
+      { "kind": "RETURNS", "text": "Pointer to the allocated slot." }
+    ]
+  },
+  {
+    "symbol": "cn_pool_realloc",
+    "decl": "CNDEF void *cn_pool_realloc(Cn_Pool *pool, void *mem, size_t new_size)",
+    "summary": "Reallocates slot of memory `mem` from `pool`.",
+    "description": "If `new_size` still fits the slot, same memory is returned.\nIf `mem` is `NULL`, works like `cn_pool_alloc`.",
+    "tags": [
+      { "kind": "RETURNS", "text": "Pointer to the reallocated memory, `NULL` if `mem` wasn't allocated by `pool`." }
+    ]
+  },
+  {
+    "symbol": "cn_pool_free",
+    "decl": "CNDEF void cn_pool_free(Cn_Pool *pool, void *mem)",
+    "summary": "Frees slot of memory `mem` from `pool`.",
+    "description": "",
+    "tags": [
+      { "kind": "NOTE", "text": "Does nothing if `mem` is `NULL`, logs a warning if `mem` wasn't allocated by `pool`." }
+    ]
+  },
+  {
+    "symbol": "cn_pool_free_all",
+    "decl": "CNDEF void cn_pool_free_all(Cn_Pool *pool)",
+    "summary": "Marks every slot of every block as free, keeping the blocks themselves allocated.",
+    "description": "",
+    "tags": []
+  },
+  {
+    "symbol": "cn_pool_allocation_info",
+    "decl": "CNDEF Cn_Pool_Block *cn_pool_allocation_info(Cn_Pool *pool, void *allocation_ptr, size_t *slot)",
+    "summary": "Finds the block and slot of memory allocated by `pool`.",
+    "description": "Given pool and pointer allocated by it, finds the block the pointer was\nallocated from, and index of the slot it occupies in that block.",
+    "tags": [
+      { "kind": "RETURNS", "text": "Block containing the pointer, `NULL` if `allocation_ptr` doesn't point to the\nbeginning of an occupied slot, which is also the case for already freed memory." },
+      { "kind": "OUTPUTS", "text": "Index of the occupied slot in the found block, written to `slot`." },
+      { "kind": "NOTE", "text": "Returns properly whenever `allocation_ptr` points to the beginning of an occupied slot,\neven if it isn't the exact address returned by an allocation." }
+    ]
+  },
+  {
+    "symbol": "cn_pool_destroy",
+    "decl": "CNDEF void cn_pool_destroy(Cn_Pool *pool)",
+    "summary": "Completely destroys `pool` and frees all memory occupied by it.",
+    "description": "",
+    "tags": [
+      { "kind": "NOTE", "text": "Supplied array of capacities is not freed, since pool doesn't own it." }
+    ]
+  },
+  {
+    "symbol": "cn_alloc",
+    "decl": "CNDEF void *cn_alloc(Cn_Allocator *allocator, size_t size)",
+    "summary": "Calls `alloc` of `allocator`, passing the allocator itself as a parameter.",
+    "description": "",
+    "tags": [
+      { "kind": "RETURNS", "text": "Pointer to the allocated memory." }
+    ]
+  },
+  {
+    "symbol": "cn_realloc",
+    "decl": "CNDEF void *cn_realloc(Cn_Allocator *allocator, void *mem, size_t size)",
+    "summary": "Calls `realloc` of `allocator`, passing the allocator itself as a parameter.",
+    "description": "",
+    "tags": [
+      { "kind": "RETURNS", "text": "Pointer to the reallocated memory." }
+    ]
+  },
+  {
+    "symbol": "cn_free",
+    "decl": "CNDEF void cn_free(Cn_Allocator *allocator, void *mem)",
+    "summary": "Calls `free` of `allocator`, passing the allocator itself as a parameter.",
+    "description": "",
+    "tags": []
+  },
+  {
+    "symbol": "cn_free_all",
+    "decl": "CNDEF void cn_free_all(Cn_Allocator *allocator)",
+    "summary": "Calls `free_all` of `allocator`, passing the allocator itself as a parameter.",
+    "description": "",
+    "tags": []
+  },
+  {
+    "symbol": "cn_source_to_str",
+    "decl": "CNDEF Cn_String cn_source_to_str(Cn_Source *src)",
+    "summary": "Gets string of the source code that `src` points to.",
+    "description": "",
+    "tags": [
+      { "kind": "RETURNS", "text": "String based on the supplied source." },
+      { "kind": "NOTE", "text": "If length of `src` is `0`, empty string is returned,\nbut its data still points to the valid memory specified by the source." }
+    ]
+  },
+  {
+    "symbol": "cn_source_dist",
+    "decl": "CNDEF int64_t cn_source_dist(Cn_Source *a, Cn_Source *b)",
+    "summary": "Computes signed distance between offsets of sources `a` and `b`.",
+    "description": "",
+    "tags": [
+      { "kind": "RETURNS", "text": "Signed distance from source `a` to source `b`." }
+    ]
+  },
+  {
+    "symbol": "cn_source_is_empty",
+    "decl": "CNDEF int64_t cn_source_is_empty(Cn_Source *src)",
+    "summary": "Checks whether `src` is empty, meaning its length is `0`.",
+    "description": "",
+    "tags": [
+      { "kind": "RETURNS", "text": "Non-zero if source is empty, `0` otherwise." }
+    ]
+  },
+  {
+    "symbol": "cn_lexer_token",
+    "decl": "#define cn_lexer_token(lexer)   (lexer)->queue[(lexer)->current_idx]",
+    "summary": "Unwraps to the current token of `lexer`.",
+    "description": "Changes whenever `cn_lexer_next_token` is called.",
+    "tags": []
+  },
+  {
+    "symbol": "cn_lexer_init",
+    "decl": "CNDEF void cn_lexer_init(Cn_Lexer *lexer, Cn_String content, Cn_Lexer_Blacklist blacklist)",
+    "summary": "Initializes `lexer` with specific `content`, setting up queue and getting ready to output tokens.",
+    "description": "Setting `blacklist` is optional, but if set, tokens from that list won't appear in the lexed output.",
+    "tags": []
+  },
+  {
+    "symbol": "cn_lexer_load_content",
+    "decl": "CNDEF void cn_lexer_load_content(Cn_Lexer *lexer, Cn_String content)",
+    "summary": "Loads new `content` into `lexer`, resetting queue cursor and everything else.",
+    "description": "Compared to `cn_lexer_init`, only initializes content. It overwrites previous content\nand tokens that were enqueued in lexer, without touching `file`, `line` or `blacklist` values.",
+    "tags": []
+  },
+  {
+    "symbol": "cn_lexer_next_token",
+    "decl": "CNDEF void cn_lexer_next_token(Cn_Lexer *lexer)",
+    "summary": "Advances `lexer` to the next token.",
+    "description": "",
+    "tags": []
+  },
+  {
+    "symbol": "cn_lexer_expect",
+    "decl": "CNDEF bool cn_lexer_expect(Cn_Lexer *lexer, Cn_Token_Type type)",
+    "summary": "Checks whether current token of `lexer` matches expected `type`.",
+    "description": "",
+    "tags": [
+      { "kind": "RETURNS", "text": "`true` if it matches, `false` otherwise." }
+    ]
+  },
+  {
+    "symbol": "cn_lexer_peek",
+    "decl": "CNDEF Cn_Token cn_lexer_peek(Cn_Lexer *lexer, int64_t offset)",
+    "summary": "Peeks token based on its `offset` from the current token.",
+    "description": "`offset == 0` peeks current token, `offset < 0` peeks past tokens.",
+    "tags": [
+      { "kind": "RETURNS", "text": "Token at the requested offset. `CN_TOKEN_UNKNOWN` if requested token is out of queue bounds,\n`CN_TOKEN_EOF` if requested token comes after already found `CN_TOKEN_EOF`." },
+      { "kind": "IMPORTANT", "text": "Expects `-CN_LEXER_LOOKDOWN_COUNT < offset < CN_LEXER_LOOKUP_COUNT`." }
+    ]
+  },
+  {
+    "symbol": "cn_lexer_log_tokens",
+    "decl": "CNDEF void cn_lexer_log_tokens(Cn_Lexer *lexer, int64_t n)",
+    "summary": "Logs next `n` tokens from `lexer`, if `n == -1` logs all available tokens.",
+    "description": "",
+    "tags": []
+  },
+  {
+    "symbol": "cn_token_kind_name",
+    "decl": "CNDEF const char *cn_token_kind_name(Cn_Token_Type type)",
+    "summary": "Gets name of the token `type`, used in messages.",
+    "description": "",
+    "tags": [
+      { "kind": "RETURNS", "text": "Static string of the token type." }
+    ]
+  },
+  {
+    "symbol": "cn_type_make_pointer",
+    "decl": "CNDEF Cn_Type cn_type_make_pointer(const Cn_Type *type)",
+    "summary": "Makes pointer type that points to `type`.",
+    "description": "",
+    "tags": [
+      { "kind": "RETURNS", "text": "Pointer type struct with `type` as its base type." }
+    ]
+  },
+  {
+    "symbol": "cn_type_make_qualified",
+    "decl": "CNDEF Cn_Type cn_type_make_qualified(Cn_Type_Flags flags, const Cn_Type *type)",
+    "summary": "Makes qualified version of `type` with qualifier `flags`.",
+    "description": "",
+    "tags": [
+      { "kind": "RETURNS", "text": "Qualified type struct with `type` as its base type." }
+    ]
+  },
+  {
+    "symbol": "cn_type_equals",
+    "decl": "CNDEF bool cn_type_equals(const Cn_Type *type1, const Cn_Type *type2)",
+    "summary": "Checks whether `type1` equals `type2`.",
+    "description": "",
+    "tags": [
+      { "kind": "RETURNS", "text": "`true` if types are identical, `false` otherwise." }
+    ]
+  },
+  {
+    "symbol": "cn_type_hash",
+    "decl": "CNDEF uint64_t cn_type_hash(const Cn_Type *type)",
+    "summary": "Hashes `type`.",
+    "description": "",
+    "tags": [
+      { "kind": "RETURNS", "text": "Hash of the type." }
+    ]
+  },
+  {
+    "symbol": "cn_type_stringify",
+    "decl": "CNDEF Cn_String cn_type_stringify(Cn_String buffer, const Cn_Type *type, Cn_String identifier)",
+    "summary": "Converts `type` to string and copies its contents into `buffer`.",
+    "description": "",
+    "tags": [
+      { "kind": "PARAM", "text": "identifier: If not empty, inserted as a declarator name into the type, e.g. `int (*f)(void)`." },
+      { "kind": "RETURNS", "text": "Resulting string, with `NULL` data if `buffer` is too small to hold it." },
+      { "kind": "IMPORTANT", "text": "`buffer` must be big enough to hold the string, otherwise an error is logged." }
+    ]
+  },
+  {
+    "symbol": "cn_type_print",
+    "decl": "CNDEF void cn_type_print(const Cn_Type *type)",
+    "summary": "Prints `type` to `stderr`, using `cn_type_stringify`.",
+    "description": "",
+    "tags": []
+  },
+  {
+    "symbol": "cn_type_is_constant",
+    "decl": "CNDEF bool cn_type_is_constant(const Cn_Type *type)",
+    "summary": "Checks whether `type` is constant.",
+    "description": "",
+    "tags": [
+      { "kind": "RETURNS", "text": "`true` if type is constant, `false` otherwise." }
+    ]
+  },
+  {
+    "symbol": "cn_type_unqualified",
+    "decl": "CNDEF Cn_Type *cn_type_unqualified(const Cn_Type *type)",
+    "summary": "Gets unqualified version of `type`.",
+    "description": "",
+    "tags": [
+      { "kind": "RETURNS", "text": "Unqualified version of the type." }
+    ]
+  },
+  {
+    "symbol": "cn_type_is_arithmetic",
+    "decl": "CNDEF bool cn_type_is_arithmetic(const Cn_Type *type)",
+    "summary": "Checks whether `type` is arithmetic: integer or float, including complex.",
+    "description": "",
+    "tags": [
+      { "kind": "RETURNS", "text": "`true` if type is arithmetic, `false` otherwise." }
+    ]
+  },
+  {
+    "symbol": "cn_type_is_assignable",
+    "decl": "CNDEF bool cn_type_is_assignable(const Cn_Type *to, const Cn_Type *from)",
+    "summary": "Checks whether value of type `from` can be assigned to value of type `to`.",
+    "description": "",
+    "tags": [
+      { "kind": "RETURNS", "text": "`true` if assignment is allowed, `false` otherwise." }
+    ]
+  },
+  {
+    "symbol": "cn_type_is_compatible",
+    "decl": "CNDEF bool cn_type_is_compatible(const Cn_Type *a, const Cn_Type *b)",
+    "summary": "Checks whether types `a` and `b` are structurally compatible.",
+    "description": "",
+    "tags": [
+      { "kind": "RETURNS", "text": "`true` if types are compatible, `false` otherwise." }
+    ]
+  },
+  {
+    "symbol": "cn_type_is_compatible_no_qualifiers",
+    "decl": "CNDEF bool cn_type_is_compatible_no_qualifiers(const Cn_Type *a, const Cn_Type *b)",
+    "summary": "Checks whether types `a` and `b` are structurally compatible, ignoring qualifiers.",
+    "description": "",
+    "tags": [
+      { "kind": "RETURNS", "text": "`true` if types are compatible, `false` otherwise." }
+    ]
+  },
+  {
+    "symbol": "cn_type_greatest_arithmetic_rank",
+    "decl": "CNDEF Cn_Type *cn_type_greatest_arithmetic_rank(const Cn_Type *a, const Cn_Type *b)",
+    "summary": "Picks the type with greater arithmetic rank out of `a` and `b`.",
+    "description": "",
+    "tags": [
+      { "kind": "RETURNS", "text": "Type that has the greater arithmetic rank." },
+      { "kind": "IMPORTANT", "text": "Expects `a` and `b` to be arithmetic types." },
+      { "kind": "NOTE", "text": "If either type is `CN_OPAQUE`, opaque type is returned, since its rank is unknown." }
+    ]
+  },
+  {
+    "symbol": "cn_type_is_scalar",
+    "decl": "CNDEF bool cn_type_is_scalar(Cn_Type *type)",
+    "summary": "Checks whether `type` is scalar: arithmetic, pointer or `bool`.",
+    "description": "",
+    "tags": [
+      { "kind": "RETURNS", "text": "`true` if type is scalar, `false` otherwise." }
+    ]
+  },
+  {
+    "symbol": "cn_any_read_int",
+    "decl": "CNDEF int64_t cn_any_read_int(Cn_Any any)",
+    "summary": "Reads contents of `any`, interpreting them as integer.",
+    "description": "",
+    "tags": [
+      { "kind": "RETURNS", "text": "Integer value of `any`." }
+    ]
+  },
+  {
+    "symbol": "cn_any_read_float",
+    "decl": "CNDEF double cn_any_read_float(Cn_Any any)",
+    "summary": "Reads contents of `any`, interpreting them as floating point.",
+    "description": "",
+    "tags": [
+      { "kind": "RETURNS", "text": "Floating point value of `any`." }
+    ]
+  },
+  {
+    "symbol": "cn_any_write_int",
+    "decl": "CNDEF Cn_Any cn_any_write_int(Cn_Any any, int64_t value)",
+    "summary": "Writes integer `value` to contents of `any`, using its type to properly size the integer.",
+    "description": "",
+    "tags": [
+      { "kind": "RETURNS", "text": "Resulting any." }
+    ]
+  },
+  {
+    "symbol": "cn_any_write_float",
+    "decl": "CNDEF Cn_Any cn_any_write_float(Cn_Any any, double value)",
+    "summary": "Writes floating point `value` to contents of `any`, using its type to properly size the floating point.",
+    "description": "",
+    "tags": [
+      { "kind": "RETURNS", "text": "Resulting any." }
+    ]
+  },
+  {
+    "symbol": "cn_any_is_zero",
+    "decl": "CNDEF bool cn_any_is_zero(Cn_Any any)",
+    "summary": "Checks whether value of `any` is zero.",
+    "description": "",
+    "tags": [
+      { "kind": "RETURNS", "text": "`true` if `any` is `0`, `false` otherwise." }
+    ]
+  },
+  {
+    "symbol": "cn_any_as_double",
+    "decl": "CNDEF double cn_any_as_double(Cn_Any any)",
+    "summary": "Converts `any` of any scalar type to `double`.",
+    "description": "",
+    "tags": [
+      { "kind": "RETURNS", "text": "Resulting `double` value." },
+      { "kind": "NOTE", "text": "If `any` is not of a scalar type, it is still read as a raw integer and converted to `double`." }
+    ]
+  },
+  {
+    "symbol": "cn_double_to_int64",
+    "decl": "CNDEF bool cn_double_to_int64(double d, int64_t *out)",
+    "summary": "Safely converts `double` to `int64_t`, used by casts.",
+    "description": "Rejects `NaN` and out of range values, whose conversion would be undefined.",
+    "tags": [
+      { "kind": "RETURNS", "text": "`true` on success, `false` on failure." },
+      { "kind": "OUTPUTS", "text": "Converted value, written to `out`." }
+    ]
+  },
+  {
+    "symbol": "cn_any_convert",
+    "decl": "CNDEF Cn_Any cn_any_convert(Cn_Any src, Cn_Type *target, void *buffer)",
+    "summary": "Converts already evaluated scalar value `src` to `target` type, used by casts.",
+    "description": "",
+    "tags": [
+      { "kind": "RETURNS", "text": "Any of the converted value on success. `NIL` when target or source isn't a\nfoldable scalar, or when a float to int conversion would be out of range." },
+      { "kind": "NOTE", "text": "Converted value is stored in the supplied `buffer`." }
+    ]
+  },
+  {
+    "symbol": "cn_any_is_empty",
+    "decl": "CNDEF bool cn_any_is_empty(Cn_Any any)",
+    "summary": "Checks whether `any` is empty, meaning its data and type are both `NULL`.",
+    "description": "",
+    "tags": [
+      { "kind": "RETURNS", "text": "`true` if `any` is empty, `false` otherwise." }
+    ]
+  },
+  {
+    "symbol": "cn_array_list_length",
+    "decl": "#define CN_SCOPE_STACK_CURRENT_IDX (cn_array_list_length(&cn__tu_data->scope_stack) - 1)",
+    "summary": "Index of the currently active scope.",
+    "description": "",
+    "tags": []
+  },
+  {
+    "symbol": "cn_scope_stack_peek",
+    "decl": "CNDEF Cn_Scope *cn_scope_stack_peek()",
+    "summary": "Peeks scope at the top of the scope stack.",
+    "description": "",
+    "tags": [
+      { "kind": "RETURNS", "text": "Scope that sits at the top of the scope stack." }
+    ]
+  },
+  {
+    "symbol": "cn_scope_stack_push",
+    "decl": "CNDEF void cn_scope_stack_push()",
+    "summary": "Pushes new scope to the top of the scope stack.",
+    "description": "",
+    "tags": []
+  },
+  {
+    "symbol": "cn_scope_stack_pop",
+    "decl": "CNDEF void cn_scope_stack_pop()",
+    "summary": "Pops scope from the top of the scope stack.",
+    "description": "",
+    "tags": []
+  },
+  {
+    "symbol": "cn_ast_counter_next",
+    "decl": "#define cn_ast_counter_next() (cn__tu_data->counter++)",
+    "summary": "Gets next fresh counter value, incrementing the counter.",
+    "description": "",
+    "tags": [
+      { "kind": "RETURNS", "text": "Counter value before increment." }
+    ]
+  },
+  {
+    "symbol": "cn_ast_type_ptr_equals",
+    "decl": "CNDEF bool cn_ast_type_ptr_equals(const Cn_Type **type1_ptr, const Cn_Type **type2_ptr)",
+    "summary": "Compares types that `type1_ptr` and `type2_ptr` point to, wrapping around `cn_type_equals`.",
+    "description": "Used in a set that holds pointers to the types,\nso that actual type data stays at the same memory addresses.",
+    "tags": [
+      { "kind": "RETURNS", "text": "`true` if types are identical, `false` otherwise." }
+    ]
+  },
+  {
+    "symbol": "cn_ast_type_ptr_hash",
+    "decl": "CNDEF uint64_t cn_ast_type_ptr_hash(const Cn_Type **type_ptr)",
+    "summary": "Hashes type that `type_ptr` points to, wrapping around `cn_type_hash`.",
+    "description": "Used in a set that holds pointers to the types,\nso that actual type data stays at the same memory addresses.",
+    "tags": [
+      { "kind": "RETURNS", "text": "Hash of the type." }
+    ]
+  },
+  {
+    "symbol": "cn_ast_is_binary_operator",
+    "decl": "CNDEF Cn_Ast_Binary_Operator_Kind cn_ast_is_binary_operator(Cn_Lexer *lexer)",
+    "summary": "Checks table whether current token of `lexer` is a binary operator.",
+    "description": "",
+    "tags": [
+      { "kind": "RETURNS", "text": "Kind of the binary operator, `CN_AST_BINARY_OP_NONE` if token is not one." }
+    ]
+  },
+  {
+    "symbol": "cn_ast_is_unary_operator",
+    "decl": "CNDEF Cn_Ast_Unary_Operator_Kind cn_ast_is_unary_operator(Cn_Lexer *lexer)",
+    "summary": "Checks table whether current token of `lexer` is a unary operator.",
+    "description": "",
+    "tags": [
+      { "kind": "RETURNS", "text": "Kind of the unary operator, `CN_AST_UNARY_OP_NONE` if token is not one." }
+    ]
+  },
+  {
+    "symbol": "cn_ast_is_assignment_operator",
+    "decl": "CNDEF Cn_Ast_Assignment_Operator_Kind cn_ast_is_assignment_operator(Cn_Lexer *lexer)",
+    "summary": "Checks table whether current token of `lexer` is an assignment operator.",
+    "description": "",
+    "tags": [
+      { "kind": "RETURNS", "text": "Kind of the assignment operator, `CN_AST_ASSIGNMENT_OP_NONE` if token is not one." }
+    ]
+  },
+  {
+    "symbol": "cn_ast_is_postfix_operator",
+    "decl": "CNDEF Cn_Ast_Postfix_Operator_Kind cn_ast_is_postfix_operator(Cn_Lexer *lexer)",
+    "summary": "Checks table whether current token of `lexer` is a postfix operator.",
+    "description": "",
+    "tags": [
+      { "kind": "RETURNS", "text": "Kind of the postfix operator, `CN_AST_POSTFIX_OP_NONE` if token is not one." }
+    ]
+  },
+  {
+    "symbol": "cn_ast_as",
+    "decl": "#define cn_ast_as(T, p) ((Cn_Ast_##T *)(p))",
+    "summary": "Downcasts generic node pointer `p` to a concrete node type.",
+    "description": "`T` is the type name column of `CN_AST_GEN_LIST`, e.g. `cn_ast_as(Function, node)`.",
+    "tags": []
+  },
+  {
+    "symbol": "cn_ast_node",
+    "decl": "#define cn_ast_node(p) ((Cn_Ast_Node *)(p))",
+    "summary": "Upcasts concrete node pointer `p` to the generic `Cn_Ast_Node *`.",
+    "description": "Every `Cn_Ast_...` struct starts with `CN_AST_BASE`, so this is always valid.",
+    "tags": []
+  },
+  {
+    "symbol": "cn_ast_##m Cn_Ast_##T",
+    "decl": "#define X(K, T, m) typedef struct cn_ast_##m Cn_Ast_##T",
+    "summary": "Forward declaration of every concrete node type, so that node structs\ncan reference each other, and themselves, by pointer regardless of the\norder they are defined in below.",
+    "description": "",
+    "tags": []
+  },
+  {
+    "symbol": "cn_ast_new",
+    "decl": "#define cn_ast_new(...) cn__ast_new(&(__VA_ARGS__.base), sizeof(__VA_ARGS__))",
+    "summary": "Allocates a copy of any `Cn_Ast_...` struct in the ast arena.",
+    "description": "Only `sizeof(node)` bytes are allocated, so small nodes stay small.",
+    "tags": [
+      { "kind": "RETURNS", "text": "`void *`, so the result can be assigned to any concrete `Cn_Ast_...` pointer\nwithout a cast." },
+      { "kind": "NOTE", "text": "Variadic, so a compound literal with commas can be passed directly." }
+    ]
+  },
+  {
+    "symbol": "cn_ast_print",
+    "decl": "CNDEF void cn_ast_print(void * idx, int depth)",
+    "summary": "Recursively prints ast tree of `idx` to `stdout`.",
+    "description": "",
+    "tags": [
+      { "kind": "IMPORTANT", "text": "Use `0` as starting `depth`." }
+    ]
+  },
+  {
+    "symbol": "cn_ast_node_kind_name",
+    "decl": "CNDEF const char *cn_ast_node_kind_name(Cn_Ast_Kind kind)",
+    "summary": "Gets enum name of the node `kind`, used in messages.",
+    "description": "",
+    "tags": [
+      { "kind": "RETURNS", "text": "Static string with the enum name of the node kind." }
+    ]
+  },
+  {
+    "symbol": "cn_ast_node_size",
+    "decl": "CNDEF size_t cn_ast_node_size(Cn_Ast_Kind kind)",
+    "summary": "Gets size of the concrete node struct for the given `kind`.",
+    "description": "Nodes are allocated at their own size, so anything that copies or moves a\nnode generically needs this.",
+    "tags": [
+      { "kind": "RETURNS", "text": "Size in bytes of the concrete `Cn_Ast_...` struct." }
+    ]
+  },
+  {
+    "symbol": "cn_ast_is_primary",
+    "decl": "CNDEF bool cn_ast_is_primary(void * node)",
+    "summary": "Checks whether `node` is primary: identifier, integer, float or string.",
+    "description": "",
+    "tags": [
+      { "kind": "RETURNS", "text": "`true` if node is primary, `false` otherwise." }
+    ]
+  },
+  {
+    "symbol": "cn_ast_stack_mark",
+    "decl": "#define cn_ast_stack_mark() cn_array_list_length(&cn__tu_data->ptr_stack)",
+    "summary": "Gets current `ptr_stack` length, used to mark start of a list.",
+    "description": "",
+    "tags": []
+  },
+  {
+    "symbol": "cn_ast_stack_push",
+    "decl": "#define cn_ast_stack_push(ptr) cn_array_list_append(&cn__tu_data->ptr_stack, cn_ast_node(ptr))",
+    "summary": "Pushes `ptr` onto the `ptr_stack`.",
+    "description": "",
+    "tags": []
+  },
+  {
+    "symbol": "cn_ast_stack_prepend",
+    "decl": "#define cn_ast_stack_prepend(ptr, mark) cn_array_list_add(&cn__tu_data->ptr_stack, (mark), cn_ast_node(ptr))",
+    "summary": "Inserts `ptr` into the `ptr_stack` at `mark`.",
+    "description": "",
+    "tags": []
+  },
+  {
+    "symbol": "cn_ast_stack_discard",
+    "decl": "#define cn_ast_stack_discard(mark) cn_array_list_pop_multiple(&cn__tu_data->ptr_stack, cn_array_list_length(&cn__tu_data->ptr_stack) - (mark))",
+    "summary": "Discards all pointers added after `mark`, by returning the `ptr_stack` to it.",
+    "description": "",
+    "tags": []
+  },
+  {
+    "symbol": "cn_ast_stack_finalize",
+    "decl": "CNDEF Cn_Ast_Nodes cn_ast_stack_finalize(int64_t mark)",
+    "summary": "Finalizes range of the `ptr_stack`, from `mark` to the end, into `Cn_Ast_Nodes`.",
+    "description": "Finalized pointers are popped from the stack.",
+    "tags": [
+      { "kind": "RETURNS", "text": "Finalized list, allocated in the ast arena. Empty list if range is empty." }
+    ]
+  },
+  {
+    "symbol": "cn_ast_remove_from_list",
+    "decl": "CNDEF Cn_Ast_Node *cn_ast_remove_from_list(Cn_Ast_Nodes *list, int64_t index)",
+    "summary": "Removes entry at `index` from `list`, keeping order of the remaining entries.",
+    "description": "Length of the list is decreased for good.",
+    "tags": [
+      { "kind": "RETURNS", "text": "Removed node." }
+    ]
+  },
+  {
+    "symbol": "cn_ast_copy_list",
+    "decl": "CNDEF Cn_Ast_Nodes cn_ast_copy_list(Cn_Ast_Nodes list)",
+    "summary": "Deep copies `list`, allocating memory for every node branch.",
+    "description": "",
+    "tags": [
+      { "kind": "RETURNS", "text": "Copied list." },
+      { "kind": "NOTE", "text": "Copying is recursive, so copying giant branches is not recommended." }
+    ]
+  },
+  {
+    "symbol": "cn_ast_copy",
+    "decl": "CNDEF void *cn_ast_copy(void *node)",
+    "summary": "Deep copies `node`, allocating memory for the whole branch.",
+    "description": "",
+    "tags": [
+      { "kind": "RETURNS", "text": "Copied node." },
+      { "kind": "NOTE", "text": "Copying is recursive, so copying giant branches is not recommended." }
+    ]
+  },
+  {
+    "symbol": "cn_ast_remove_attribute",
+    "decl": "CNDEF bool cn_ast_remove_attribute(void *target, Cn_String attribute_name)",
+    "summary": "Removes attribute `attribute_name` from attribute list of `target`.",
+    "description": "",
+    "tags": [
+      { "kind": "RETURNS", "text": "`true` if attribute was found and removed, `false` otherwise." }
+    ]
+  },
+  {
+    "symbol": "cn_get_declarator_info",
+    "decl": "CNDEF void cn_get_declarator_info(Cn_Ast_Declarator *declarator, Cn_Ast_Node **last_declarator)",
+    "summary": "Traverses declarator nodes to get declarator identifier.",
+    "description": "",
+    "tags": [
+      { "kind": "OUTPUTS", "text": "Last declarator in chain, written to `last_declarator`." },
+      { "kind": "TODO", "text": "Make always output `NIL` as identifier on any abstract declarator." }
+    ]
+  },
+  {
+    "symbol": "cn_get_function_declarator_info",
+    "decl": "CNDEF bool cn_get_function_declarator_info(Cn_Ast_Declarator *declarator, Cn_Ast_Node **function_direct_declarator, Cn_Ast_Node **last_declarator)",
+    "summary": "Traverses declarator nodes to get function declarator identifier and other information.",
+    "description": "",
+    "tags": [
+      { "kind": "RETURNS", "text": "`true` on success, `false` if declarator is not a proper function." },
+      { "kind": "OUTPUTS", "text": "Parameter type list of the function, written to `function_direct_declarator` if it is not `NULL`." },
+      { "kind": "OUTPUTS", "text": "Last declarator in chain, written to `last_declarator`." },
+      { "kind": "TODO", "text": "Make always output `NIL` as identifier on any abstract declarator." }
+    ]
+  },
+  {
+    "symbol": "cn_get_attribute_info",
+    "decl": "CNDEF Cn_Ast_Attribute *cn_get_attribute_info(void *target, Cn_String attribute_name, Cn_Ast_Attribute_Specifier **owner, int64_t *index)",
+    "summary": "Finds attribute `attribute_name` on `target` node.",
+    "description": "",
+    "tags": [
+      { "kind": "RETURNS", "text": "Found attribute, `NULL` if there is none." },
+      { "kind": "OUTPUTS", "text": "Attribute specifier holding the attribute, written to `owner` if it is not `NULL`." },
+      { "kind": "OUTPUTS", "text": "Position of the attribute in the list of that specifier, written to `index` if it is not `NULL`." }
+    ]
+  },
+  {
+    "symbol": "cn_get_attribute",
+    "decl": "CNDEF Cn_Ast_Attribute *cn_get_attribute(void *target, Cn_String attribute_name)",
+    "summary": "Finds attribute `attribute_name` on `target` node.",
+    "description": "",
+    "tags": [
+      { "kind": "RETURNS", "text": "Found attribute, `NULL` if there is none." },
+      { "kind": "NOTE", "text": "If there are multiple attributes with the same name, the first one is found." }
+    ]
+  },
+  {
+    "symbol": "cn_get_expression_type",
+    "decl": "CNDEF Cn_Type *cn_get_expression_type(void * expression)",
+    "summary": "Gets resulting type of `expression`.",
+    "description": "",
+    "tags": [
+      { "kind": "RETURNS", "text": "Valid type on success, `NULL` if expression wasn't typechecked." },
+      { "kind": "IMPORTANT", "text": "Expects `expression != NULL`." }
+    ]
+  },
+  {
+    "symbol": "cn_diagnostic_node",
+    "decl": "CNDEF void cn_diagnostic_node(Cn_Diagnostic_Level level, void * idx, Cn_Diagnostic_Code code, const char *format, ...)",
+    "summary": "Reports diagnostic per node.",
+    "description": "If node was modified or replaced, multiple diagnostics eventually\npointing to the same source location will be emitted.",
+    "tags": []
+  },
+  {
+    "symbol": "cn_binding_get",
+    "decl": "#define cn_binding_get(idx)    (cn__tu_data->binding_list + (idx))",
+    "summary": "Gets binding based on its `idx`.",
+    "description": "",
+    "tags": []
+  },
+  {
+    "symbol": "cn_binding_table_put",
+    "decl": "CNDEF Cn_Binding_Idx cn_binding_table_put(Cn_Binding binding, Cn_Binding_Idx **binding_table)",
+    "summary": "Adds `binding` to the binding list, and puts its index into `binding_table` under its name.",
+    "description": "",
+    "tags": [
+      { "kind": "RETURNS", "text": "Index of the added binding." }
+    ]
+  },
+  {
+    "symbol": "cn_binding_table_get",
+    "decl": "CNDEF Cn_Binding_Idx cn_binding_table_get(Cn_String name, Cn_Binding_Idx **binding_table)",
+    "summary": "Looks up binding `name` in `binding_table`.",
+    "description": "",
+    "tags": [
+      { "kind": "RETURNS", "text": "Index of the found binding, `CN_BINDING_NIL_IDX` if there is none." }
+    ]
+  },
+  {
+    "symbol": "cn_binding_declare_function",
+    "decl": "CNDEF Cn_Binding_Idx cn_binding_declare_function(Cn_String name, void * source, Cn_Ast_Storage_Specifier_Flags storage_flags, Cn_Ast_Function_Specifier_Flags function_flags, Cn_Type *type, Cn_Ast_Nodes *parameter_declarations, bool is_definition)",
+    "summary": "Adds new function binding to the current scope.",
+    "description": "If same binding already exists, handles redeclaration and redefinition of the binding.",
+    "tags": [
+      { "kind": "RETURNS", "text": "Binding index on success, `NIL` if an error occurred." }
+    ]
+  },
+  {
+    "symbol": "cn_binding_declare_variable",
+    "decl": "CNDEF Cn_Binding_Idx cn_binding_declare_variable(Cn_String name, void * source, Cn_Ast_Storage_Specifier_Flags storage_flags, Cn_Type *type, bool is_definition)",
+    "summary": "Adds new variable binding to the current scope.",
+    "description": "If same binding already exists, handles redeclaration and redefinition of the binding.",
+    "tags": [
+      { "kind": "RETURNS", "text": "Binding index on success, `NIL` if an error occurred." }
+    ]
+  },
+  {
+    "symbol": "cn_binding_declare_typedef",
+    "decl": "CNDEF Cn_Binding_Idx cn_binding_declare_typedef(Cn_String name, void * source, Cn_Type *type)",
+    "summary": "Adds new typedef binding to the current scope.",
+    "description": "If same binding already exists, handles redeclaration and redefinition of the binding.",
+    "tags": [
+      { "kind": "RETURNS", "text": "Binding index on success, `NIL` if an error occurred." }
+    ]
+  },
+  {
+    "symbol": "cn_binding_declare_enum_constant",
+    "decl": "CNDEF Cn_Binding_Idx cn_binding_declare_enum_constant(Cn_String name, void * source, Cn_Type *type, int64_t value)",
+    "summary": "Adds new enum constant binding to the current scope.",
+    "description": "If same binding already exists, handles redeclaration and redefinition of the binding.",
+    "tags": [
+      { "kind": "RETURNS", "text": "Binding index on success, `NIL` if an error occurred." }
+    ]
+  },
+  {
+    "symbol": "cn_binding_declare_tag",
+    "decl": "CNDEF Cn_Binding_Idx cn_binding_declare_tag(Cn_String tag, Cn_Type_Kind kind)",
+    "summary": "Declares new tag binding in the current scope.",
+    "description": "If same binding already exists, handles redeclaration:\n\n- If binding exists and is complete in any scope, including current scope,\nthat binding is returned.\n\n- If binding exists but is not complete in a different scope,\nnew binding is declared in current scope.\n\n- If binding exists but is not complete in current scope,\nthat declaration is referenced.\n\n- If binding doesn't exist, new binding is declared in current scope.",
+    "tags": [
+      { "kind": "RETURNS", "text": "Binding index on success, `NIL` if an error occurred." }
+    ]
+  },
+  {
+    "symbol": "cn_binding_declare_label",
+    "decl": "CNDEF Cn_Binding_Idx cn_binding_declare_label(Cn_String name, void * source)",
+    "summary": "Declares new label binding in the current function scope.",
+    "description": "",
+    "tags": [
+      { "kind": "RETURNS", "text": "Binding index on success, `NIL` if an error occurred." }
+    ]
+  },
+  {
+    "symbol": "cn_binding_declare_builtin",
+    "decl": "CNDEF Cn_Binding_Idx cn_binding_declare_builtin(Cn_String name, void *source)",
+    "summary": "Adds new builtin binding to the current scope.",
+    "description": "If same binding already exists, errors.",
+    "tags": [
+      { "kind": "PARAM", "text": "source: Only used to print error diagnostics of the source location." },
+      { "kind": "RETURNS", "text": "Binding index on success, `NIL` if an error occurred." },
+      { "kind": "NOTE", "text": "Builtin's don't have source location,\nthey are names that are only binded to `CN_OPAQUE` type." }
+    ]
+  },
+  {
+    "symbol": "cn_binding_declare_function_arguments",
+    "decl": "CNDEF bool cn_binding_declare_function_arguments(Cn_Binding_Idx function_binding_idx)",
+    "summary": "Binds parameters of function definition `function_binding_idx` as arguments in the current scope.",
+    "description": "",
+    "tags": [
+      { "kind": "RETURNS", "text": "`true` on success, `false` if any errors occurred." }
+    ]
+  },
+  {
+    "symbol": "cn_analyze_declaration",
+    "decl": "#define cn_analyze_declaration(declaration_specifiers, ...) cn__analyze_declaration_opt(declaration_specifiers, (Cn_Analyze_Declaration_Opt) { __VA_ARGS__ })",
+    "summary": "Analyzes already constructed specifiers, declarator and initializer as one binding.",
+    "description": "Modifies the global state, by recording new binding from the given ast nodes.\nInitializer can be passed as `NULL` if binding doesn't contain a definition.\nDeclarator itself can also be passed as `NULL`, in that case only declaration specifiers are checked.\n\nPerforms typechecking, can error if the binding is illegal in the current context,\nor if there is any type mismatch, or undefined names.",
+    "tags": [
+      { "kind": "RETURNS", "text": "`true` on success, `false` if any errors occurred." }
+    ]
+  },
+  {
+    "symbol": "cn_analyze_function_definition",
+    "decl": "CNDEF bool cn_analyze_function_definition(void *declaration_specifiers, void *declarator, Cn_Binding_Idx *function_binding_idx)",
+    "summary": "Analyzes already constructed ast nodes as function definition, adding proper function binding.",
+    "description": "Modifies the global state and performs typechecking.",
+    "tags": [
+      { "kind": "RETURNS", "text": "`true` on success, `false` if any errors occurred." },
+      { "kind": "OUTPUTS", "text": "Function binding on success, written to `function_binding_idx`." }
+    ]
+  },
+  {
+    "symbol": "cn_analyze_to_type",
+    "decl": "CNDEF Cn_Type *cn_analyze_to_type(Cn_Ast_Qualifier_Flags qualifier, void *type_specifier, void *declarator, Cn_Analyze_Flags flags)",
+    "summary": "Converts `qualifier`, `type_specifier` and `declarator` triple into a resolved `Cn_Type`.",
+    "description": "Type specifier gives the base type, qualifiers are applied to it,\nand declarator wraps it in pointer, array or function layers.",
+    "tags": [
+      { "kind": "PARAM", "text": "declarator: Can be `NULL` if no declarator is present at all.\nIn that case, the type is composed only from type specifier and qualifiers." },
+      { "kind": "RETURNS", "text": "Resolved type, `NULL` on error." }
+    ]
+  },
+  {
+    "symbol": "cn_analyze_typecheck_expression",
+    "decl": "CNDEF Cn_Type *cn_analyze_typecheck_expression(void *expression)",
+    "summary": "Typechecks `expression`, assigning appropriate type to every node.",
+    "description": "Recursively traverses ast nodes from the bottom up.",
+    "tags": [
+      { "kind": "RETURNS", "text": "Resulting type of the expression on success, `NULL` if an error occurred." },
+      { "kind": "IMPORTANT", "text": "Expects `expression != NULL`." }
+    ]
+  },
+  {
+    "symbol": "cn_analyze_evaluate_expression",
+    "decl": "CNDEF Cn_Any cn_analyze_evaluate_expression(void *expression, void *buffer)",
+    "summary": "Evaluates `expression`, using supplied `buffer` to store data.",
+    "description": "",
+    "tags": [
+      { "kind": "PARAM", "text": "expression: If `NULL`, `NIL` is returned." },
+      { "kind": "RETURNS", "text": "Valid any struct on success. `NIL` if expression wasn't typechecked,\nor if it cannot be evaluated at compile time." },
+      { "kind": "IMPORTANT", "text": "Expects `expression` to be typechecked, or to be `NULL`." },
+      { "kind": "NOTE", "text": "Size of `buffer` can be determined from the resulting type of the expression." }
+    ]
+  },
+  {
+    "symbol": "cn_analyze_typecheck_designations",
+    "decl": "CNDEF bool cn_analyze_typecheck_designations(Cn_Ast_Nodes designations, Cn_Type *type)",
+    "summary": "Typechecks `designations` against known `type`, recursively.",
+    "description": "",
+    "tags": [
+      { "kind": "RETURNS", "text": "`true` on success, `false` if an error occurred." }
+    ]
+  },
+  {
+    "symbol": "cn_analyze_typecheck_initializer",
+    "decl": "CNDEF bool cn_analyze_typecheck_initializer(void *initializer, Cn_Type *type)",
+    "summary": "Typechecks `initializer` against known `type`, recursively.",
+    "description": "",
+    "tags": [
+      { "kind": "RETURNS", "text": "`true` on success, `false` if an error occurred." },
+      { "kind": "IMPORTANT", "text": "Expects `initializer != NULL`." }
+    ]
+  },
+  {
+    "symbol": "cn_emit",
+    "decl": "CNDEF void cn_emit(Cn_Emitter *e, void * node_ptr)",
+    "summary": "Emits C source code of `node_ptr` to the output of `e`.",
+    "description": "Reconstructs valid C source code from the ast representation.",
+    "tags": []
+  },
+  {
+    "symbol": "cn_parse_expect",
+    "decl": "CNDEF bool cn_parse_expect(Cn_Lexer *lexer, Cn_Token_Type type)",
+    "summary": "Parses single token of expected `type`, reporting error diagnostic if token doesn't match.",
+    "description": "",
+    "tags": [
+      { "kind": "RETURNS", "text": "`true` if token was parsed, `false` otherwise." }
+    ]
+  },
+  {
+    "symbol": "cn_parse_optional",
+    "decl": "CNDEF bool cn_parse_optional(Cn_Lexer *lexer, Cn_Token_Type type)",
+    "summary": "Parses single token of `type` if it is present, without reporting any error otherwise.",
+    "description": "",
+    "tags": [
+      { "kind": "RETURNS", "text": "`true` if token was parsed, `false` otherwise." }
+    ]
+  },
+  {
+    "symbol": "cn_parse_translation_unit",
+    "decl": "CNDEF Cn_Ast_Translation_Unit *cn_parse_translation_unit(Cn_Lexer *lexer)",
+    "summary": "Parses translation unit from the current token of `lexer`.",
+    "description": "```\n translation_unit\n         : external_declaration* EOF\n         ;\n```",
+    "tags": [
+      { "kind": "RETURNS", "text": "Parsed translation unit, `NULL` on error." }
+    ]
+  },
+  {
+    "symbol": "cn_parse_external_declaration",
+    "decl": "CNDEF Cn_Ast_External_Declaration *cn_parse_external_declaration(Cn_Lexer *lexer)",
+    "summary": "Parses external declaration from the current token of `lexer`.",
+    "description": "```\n external_declaration\n         : gnu_extensions (\n             ';'                         // Stray ';'\n             | gnu_asm_statement         // File-scope basic asm, without qualifiers.\n             | function\n             | declaration ';'\n             )\n         ;\n```",
+    "tags": [
+      { "kind": "RETURNS", "text": "Parsed external declaration, `NULL` on error." },
+      { "kind": "NOTE", "text": "If `gnu_extensions` are present, `CN_AST_GNU_EXTENSION` flag is set on the external declaration." }
+    ]
+  },
+  {
+    "symbol": "cn_parse_function_or_declaration",
+    "decl": "CNDEF Cn_Ast_Node *cn_parse_function_or_declaration(Cn_Lexer *lexer)",
+    "summary": "Parses function definition or declaration from the current token of `lexer`.",
+    "description": "It can't be known for certain which one it is, until the ast structure is parsed far enough.\nUltimately, existence of a function body at the end of the declaration signifies that the\ndeclaration is a function definition.\n\nThe deciding logic is to first try to parse a single declarator, and if it is followed by a function\nbody, then it is a function definition.\n\n```\n declaration ';'\n         : attribute_specifiers declaration_specifiers init_declarators? ';'\n         ;\n\n function\n         : attribute_specifiers declaration_specifiers declarator block\n         ;\n```",
+    "tags": [
+      { "kind": "RETURNS", "text": "Parsed function or declaration, `NULL` on error." },
+      { "kind": "NOTE", "text": "K&R styled function definitions with classic declaration lists are not supported." }
+    ]
+  },
+  {
+    "symbol": "cn_parse_finish_declaration",
+    "decl": "CNDEF Cn_Ast_Node *cn_parse_finish_declaration(Cn_Lexer *lexer, Cn_Ast_Nodes attribute_specifiers)",
+    "summary": "Finishes parsing declaration from the current token of `lexer`, using already parsed\n`attribute_specifiers`.",
+    "description": "```\n declaration\n         : attribute_specifiers declaration_specifiers init_declarators? gnu_attribute_specifiers\n         ;\n```",
+    "tags": [
+      { "kind": "RETURNS", "text": "Parsed declaration, `NULL` on error." }
+    ]
+  },
+  {
+    "symbol": "cn_parse_starts_declaration",
+    "decl": "CNDEF bool cn_parse_starts_declaration(Cn_Lexer *lexer)",
+    "summary": "Determines whether tokens of `lexer` indicate start of a declaration.",
+    "description": "Used to distinguish between declaration and statement before parsing them.",
+    "tags": [
+      { "kind": "RETURNS", "text": "`true` if tokens indicate start of a declaration, `false` otherwise." },
+      { "kind": "NOTE", "text": "Doesn't alter state of `lexer`." }
+    ]
+  },
+  {
+    "symbol": "cn_parse_starts_type",
+    "decl": "CNDEF bool cn_parse_starts_type(Cn_Lexer *lexer)",
+    "summary": "Determines whether tokens of `lexer` indicate start of a type.",
+    "description": "Used to distinguish type cast during parsing of an expression.",
+    "tags": [
+      { "kind": "RETURNS", "text": "`true` if tokens indicate start of a type, `false` otherwise." },
+      { "kind": "NOTE", "text": "Doesn't alter state of `lexer`." }
+    ]
+  },
+  {
+    "symbol": "cn_parse_statement",
+    "decl": "CNDEF Cn_Ast_Node *cn_parse_statement(Cn_Lexer *lexer)",
+    "summary": "Parses statement from the current token of `lexer`.",
+    "description": "There is no single statement node kind, instead one of the following statement nodes is returned.\n\n```\n statement\n         : block\n         | selection_statement\n         | iteration_statement\n         | jump_statement\n         | labeled_statement\n         | expression_statement\n         ;\n```",
+    "tags": [
+      { "kind": "RETURNS", "text": "Parsed statement, `NULL` on error." }
+    ]
+  },
+  {
+    "symbol": "cn_parse_finish_statement",
+    "decl": "CNDEF Cn_Ast_Node *cn_parse_finish_statement(Cn_Lexer *lexer, Cn_Ast_Nodes attribute_specifiers)",
+    "summary": "Finishes parsing statement from the current token of `lexer`, using already parsed\n`attribute_specifiers`.",
+    "description": "There is no single statement node kind, instead one of the following statement nodes is returned.\n\n```\n statement\n         : block\n         | selection_statement\n         | iteration_statement\n         | jump_statement\n         | labeled_statement\n         | expression_statement\n         ;\n```",
+    "tags": [
+      { "kind": "RETURNS", "text": "Parsed statement, `NULL` on error." }
+    ]
+  },
+  {
+    "symbol": "cn_parse_block",
+    "decl": "CNDEF Cn_Ast_Block *cn_parse_block(Cn_Lexer *lexer, bool use_current_scope)",
+    "summary": "Parses block from the current token of `lexer`.",
+    "description": "Block introduces new scope, unless `use_current_scope` is set.\n\n```\n block\n         : '{' block_item* '}'\n         ;\n```",
+    "tags": [
+      { "kind": "PARAM", "text": "use_current_scope: If `true`, block doesn't introduce new scope, everything is declared and\ndefined in the current scope instead." },
+      { "kind": "RETURNS", "text": "Parsed block, `NULL` on error." }
+    ]
+  },
+  {
+    "symbol": "cn_parse_block_item",
+    "decl": "CNDEF Cn_Ast_Block_Item *cn_parse_block_item(Cn_Lexer *lexer)",
+    "summary": "Parses block item from the current token of `lexer`.",
+    "description": "```\n block_item\n         : gnu_extensions declaration ';'\n         | statement\n         ;\n```",
+    "tags": [
+      { "kind": "RETURNS", "text": "Parsed block item, `NULL` on error." },
+      { "kind": "NOTE", "text": "If `gnu_extensions` are present, `CN_AST_GNU_EXTENSION` flag is set on the declaration.\nIf `gnu_extensions` aren't followed by a declaration, item is parsed as a statement, where they\nare a part of the expression, see `cn_parse_expression`." }
+    ]
+  },
+  {
+    "symbol": "cn_parse_if_statement",
+    "decl": "CNDEF Cn_Ast_Node *cn_parse_if_statement(Cn_Lexer *lexer)",
+    "summary": "Parses `if` statement from the current token of `lexer`.",
+    "description": "```\n if_statement\n         : 'if' '(' expression ')' statement ('else' statement)?\n         ;\n```",
+    "tags": [
+      { "kind": "RETURNS", "text": "Parsed `if` statement, `NULL` on error." }
+    ]
+  },
+  {
+    "symbol": "cn_parse_switch_statement",
+    "decl": "CNDEF Cn_Ast_Node *cn_parse_switch_statement(Cn_Lexer *lexer)",
+    "summary": "Parses `switch` statement from the current token of `lexer`.",
+    "description": "```\n switch_statement\n         : 'switch' '(' expression ')' statement\n         ;\n```",
+    "tags": [
+      { "kind": "RETURNS", "text": "Parsed `switch` statement, `NULL` on error." }
+    ]
+  },
+  {
+    "symbol": "cn_parse_while_statement",
+    "decl": "CNDEF Cn_Ast_Node *cn_parse_while_statement(Cn_Lexer *lexer)",
+    "summary": "Parses `while` statement from the current token of `lexer`.",
+    "description": "```\n while_statement\n         : 'while' '(' expression ')' statement\n         ;\n```",
+    "tags": [
+      { "kind": "RETURNS", "text": "Parsed `while` statement, `NULL` on error." }
+    ]
+  },
+  {
+    "symbol": "cn_parse_do_while",
+    "decl": "CNDEF Cn_Ast_Node *cn_parse_do_while(Cn_Lexer *lexer)",
+    "summary": "Parses `do while` statement from the current token of `lexer`.",
+    "description": "```\n do_while\n         : 'do' statement 'while' '(' expression ')' ';'\n         ;\n```",
+    "tags": [
+      { "kind": "RETURNS", "text": "Parsed `do while` statement, `NULL` on error." }
+    ]
+  },
+  {
+    "symbol": "cn_parse_for_statement",
+    "decl": "CNDEF Cn_Ast_Node *cn_parse_for_statement(Cn_Lexer *lexer)",
+    "summary": "Parses `for` statement from the current token of `lexer`.",
+    "description": "```\n for_statement\n         : 'for' '(' (gnu_extensions declaration | expression)? ';' expression? ';' expression? ')' statement\n         ;\n```",
+    "tags": [
+      { "kind": "RETURNS", "text": "Parsed `for` statement, `NULL` on error." },
+      { "kind": "NOTE", "text": "If `gnu_extensions` are present, `CN_AST_GNU_EXTENSION` flag is set on the initialization\ndeclaration. If `gnu_extensions` aren't followed by a declaration, they are a part of the\ninitialization expression, see `cn_parse_expression`." }
+    ]
+  },
+  {
+    "symbol": "cn_parse_goto_statement",
+    "decl": "CNDEF Cn_Ast_Node *cn_parse_goto_statement(Cn_Lexer *lexer)",
+    "summary": "Parses `goto` statement from the current token of `lexer`.",
+    "description": "```\n goto_statement\n         : 'goto' identifier ';'\n         ;\n```",
+    "tags": [
+      { "kind": "RETURNS", "text": "Parsed `goto` statement, `NULL` on error." }
+    ]
+  },
+  {
+    "symbol": "cn_parse_return_statement",
+    "decl": "CNDEF Cn_Ast_Node *cn_parse_return_statement(Cn_Lexer *lexer)",
+    "summary": "Parses `return` statement from the current token of `lexer`.",
+    "description": "```\n return_statement\n         : 'return' expression? ';'\n         ;\n```",
+    "tags": [
+      { "kind": "RETURNS", "text": "Parsed `return` statement, `NULL` on error." }
+    ]
+  },
+  {
+    "symbol": "cn_parse_break_statement",
+    "decl": "CNDEF Cn_Ast_Node *cn_parse_break_statement(Cn_Lexer *lexer)",
+    "summary": "Parses `break` statement from the current token of `lexer`.",
+    "description": "```\n break_statement\n         : 'break' ';'\n         ;\n```",
+    "tags": [
+      { "kind": "RETURNS", "text": "Parsed `break` statement, `NULL` on error." }
+    ]
+  },
+  {
+    "symbol": "cn_parse_continue_statement",
+    "decl": "CNDEF Cn_Ast_Node *cn_parse_continue_statement(Cn_Lexer *lexer)",
+    "summary": "Parses `continue` statement from the current token of `lexer`.",
+    "description": "```\n continue_statement\n         : 'continue' ';'\n         ;\n```",
+    "tags": [
+      { "kind": "RETURNS", "text": "Parsed `continue` statement, `NULL` on error." }
+    ]
+  },
+  {
+    "symbol": "cn_parse_label",
+    "decl": "CNDEF Cn_Ast_Node *cn_parse_label(Cn_Lexer *lexer)",
+    "summary": "Parses label from the current token of `lexer`.",
+    "description": "```\n label\n         : (identifier | ('case' expression) | 'default') ':' statement\n         ;\n```",
+    "tags": [
+      { "kind": "RETURNS", "text": "Parsed label, `NULL` on error." },
+      { "kind": "NOTE", "text": "Instead of separate nodes, label node represents all three kinds of labels: identifier label,\n`case` label and `default` label. Kind is stored in flags, and fields that don't apply to the kind\nare `NULL`." }
+    ]
+  },
+  {
+    "symbol": "cn_parse_expression_statement",
+    "decl": "CNDEF Cn_Ast_Node *cn_parse_expression_statement(Cn_Lexer *lexer)",
+    "summary": "Parses expression statement from the current token of `lexer`.",
+    "description": "```\n expression_statement\n         : expression? ';'\n         ;\n```",
+    "tags": [
+      { "kind": "RETURNS", "text": "Parsed expression statement, `NULL` on error." }
+    ]
+  },
+  {
+    "symbol": "cn_parse_arguments",
+    "decl": "CNDEF Cn_Ast_Nodes cn_parse_arguments(Cn_Lexer *lexer, bool *ok)",
+    "summary": "Parses argument list from the current token of `lexer`.",
+    "description": "```\n argument_list\n         : expression (',' expression)*\n         ;\n```",
+    "tags": [
+      { "kind": "RETURNS", "text": "Parsed list of argument expressions." },
+      { "kind": "OUTPUTS", "text": "`true` on success, `false` on error, written to `ok`." }
+    ]
+  },
+  {
+    "symbol": "cn_parse_expression",
+    "decl": "CNDEF Cn_Ast_Node *cn_parse_expression(Cn_Lexer *lexer, int min_precedence, Cn_Parse_Expression_Flags flags)",
+    "summary": "Parses expression from the current token of `lexer`.",
+    "description": "First parses left leaf, and then calls increasing precedence parsing until it returns left leaf,\nutilizing the following precedence table as a guide to properly structure ast nodes in order.\n\n```\n C OPERATOR PRECEDENCE TABLE highest (14) to lowest (0)\n ===============================================================\n\n 14                              Associativity: Left-to-right\n ---------------------------------------------------------------\n   ++  --        Postfix increment/decrement\n   ()            Function call\n   []            Array subscript\n   .             Member access\n   ->            Member access through pointer\n   (type){...}   Compound literal\n\n 13                              Associativity: Right-to-left\n ---------------------------------------------------------------\n   ++  --        Prefix increment/decrement\n   +   -         Unary plus/minus\n   !   ~         Logical NOT, bitwise NOT\n   (type)        Cast\n   *             Dereference\n   &             Address-of\n   sizeof        Size-of\n\n 12                              Associativity: Left-to-right\n ---------------------------------------------------------------\n   *   /   %     Multiplication, division, remainder\n\n 11                              Associativity: Left-to-right\n ---------------------------------------------------------------\n   +   -         Addition, subtraction\n\n 10                              Associativity: Left-to-right\n ---------------------------------------------------------------\n   <<  >>        Bitwise left/right shift\n\n 9                               Associativity: Left-to-right\n ---------------------------------------------------------------\n   <   <=        Less than, less-or-equal\n   >   >=        Greater than, greater-or-equal\n\n 8                               Associativity: Left-to-right\n ---------------------------------------------------------------\n   ==  !=        Equal, not equal\n\n 7                               Associativity: Left-to-right\n ---------------------------------------------------------------\n   &             Bitwise AND\n\n 6                               Associativity: Left-to-right\n ---------------------------------------------------------------\n   ^             Bitwise XOR\n\n 5                               Associativity: Left-to-right\n ---------------------------------------------------------------\n   |             Bitwise OR\n\n 4                               Associativity: Left-to-right\n ---------------------------------------------------------------\n   &&            Logical AND\n\n 3                               Associativity: Left-to-right\n ---------------------------------------------------------------\n   ||            Logical OR\n\n 2                               Associativity: Right-to-left\n ---------------------------------------------------------------\n   ? :           Ternary conditional\n\n 1                               Associativity: Right-to-left\n ---------------------------------------------------------------\n   =             Simple assignment\n   +=  -=        Compound assignment (additive)\n   *=  /=  %=    Compound assignment (multiplicative)\n   <<=  >>=      Compound assignment (shift)\n   &=  ^=  |=    Compound assignment (bitwise)\n\n 0                               Associativity: Left-to-right\n ---------------------------------------------------------------\n   ,             Comma\n```\n\nFollowing grammar rules group expressions into certain kinds, but in reality all parsing is based\non the precedence table. Grammar rules only show the general logic, and which specific tokens\nparser might expect in certain expressions.\n\n```\n expression\n         : binary_expression\n         | function_expression\n         | access_expression\n         | unary_expression\n         | cast_expression\n         | compound_literal\n         | sizeof_expression\n         | primary_expression\n         | ternary_expression\n         | assignment_expression\n         | postfix_expression\n         ;\n\n binary_expression\n         : expression binary_operator expression\n         | expression '[' expression ']'\n         | function_expression\n         | access_expression\n         ;\n\n function_expression\n         : expression '(' argument_list? ')'\n         ;\n\n access_expression\n         : expression '.' identifier\n         | expression '->' identifier\n         ;\n\n unary_expression\n         : cast_expression\n         | '(' expression ')'\n         | sizeof_expression\n         | unary_operator expression\n         | gnu_extensions expression\n         ;\n\n cast_expression\n         : '(' type_name ')' expression\n         | compound\n         ;\n\n compound\n         : '(' type_name ')' designations\n         ;\n\n sizeof_expression\n         : 'sizeof' expression\n         | 'sizeof' '(' type_name ')'\n         ;\n\n primary_expression\n         : identifier\n         | integer\n         | float\n         | string\n         ;\n\n ternary_expression\n         : expression '?' expression ':' expression\n         ;\n\n assignment_expression\n         : expression assignment_operator expression\n         ;\n\n postfix_expression\n         : expression '++'\n         | expression '--'\n         ;\n```",
+    "tags": [
+      { "kind": "PARAM", "text": "min_precedence: Lowest precedence of binary operators that are parsed, `-1` to parse all of them." },
+      { "kind": "RETURNS", "text": "Parsed expression, `NULL` on error." },
+      { "kind": "NOTE", "text": "`gnu_extensions expression` binds as a unary operator, but doesn't produce its own node,\ninstead `CN_AST_GNU_EXTENSION` flag is set on the operand expression." }
+    ]
+  },
+  {
+    "symbol": "cn_parse_expression_increasing_precedence",
+    "decl": "CNDEF Cn_Ast_Node *cn_parse_expression_increasing_precedence(Cn_Lexer *lexer, void * left, int min_precedence, Cn_Parse_Expression_Flags flags)",
+    "summary": "Continues parsing binary expression after already parsed `left` leaf.",
+    "description": "Constructs right leaning tree if next binary operator has increasing precedence,\notherwise just returns `left` leaf. Recursively calls `cn_parse_expression` to get right leaf.\n\nExample of `a + b * c`, strictly increasing precedence results in right leaning tree:\n\n```\n   +\n  /\n a\n\n   +\n  / \\\n a   *\n    /\n   b\n\n   +\n  / \\\n a   *\n    / \\\n   b   c\n```\n\nBut there is also a situation where left leaning tree must be constructed.\nExample of `a + b - c`, same precedence results in left leaning tree:\n\n```\n   +\n  /\n a\n\n     -\n    /\n   +\n  / \\\n a   b\n\n     -\n    / \\\n   +   c\n  / \\\n a   b\n```\n\nA more sophisticated example, `a + b * c + d` is parsed like `((a + (b * c)) + d)`:\n\n```\nparse0 min_prec -1:\n\n  +\n / \\\na   parse1\n\nparse1 min_prec 11:\n\n  *\n / \\\nb   parse2\n\nparse2 min_prec 12:\n\nc\n\nRETURNING\n\nparse1 min_prec 11:\n\n  *\n / \\\nb   c\n\nparse0 min_prec -1:\n\n  +\n / \\\na   *\n   / \\\n  b   c\n\nparse0 min_prec -1:\n\n    +\n   / \\\n  +   parse3\n / \\\na   *\n   / \\\n  b   c\n\nparse3 min_prec 11:\n\nd\n\nRETURNING\n\nparse0 min_prec -1:\n\n    +\n   / \\\n  +   d\n / \\\na   *\n   / \\\n  b   c\n\nNO MORE INPUT, STOP.\n```",
+    "tags": [
+      { "kind": "RETURNS", "text": "Parsed expression, `NULL` on error." },
+      { "kind": "NOTE", "text": "Naturally, this function constructs right leaning tree on binary expressions." }
+    ]
+  },
+  {
+    "symbol": "cn_parse_expression_leaf",
+    "decl": "CNDEF Cn_Ast_Node *cn_parse_expression_leaf(Cn_Lexer *lexer, Cn_Parse_Expression_Flags flags)",
+    "summary": "Parses non-binary leaf expression from the current token of `lexer`.",
+    "description": "Detects and parses unary operators, but doesn't parse binary or postfix expressions.",
+    "tags": [
+      { "kind": "RETURNS", "text": "Parsed expression, `NULL` on error." },
+      { "kind": "NOTE", "text": "Leading `gnu_extensions` are parsed as a unary operator, setting `CN_AST_GNU_EXTENSION`\nflag on the operand expression." }
+    ]
+  },
+  {
+    "symbol": "cn_parse_finish_init_declarators",
+    "decl": "CNDEF Cn_Ast_Nodes cn_parse_finish_init_declarators(Cn_Lexer *lexer, void *declarator, bool *ok, void *declaration_specifiers)",
+    "summary": "Finishes parsing init declarator list from the current token of `lexer`, using already parsed\n`declarator` as the first init declarator.",
+    "description": "```\n init_declarators\n         : init_declarator (',' init_declarator)*\n         ;\n```",
+    "tags": [
+      { "kind": "RETURNS", "text": "Parsed list of init declarators." },
+      { "kind": "OUTPUTS", "text": "`true` on success, `false` on error, written to `ok`." }
+    ]
+  },
+  {
+    "symbol": "cn_parse_init_declarators",
+    "decl": "CNDEF Cn_Ast_Nodes cn_parse_init_declarators(Cn_Lexer *lexer, bool *ok, void *declaration_specifiers)",
+    "summary": "Parses init declarator list from the current token of `lexer`.",
+    "description": "```\n init_declarators\n         : init_declarator (',' init_declarator)*\n         ;\n```",
+    "tags": [
+      { "kind": "RETURNS", "text": "Parsed list of init declarators." },
+      { "kind": "OUTPUTS", "text": "`true` on success, `false` on error, written to `ok`." }
+    ]
+  },
+  {
+    "symbol": "cn_parse_finish_init_declarator",
+    "decl": "CNDEF Cn_Ast_Init_Declarator *cn_parse_finish_init_declarator(Cn_Lexer *lexer, Cn_Ast_Declarator *declarator, void *declaration_specifiers)",
+    "summary": "Finishes parsing init declarator from the current token of `lexer`, using already parsed\n`declarator`.",
+    "description": "```\n init_declarator\n         : declarator gnu_attribute_specifiers gnu_asm_label? ('=' initializer)?\n         ;\n```",
+    "tags": [
+      { "kind": "RETURNS", "text": "Parsed init declarator, `NULL` on error." }
+    ]
+  },
+  {
+    "symbol": "cn_parse_init_declarator",
+    "decl": "CNDEF Cn_Ast_Init_Declarator *cn_parse_init_declarator(Cn_Lexer *lexer, void *declaration_specifiers)",
+    "summary": "Parses init declarator from the current token of `lexer`.",
+    "description": "```\n init_declarator\n         : declarator gnu_attribute_specifiers gnu_asm_label? ('=' initializer)?\n         ;\n```",
+    "tags": [
+      { "kind": "RETURNS", "text": "Parsed init declarator, `NULL` on error." }
+    ]
+  },
+  {
+    "symbol": "cn_parse_initializer",
+    "decl": "CNDEF Cn_Ast_Initializer *cn_parse_initializer(Cn_Lexer *lexer)",
+    "summary": "Parses initializer from the current token of `lexer`.",
+    "description": "```\n initializer\n         : expression\n         | designations\n         ;\n```",
+    "tags": [
+      { "kind": "RETURNS", "text": "Parsed initializer, `NULL` on error." }
+    ]
+  },
+  {
+    "symbol": "cn_parse_designations",
+    "decl": "CNDEF Cn_Ast_Nodes cn_parse_designations(Cn_Lexer *lexer, bool *ok)",
+    "summary": "Parses designations from the current token of `lexer`.",
+    "description": "```\n designations\n         : '{' ( designation (',' designation)* )? ','? '}'\n         ;\n```",
+    "tags": [
+      { "kind": "RETURNS", "text": "Parsed list of designations." },
+      { "kind": "OUTPUTS", "text": "`true` on success, `false` on error, written to `ok`." }
+    ]
+  },
+  {
+    "symbol": "cn_parse_designation",
+    "decl": "CNDEF Cn_Ast_Designation *cn_parse_designation(Cn_Lexer *lexer)",
+    "summary": "Parses designation from the current token of `lexer`.",
+    "description": "```\n designation\n         : (designators '=')? initializer\n         ;\n```",
+    "tags": [
+      { "kind": "RETURNS", "text": "Parsed designation, `NULL` on error." }
+    ]
+  },
+  {
+    "symbol": "cn_parse_designators",
+    "decl": "CNDEF Cn_Ast_Nodes cn_parse_designators(Cn_Lexer *lexer, bool *ok)",
+    "summary": "Parses designators from the current token of `lexer`.",
+    "description": "```\n designators\n         : designator+\n         ;\n```",
+    "tags": [
+      { "kind": "RETURNS", "text": "Parsed list of designators." },
+      { "kind": "OUTPUTS", "text": "`true` on success, `false` on error, written to `ok`." }
+    ]
+  },
+  {
+    "symbol": "cn_parse_designator",
+    "decl": "CNDEF Cn_Ast_Designator *cn_parse_designator(Cn_Lexer *lexer)",
+    "summary": "Parses designator from the current token of `lexer`.",
+    "description": "```\n designator\n         : '.' identifier\n         | '[' expression ']'\n         | '[' expression '...' expression ']'\n         ;\n```",
+    "tags": [
+      { "kind": "RETURNS", "text": "Parsed designator, `NULL` on error." }
+    ]
+  },
+  {
+    "symbol": "cn_parse_starts_designator",
+    "decl": "CNDEF bool cn_parse_starts_designator(Cn_Lexer *lexer)",
+    "summary": "Determines whether tokens of `lexer` indicate start of a designator.",
+    "description": "Used to distinguish between designator and initializer before parsing them.",
+    "tags": [
+      { "kind": "RETURNS", "text": "`true` if tokens indicate start of a designator, `false` otherwise." },
+      { "kind": "NOTE", "text": "Doesn't alter state of `lexer`." }
+    ]
+  },
+  {
+    "symbol": "cn_parse_declarator",
+    "decl": "CNDEF Cn_Ast_Declarator *cn_parse_declarator(Cn_Lexer *lexer, bool *ok)",
+    "summary": "Parses declarator from the current token of `lexer`.",
+    "description": "```\n declarator\n         : pointer? direct_declarator\n         ;\n```",
+    "tags": [
+      { "kind": "RETURNS", "text": "Parsed declarator, `NULL` on error or if declarator is completely empty." },
+      { "kind": "OUTPUTS", "text": "`true` on success, `false` on error, written to `ok`." },
+      { "kind": "NOTE", "text": "`NULL` can be returned on success, only in case of a completely empty abstract declarator,\nmeaning abstract declarator without direct declarator. In that case no tokens are consumed, since\nnothing is parsed." }
+    ]
+  },
+  {
+    "symbol": "cn_parse_pointer",
+    "decl": "CNDEF Cn_Ast_Pointer *cn_parse_pointer(Cn_Lexer *lexer)",
+    "summary": "Parses pointer from the current token of `lexer`.",
+    "description": "```\n pointer\n         : '*' (qualifier | gnu_attribute_specifier)* pointer?\n         ;\n```",
+    "tags": [
+      { "kind": "RETURNS", "text": "Parsed pointer, `NULL` on error." }
+    ]
+  },
+  {
+    "symbol": "cn_parse_direct_declarator",
+    "decl": "CNDEF Cn_Ast_Node *cn_parse_direct_declarator(Cn_Lexer *lexer, bool *is_abstract)",
+    "summary": "Parses direct declarator from the current token of `lexer`.",
+    "description": "```\n direct_declarator\n         : identifier\n         | '(' declarator ')'\n         | direct_declarator '[' expression? ']'\n         | direct_declarator '(' ('void' | parameter_type_list)? ')'\n         ;\n```",
+    "tags": [
+      { "kind": "RETURNS", "text": "Parsed direct declarator, `NULL` on error." },
+      { "kind": "OUTPUTS", "text": "`true` if no identifier was found at the end of the direct declarator, `false` otherwise,\nwritten to `is_abstract`." }
+    ]
+  },
+  {
+    "symbol": "cn_parse_identifier",
+    "decl": "CNDEF Cn_Ast_Identifier *cn_parse_identifier(Cn_Lexer *lexer)",
+    "summary": "Parses identifier from the current token of `lexer`.",
+    "description": "",
+    "tags": [
+      { "kind": "RETURNS", "text": "Parsed identifier, `NULL` on error." }
+    ]
+  },
+  {
+    "symbol": "cn_parse_integer",
+    "decl": "CNDEF Cn_Ast_Integer *cn_parse_integer(Cn_Lexer *lexer)",
+    "summary": "Parses integer from the current token of `lexer`.",
+    "description": "",
+    "tags": [
+      { "kind": "RETURNS", "text": "Parsed integer, `NULL` on error." }
+    ]
+  },
+  {
+    "symbol": "cn_parse_float",
+    "decl": "CNDEF Cn_Ast_Float *cn_parse_float(Cn_Lexer *lexer)",
+    "summary": "Parses float from the current token of `lexer`.",
+    "description": "",
+    "tags": [
+      { "kind": "RETURNS", "text": "Parsed float, `NULL` on error." }
+    ]
+  },
+  {
+    "symbol": "cn_parse_character",
+    "decl": "CNDEF Cn_Ast_Char *cn_parse_character(Cn_Lexer *lexer)",
+    "summary": "Parses character from the current token of `lexer`.",
+    "description": "",
+    "tags": [
+      { "kind": "RETURNS", "text": "Parsed character, `NULL` on error." },
+      { "kind": "NOTE", "text": "Value of the char is parsed, so any escape sequence is converted." }
+    ]
+  },
+  {
+    "symbol": "cn_parse_string",
+    "decl": "CNDEF Cn_Ast_String *cn_parse_string(Cn_Lexer *lexer)",
+    "summary": "Parses string from the current token of `lexer`.",
+    "description": "",
+    "tags": [
+      { "kind": "RETURNS", "text": "Parsed string, `NULL` on error." },
+      { "kind": "NOTE", "text": "Any neighboring string tokens are concatenated, until a non-string token is reached." }
+    ]
+  },
+  {
+    "symbol": "cn_parse_declaration_specifiers",
+    "decl": "CNDEF Cn_Ast_Declaration_Specifiers *cn_parse_declaration_specifiers(Cn_Lexer *lexer)",
+    "summary": "Parses declaration specifiers from the current token of `lexer`.",
+    "description": "```\n declaration_specifiers\n         : (\n             storage_specifier\n             | qualifier\n             | function_specifier\n             | gnu_attribute_specifier\n             | type_specifier\n             )+\n         ;\n```",
+    "tags": [
+      { "kind": "RETURNS", "text": "Parsed declaration specifiers, `NULL` on error." }
+    ]
+  },
+  {
+    "symbol": "cn_parse_try_storage_specifier",
+    "decl": "CNDEF int cn_parse_try_storage_specifier(Cn_Lexer *lexer, Cn_Ast_Storage_Specifier_Flags *output)",
+    "summary": "Tries to parse storage specifier from the current token of `lexer`.",
+    "description": "```\n storage_specifier\n         : 'static'\n         | 'extern'\n         | 'register'\n         | 'auto'\n         | 'typedef'\n         ;\n```",
+    "tags": [
+      { "kind": "RETURNS", "text": "`0` on success, `1` if token wasn't accepted, `2` on error." },
+      { "kind": "OUTPUTS", "text": "Parsed storage specifier, written to `output`." }
+    ]
+  },
+  {
+    "symbol": "cn_parse_try_qualifier",
+    "decl": "CNDEF int cn_parse_try_qualifier(Cn_Lexer *lexer, Cn_Ast_Qualifier_Flags *output)",
+    "summary": "Tries to parse qualifier from the current token of `lexer`.",
+    "description": "```\n qualifier\n         : 'const'\n         | 'restrict'\n         | 'volatile'\n         | '_Atomic'\n         ;\n```",
+    "tags": [
+      { "kind": "RETURNS", "text": "`0` on success, `1` if token wasn't accepted, `2` on error." },
+      { "kind": "OUTPUTS", "text": "Parsed qualifier, written to `output`." }
+    ]
+  },
+  {
+    "symbol": "cn_parse_try_function_specifier",
+    "decl": "CNDEF int cn_parse_try_function_specifier(Cn_Lexer *lexer, Cn_Ast_Function_Specifier_Flags *output)",
+    "summary": "Tries to parse function specifier from the current token of `lexer`.",
+    "description": "```\n function_specifier\n         : 'inline'\n         | '_Noreturn'\n         ;\n```",
+    "tags": [
+      { "kind": "RETURNS", "text": "`0` on success, `1` if token wasn't accepted, `2` on error." },
+      { "kind": "OUTPUTS", "text": "Parsed function specifier, written to `output`." }
+    ]
+  },
+  {
+    "symbol": "cn_parse_gnu_typeof",
+    "decl": "CNDEF Cn_Ast_Gnu_Typeof *cn_parse_gnu_typeof(Cn_Lexer *lexer)",
+    "summary": "Parses GNU `typeof` specifier from the current token of `lexer`.",
+    "description": "```\n gnu_typeof_specifier\n         : 'typeof' '(' type_name ')'\n         | 'typeof' '(' expression ')'\n         ;\n```",
+    "tags": [
+      { "kind": "RETURNS", "text": "Parsed `typeof` specifier, `NULL` on error." }
+    ]
+  },
+  {
+    "symbol": "cn_parse_try_type_specifier",
+    "decl": "CNDEF int cn_parse_try_type_specifier(Cn_Lexer *lexer, Cn_Primitive_Type_Info *primitive_info, Cn_Ast_Node **type_specifier)",
+    "summary": "Tries to parse type specifier from the current token of `lexer`.",
+    "description": "```\n type_specifier\n         : 'void'\n         | 'char'\n         | 'short'\n         | 'int'\n         | 'long'\n         | 'float'\n         | 'double'\n         | 'signed'\n         | 'unsigned'\n         | '_Bool'\n         | '_Complex'\n         | atomic_type_specifier\n         | struct_specifier\n         | union_specifier\n         | enum_specifier\n         | typedef\n         | gnu_typeof\n         ;\n```",
+    "tags": [
+      { "kind": "RETURNS", "text": "`0` on success, `1` if token wasn't accepted, `2` on error." },
+      { "kind": "OUTPUTS", "text": "For primitive types like `int`, `char`, `signed`, `unsigned`, `long`, `short`, etc.,\nupdates `primitive_info`." },
+      { "kind": "OUTPUTS", "text": "For typedef, `struct`, `union`, `enum` and `typeof`, sets `type_specifier` to the node." },
+      { "kind": "NOTE", "text": "Returning `1` is NOT an error. It occurs when current token is not a valid token\ntype specifier can accept, and no errors occurred. This way type specifier can check everything\nit needs, and if there is no work to be done, signal to the outer function\nthat current token is definitely not a type specifier." },
+      { "kind": "TODO", "text": "Refactor implementation of this function and its interface.\nIt can be simpler, without need of the helper primitive type info struct." }
+    ]
+  },
+  {
+    "symbol": "cn_parse_type_name",
+    "decl": "CNDEF Cn_Ast_Type_Name *cn_parse_type_name(Cn_Lexer *lexer)",
+    "summary": "Parses type name from the current token of `lexer`.",
+    "description": "```\n type_name\n         : specifier_qualifier abstract_declarator\n         ;\n```",
+    "tags": [
+      { "kind": "RETURNS", "text": "Parsed type name, `NULL` on error." }
+    ]
+  },
+  {
+    "symbol": "cn_parse_specifier_qualifier",
+    "decl": "CNDEF Cn_Ast_Specifier_Qualifier *cn_parse_specifier_qualifier(Cn_Lexer *lexer)",
+    "summary": "Parses specifier qualifier from the current token of `lexer`.",
+    "description": "```\n specifier_qualifier\n         : gnu_attribute_specifiers (qualifier | type_specifier)+\n         ;\n```",
+    "tags": [
+      { "kind": "RETURNS", "text": "Parsed specifier qualifier, `NULL` on error." }
+    ]
+  },
+  {
+    "symbol": "cn_parse_parameter_declarations",
+    "decl": "CNDEF Cn_Ast_Nodes cn_parse_parameter_declarations(Cn_Lexer *lexer, bool *variadic, bool *ok)",
+    "summary": "Parses parameter type list from the current token of `lexer`.",
+    "description": "```\n parameter_type_list\n         : '...'\n         | parameter_declaration_list (',' '...')?\n         ;\n\n parameter_declaration_list\n         : parameter_declaration (',' parameter_declaration)*\n         ;\n```",
+    "tags": [
+      { "kind": "RETURNS", "text": "Parsed list of parameter declarations." },
+      { "kind": "OUTPUTS", "text": "`true` on success, `false` on error, written to `ok`." },
+      { "kind": "OUTPUTS", "text": "`true` if list ends with `...`, written to `variadic`." }
+    ]
+  },
+  {
+    "symbol": "cn_parse_parameter_declaration",
+    "decl": "CNDEF Cn_Ast_Parameter_Declaration *cn_parse_parameter_declaration(Cn_Lexer *lexer)",
+    "summary": "Parses parameter declaration from the current token of `lexer`.",
+    "description": "```\n parameter_declaration\n         : declaration_specifiers declarator\n         ;\n```",
+    "tags": [
+      { "kind": "RETURNS", "text": "Parsed parameter declaration, `NULL` on error." }
+    ]
+  },
+  {
+    "symbol": "cn_parse_struct_or_union_specifier",
+    "decl": "CNDEF Cn_Ast_Node *cn_parse_struct_or_union_specifier(Cn_Lexer *lexer)",
+    "summary": "Parses `struct` or `union` specifier from the current token of `lexer`.",
+    "description": "```\n struct_specifier\n         : 'struct' attribute_specifiers gnu_attribute_specifiers\n         ( identifier? '{' member_declaration* '}' )\n         | identifier\n         ;\n\n union_specifier\n         : 'union' attribute_specifiers gnu_attribute_specifiers\n         ( identifier? '{' member_declaration* '}' )\n         | identifier\n         ;\n```",
+    "tags": [
+      { "kind": "RETURNS", "text": "Parsed `struct` or `union` specifier, `NULL` on error." }
+    ]
+  },
+  {
+    "symbol": "cn_parse_member_declaration",
+    "decl": "CNDEF Cn_Ast_Member_Declaration *cn_parse_member_declaration(Cn_Lexer *lexer)",
+    "summary": "Parses member declaration from the current token of `lexer`.",
+    "description": "```\n member_declaration\n         : gnu_extensions attribute_specifiers specifier_qualifier member_declarators ';'\n         ;\n```",
+    "tags": [
+      { "kind": "RETURNS", "text": "Parsed member declaration, `NULL` on error." },
+      { "kind": "NOTE", "text": "If `gnu_extensions` are present, `CN_AST_GNU_EXTENSION` flag is set on the member declaration." }
+    ]
+  },
+  {
+    "symbol": "cn_parse_member_declarators",
+    "decl": "CNDEF Cn_Ast_Nodes cn_parse_member_declarators(Cn_Lexer *lexer, bool *ok)",
+    "summary": "Parses member declarator list from the current token of `lexer`.",
+    "description": "```\n member_declarators\n         : member_declarator (',' member_declarator)*\n         ;\n```",
+    "tags": [
+      { "kind": "RETURNS", "text": "Parsed list of member declarators." },
+      { "kind": "OUTPUTS", "text": "`true` on success, `false` on error, written to `ok`." }
+    ]
+  },
+  {
+    "symbol": "cn_parse_member_declarator",
+    "decl": "CNDEF Cn_Ast_Member_Declarator *cn_parse_member_declarator(Cn_Lexer *lexer)",
+    "summary": "Parses member declarator from the current token of `lexer`.",
+    "description": "```\n member_declarator\n         : declarator gnu_attribute_specifiers\n         | declarator? ':' expression gnu_attribute_specifiers\n         ;\n```",
+    "tags": [
+      { "kind": "RETURNS", "text": "Parsed member declarator, `NULL` on error." }
+    ]
+  },
+  {
+    "symbol": "cn_parse_enum_specifier",
+    "decl": "CNDEF Cn_Ast_Node *cn_parse_enum_specifier(Cn_Lexer *lexer)",
+    "summary": "Parses `enum` specifier from the current token of `lexer`.",
+    "description": "```\n enum_specifier\n         : 'enum' attribute_specifiers gnu_attribute_specifiers\n         ( identifier? (':' specifier_qualifier)? '{' ( enumerator (',' enumerator)* ','? )? '}' )\n         | identifier  (':' specifier_qualifier)?\n         ;\n```",
+    "tags": [
+      { "kind": "RETURNS", "text": "Parsed `enum` specifier, `NULL` on error." }
+    ]
+  },
+  {
+    "symbol": "cn_parse_enumerator",
+    "decl": "CNDEF Cn_Ast_Enumerator *cn_parse_enumerator(Cn_Lexer *lexer)",
+    "summary": "Parses enumerator from the current token of `lexer`.",
+    "description": "```\n enumerator\n         : identifier attribute_specifiers gnu_attribute_specifiers ('=' expression)?\n         ;\n```",
+    "tags": [
+      { "kind": "RETURNS", "text": "Parsed enumerator, `NULL` on error." }
+    ]
+  },
+  {
+    "symbol": "cn_parse_attribute_specifiers",
+    "decl": "CNDEF Cn_Ast_Nodes cn_parse_attribute_specifiers(Cn_Lexer *lexer, bool *ok)",
+    "summary": "Parses attribute specifier sequence from the current token of `lexer`.",
+    "description": "```\n attribute_specifiers\n         : attribute_specifier*\n         ;\n```",
+    "tags": [
+      { "kind": "RETURNS", "text": "Parsed list of attribute specifiers." },
+      { "kind": "OUTPUTS", "text": "`true` on success, `false` on error, written to `ok`." }
+    ]
+  },
+  {
+    "symbol": "cn_parse_attribute_specifier",
+    "decl": "CNDEF Cn_Ast_Attribute_Specifier *cn_parse_attribute_specifier(Cn_Lexer *lexer)",
+    "summary": "Parses attribute specifier from the current token of `lexer`.",
+    "description": "```\n attribute_specifier\n         : '[' '[' attribute_list? ']' ']'\n         ;\n```",
+    "tags": [
+      { "kind": "RETURNS", "text": "Parsed attribute specifier, `NULL` on error." }
+    ]
+  },
+  {
+    "symbol": "cn_parse_attributes",
+    "decl": "CNDEF Cn_Ast_Nodes cn_parse_attributes(Cn_Lexer *lexer, bool *ok)",
+    "summary": "Parses attribute list from the current token of `lexer`.",
+    "description": "```\n attributes\n         : attribute (',' attribute)*\n         ;\n```",
+    "tags": [
+      { "kind": "RETURNS", "text": "Parsed list of attributes." },
+      { "kind": "OUTPUTS", "text": "`true` on success, `false` on error, written to `ok`." }
+    ]
+  },
+  {
+    "symbol": "cn_parse_attribute",
+    "decl": "CNDEF Cn_Ast_Attribute *cn_parse_attribute(Cn_Lexer *lexer)",
+    "summary": "Parses attribute from the current token of `lexer`.",
+    "description": "```\n attribute\n         : ( identifier ':' ':' )? identifier ( '(' arguments ')' )?\n         ;\n```",
+    "tags": [
+      { "kind": "RETURNS", "text": "Parsed attribute, `NULL` on error." }
+    ]
+  },
+  {
+    "symbol": "cn_parse_gnu_attribute_specifiers",
+    "decl": "CNDEF Cn_Ast_Nodes cn_parse_gnu_attribute_specifiers(Cn_Lexer *lexer, bool *ok)",
+    "summary": "Parses GNU attribute specifier sequence from the current token of `lexer`.",
+    "description": "```\n gnu_attribute_specifiers\n         : gnu_attribute_specifier*\n         ;\n```",
+    "tags": [
+      { "kind": "RETURNS", "text": "Parsed list of GNU attribute specifiers." },
+      { "kind": "OUTPUTS", "text": "`true` on success, `false` on error, written to `ok`." }
+    ]
+  },
+  {
+    "symbol": "cn_parse_gnu_extensions",
+    "decl": "CNDEF bool cn_parse_gnu_extensions(Cn_Lexer *lexer)",
+    "summary": "Parses GNU `__extension__` keywords from the current token of `lexer`.",
+    "description": "```\n gnu_extensions\n         : '__extension__'*\n         ;\n```",
+    "tags": [
+      { "kind": "RETURNS", "text": "`true` if at least one keyword was parsed, `false` otherwise." },
+      { "kind": "NOTE", "text": "Keyword only disables pedantic diagnostics in GCC, so repeated keywords are collapsed\ninto a single `CN_AST_GNU_EXTENSION` flag, set by the caller on the node that follows." },
+      { "kind": "NOTE", "text": "Allowed only at the start of an external declaration, block item declaration, `for`\ninitialization declaration, member declaration, and as a unary operator in expressions.\nNever after attribute specifiers, same as GCC." },
+      { "kind": "AI", "text": "Generated." }
+    ]
+  },
+  {
+    "symbol": "cn_parse_gnu_attribute_specifier",
+    "decl": "CNDEF Cn_Ast_Gnu_Attribute_Specifier *cn_parse_gnu_attribute_specifier(Cn_Lexer *lexer)",
+    "summary": "Parses GNU attribute specifier from the current token of `lexer`.",
+    "description": "```\n gnu_attribute_specifier\n         : '__attribute__' '(' '(' gnu_attribute_list? ')' ')'\n         ;\n```",
+    "tags": [
+      { "kind": "RETURNS", "text": "Parsed GNU attribute specifier, `NULL` on error." }
+    ]
+  },
+  {
+    "symbol": "cn_parse_gnu_attributes",
+    "decl": "CNDEF Cn_Ast_Nodes cn_parse_gnu_attributes(Cn_Lexer *lexer, bool *ok)",
+    "summary": "Parses GNU attribute list from the current token of `lexer`.",
+    "description": "```\n gnu_attributes\n         : gnu_attribute (',' gnu_attribute)*\n         ;\n```",
+    "tags": [
+      { "kind": "RETURNS", "text": "Parsed list of GNU attributes." },
+      { "kind": "OUTPUTS", "text": "`true` on success, `false` on error, written to `ok`." }
+    ]
+  },
+  {
+    "symbol": "cn_parse_gnu_attribute",
+    "decl": "CNDEF Cn_Ast_Gnu_Attribute *cn_parse_gnu_attribute(Cn_Lexer *lexer)",
+    "summary": "Parses GNU attribute from the current token of `lexer`.",
+    "description": "```\n gnu_attribute\n         : identifier ( '(' arguments ')' )?\n         ;\n```",
+    "tags": [
+      { "kind": "RETURNS", "text": "Parsed GNU attribute, `NULL` on error." }
+    ]
+  },
+  {
+    "symbol": "cn_parse_gnu_asm_statement",
+    "decl": "CNDEF Cn_Ast_Gnu_Asm_Statement *cn_parse_gnu_asm_statement(Cn_Lexer *lexer)",
+    "summary": "Parses GNU `asm` statement from the current token of `lexer`.",
+    "description": "```\n gnu_asm_statement\n         : 'asm' gnu_asm_qualifier* '(' string gnu_asm_sections? ')' ';'\n         ;\n\n gnu_asm_sections\n         : ':' gnu_asm_operands? ( ':' gnu_asm_operands? ( ':' gnu_asm_clobbers? ( ':' gnu_asm_goto_labels )? )? )?\n         ;\n```",
+    "tags": [
+      { "kind": "RETURNS", "text": "Parsed GNU `asm` statement, `NULL` on error." },
+      { "kind": "NOTE", "text": "Without `gnu_asm_sections` the statement is basic asm, otherwise it is extended asm.\nFirst operand list holds outputs, second holds inputs. Lists that are not present are empty." },
+      { "kind": "NOTE", "text": "Constraints not expressed by the grammar, reported as errors:\n- each qualifier may appear at most once, in any order,\n- `goto` qualifier is not allowed in basic asm,\n- `goto` qualifier requires the goto labels section, with at least one label,\n- goto labels section is not allowed without `goto` qualifier." },
+      { "kind": "NOTE", "text": "Also used for file-scope asm, which is a basic asm statement appearing as an external\ndeclaration. Callers at file scope should reject extended asm and any qualifiers, GCC and Clang\nreject them too." },
+      { "kind": "AI", "text": "Generated." }
+    ]
+  },
+  {
+    "symbol": "cn_parse_try_gnu_asm_qualifier",
+    "decl": "CNDEF int cn_parse_try_gnu_asm_qualifier(Cn_Lexer *lexer, Cn_Ast_Gnu_Asm_Qualifier_Flags *output)",
+    "summary": "Tries to parse GNU `asm` qualifier from the current token of `lexer`.",
+    "description": "```\n gnu_asm_qualifier\n         : 'volatile'\n         | 'inline'\n         | 'goto'\n         ;\n```",
+    "tags": [
+      { "kind": "RETURNS", "text": "`0` on success, `1` if token wasn't accepted, `2` on error." },
+      { "kind": "OUTPUTS", "text": "Parsed qualifier, added to `output`." },
+      { "kind": "NOTE", "text": "Returns `2` if the qualifier is already set in `output`." },
+      { "kind": "AI", "text": "Generated." }
+    ]
+  },
+  {
+    "symbol": "cn_parse_gnu_asm_operands",
+    "decl": "CNDEF Cn_Ast_Nodes cn_parse_gnu_asm_operands(Cn_Lexer *lexer, bool *ok)",
+    "summary": "Parses GNU `asm` operand list from the current token of `lexer`.",
+    "description": "```\n gnu_asm_operands\n         : gnu_asm_operand (',' gnu_asm_operand)*\n         ;\n```",
+    "tags": [
+      { "kind": "RETURNS", "text": "Parsed list of GNU `asm` operands." },
+      { "kind": "OUTPUTS", "text": "`true` on success, `false` on error, written to `ok`." },
+      { "kind": "NOTE", "text": "Returns an empty list without consuming tokens if current token is `:` or `)`,\nsince operand lists may be empty." },
+      { "kind": "AI", "text": "Generated." }
+    ]
+  },
+  {
+    "symbol": "cn_parse_gnu_asm_operand",
+    "decl": "CNDEF Cn_Ast_Gnu_Asm_Operand *cn_parse_gnu_asm_operand(Cn_Lexer *lexer)",
+    "summary": "Parses GNU `asm` operand from the current token of `lexer`.",
+    "description": "```\n gnu_asm_operand\n         : ('[' identifier ']')? string '(' expression ')'\n         ;\n```",
+    "tags": [
+      { "kind": "RETURNS", "text": "Parsed GNU `asm` operand, `NULL` on error." },
+      { "kind": "NOTE", "text": "`string` is the constraint, e.g. `\"=r\"`, `\"+m\"`, `\"i\"`. Identifier is the optional\nsymbolic name referenced from the template as `%[name]`." },
+      { "kind": "AI", "text": "Generated." }
+    ]
+  },
+  {
+    "symbol": "cn_parse_gnu_asm_clobbers",
+    "decl": "CNDEF Cn_Ast_Nodes cn_parse_gnu_asm_clobbers(Cn_Lexer *lexer, bool *ok)",
+    "summary": "Parses GNU `asm` clobber list from the current token of `lexer`.",
+    "description": "```\n gnu_asm_clobbers\n         : string (',' string)*\n         ;\n```",
+    "tags": [
+      { "kind": "RETURNS", "text": "Parsed list of clobber strings." },
+      { "kind": "OUTPUTS", "text": "`true` on success, `false` on error, written to `ok`." },
+      { "kind": "NOTE", "text": "Returns an empty list without consuming tokens if current token is `:` or `)`." },
+      { "kind": "AI", "text": "Generated." }
+    ]
+  },
+  {
+    "symbol": "cn_parse_gnu_asm_goto_labels",
+    "decl": "CNDEF Cn_Ast_Nodes cn_parse_gnu_asm_goto_labels(Cn_Lexer *lexer, bool *ok)",
+    "summary": "Parses GNU `asm goto` label list from the current token of `lexer`.",
+    "description": "```\n gnu_asm_goto_labels\n         : identifier (',' identifier)*\n         ;\n```",
+    "tags": [
+      { "kind": "RETURNS", "text": "Parsed list of label identifiers." },
+      { "kind": "OUTPUTS", "text": "`true` on success, `false` on error, written to `ok`." },
+      { "kind": "AI", "text": "Generated." }
+    ]
+  },
+  {
+    "symbol": "cn_parse_gnu_asm_label",
+    "decl": "CNDEF Cn_Ast_Gnu_Asm_Label *cn_parse_gnu_asm_label(Cn_Lexer *lexer)",
+    "summary": "Parses GNU `asm` label from the current token of `lexer`.",
+    "description": "```\n gnu_asm_label\n         : 'asm' '(' string ')'\n         ;\n```",
+    "tags": [
+      { "kind": "RETURNS", "text": "Parsed GNU `asm` label, `NULL` on error." }
+    ]
+  },
+  {
+    "symbol": "cn_parse_int_literal",
+    "decl": "CNDEF bool cn_parse_int_literal(Cn_String literal, uint64_t *out)",
+    "summary": "Parses integer literal into its magnitude.",
+    "description": "Accepts decimal, octal and `0x` hex literals, with optional `u`, `U`, `l` or `L` suffix.\nNo leading sign is accepted, since unary minus is its own ast node.",
+    "tags": [
+      { "kind": "RETURNS", "text": "`true` on success, `false` on error." },
+      { "kind": "OUTPUTS", "text": "Magnitude of the literal, written to `out`." }
+    ]
+  },
+  {
+    "symbol": "cn_parse_float_literal",
+    "decl": "CNDEF bool cn_parse_float_literal(Cn_String literal, double *out)",
+    "summary": "Parses float literal.",
+    "description": "Accepts mantissa with optional exponent and optional `f`, `F`, `l` or `L` suffix.\nRounding is not bit exact.",
+    "tags": [
+      { "kind": "RETURNS", "text": "`true` on success, `false` on error." },
+      { "kind": "OUTPUTS", "text": "Value of the literal, written to `out`." },
+      { "kind": "TODO", "text": "Hex floats are not handled, they output `NIL`." }
+    ]
+  },
+  {
+    "symbol": "cn_parse_char_literal",
+    "decl": "CNDEF bool cn_parse_char_literal(Cn_String literal, uint64_t *out, int *unit_count_out)",
+    "summary": "Parses char literal into its numeric value.",
+    "description": "Accepts single characters and escape sequences.",
+    "tags": [
+      { "kind": "RETURNS", "text": "`true` on success, `false` on error." },
+      { "kind": "OUTPUTS", "text": "Value of the literal, written to `out`. It is 64 bits wide, because multi-character\nliteral can occupy more than one byte." },
+      { "kind": "OUTPUTS", "text": "Number of character units in the literal, written to `unit_count_out`." },
+      { "kind": "AI", "text": "Generated." }
+    ]
+  },
+  {
+    "symbol": "cn_build_format",
+    "decl": "#define cn_build_format(...) cn__build_format(__FILE__, __LINE__, __VA_ARGS__)",
+    "summary": "Builds code ast node that contains formatted text.",
+    "description": "Once reparsed, the node is expanded and parsed into actual ast nodes.",
+    "tags": [
+      { "kind": "RETURNS", "text": "Built code node." }
+    ]
+  },
+  {
+    "symbol": "cn_build_list",
+    "decl": "#define cn_build_list(...) cn_build_list_from((void *[]) { __VA_ARGS__ }, sizeof((void *[]) { __VA_ARGS__ }) / sizeof(void *))",
+    "summary": "Builds list out of supplied nodes, passed as variadic arguments in order.",
+    "description": "",
+    "tags": [
+      { "kind": "RETURNS", "text": "List composed of supplied nodes, allocated internally in arena." }
+    ]
+  },
+  {
+    "symbol": "cn_build_list_from",
+    "decl": "CNDEF Cn_Ast_Nodes cn_build_list_from(void *ptrs[], int64_t length)",
+    "summary": "Builds list out of `length` nodes in `ptrs`.",
+    "description": "",
+    "tags": [
+      { "kind": "RETURNS", "text": "List composed of supplied nodes, allocated internally in arena." }
+    ]
+  },
+  {
+    "symbol": "cn_build_identifier",
+    "decl": "#define cn_build_identifier(name, ...) cn__build_identifier(name, (Cn_Build_Opt) { .file = __FILE__, .line =__LINE__, __VA_ARGS__ })",
+    "summary": "Builds identifier with supplied `name`.",
+    "description": "",
+    "tags": [
+      { "kind": "RETURNS", "text": "Built identifier." }
+    ]
+  },
+  {
+    "symbol": "cn_build_integer",
+    "decl": "#define cn_build_integer(value, ...) cn__build_integer(value, (Cn_Build_Opt) { .file = __FILE__, .line =__LINE__, __VA_ARGS__ })",
+    "summary": "Builds integer with supplied `value`.",
+    "description": "",
+    "tags": [
+      { "kind": "RETURNS", "text": "Built integer." }
+    ]
+  },
+  {
+    "symbol": "cn_build_float",
+    "decl": "#define cn_build_float(value, ...) cn__build_float(value, (Cn_Build_Opt) { .file = __FILE__, .line =__LINE__, __VA_ARGS__ })",
+    "summary": "Builds float with supplied `value`.",
+    "description": "",
+    "tags": [
+      { "kind": "RETURNS", "text": "Built float." }
+    ]
+  },
+  {
+    "symbol": "cn_build_string",
+    "decl": "#define cn_build_string(str, ...) cn__build_string(str, (Cn_Build_Opt) { .file = __FILE__, .line =__LINE__, __VA_ARGS__ })",
+    "summary": "Builds string with supplied `str`.",
+    "description": "",
+    "tags": [
+      { "kind": "RETURNS", "text": "Built string." }
+    ]
+  },
+  {
+    "symbol": "cn_build_binary",
+    "decl": "#define cn_build_binary(op, left, right, ...) cn__build_binary(op, left, right, (Cn_Build_Opt) { .file = __FILE__, .line =__LINE__, __VA_ARGS__ })",
+    "summary": "Builds binary expression with operator `op`.",
+    "description": "",
+    "tags": [
+      { "kind": "RETURNS", "text": "Built binary expression." },
+      { "kind": "IMPORTANT", "text": "`left` and `right` must be valid built nodes." }
+    ]
+  },
+  {
+    "symbol": "cn_build_assign",
+    "decl": "#define cn_build_assign(op, left, right, ...) cn__build_assign(op, left, right, (Cn_Build_Opt) { .file = __FILE__, .line =__LINE__, __VA_ARGS__ })",
+    "summary": "Builds assignment expression with operator `op`.",
+    "description": "",
+    "tags": [
+      { "kind": "RETURNS", "text": "Built assignment expression." },
+      { "kind": "IMPORTANT", "text": "`left` and `right` must be valid built nodes." }
+    ]
+  },
+  {
+    "symbol": "cn_build_unary",
+    "decl": "#define cn_build_unary(op, expression, ...) cn__build_unary(op, expression, (Cn_Build_Opt) { .file = __FILE__, .line =__LINE__, __VA_ARGS__ })",
+    "summary": "Builds unary expression with operator `op`.",
+    "description": "",
+    "tags": [
+      { "kind": "RETURNS", "text": "Built unary expression." },
+      { "kind": "IMPORTANT", "text": "`expression` must be a valid built node." }
+    ]
+  },
+  {
+    "symbol": "cn_build_func_call",
+    "decl": "#define cn_build_func_call(callee, arguments, ...) cn__build_func_call(callee, arguments, (Cn_Build_Opt) { .file = __FILE__, .line =__LINE__, __VA_ARGS__ })",
+    "summary": "Builds function call expression.",
+    "description": "",
+    "tags": [
+      { "kind": "RETURNS", "text": "Built function call expression." },
+      { "kind": "IMPORTANT", "text": "`callee` must be a valid built node, and `arguments` must be constructed beforehand\nwith appropriate expression children." }
+    ]
+  },
+  {
+    "symbol": "cn_build_expr_statement",
+    "decl": "#define cn_build_expr_statement(expression, ...) cn__build_expr_statement(expression, (Cn_Build_Opt) { .file = __FILE__, .line =__LINE__, __VA_ARGS__ })",
+    "summary": "Builds expression statement.",
+    "description": "",
+    "tags": [
+      { "kind": "RETURNS", "text": "Built expression statement." },
+      { "kind": "IMPORTANT", "text": "`expression` must be a valid built node." }
+    ]
+  },
+  {
+    "symbol": "cn_build_goto_statement",
+    "decl": "#define cn_build_goto_statement(identifier, ...) cn__build_goto_statement(identifier, (Cn_Build_Opt) { .file = __FILE__, .line =__LINE__, __VA_ARGS__ })",
+    "summary": "Builds `goto` statement.",
+    "description": "",
+    "tags": [
+      { "kind": "RETURNS", "text": "Built `goto` statement." },
+      { "kind": "IMPORTANT", "text": "`identifier` must be a valid built node." }
+    ]
+  },
+  {
+    "symbol": "cn_build_return_statement",
+    "decl": "#define cn_build_return_statement(expression, ...) cn__build_return_statement(expression, (Cn_Build_Opt) { .file = __FILE__, .line =__LINE__, __VA_ARGS__ })",
+    "summary": "Builds `return` statement.",
+    "description": "",
+    "tags": [
+      { "kind": "RETURNS", "text": "Built `return` statement." },
+      { "kind": "IMPORTANT", "text": "`expression` must be a valid built node." }
+    ]
+  },
+  {
+    "symbol": "cn_build_label",
+    "decl": "#define cn_build_label(identifier, statement, ...) cn__build_label(identifier, statement, (Cn_Build_Opt) { .file = __FILE__, .line =__LINE__, __VA_ARGS__ })",
+    "summary": "Builds label.",
+    "description": "",
+    "tags": [
+      { "kind": "RETURNS", "text": "Built label." },
+      { "kind": "IMPORTANT", "text": "`identifier` and `statement` must be valid built nodes." }
+    ]
+  },
+  {
+    "symbol": "cn_build_block_item",
+    "decl": "#define cn_build_block_item(declaration_or_statement, ...) cn__build_block_item(declaration_or_statement, (Cn_Build_Opt) { .file = __FILE__, .line =__LINE__, __VA_ARGS__ })",
+    "summary": "Builds block item.",
+    "description": "",
+    "tags": [
+      { "kind": "RETURNS", "text": "Built block item." },
+      { "kind": "IMPORTANT", "text": "`declaration_or_statement` must be a valid built node." }
+    ]
+  },
+  {
+    "symbol": "cn_build_pointer",
+    "decl": "#define cn_build_pointer(qualifiers, pointer, ...) cn__build_pointer(qualifiers, pointer, (Cn_Build_Opt) { .file = __FILE__, .line =__LINE__, __VA_ARGS__ })",
+    "summary": "Builds pointer with supplied `qualifiers`.",
+    "description": "Chains `pointer` that stands closer to the declared name. As in `char * const * name`,\nwhere outer built pointer holds `const` qualifier and chains the inner one.",
+    "tags": [
+      { "kind": "RETURNS", "text": "Built pointer." },
+      { "kind": "IMPORTANT", "text": "`pointer` must be `NIL` or a valid built pointer." }
+    ]
+  },
+  {
+    "symbol": "cn_build_direct_declarator_grouped",
+    "decl": "#define cn_build_direct_declarator_grouped(declarator, ...) cn__build_direct_declarator_grouped(declarator, (Cn_Build_Opt) { .file = __FILE__, .line =__LINE__, __VA_ARGS__ })",
+    "summary": "Builds grouped direct declarator `'(' declarator ')'`.",
+    "description": "",
+    "tags": [
+      { "kind": "RETURNS", "text": "Built grouped direct declarator." },
+      { "kind": "IMPORTANT", "text": "`declarator` must be a valid built node." },
+      { "kind": "NOTE", "text": "Identifier direct declarator variation has no dedicated build function,\nplain `cn_build_identifier` result is used in its place." }
+    ]
+  },
+  {
+    "symbol": "cn_build_direct_declarator_array",
+    "decl": "#define cn_build_direct_declarator_array(direct_declarator, expression, ...) cn__build_direct_declarator_array(direct_declarator, expression, (Cn_Build_Opt) { .file = __FILE__, .line =__LINE__, __VA_ARGS__ })",
+    "summary": "Builds array direct declarator `direct_declarator '[' expression? ']'`.",
+    "description": "",
+    "tags": [
+      { "kind": "PARAM", "text": "direct_declarator: Valid built node, or `NIL` if array declarator is abstract." },
+      { "kind": "PARAM", "text": "expression: Can be `NIL` to build unsized `[]` array." },
+      { "kind": "RETURNS", "text": "Built array direct declarator." }
+    ]
+  },
+  {
+    "symbol": "cn_build_direct_declarator_function",
+    "decl": "#define cn_build_direct_declarator_function(direct_declarator, parameter_declarations, variadic, ...) cn__build_direct_declarator_function(direct_declarator, parameter_declarations, variadic, (Cn_Build_Opt) { .file = __FILE__, .line =__LINE__, __VA_ARGS__ })",
+    "summary": "Builds function direct declarator `direct_declarator '(' parameter_declarations? ')'`.",
+    "description": "",
+    "tags": [
+      { "kind": "PARAM", "text": "direct_declarator: Valid built node, or `NIL` if function declarator is abstract." },
+      { "kind": "PARAM", "text": "parameter_declarations: Must be constructed beforehand with appropriate parameter\ndeclaration children, empty list builds `(void)`." },
+      { "kind": "PARAM", "text": "variadic: Marks declarator as ending with `...`." },
+      { "kind": "RETURNS", "text": "Built function direct declarator." }
+    ]
+  },
+  {
+    "symbol": "cn_build_declarator",
+    "decl": "#define cn_build_declarator(pointer, direct_declarator, ...) cn__build_declarator(pointer, direct_declarator, (Cn_Build_Opt) { .file = __FILE__, .line =__LINE__, __VA_ARGS__ })",
+    "summary": "Builds declarator.",
+    "description": "",
+    "tags": [
+      { "kind": "PARAM", "text": "pointer: Can be `NIL` if declarator is not wrapped with pointers." },
+      { "kind": "PARAM", "text": "direct_declarator: Can be `NIL` only if declarator is abstract." },
+      { "kind": "RETURNS", "text": "Built declarator." },
+      { "kind": "NOTE", "text": "`CN_AST_DECLARATOR_IS_ABSTRACT` flag is deduced from supplied direct declarator chain,\ndeclarator is abstract when that chain carries no identifier." }
+    ]
+  },
+  {
+    "symbol": "cn_build_init_declarator",
+    "decl": "#define cn_build_init_declarator(declarator, initializer, ...) cn__build_init_declarator(declarator, initializer, (Cn_Build_Opt) { .file = __FILE__, .line =__LINE__, __VA_ARGS__ })",
+    "summary": "Builds init declarator.",
+    "description": "",
+    "tags": [
+      { "kind": "PARAM", "text": "initializer: Can be `NIL` if declared name is left uninitialized." },
+      { "kind": "RETURNS", "text": "Built init declarator." },
+      { "kind": "IMPORTANT", "text": "`declarator` must be a valid non-abstract built node." }
+    ]
+  },
+  {
+    "symbol": "cn_build_declaration",
+    "decl": "#define cn_build_declaration(declaration_specifiers, init_declarators, ...) cn__build_declaration(declaration_specifiers, init_declarators, (Cn_Build_Opt) { .file = __FILE__, .line =__LINE__, __VA_ARGS__ })",
+    "summary": "Builds declaration.",
+    "description": "",
+    "tags": [
+      { "kind": "PARAM", "text": "init_declarators: Must be constructed beforehand with appropriate init declarator children,\nempty list builds empty declaration." },
+      { "kind": "RETURNS", "text": "Built declaration." },
+      { "kind": "IMPORTANT", "text": "`declaration_specifiers` must be a valid built node." }
+    ]
+  },
+  {
+    "symbol": "cn_tu_init",
+    "decl": "#define cn_tu_init(tu, intermidiate_path, ...) cn__tu_init_opt(tu, intermidiate_path, (Cn_Tu_Make_Opt) { __VA_ARGS__ })",
+    "summary": "Initializes translation unit `tu` from the pre-processed file at `intermidiate_path`.",
+    "description": "Translation unit represents classic C translation unit, in which all lexing, parsing,\ninferring and modification occurs.\n\nPath must point to an `.i` file, that is the intermediate pre-processed representation of\na translation unit. Simply, it is a `.c` file that has all macros expanded and is ready to be\nsent to the compiler. In `gcc` it would be generated by executing the following:\n\n```\n$ gcc -E -o file.i file.c\n```",
+    "tags": [
+      { "kind": "RETURNS", "text": "`true` on success, `false` on error." },
+      { "kind": "IMPORTANT", "text": "Supplying `.c` files with macros that are not expanded results in an error,\nmake sure to pass the `.c` file through the compiler's pre-processor first." }
+    ]
+  },
+  {
+    "symbol": "cn_tu_process",
+    "decl": "CNDEF int cn_tu_process(Cn_Translation_Unit *tu)",
+    "summary": "Processes translation unit `tu` from top to bottom.",
+    "description": "Translation unit passes through Infer and Size stages. Meaning ast is built, type and symbol\ntables are constructed, and sizes of the types are calculated too.\n\nThroughout the processing, various messages are sent, which can be intercepted to introspect\nand modify code, state, etc. This can be done by setting `cn_message_handler`.\nSee `Message` section for more info.",
+    "tags": [
+      { "kind": "RETURNS", "text": "`0` if processing is successful, `-1` if an error occurred." }
+    ]
+  },
+  {
+    "symbol": "cn_tu_free",
+    "decl": "CNDEF void cn_tu_free(Cn_Translation_Unit *tu)",
+    "summary": "Frees all memory used by translation unit `tu`, including closing previously opened file.",
+    "description": "",
+    "tags": []
+  }
+]
