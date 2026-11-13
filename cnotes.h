@@ -1238,6 +1238,7 @@ CNDEF int64_t cn_source_is_empty(Cn_Source *src);
  * ============================================
  */
 typedef enum {
+    // General tokens.
     CN_TOKEN_EOF,
     CN_TOKEN_UNKNOWN,
     CN_TOKEN_STRING,
@@ -1247,47 +1248,7 @@ typedef enum {
     CN_TOKEN_FLOAT_VALUE,
     CN_TOKEN_CHAR_VALUE,
     CN_TOKEN_IDENTIFIER,
-    // Keyword tokens
-    CN_TOKEN_GNU_EXTENSION,
-    CN_TOKEN_GNU_ATTRIBUTE,
-    CN_TOKEN_CONST,
-    CN_TOKEN_RESTRICT,
-    CN_TOKEN_VOLATILE,
-    CN_TOKEN_ATOMIC,
-    CN_TOKEN_STATIC,
-    CN_TOKEN_EXTERN,
-    CN_TOKEN_REGISTER,
-    CN_TOKEN_AUTO,
-    CN_TOKEN_TYPEDEF,
-    CN_TOKEN_SIGNED,
-    CN_TOKEN_UNSIGNED,
-    CN_TOKEN_SHORT,
-    CN_TOKEN_LONG,
-    CN_TOKEN_INT,
-    CN_TOKEN_CHAR,
-    CN_TOKEN_FLOAT,
-    CN_TOKEN_DOUBLE,
-    CN_TOKEN_BOOL,
-    CN_TOKEN_VOID,
-    CN_TOKEN_STRUCT,
-    CN_TOKEN_ENUM,
-    CN_TOKEN_UNION,
-    CN_TOKEN_GNU_TYPEOF,
-    CN_TOKEN_IF,
-    CN_TOKEN_ELSE,
-    CN_TOKEN_SWITCH,
-    CN_TOKEN_WHILE,
-    CN_TOKEN_DO,
-    CN_TOKEN_FOR,
-    CN_TOKEN_GOTO,
-    CN_TOKEN_CONTINUE,
-    CN_TOKEN_BREAK,
-    CN_TOKEN_RETURN,
-    CN_TOKEN_SIZEOF,
-    CN_TOKEN_INLINE,
-    CN_TOKEN_NORETURN,
-    CN_TOKEN_ASM,
-    // Literal tokens
+    // Literal tokens, non-identifer.
     CN_TOKEN_COLON,
     CN_TOKEN_SEMICOLON,
     CN_TOKEN_PARAN_OPEN,
@@ -1334,8 +1295,54 @@ typedef enum {
     CN_TOKEN_BIT_OR_ASSIGN,
     CN_TOKEN_QUESTION,
     CN_TOKEN_ELLIPSIS,
+    // Keyword tokens.
+    CN_TOKEN_CONST,
+    CN_TOKEN_RESTRICT,
+    CN_TOKEN_VOLATILE,
+    CN_TOKEN_STATIC,
+    CN_TOKEN_EXTERN,
+    CN_TOKEN_REGISTER,
+    CN_TOKEN_AUTO,
+    CN_TOKEN_TYPEDEF,
+    CN_TOKEN_SIGNED,
+    CN_TOKEN_UNSIGNED,
+    CN_TOKEN_SHORT,
+    CN_TOKEN_LONG,
+    CN_TOKEN_INT,
+    CN_TOKEN_CHAR,
+    CN_TOKEN_FLOAT,
+    CN_TOKEN_DOUBLE,
+    CN_TOKEN_BOOL,
+    CN_TOKEN_VOID,
+    CN_TOKEN_STRUCT,
+    CN_TOKEN_ENUM,
+    CN_TOKEN_UNION,
+    CN_TOKEN_IF,
+    CN_TOKEN_ELSE,
+    CN_TOKEN_SWITCH,
+    CN_TOKEN_WHILE,
+    CN_TOKEN_DO,
+    CN_TOKEN_FOR,
+    CN_TOKEN_GOTO,
+    CN_TOKEN_CONTINUE,
+    CN_TOKEN_BREAK,
+    CN_TOKEN_RETURN,
+    CN_TOKEN_SIZEOF,
+    CN_TOKEN_INLINE,
     CN_TOKEN_CASE,
     CN_TOKEN_DEFAULT,
+    CN_TOKEN_COMPLEX,
+    CN_TOKEN_IMAGINARY,
+
+    // TEMPORARY: Post C99.
+    CN_TOKEN_ATOMIC,
+    CN_TOKEN_NORETURN,
+
+    // TEMPORARY: GNU keywords.
+    CN_TOKEN_GNU_ASM,
+    CN_TOKEN_GNU_EXTENSION,
+    CN_TOKEN_GNU_ATTRIBUTE,
+    CN_TOKEN_GNU_TYPEOF,
 } Cn_Token_Type;
 
 typedef struct {
@@ -6938,14 +6945,9 @@ CNDEF int64_t cn_source_is_empty(Cn_Source *src) {
  * ============================================
  */
 const Cn_Token_Literal CN_KEYWORD_TOKENS[] = {
-    { CN_TOKEN_GNU_EXTENSION,   CN_STR_BUFFER("__extension__") }, 
-    { CN_TOKEN_GNU_ATTRIBUTE,   CN_STR_BUFFER("__attribute__") }, 
     { CN_TOKEN_CONST,           CN_STR_BUFFER("const") },
     { CN_TOKEN_RESTRICT,        CN_STR_BUFFER("restrict") },
-    { CN_TOKEN_RESTRICT,        CN_STR_BUFFER("__restrict") },
     { CN_TOKEN_VOLATILE,        CN_STR_BUFFER("volatile") },
-    { CN_TOKEN_VOLATILE,        CN_STR_BUFFER("__volatile__") },
-    { CN_TOKEN_ATOMIC,          CN_STR_BUFFER("_Atomic") },
     { CN_TOKEN_STATIC,          CN_STR_BUFFER("static") },
     { CN_TOKEN_EXTERN,          CN_STR_BUFFER("extern") },
     { CN_TOKEN_REGISTER,        CN_STR_BUFFER("register") },
@@ -6964,8 +6966,6 @@ const Cn_Token_Literal CN_KEYWORD_TOKENS[] = {
     { CN_TOKEN_STRUCT,          CN_STR_BUFFER("struct") },
     { CN_TOKEN_ENUM,            CN_STR_BUFFER("enum") },
     { CN_TOKEN_UNION,           CN_STR_BUFFER("union") },
-    { CN_TOKEN_GNU_TYPEOF,      CN_STR_BUFFER("typeof") },
-    { CN_TOKEN_GNU_TYPEOF,      CN_STR_BUFFER("__typeof") },
     { CN_TOKEN_IF,              CN_STR_BUFFER("if") },
     { CN_TOKEN_ELSE,            CN_STR_BUFFER("else") },
     { CN_TOKEN_SWITCH,          CN_STR_BUFFER("switch") },
@@ -6978,14 +6978,28 @@ const Cn_Token_Literal CN_KEYWORD_TOKENS[] = {
     { CN_TOKEN_RETURN,          CN_STR_BUFFER("return") },
     { CN_TOKEN_SIZEOF,          CN_STR_BUFFER("sizeof") },
     { CN_TOKEN_INLINE,          CN_STR_BUFFER("inline") },
-    { CN_TOKEN_INLINE,          CN_STR_BUFFER("__inline") },
-    { CN_TOKEN_INLINE,          CN_STR_BUFFER("__inline__") },
-    { CN_TOKEN_NORETURN,        CN_STR_BUFFER("_Noreturn") },
-    { CN_TOKEN_ASM,             CN_STR_BUFFER("asm") },
-    { CN_TOKEN_ASM,             CN_STR_BUFFER("__asm__") },
-    { CN_TOKEN_ASM,             CN_STR_BUFFER("__asm") },
     { CN_TOKEN_CASE,            CN_STR_BUFFER("case") },
     { CN_TOKEN_DEFAULT,         CN_STR_BUFFER("default") },
+    { CN_TOKEN_COMPLEX,         CN_STR_BUFFER("_Complex") },
+    { CN_TOKEN_IMAGINARY,       CN_STR_BUFFER("_Imaginary") },
+
+    // TEMPORARY: Post C99.
+    { CN_TOKEN_NORETURN,        CN_STR_BUFFER("_Noreturn") },
+    { CN_TOKEN_ATOMIC,          CN_STR_BUFFER("_Atomic") },
+
+    // TEMPORARY: GNU extension keywords.
+    { CN_TOKEN_GNU_ASM,         CN_STR_BUFFER("asm") },
+    { CN_TOKEN_GNU_ASM,         CN_STR_BUFFER("__asm__") },
+    { CN_TOKEN_GNU_ASM,         CN_STR_BUFFER("__asm") },
+    { CN_TOKEN_GNU_EXTENSION,   CN_STR_BUFFER("__extension__") }, 
+    { CN_TOKEN_GNU_ATTRIBUTE,   CN_STR_BUFFER("__attribute__") }, 
+    { CN_TOKEN_GNU_TYPEOF,      CN_STR_BUFFER("typeof") },
+    { CN_TOKEN_GNU_TYPEOF,      CN_STR_BUFFER("__typeof") },
+
+    { CN_TOKEN_RESTRICT,        CN_STR_BUFFER("__restrict") },
+    { CN_TOKEN_INLINE,          CN_STR_BUFFER("__inline") },
+    { CN_TOKEN_INLINE,          CN_STR_BUFFER("__inline__") },
+    { CN_TOKEN_VOLATILE,        CN_STR_BUFFER("__volatile__") },
 };
 const Cn_Token_Literal CN_LITERAL_TOKENS[] = {
     { CN_TOKEN_ELLIPSIS,            CN_STR_BUFFER("...") },
@@ -7579,7 +7593,7 @@ CNDEF const char *cn_token_kind_name(Cn_Token_Type type) {
         case CN_TOKEN_SIZEOF:           return "sizeof";
         case CN_TOKEN_INLINE:           return "inline";
         case CN_TOKEN_NORETURN:         return "_Noreturn";
-        case CN_TOKEN_ASM:              return "asm";
+        case CN_TOKEN_GNU_ASM:              return "asm";
         case CN_TOKEN_CASE:             return "case";
         case CN_TOKEN_DEFAULT:          return "default";
         // Literal tokens
@@ -14220,7 +14234,7 @@ CNDEF Cn_Ast_External_Declaration *cn_parse_external_declaration(Cn_Lexer *lexer
 
     // AI: Generated.
     // File-scope asm, basic asm statement without qualifiers, same as GCC and Clang.
-    if (cn_lexer_token(lexer).type == CN_TOKEN_ASM) {
+    if (cn_lexer_token(lexer).type == CN_TOKEN_GNU_ASM) {
         Cn_Ast_Gnu_Asm_Statement *gnu_asm_statement = cn_parse_gnu_asm_statement(lexer);
         if (gnu_asm_statement == NULL) goto error;
 
@@ -14633,7 +14647,7 @@ CNDEF Cn_Ast_Node *cn_parse_finish_statement(Cn_Lexer *lexer, Cn_Ast_Nodes attri
                 break;
 
             // AI: Generated.
-            case CN_TOKEN_ASM:
+            case CN_TOKEN_GNU_ASM:
                 // Asm statement has no attribute specifiers, same as GCC they are ignored.
                 if (attribute_specifiers.length > 0) {
                     cn_diagnostic_node(CN_DIAGNOSTIC_WARNING, attribute_specifiers.ptrs[0], CN_DC_ILLEGAL_ATTRIBUTE, "Attributes on asm statement are ignored.");
@@ -15539,7 +15553,7 @@ CNDEF Cn_Ast_Init_Declarator *cn_parse_finish_init_declarator(Cn_Lexer *lexer, C
 
     node.declarator = cn_ast_as(Declarator, declarator);
 
-    if (cn_lexer_expect(lexer, CN_TOKEN_ASM)) {
+    if (cn_lexer_expect(lexer, CN_TOKEN_GNU_ASM)) {
         Cn_Ast_Gnu_Asm_Label *gnu_asm_label = cn_parse_gnu_asm_label(lexer);
         if (gnu_asm_label == NULL) goto error;
         node.gnu_asm_label = gnu_asm_label;
@@ -17169,7 +17183,7 @@ CNDEF Cn_Ast_Gnu_Asm_Statement *cn_parse_gnu_asm_statement(Cn_Lexer *lexer) {
 
     Cn_Ast_Gnu_Asm_Statement node = { .kind = CN_AST_GNU_ASM_STATEMENT, .loc = cn_lexer_token(lexer).loc, .src = cn_lexer_token(lexer).src };
 
-    if (!cn_parse_expect(lexer, CN_TOKEN_ASM)) goto error;
+    if (!cn_parse_expect(lexer, CN_TOKEN_GNU_ASM)) goto error;
 
     // Qualifiers, in any order, each at most once.
     while (true) {
@@ -17402,7 +17416,7 @@ CNDEF Cn_Ast_Gnu_Asm_Label *cn_parse_gnu_asm_label(Cn_Lexer *lexer) {
 
     Cn_Ast_Gnu_Asm_Label node = { .kind = CN_AST_GNU_ASM_LABEL, .loc = cn_lexer_token(lexer).loc, .src = cn_lexer_token(lexer).src };
 
-    if (!cn_parse_expect(lexer, CN_TOKEN_ASM)) goto error;
+    if (!cn_parse_expect(lexer, CN_TOKEN_GNU_ASM)) goto error;
     if (!cn_parse_expect(lexer, CN_TOKEN_PARAN_OPEN)) goto error;
 
     if (cn_lexer_expect(lexer, CN_TOKEN_STRING)) {
