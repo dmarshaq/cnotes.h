@@ -63,7 +63,8 @@
         `get_`                          Getter interface, doesn't modify anything only provides ast introspection ability.
         `diagnostic_`                   Interface to produce variety of source based diagnostics.
         `binding_`                      Binding interface, it is resposible for all names that are glued to some type, handles binding operations.
-        `message_`                      Interface to set up user hooks and send or receive messages between user and parser.
+        `message_`                      TEMPORARY: Interface to set up user hooks and send or receive messages between user and parser.
+        `hook_`                         Interface to set up user hooks and send or receive messages between user and parser.
         `analyze_`                      Interface to perfom complex analysis on ast, typechecking, expression evaluation, etc.
         `emit_`                         Interface for C code emittion from Abstract Syntax Tree.
         `parse_`                        Interface for parsing, utilizes other sections to perfrom full source code to typed ast transition.
@@ -2201,14 +2202,28 @@ typedef enum : uint8_t {
     X(GNU_ASM_OPERAND,                  Gnu_Asm_Operand,                    gnu_asm_operand)                \
     X(GNU_ASM_LABEL,                    Gnu_Asm_Label,                      gnu_asm_label)
 
-typedef enum : uint8_t {
+/**
+ * This enum is used to identify each node, in core library.
+ *
+ * But library extensions can introduce their own AST nodes.
+ * In order to sustain stable identifications in enums 
+ * across the extensions the top 8 bits are reserved for "extension id".
+ * For example let say GNU extension introduces its own AST nodes, with enum of its kinds.
+ * If it's extension id is `1`, the enum kinds must start at the value `0x01000000`.
+ *
+ * IMPORTANT: Extension id of `0` is reserved by main library. Each extension gets range of `2^24` values,
+ * for its custom AST nodes. That also means there at most `255` extensions with custom AST nodes 
+ * possible to pack with this library without causing overlap in AST nodes.
+ */
+typedef enum : uint32_t {
     CN_AST_UNKNOWN = 0,
 #define X(K, T, m) CN_AST_##K,
     CN_AST_GEN_LIST(X)
 #undef X
 } Cn_Ast_Kind;
 
-typedef enum {
+typedef enum : uint32_t {
+
     CN_AST_SYNTHETIC                    = 0x4,
     // AI: Generated.
     // Node is preceded by one or more '__extension__' keywords, applicable to any node.
@@ -2236,21 +2251,7 @@ typedef enum {
     CN_AST_GNU_ASM_STATEMENT_IS_EXTENDED          = 0x100, // Set when at least one ':' section is present.
 } Cn_Ast_Flags;
 
-#define CN_AST_BASE_MEMBERS         \
-    Cn_Ast_Kind     kind;           \
-    Cn_Ast_Flags    flags;          \
-    Cn_Location     loc;            \
-    Cn_Source       src;            
-
-typedef struct {
-    CN_AST_BASE_MEMBERS
-} Cn_Ast_Node;
-
-#define CN_AST_BASE                         \
-    union {                                 \
-        Cn_Ast_Node base;                   \
-        struct { CN_AST_BASE_MEMBERS };     \
-    }
+typedef struct cn_ast_node Cn_Ast_Node;
 
 /**
  * Finalized, immutable-length array of node pointers.
@@ -2262,6 +2263,24 @@ typedef struct {
     Cn_Ast_Node **ptrs;
     int64_t       length;
 } Cn_Ast_Nodes;
+
+#define CN_AST_BASE_MEMBERS         \
+    Cn_Ast_Kind     kind;           \
+    Cn_Ast_Flags    flags;          \
+    Cn_Location     loc;            \
+    Cn_Source       src;            \
+    Cn_Ast_Nodes    extensions;
+
+struct cn_ast_node {
+    CN_AST_BASE_MEMBERS
+};
+
+#define CN_AST_BASE                         \
+    union {                                 \
+        Cn_Ast_Node base;                   \
+        struct { CN_AST_BASE_MEMBERS };     \
+    }
+
 
 /**
  * Downcasts generic node pointer `p` to a concrete node type.
@@ -3116,6 +3135,54 @@ typedef enum {
 
 typedef Cn_Message_Response (Cn_Message_Handler)(Cn_Message *message);
 extern Cn_Message_Handler *cn_message_handler;
+
+/**
+ * ============================================
+ * SECTION: Hook
+ * ============================================
+ */
+
+/**
+ * Response flags, they are returned by every hook function,
+ * they are used to communicate on how processing should 
+ * continue after hook's execution.
+ */
+typedef enum {
+    CN_HOOK_RESPONSE_ERROR    = 0x0,
+    CN_HOOK_RESPONSE_CONTINUE = 0x1,
+    CN_HOOK_RESPONSE_MODIFIED = 0x2,
+} Cn_Hook_Response;    
+
+/**
+ * Classic meta programming hook, it is called after code was parsed
+ * into AST. It guarantees that given AST is typechecked and is correct.
+ * It allows any modification of AST, those modifications will be reparsed
+ * sending proper diagnostics if errors occured.
+ *
+ * RETURNS: `CN_HOOK_RESPONSE_MODIFIED` if AST modifications occured.
+ *
+ * NOTE: The reason why `node_ptr` is `Cn_Ast_Node **` is because the hook
+ * can completely delete the AST node by setting `*node_ptr = NULL`.
+ * Essentially `*node_ptr` value is what being utilized by the library,
+ * meaning it can point to a completely different AST and library will
+ * utilize that new node.
+ */
+typedef Cn_Hook_Response (Cn_Hook_Ast_Parsed)(Cn_Ast_Node **node_ptr);
+
+/**
+ * Analyze hook that is called whenever declarator was analyzed to type.
+ * 
+ * IMPORTANT: It is not allowed to perfom AST modifications in here.
+ * But modification of the analyzed type are expected.
+ */
+typedef Cn_Hook_Response (Cn_Hook_Analyze_Declarator)(Cn_Ast_Node *declarator, Cn_Type **type_ptr);
+
+typedef struct {
+    Cn_Hook_Ast_Parsed         *ast_parsed_hooks;
+    Cn_Hook_Analyze_Declarator *analyze_declarator_hooks;
+} Cn_Hooks;
+
+extern Cn_Hooks cn_hooks;
 
 /**
  * ============================================
