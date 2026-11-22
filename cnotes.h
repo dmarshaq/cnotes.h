@@ -1443,11 +1443,21 @@ CNDEF Cn_Token cn_lexer_peek(Cn_Lexer *lexer, int64_t offset);
 CNDEF void cn_lexer_log_tokens(Cn_Lexer *lexer, int64_t n);
 
 /**
+ * Checks if `lexer` state was changed from the given `saved` state.
+ */
+CNDEF bool cn_lexer_changed(Cn_Lexer *lexer, Cn_Lexer *saved);
+
+/**
  * Gets name of the token `type`, used in messages.
  *
  * RETURNS: Static string of the token type.
  */
 CNDEF const char *cn_token_kind_name(Cn_Token_Type type);
+
+/**
+ * RETURNS: `true` if tokens `a == b`.
+ */
+CNDEF bool cn_token_equals(Cn_Token *a, Cn_Token *b);
 
 /**
  * ============================================
@@ -2121,10 +2131,51 @@ typedef struct {
  */
 CNDEF Cn_Ast_Postfix_Operator_Kind cn_ast_is_postfix_operator(Cn_Lexer *lexer);
 
+/**
+ * Extension id of the `kind`, `0` for the core library kinds.
+ */
+#define CN_AST_KIND_EXTENSION_ID(kind) ((uint8_t)((uint32_t)(kind) >> 24))
+
+/**
+ * First kind value of the extension with id `id`, every custom kind of that extension
+ * must be greater than it. See `Cn_Ast_Kind`.
+ */
+#define CN_AST_KIND_EXTENSION_BASE(id) ((uint32_t)(id) << 24)
+
+/**
+ * Every AST node kind entry in enum, is prefixed by `CN_AST_`.
+ * This X macro used to generate a single kind entry in enum.
+ */
+#define CN__AST_ENUM_ENTRY(K, T, m) CN_AST_##K,
+
+/**
+ * This macro declares enum that is used to identify each node intoduced.
+ *
+ * But library extensions can introduce their own AST nodes.
+ * In order to sustain stable identifications in enums 
+ * across the extensions the top 8 bits are reserved for "extension id".
+ * For example let say GNU extension introduces its own AST nodes, with enum of its kinds.
+ * If it's extension id is `1`, the enum kinds must start at the value `0x01000000`.
+ *
+ * IMPORTANT: Extension id of `0` is reserved by main library. Each extension gets range of `2^24` values,
+ * for its custom AST nodes. That also means there at most `255` extensions with custom AST nodes 
+ * possible to pack with this library without causing overlap in AST nodes.
+ *
+ * PARAM NAME: Is uppercase naming of the enum entry. For example `GNU`.
+ *
+ * PARAM Name: Is type naming of the enum itself. For example `Gnu`.
+ */
+#define CN_AST_DECLARE_KINDS(NAME, Name, ID, LIST)                      \
+    typedef enum {                                                      \
+        CN_AST_##NAME##_UNKNOWN = CN_AST_KIND_EXTENSION_BASE(ID),       \
+        LIST(CN__AST_ENUM_ENTRY)                                        \
+        CN_AST_##NAME##__END                                            \
+    } Cn_Ast_##Name##_Kind;                                             \
 
 
-
-
+/**
+ * List for X macro generation of core library AST nodes.
+ */
 #define CN_AST_GEN_LIST(X)\
     /* --- misc ----------------------------------------------------------- */                              \
     X(CODE,                             Code,                               code)                           \
@@ -2192,32 +2243,20 @@ CNDEF Cn_Ast_Postfix_Operator_Kind cn_ast_is_postfix_operator(Cn_Lexer *lexer);
     X(ATTRIBUTE,                        Attribute,                          attribute)                      \
 
 /**
- * This enum is used to identify each node, in core library.
+ * Declaration of core types.
+ */
+CN_AST_DECLARE_KINDS(CORE, Core, 0, CN_AST_GEN_LIST)
+
+
+/**
+ * Flags of the ast node.
  *
- * But library extensions can introduce their own AST nodes.
- * In order to sustain stable identifications in enums 
- * across the extensions the top 8 bits are reserved for "extension id".
- * For example let say GNU extension introduces its own AST nodes, with enum of its kinds.
- * If it's extension id is `1`, the enum kinds must start at the value `0x01000000`.
- *
- * IMPORTANT: Extension id of `0` is reserved by main library. Each extension gets range of `2^24` values,
- * for its custom AST nodes. That also means there at most `255` extensions with custom AST nodes 
- * possible to pack with this library without causing overlap in AST nodes.
+ * Values below `0x100` are shared by every node kind.
+ * Values starting from `0x100` are specific to a node kind, so they can overlap between kinds,
+ * this also lets extensions define flags for their own kinds.
  */
 typedef enum : uint32_t {
-    CN_AST_UNKNOWN = 0,
-#define X(K, T, m) CN_AST_##K,
-    CN_AST_GEN_LIST(X)
-#undef X
-} Cn_Ast_Kind;
-
-typedef enum : uint32_t {
-
     CN_AST_SYNTHETIC                    = 0x4,
-    // AI: Generated.
-    // Node is preceded by one or more '__extension__' keywords, applicable to any node.
-    // See `cn_parse_gnu_extensions`.
-    CN_AST_GNU_EXTENSION                = 0x8,
 
     CN_AST_DECLARATOR_IS_ABSTRACT                 = 0x100,
 
@@ -2235,9 +2274,6 @@ typedef enum : uint32_t {
 
     CN_AST_LABEL_IS_CASE                          = 0x100,
     CN_AST_LABEL_IS_DEFAULT                       = 0x200,
-
-    // AI: Generated.
-    CN_AST_GNU_ASM_STATEMENT_IS_EXTENDED          = 0x100, // Set when at least one ':' section is present.
 } Cn_Ast_Flags;
 
 typedef struct cn_ast_node Cn_Ast_Node;
@@ -2253,12 +2289,87 @@ typedef struct {
     int64_t       length;
 } Cn_Ast_Nodes;
 
+
+/**
+ * List for X macro generation of core ast slots---grammar points where custom sub-parser can be plugged in.
+ */
+#define CN_AST_SLOT_GEN_LIST(X)\
+    X(EXTERNAL_DECLARATION,             External_Declaration,               external_declaration)           \
+    X(EXTERNAL_DECLARATION_PREFIX,      External_Declaration_Prefix,        external_declaration_prefix)    \
+    X(STATEMENT,                        Statement,                          statement)                      \
+    X(TYPE_SPECIFIER,                   Type_Specifier,                     type_specifier)                 \
+    X(PRIMARY,                          Primary,                            primary)                        \
+    X(DECLARATION_PREFIX,               Declaration_Prefix,                 declaration_prefix)             \
+    X(MEMBER_DECLARATION_PREFIX,        Member_Declaration_Prefix,          member_declaration_prefix)      \
+    X(EXPRESSION_PREFIX,                Expression_Prefix,                  expression_prefix)              \
+    X(DECLARATION_SPECIFIERS,           Declaration_Specifiers,             declaration_specifiers)         \
+    X(POINTER,                          Pointer,                            pointer)                        \
+    X(AFTER_DECLARATOR,                 After_Declarator,                   after_declarator)               \
+    X(MEMBER_DECLARATOR,                Member_Declarator,                  member_declarator)              \
+    X(TAG,                              Tag,                                tag)                            \
+    X(ENUMERATOR,                       Enumerator,                         enumerator)                     \
+
+
+typedef uint32_t Cn_Ast_Slot_Id;
+
+/**
+ * TODO: Write me.
+ */
+#define CN__AST_SLOT_ENUM_ENTRY(K, T, m) CN_AST_SLOT_##K,
+
+/**
+ * TODO: Wrote me.
+ */
+#define CN_AST_SLOT_DECLARE_KINDS(NAME, Name, ID, LIST)                     \
+    typedef enum {                                                          \
+        CN_AST_SLOT_##NAME##_UNKNOWN = CN_AST_KIND_EXTENSION_BASE(ID),      \
+        LIST(CN__AST_SLOT_ENUM_ENTRY)                                       \
+        CN_AST_SLOT_##NAME##__END                                           \
+    } Cn_Ast_Slot_##Name##_Kind;                                            \
+
+
+CN_AST_SLOT_DECLARE_KINDS(CORE, core, 0, CN_AST_SLOT_GEN_LIST)
+
+
+
+#define CN_AST_EXTENSION_NODE 0
+#define CN_AST_EXTENSION_LIST 1
+
+typedef struct {
+    union {
+        Cn_Ast_Node *node;
+        Cn_Ast_Nodes list;
+    };
+    uint32_t kind;
+    Cn_Ast_Slot_Id slot;
+} Cn_Ast_Extension;
+
+typedef struct {
+    Cn_Ast_Extension *exts;
+    int64_t           length;
+} Cn_Ast_Extensions;
+
+/**
+ * Merges two extensions lists `a` and `b`, by reallocating and combinding them.
+ * Into a new extensions list, order is `a` elements first then `b` elements.
+ */
+CNDEF Cn_Ast_Extensions cn_ast_ext_merge(Cn_Ast_Extensions a, Cn_Ast_Extensions b);
+
+/**
+ * Pushes `ext` onto the `ext_stack`.
+ */
+#define cn_ast_ext_stack_push(ext) cn_array_list_append(&cn__tu_data->ext_stack, (ext))
+
+
+typedef uint32_t Cn_Ast_Id;
+
 #define CN_AST_BASE_MEMBERS         \
-    Cn_Ast_Kind     kind;           \
-    Cn_Ast_Flags    flags;          \
-    Cn_Location     loc;            \
-    Cn_Source       src;            \
-    Cn_Ast_Nodes    extensions;
+    Cn_Ast_Id           id;         \
+    Cn_Ast_Flags        flags;      \
+    Cn_Location         loc;        \
+    Cn_Source           src;        \
+    Cn_Ast_Extensions   extensions; \
+    Cn_Ast_Slot_Id      slot;       \
 
 struct cn_ast_node {
     CN_AST_BASE_MEMBERS
@@ -2270,6 +2381,49 @@ struct cn_ast_node {
         struct { CN_AST_BASE_MEMBERS };     \
     }
 
+typedef enum {
+    CN_AST_MEMBER_INFO_NODE,
+    CN_AST_MEMBER_INFO_NODES,
+    CN_AST_MEMBER_INFO_STRING,
+    CN_AST_MEMBER_INFO_UINT64,
+    CN_AST_MEMBER_INFO_INT32,
+    CN_AST_MEMBER_INFO_DOUBLE,
+    CN_AST_MEMBER_INFO_TYPE,
+} Cn_Ast_Member_Info_Kind;
+
+typedef struct {
+    const char              *name;
+    size_t                   offset;
+    Cn_Ast_Member_Info_Kind  kind;
+} Cn_Ast_Member_Info;
+
+/**
+ * This struct is used to store generically meta information for each ast node type.
+ */
+typedef struct {
+    const char          *name;
+    size_t               size;
+    Cn_Ast_Member_Info  *members;
+    int64_t              members_count;
+    void                *emit_func;
+} Cn_Ast_Info;
+
+/**
+ * Gets info of any ast node type, based on its id, even if
+ * node is coming from the library extensions.
+ *
+ * IMPORTANT: Expects id to be a valid AST id.
+ * Expects all ast nodes to have their respective infos.
+ * Never returns `NULL` but asserts expectations set above.
+ */
+CNDEF Cn_Ast_Info *cn_ast_info(Cn_Ast_Id id);
+
+typedef struct {
+    Cn_Ast_Info *infos;
+    int64_t      length;
+} Cn_Ast_Info_Array;
+
+extern Cn_Ast_Info_Array cn_ast_info_table[256];
 
 /**
  * Downcasts generic node pointer `p` to a concrete node type.
@@ -2286,331 +2440,349 @@ struct cn_ast_node {
 #define cn_ast_node(p) ((Cn_Ast_Node *)(p))
 
 /**
- * Forward declaration of every concrete node type, so that node structs
+ * This X macro used to generate a single forward declaration of any ast struct.
+ */
+#define CN__AST_STRUCT_FORWARD_DECLARATION(K, T, m) typedef struct cn_ast_##m Cn_Ast_##T;
+
+/**
+ * Macro for forward declaration of every concrete node type, so that node structs
  * can reference each other, and themselves, by pointer regardless of the
  * order they are defined in below.
  */
-#define X(K, T, m) typedef struct cn_ast_##m Cn_Ast_##T;
-    CN_AST_GEN_LIST(X)
-#undef X
+#define CN_AST_DECLARE_STRUCTS(LIST)            \
+    LIST(CN__AST_STRUCT_FORWARD_DECLARATION)    \
 
-struct cn_ast_code { CN_AST_BASE;
-    Cn_String text;
-};
+CN_AST_DECLARE_STRUCTS(CN_AST_GEN_LIST)
 
-struct cn_ast_translation_unit { CN_AST_BASE;
-    Cn_Ast_Nodes external_declarations; // List of Cn_Ast_External_Declaration.
-};
 
-struct cn_ast_external_declaration { CN_AST_BASE;
-    Cn_Ast_Node *child; // Declaration or function.
-};
+#define CN_AST_CODE_MEMBERS(F, X)       \
+    F(X, STRING,  Cn_String, text)      \
 
-struct cn_ast_declaration { CN_AST_BASE;
-    Cn_Ast_Nodes                    attribute_specifiers; // List of Cn_Ast_Attribute_Specifier.
-    Cn_Ast_Declaration_Specifiers *declaration_specifiers;
-    Cn_Ast_Nodes                    init_declarators; // List of Cn_Ast_Init_Declarator.
-};
+#define CN_AST_TRANSLATION_UNIT_MEMBERS(F, X)           \
+    F(X, NODES, Cn_Ast_Nodes, external_declarations)    \
 
-struct cn_ast_function { CN_AST_BASE;
-    Cn_Ast_Nodes                    attribute_specifiers; // List of Cn_Ast_Attribute_Specifier.
-    Cn_Ast_Declaration_Specifiers *declaration_specifiers;
-    Cn_Ast_Declarator             *declarator;
-    Cn_Ast_Block                  *block;
-};
+#define CN_AST_EXTERNAL_DECLARATION_MEMBERS(F, X)   \
+    F(X, NODE,  Cn_Ast_Node *, child)               \
 
-struct cn_ast_block { CN_AST_BASE;
-    Cn_Ast_Nodes attribute_specifiers; // List of Cn_Ast_Attribute_Specifier.
-    Cn_Ast_Nodes block_items; // List of ast nodes of type Cn_Ast_Block_Item.
-};
+#define CN_AST_DECLARATION_MEMBERS(F, X)                                    \
+    F(X, NODES, Cn_Ast_Nodes,                    attribute_specifiers)      \
+    F(X, NODE,  Cn_Ast_Declaration_Specifiers *, declaration_specifiers)    \
+    F(X, NODES, Cn_Ast_Nodes,                      init_declarators)        \
 
-struct cn_ast_block_item { CN_AST_BASE;
-    Cn_Ast_Node *declaration_or_statement;
-};
+#define CN_AST_FUNCTION_MEMBERS(F, X)                                       \
+    F(X, NODES, Cn_Ast_Nodes,                    attribute_specifiers)      \
+    F(X, NODE,  Cn_Ast_Declaration_Specifiers *, declaration_specifiers)    \
+    F(X, NODE,  Cn_Ast_Declarator *,             declarator)                \
+    F(X, NODE,  Cn_Ast_Block *,                  block)                     \
 
-struct cn_ast_if_statement { CN_AST_BASE;
-    Cn_Ast_Nodes  attribute_specifiers; // List of Cn_Ast_Attribute_Specifier.
-    Cn_Ast_Node *condition;
-    Cn_Ast_Node *then_statement;
-    Cn_Ast_Node *else_statement; // Can be NULL.
-};
+#define CN_AST_BLOCK_MEMBERS(F, X)                     \
+    F(X, NODES, Cn_Ast_Nodes, attribute_specifiers)    \
+    F(X, NODES, Cn_Ast_Nodes, block_items)             \
 
-struct cn_ast_switch_statement { CN_AST_BASE;
-    Cn_Ast_Nodes  attribute_specifiers; // List of Cn_Ast_Attribute_Specifier.
-    Cn_Ast_Node *condition;
-    Cn_Ast_Node *body;
-};
+#define CN_AST_BLOCK_ITEM_MEMBERS(F, X)                     \
+    F(X, NODE,  Cn_Ast_Node *, declaration_or_statement)    \
 
-struct cn_ast_while_statement { CN_AST_BASE;
-    Cn_Ast_Nodes  attribute_specifiers; // List of Cn_Ast_Attribute_Specifier.
-    Cn_Ast_Node *condition; // Expression.
-    Cn_Ast_Node *body; // Statement.
-};
+#define CN_AST_IF_MEMBERS(F, X)                         \
+    F(X, NODES, Cn_Ast_Nodes,  attribute_specifiers)    \
+    F(X, NODE,  Cn_Ast_Node *, condition)               \
+    F(X, NODE,  Cn_Ast_Node *, then_statement)          \
+    F(X, NODE,  Cn_Ast_Node *, else_statement)          \
 
-struct cn_ast_do_while { CN_AST_BASE;
-    Cn_Ast_Nodes  attribute_specifiers; // List of Cn_Ast_Attribute_Specifier.
-    Cn_Ast_Node *condition; // Expression.
-    Cn_Ast_Node *body; // Statement.
-};
+#define CN_AST_SWITCH_MEMBERS(F, X)                     \
+    F(X, NODES, Cn_Ast_Nodes,  attribute_specifiers)    \
+    F(X, NODE,  Cn_Ast_Node *, condition)               \
+    F(X, NODE,  Cn_Ast_Node *, body)                    \
 
-struct cn_ast_for_statement { CN_AST_BASE;
-    Cn_Ast_Nodes  attribute_specifiers; // List of Cn_Ast_Attribute_Specifier.
-    Cn_Ast_Node *initialization; // Declaration or expression.
-    Cn_Ast_Node *condition; // Expression.
-    Cn_Ast_Node *update; // Expression.
-    Cn_Ast_Node *body; // Statement.
-};
+#define CN_AST_WHILE_MEMBERS(F, X)                      \
+    F(X, NODES, Cn_Ast_Nodes,  attribute_specifiers)    \
+    F(X, NODE,  Cn_Ast_Node *, condition)               \
+    F(X, NODE,  Cn_Ast_Node *, body)                    \
 
-struct cn_ast_label { CN_AST_BASE;
-    Cn_Ast_Nodes        attribute_specifiers; // List of Cn_Ast_Attribute_Specifier.
-    Cn_Ast_Identifier *identifier;
-    Cn_Ast_Node       *expression; // Only in 'case' label.
-    Cn_Ast_Node       *statement;
-};
+#define CN_AST_DO_WHILE_MEMBERS(F, X)                   \
+    F(X, NODES, Cn_Ast_Nodes,  attribute_specifiers)    \
+    F(X, NODE,  Cn_Ast_Node *, condition)               \
+    F(X, NODE,  Cn_Ast_Node *, body)                    \
 
-struct cn_ast_goto_statement { CN_AST_BASE;
-    Cn_Ast_Nodes        attribute_specifiers; // List of Cn_Ast_Attribute_Specifier.
-    Cn_Ast_Identifier *identifier; // Name of the label.
-};
+#define CN_AST_FOR_MEMBERS(F, X)                        \
+    F(X, NODES, Cn_Ast_Nodes,  attribute_specifiers)    \
+    F(X, NODE,  Cn_Ast_Node *, initialization)          \
+    F(X, NODE,  Cn_Ast_Node *, condition)               \
+    F(X, NODE,  Cn_Ast_Node *, update)                  \
+    F(X, NODE,  Cn_Ast_Node *, body)                    \
 
-struct cn_ast_return_statement { CN_AST_BASE;
-    Cn_Ast_Nodes  attribute_specifiers; // List of Cn_Ast_Attribute_Specifier.
-    Cn_Ast_Node *expression; // Can be NULL.
-};
+#define CN_AST_LABEL_MEMBERS(F, X)                            \
+    F(X, NODES, Cn_Ast_Nodes,        attribute_specifiers)    \
+    F(X, NODE,  Cn_Ast_Identifier *, identifier)              \
+    F(X, NODE,  Cn_Ast_Node *,       expression)              \
+    F(X, NODE,  Cn_Ast_Node *,       statement)               \
 
-struct cn_ast_break_statement { CN_AST_BASE;
-    Cn_Ast_Nodes attribute_specifiers; // List of Cn_Ast_Attribute_Specifier.
-};
+#define CN_AST_GOTO_MEMBERS(F, X)                             \
+    F(X, NODES, Cn_Ast_Nodes,        attribute_specifiers)    \
+    F(X, NODE,  Cn_Ast_Identifier *, identifier)              \
 
-struct cn_ast_continue_statement { CN_AST_BASE;
-    Cn_Ast_Nodes attribute_specifiers; // List of Cn_Ast_Attribute_Specifier.
-};
+#define CN_AST_RETURN_MEMBERS(F, X)                     \
+    F(X, NODES, Cn_Ast_Nodes,  attribute_specifiers)    \
+    F(X, NODE,  Cn_Ast_Node *, expression)              \
 
-struct cn_ast_expression_statement { CN_AST_BASE;
-    Cn_Ast_Nodes  attribute_specifiers; // List of Cn_Ast_Attribute_Specifier.
-    Cn_Ast_Node *expression;
-};
+#define CN_AST_BREAK_MEMBERS(F, X)                     \
+    F(X, NODES, Cn_Ast_Nodes, attribute_specifiers)    \
 
-struct cn_ast_binary { CN_AST_BASE;
-    Cn_Type *               type;
-    Cn_Ast_Node *          left;
-    Cn_Ast_Binary_Operator_Kind operator;
-    Cn_Ast_Node *          right;
-};
+#define CN_AST_CONTINUE_MEMBERS(F, X)                  \
+    F(X, NODES, Cn_Ast_Nodes, attribute_specifiers)    \
 
-struct cn_ast_access { CN_AST_BASE;
-    Cn_Type *          type;
-    Cn_Ast_Node       *expression;
-    Cn_Ast_Identifier *member;
-    bool pointer;
-};
+#define CN_AST_EXPRESSION_STATEMENT_MEMBERS(F, X)       \
+    F(X, NODES, Cn_Ast_Nodes,  attribute_specifiers)    \
+    F(X, NODE,  Cn_Ast_Node *, expression)              \
 
-struct cn_ast_call { CN_AST_BASE;
-    Cn_Type *    type;
-    Cn_Ast_Node *expression;
-    Cn_Ast_Nodes  arguments; // List of expressions.
-};
+#define CN_AST_BINARY_MEMBERS(F, X)                         \
+    F(X, TYPE,  Cn_Type *,                   type)          \
+    F(X, NODE,  Cn_Ast_Node *,               left)          \
+    F(X, INT32, Cn_Ast_Binary_Operator_Kind, operator)      \
+    F(X, NODE,  Cn_Ast_Node *,               right)         \
 
-struct cn_ast_unary { CN_AST_BASE;
-    Cn_Type *              type;
-    Cn_Ast_Unary_Operator_Kind operator;
-    Cn_Ast_Node *         expression;
-};
+#define CN_AST_ACCESS_MEMBERS(F, X)                 \
+    F(X, TYPE,  Cn_Type *,           type)          \
+    F(X, NODE,  Cn_Ast_Node *,       expression)    \
+    F(X, NODE,  Cn_Ast_Identifier *, member)        \
 
-struct cn_ast_cast { CN_AST_BASE;
-    Cn_Type *         type;
-    Cn_Ast_Type_Name *type_name;
-    Cn_Ast_Node      *expression;
-};
+#define CN_AST_CALL_MEMBERS(F, X)             \
+    F(X, TYPE,  Cn_Type *,     type)          \
+    F(X, NODE,  Cn_Ast_Node *, expression)    \
+    F(X, NODES, Cn_Ast_Nodes,  arguments)     \
 
-struct cn_ast_compound { CN_AST_BASE;
-    Cn_Type *         type;
-    Cn_Ast_Type_Name *type_name;
-    Cn_Ast_Nodes       designations; // List of Cn_Ast_Designation.
-};
+#define CN_AST_UNARY_MEMBERS(F, X)                         \
+    F(X, TYPE,  Cn_Type *,                  type)          \
+    F(X, INT32, Cn_Ast_Unary_Operator_Kind, operator)      \
+    F(X, NODE,  Cn_Ast_Node *,              expression)    \
 
-struct cn_ast_sizeof_expression { CN_AST_BASE;
-    Cn_Type *    type;
-    Cn_Ast_Node *target; // Could be expression or type name.
-};
+#define CN_AST_CAST_MEMBERS(F, X)                  \
+    F(X, TYPE,  Cn_Type *,          type)          \
+    F(X, NODE,  Cn_Ast_Type_Name *, type_name)     \
+    F(X, NODE,  Cn_Ast_Node *,      expression)    \
 
-struct cn_ast_ternary { CN_AST_BASE;
-    Cn_Type *    type;
-    Cn_Ast_Node *condition;
-    Cn_Ast_Node *if_true;   // Not 'true'/'false': those are stdbool macros.
-    Cn_Ast_Node *if_false;
-};
+#define CN_AST_COMPOUND_MEMBERS(F, X)                \
+    F(X, TYPE,  Cn_Type *,          type)            \
+    F(X, NODE,  Cn_Ast_Type_Name *, type_name)       \
+    F(X, NODES, Cn_Ast_Nodes,       designations)    \
 
-struct cn_ast_assign { CN_AST_BASE;
-    Cn_Type *                   type;
-    Cn_Ast_Node *              left;
-    Cn_Ast_Assignment_Operator_Kind operator;
-    Cn_Ast_Node *              right;
-};
+#define CN_AST_SIZEOF_MEMBERS(F, X)       \
+    F(X, TYPE,  Cn_Type *,     type)      \
+    F(X, NODE,  Cn_Ast_Node *, target)    \
 
-struct cn_ast_postfix { CN_AST_BASE;
-    Cn_Type *                type;
-    Cn_Ast_Node *           expression;
-    Cn_Ast_Postfix_Operator_Kind operator;
-};
+#define CN_AST_TERNARY_MEMBERS(F, X)         \
+    F(X, TYPE,  Cn_Type *,     type)         \
+    F(X, NODE,  Cn_Ast_Node *, condition)    \
+    F(X, NODE,  Cn_Ast_Node *, if_true)      \
+    F(X, NODE,  Cn_Ast_Node *, if_false)     \
 
-struct cn_ast_primary { CN_AST_BASE;
-    Cn_Type *    type;
-    Cn_Ast_Node *literal; // Identifier, integer, float or string.
-};
+#define CN_AST_ASSIGN_MEMBERS(F, X)                           \
+    F(X, TYPE,  Cn_Type *,                       type)        \
+    F(X, NODE,  Cn_Ast_Node *,                   left)        \
+    F(X, INT32, Cn_Ast_Assignment_Operator_Kind, operator)    \
+    F(X, NODE,  Cn_Ast_Node *,                   right)       \
 
-struct cn_ast_identifier { CN_AST_BASE;
-    Cn_String name;
-};
+#define CN_AST_POSTFIX_MEMBERS(F, X)                         \
+    F(X, TYPE,  Cn_Type *,                    type)          \
+    F(X, NODE,  Cn_Ast_Node *,                expression)    \
+    F(X, INT32, Cn_Ast_Postfix_Operator_Kind, operator)      \
 
-struct cn_ast_integer { CN_AST_BASE;
-    uint64_t value;
-};
+#define CN_AST_PRIMARY_MEMBERS(F, X)       \
+    F(X, TYPE,  Cn_Type *,     type)       \
+    F(X, NODE,  Cn_Ast_Node *, literal)    \
 
-struct cn_ast_flt { CN_AST_BASE;
-    double value;
-};
+#define CN_AST_IDENTIFIER_MEMBERS(F, X)     \
+    F(X, STRING,  Cn_String, name)          \
 
-struct cn_ast_character { CN_AST_BASE;
-    uint64_t value;
-    int      unit_count;
-};
+#define CN_AST_INTEGER_MEMBERS(F, X)    \
+    F(X, UINT64,  uint64_t, value)      \
 
-struct cn_ast_string { CN_AST_BASE;
-    Cn_String str;
-};
+#define CN_AST_FLOAT_MEMBERS(F, X)      \
+    F(X, DOUBLE,  double, value)        \
 
-struct cn_ast_init_declarator { CN_AST_BASE;
-    Cn_Ast_Declarator    *declarator;
-    Cn_Ast_Nodes           gnu_attribute_specifiers; // List of Cn_Ast_Gnu_Attribute_Specifier.
-    // TODO: GNU: Cn_Ast_Gnu_Asm_Label *gnu_asm_label;
-    Cn_Ast_Initializer   *initializer;
-};
+#define CN_AST_CHAR_MEMBERS(F, X)           \
+    F(X, UINT64,  uint64_t, value)          \
+    F(X, INT32,   int,      unit_count)     \
 
-struct cn_ast_initializer { CN_AST_BASE;
-    Cn_Ast_Node *expression;  // Can be NULL if not single expression initializer.
-    Cn_Ast_Nodes designations;   // Can be empty if not compound intializer '{' '}'.
-};
+#define CN_AST_STRING_MEMBERS(F, X)     \
+    F(X, STRING,  Cn_String, str)       \
 
-struct cn_ast_designation { CN_AST_BASE;
-    Cn_Ast_Nodes        designators;    // Can be empty. List of Cn_Ast_Designator.
-    Cn_Ast_Initializer *initializer;
-};
+#define CN_AST_INIT_DECLARATOR_MEMBERS(F, X)                       \
+    F(X, NODE,  Cn_Ast_Declarator *,  declarator)                  \
+    F(X, NODES, Cn_Ast_Nodes,         gnu_attribute_specifiers)    \
+    F(X, NODE,  Cn_Ast_Initializer *, initializer)                 \
 
-struct cn_ast_designator { CN_AST_BASE;
-    Cn_Ast_Identifier *identifier;              // Can be NULL if not member designator.
-    Cn_Ast_Node       *expression;              // Can be NULL if not array designator.
-    Cn_Ast_Node       *expression_range_end;    // Can be NULL if not ragne.
-};
+#define CN_AST_INITIALIZER_MEMBERS(F, X)        \
+    F(X, NODE,  Cn_Ast_Node *, expression)      \
+    F(X, NODES, Cn_Ast_Nodes,  designations)    \
 
-struct cn_ast_declarator { CN_AST_BASE;
-    Cn_Ast_Pointer *pointer;            // Can be NULL if declarator is not wrapped with pointer(s).
-    Cn_Ast_Node    *direct_declarator;  // Cab be NULL if declarator is abstract.
-};
+#define CN_AST_DESIGNATION_MEMBERS(F, X)              \
+    F(X, NODES, Cn_Ast_Nodes,         designators)    \
+    F(X, NODE,  Cn_Ast_Initializer *, initializer)    \
 
-struct cn_ast_pointer { CN_AST_BASE;
-    Cn_Ast_Qualifier_Flags qualifiers;
-    Cn_Ast_Nodes           gnu_attribute_specifiers; // List of Cn_Ast_Gnu_Attribute_Specifier.
-    Cn_Ast_Pointer        *pointer;     // Can be NULL.
-};
+#define CN_AST_DESIGNATOR_MEMBERS(F, X)                       \
+    F(X, NODE,  Cn_Ast_Identifier *, identifier)              \
+    F(X, NODE,  Cn_Ast_Node *,       expression)              \
+    F(X, NODE,  Cn_Ast_Node *,       expression_range_end)    \
 
-struct cn_ast_direct_declarator_grouped { CN_AST_BASE;
-    Cn_Ast_Declarator *declarator;
-};
+#define CN_AST_DECLARATOR_MEMBERS(F, X)                 \
+    F(X, NODE,  Cn_Ast_Pointer *, pointer)              \
+    F(X, NODE,  Cn_Ast_Node *,    direct_declarator)    \
 
-struct cn_ast_direct_declarator_array { CN_AST_BASE;
-    Cn_Ast_Node *direct_declarator;   // Can be NULL, if abstract.
-    Cn_Ast_Node *expression;
-};
+#define CN_AST_POINTER_MEMBERS(F, X)                                 \
+    F(X, INT32,  Cn_Ast_Qualifier_Flags, qualifiers)                 \
+    F(X, NODES, Cn_Ast_Nodes,           gnu_attribute_specifiers)    \
+    F(X, NODE,  Cn_Ast_Pointer *,       pointer)                     \
 
-struct cn_ast_direct_declarator_function { CN_AST_BASE;
-    Cn_Ast_Node *direct_declarator;
-    Cn_Ast_Nodes  parameter_declarations; // List of Cn_Ast_Parameter_Declaration.
-};
+#define CN_AST_DIRECT_DECLARATOR_GROUPED_MEMBERS(F, X)   \
+    F(X, NODE,  Cn_Ast_Declarator *, declarator)         \
 
-struct cn_ast_declaration_specifiers { CN_AST_BASE;
-    Cn_Ast_Storage_Specifier_Flags  storage_specifiers;
-    Cn_Ast_Qualifier_Flags          qualifiers;
-    Cn_Ast_Function_Specifier_Flags function_specifiers;
-    Cn_Ast_Nodes                 gnu_attribute_specifiers; // List of Cn_Ast_Gnu_Attribute_Specifier.
-    Cn_Ast_Node                *type_specifier;
-};
+#define CN_AST_DIRECT_DECLARATOR_ARRAY_MEMBERS(F, X)   \
+    F(X, NODE,  Cn_Ast_Node *, direct_declarator)      \
+    F(X, NODE,  Cn_Ast_Node *, expression)             \
 
-struct cn_ast_type_specifier_primitive { CN_AST_BASE;
-    Cn_Ast_Type_Kind  primitive_kind;
-    Cn_Ast_Type_Width width;
-    Cn_Ast_Type_Sign  sign;
-};
+#define CN_AST_DIRECT_DECLARATOR_FUNCTION_MEMBERS(F, X)   \
+    F(X, NODE,  Cn_Ast_Node *, direct_declarator)         \
+    F(X, NODES, Cn_Ast_Nodes,  parameter_declarations)    \
 
-struct cn_ast_type_specifier_typedef { CN_AST_BASE;
-    Cn_String typedef_name;
-};
+#define CN_AST_DECLARATION_SPECIFIERS_MEMBERS(F, X)                           \
+    F(X, INT32, Cn_Ast_Storage_Specifier_Flags,  storage_specifiers)          \
+    F(X, INT32, Cn_Ast_Qualifier_Flags,          qualifiers)                  \
+    F(X, INT32, Cn_Ast_Function_Specifier_Flags, function_specifiers)         \
+    F(X, NODES, Cn_Ast_Nodes,                    gnu_attribute_specifiers)    \
+    F(X, NODE,  Cn_Ast_Node *,                   type_specifier)              \
 
-struct cn_ast_type_name { CN_AST_BASE;
-    Cn_Ast_Specifier_Qualifier *specifier_qualifier;
-    Cn_Ast_Declarator          *abstract_declarator;
-};
+#define CN_AST_TYPE_SPECIFIER_PRIMITIVE_MEMBERS(F, X)   \
+    F(X, INT32, Cn_Ast_Type_Kind,  primitive_kind)      \
+    F(X, INT32, Cn_Ast_Type_Width, width)               \
+    F(X, INT32, Cn_Ast_Type_Sign,  sign)                \
 
-struct cn_ast_specifier_qualifier { CN_AST_BASE;
-    Cn_Ast_Qualifier_Flags qualifiers;
-    Cn_Ast_Node       *type_specifier;
-};
+#define CN_AST_TYPE_SPECIFIER_TYPEDEF_MEMBERS(F, X)     \
+    F(X, STRING,  Cn_String, typedef_name)              \
 
-struct cn_ast_parameter_declaration { CN_AST_BASE;
-    Cn_Ast_Declaration_Specifiers *declaration_specifiers;
-    Cn_Ast_Declarator             *declarator;
-};
+#define CN_AST_TYPE_NAME_MEMBERS(F, X)                                \
+    F(X, NODE,  Cn_Ast_Specifier_Qualifier *, specifier_qualifier)    \
+    F(X, NODE,  Cn_Ast_Declarator *,          abstract_declarator)    \
 
-struct cn_ast_struct_specifier { CN_AST_BASE;
-    Cn_Ast_Nodes       attribute_specifiers; // List of Cn_Ast_Attribute_Specifier.
-    Cn_Ast_Nodes       gnu_attribute_specifiers; // List of Cn_Ast_Gnu_Attribute_Specifier.
-    Cn_Ast_Identifier *identifier;
-    Cn_Ast_Nodes       member_declarations; // List of Cn_Ast_Member_Declaration.
-};
+#define CN_AST_SPECIFIER_QUALIFIER_MEMBERS(F, X)           \
+    F(X, INT32, Cn_Ast_Qualifier_Flags, qualifiers)        \
+    F(X, NODE,  Cn_Ast_Node *,          type_specifier)    \
 
-struct cn_ast_union_specifier { CN_AST_BASE;
-    Cn_Ast_Nodes       attribute_specifiers; // List of Cn_Ast_Attribute_Specifier.
-    Cn_Ast_Nodes       gnu_attribute_specifiers; // List of Cn_Ast_Gnu_Attribute_Specifier.
-    Cn_Ast_Identifier *identifier;
-    Cn_Ast_Nodes       member_declarations; // List of Cn_Ast_Member_Declaration.
-};
+#define CN_AST_PARAMETER_DECLARATION_MEMBERS(F, X)                          \
+    F(X, NODE,  Cn_Ast_Declaration_Specifiers *, declaration_specifiers)    \
+    F(X, NODE,  Cn_Ast_Declarator *,             declarator)                \
 
-struct cn_ast_member_declaration { CN_AST_BASE;
-    Cn_Ast_Nodes                attribute_specifiers; // List of Cn_Ast_Attribute_Specifier.
-    Cn_Ast_Specifier_Qualifier *specifier_qualifier;
-    Cn_Ast_Nodes                member_declarators; // List of Cn_Ast_Member_Declarator.
-};
+#define CN_AST_STRUCT_SPECIFIER_MEMBERS(F, X)                     \
+    F(X, NODES, Cn_Ast_Nodes,        attribute_specifiers)        \
+    F(X, NODES, Cn_Ast_Nodes,        gnu_attribute_specifiers)    \
+    F(X, NODE,  Cn_Ast_Identifier *, identifier)                  \
+    F(X, NODES, Cn_Ast_Nodes,        member_declarations)         \
 
-struct cn_ast_member_declarator { CN_AST_BASE;
-    Cn_Ast_Declarator *declarator;
-    Cn_Ast_Node       *bitfield;
-    Cn_Ast_Nodes       gnu_attribute_specifiers; // List of Cn_Ast_Gnu_Attribute_Specifier.
-};
+#define CN_AST_UNION_SPECIFIER_MEMBERS(F, X)                      \
+    F(X, NODES, Cn_Ast_Nodes,        attribute_specifiers)        \
+    F(X, NODES, Cn_Ast_Nodes,        gnu_attribute_specifiers)    \
+    F(X, NODE,  Cn_Ast_Identifier *, identifier)                  \
+    F(X, NODES, Cn_Ast_Nodes,        member_declarations)         \
 
-struct cn_ast_enum_specifier { CN_AST_BASE;
-    Cn_Ast_Nodes                attribute_specifiers; // List of Cn_Ast_Attribute_Specifier.
-    Cn_Ast_Nodes                gnu_attribute_specifiers; // List of Cn_Ast_Gnu_Attribute_Specifier.
-    Cn_Ast_Identifier          *identifier;
-    Cn_Ast_Specifier_Qualifier *specifier_qualifier;
-    Cn_Ast_Nodes                enumerators; // List of Cn_Ast_Enumerator.
-};
+#define CN_AST_MEMBER_DECLARATION_MEMBERS(F, X)                        \
+    F(X, NODES, Cn_Ast_Nodes,                 attribute_specifiers)    \
+    F(X, NODE,  Cn_Ast_Specifier_Qualifier *, specifier_qualifier)     \
+    F(X, NODES, Cn_Ast_Nodes,                 member_declarators)      \
 
-struct cn_ast_enumerator { CN_AST_BASE;
-    Cn_Ast_Identifier *identifier;
-    Cn_Ast_Nodes       attribute_specifiers; // List of Cn_Ast_Attribute_Specifier.
-    Cn_Ast_Nodes       gnu_attribute_specifiers; // List of Cn_Ast_Gnu_Attribute_Specifier.
-    Cn_Ast_Node       *expression;
-};
+#define CN_AST_MEMBER_DECLARATOR_MEMBERS(F, X)                    \
+    F(X, NODE,  Cn_Ast_Declarator *, declarator)                  \
+    F(X, NODE,  Cn_Ast_Node *,       bitfield)                    \
+    F(X, NODES, Cn_Ast_Nodes,        gnu_attribute_specifiers)    \
 
-struct cn_ast_attribute_specifier { CN_AST_BASE;
-    Cn_Ast_Nodes attributes; // List of Cn_Ast_Attribute.
-};
+#define CN_AST_ENUM_SPECIFIER_MEMBERS(F, X)                                \
+    F(X, NODES, Cn_Ast_Nodes,                 attribute_specifiers)        \
+    F(X, NODES, Cn_Ast_Nodes,                 gnu_attribute_specifiers)    \
+    F(X, NODE,  Cn_Ast_Identifier *,          identifier)                  \
+    F(X, NODE,  Cn_Ast_Specifier_Qualifier *, specifier_qualifier)         \
+    F(X, NODES, Cn_Ast_Nodes,                 enumerators)                 \
 
-struct cn_ast_attribute { CN_AST_BASE;
-    Cn_Ast_Identifier *vendor_identifier;
-    Cn_Ast_Identifier *identifier;
-    Cn_Ast_Nodes       arguments;
-};
+#define CN_AST_ENUMERATOR_MEMBERS(F, X)                           \
+    F(X, NODE,  Cn_Ast_Identifier *, identifier)                  \
+    F(X, NODES, Cn_Ast_Nodes,        attribute_specifiers)        \
+    F(X, NODES, Cn_Ast_Nodes,        gnu_attribute_specifiers)    \
+    F(X, NODE,  Cn_Ast_Node *,       expression)                  \
+
+#define CN_AST_ATTRIBUTE_SPECIFIER_MEMBERS(F, X)   \
+    F(X, NODES, Cn_Ast_Nodes, attributes)          \
+
+#define CN_AST_ATTRIBUTE_MEMBERS(F, X)                     \
+    F(X, NODE,  Cn_Ast_Identifier *, vendor_identifier)    \
+    F(X, NODE,  Cn_Ast_Identifier *, identifier)           \
+    F(X, NODES, Cn_Ast_Nodes,        arguments)            \
+
+/**
+ * This F macro used to generate a single member declaration 
+ * inside of any ast struct definition.
+ */
+#define CN__AST_STRUCT_MEMBER_DECLARATION(T, k, Type, name) Type name;
+
+/**
+ * This X macro used to generate a single definition of any ast struct.
+ */
+#define CN__AST_STRUCT_DEFINITION(K, T, m)                          \
+    struct cn_ast_##m { CN_AST_BASE;                                \
+        CN_AST_##K##_MEMBERS(CN__AST_STRUCT_MEMBER_DECLARATION, T)  \
+    };                                                              \
+
+/**
+ * Macro for definition of every concrete ast node type.
+ */
+#define CN_AST_DEFINE_STRUCTS(LIST)                             \
+    LIST(CN__AST_STRUCT_DEFINITION)                             \
+
+CN_AST_DEFINE_STRUCTS(CN_AST_GEN_LIST)
+
+
+/**
+ * F macro to generate ast member info entry for an ast struct.
+ */
+#define CN__AST_MEMBER_INFO_DESIGNATION(T, k, Type, name) { #name, offsetof(Cn_Ast_##T, name), CN_AST_MEMBER_INFO_##k },
+
+/**
+ * This X macro used to generate an ast info entry for an ast struct.
+ */
+#define CN__AST_INFO_DESIGNATION(K, T, m) {                                                             \
+    .name = #m,                                                                                         \
+    .size = sizeof(Cn_Ast_##T),                                                                         \
+    .members = (Cn_Ast_Member_Info []) { CN_AST_##K##_MEMBERS(CN__AST_MEMBER_INFO_DESIGNATION, T) },    \
+    .members_count =                                                                                    \
+        sizeof((Cn_Ast_Member_Info []) { CN_AST_##K##_MEMBERS(CN__AST_MEMBER_INFO_DESIGNATION, T) })    \
+        / sizeof(Cn_Ast_Member_Info),                                                                   \
+    .emit_func = cn__emit_##m,                                                                          \
+},                                                                                                      \
+
+#define CN_AST_INFO_DECLARE_ARRAY(NAME) extern const Cn_Ast_Info_Array cn__ast_info_##NAME##_array;
+
+CN_AST_INFO_DECLARE_ARRAY(CORE)
+
+/**
+ * This macro generates all meta info for the AST types list specified.
+ * The meta info generated is stored statically. If you writing your own extension,
+ * make sure to declare this array in header using `CN_AST_INFO_DECLARE_ARRAY`.
+ * and then simply define it using this macro somewhere in your implementation.
+ * In this file it is done at the very end of the file, so that all declarations
+ * and bindings can be referenced from array definiton.
+ */
+#define CN_AST_INFO_DEFINE_ARRAY(NAME, ID, LIST)                                        \
+   const Cn_Ast_Info_Array cn__ast_info_##NAME##_array = {                       \
+        .infos = (Cn_Ast_Info []) {                                                     \
+            { .name = "<unknown>", .size = 0, .members = NULL, .members_count = 0 },    \
+            LIST(CN__AST_INFO_DESIGNATION)                                              \
+        },                                                                              \
+        .length = (int64_t)CN_AST_##NAME##__END,                                        \
+   };
+
+/**
+ * Following macro adds ast infos to the table given the extension `ID` and `LIST` of
+ * AST nodes.
+ *
+ * PARAM NAME: Extension uppercase name.
+ */
+#define CN_AST_INFO_TABLE_REGISTER(table, ID, NAME) table[ID] = cn__ast_info_##NAME##_array
 
 
 /**
@@ -2638,7 +2810,7 @@ CNDEF void cn_ast_print(void * idx, int depth);
  *
  * RETURNS: Static string with the enum name of the node kind.
  */
-CNDEF const char *cn_ast_node_kind_name(Cn_Ast_Kind kind);
+CNDEF const char *cn_ast_node_kind_name(Cn_Ast_Id id);
 
 /**
  * Gets size of the concrete node struct for the given `kind`.
@@ -2648,7 +2820,7 @@ CNDEF const char *cn_ast_node_kind_name(Cn_Ast_Kind kind);
  *
  * RETURNS: Size in bytes of the concrete `Cn_Ast_...` struct.
  */
-CNDEF size_t cn_ast_node_size(Cn_Ast_Kind kind);
+CNDEF size_t cn_ast_node_size(Cn_Ast_Id id);
 
 /**
  * Checks whether `node` is primary: identifier, integer, float or string.
@@ -3106,18 +3278,19 @@ extern Cn_Message_Handler *cn_message_handler;
  * continue after hook's execution.
  */
 typedef enum {
-    CN_HOOK_RESPONSE_ERROR    = 0x0,
-    CN_HOOK_RESPONSE_CONTINUE = 0x1,
-    CN_HOOK_RESPONSE_MODIFIED = 0x2,
+    CN_HOOK_RESPONSE_NONE     = 0,
+    CN_HOOK_RESPONSE_ERROR    = 0x1,
 } Cn_Hook_Response;    
 
 /**
  * Classic meta programming hook, it is called after code was parsed
- * into AST. It guarantees that given AST is typechecked and is correct.
+ * into AST. 
+ *
+ * It guarantees that given AST is typechecked and is correct.
  * It allows any modification of AST, those modifications will be reparsed
  * sending proper diagnostics if errors occured.
  *
- * RETURNS: `CN_HOOK_RESPONSE_MODIFIED` if AST modifications occured.
+ * OUTPUTS: `true` to `ast_is_modified` if AST modifications occured.
  *
  * NOTE: The reason why `node_ptr` is `Cn_Ast_Node **` is because the hook
  * can completely delete the AST node by setting `*node_ptr = NULL`.
@@ -3125,7 +3298,28 @@ typedef enum {
  * meaning it can point to a completely different AST and library will
  * utilize that new node.
  */
-typedef Cn_Hook_Response (Cn_Hook_Ast_Parsed)(Cn_Ast_Node **node_ptr);
+typedef Cn_Hook_Response (Cn_Hook_Ast_Parsed)(Cn_Ast_Node **node_ptr, bool *ast_is_modified);
+
+/**
+ * Subparsing hook, is used to extend parsing grammar of core library.
+ *
+ * There are two ways to attach subparsed nodes to the parent ast.
+ *
+ *  1) `Substitution`: The pointer to parsed node is copied to `null_ptr` output parameter.
+ *  Upon the hook return, this pointer is utilized in the related ast slot.
+ *
+ *  2) `Extension`: The subparsing uses `cn_ast_ext_*` functions to push new extensions consisting
+ *  of ast nodes or ast lists, no need to output it anywhere. Those extensions are stored are stored
+ *  in the `Cn_Tu_Data.ext_stack` and will be collected after all hooks finish on that slot.
+ *
+ * IMPORTANT: `null_ptr` can be `NULL` itself, only in cases where grammar slot doesn't permit
+ * grammar substitution with custom ast nodes, for such slots only ast extensions are allowed.
+ *
+ * NOTE: Since analyzing comes from parsing, hook is responsible for analyzing and
+ * typechecking whatever it parses, e.g. by calling `cn_analyze_typecheck_expression`,
+ * after the expression was parsed.
+ */
+typedef Cn_Hook_Response (Cn_Hook_Parse)(Cn_Ast_Slot_Id id, Cn_Ast_Node **null_ptr, Cn_Lexer *lexer);
 
 /**
  * Analyze hook that is called whenever declarator was analyzed to type.
@@ -3136,11 +3330,27 @@ typedef Cn_Hook_Response (Cn_Hook_Ast_Parsed)(Cn_Ast_Node **node_ptr);
 typedef Cn_Hook_Response (Cn_Hook_Analyze_Declarator)(Cn_Ast_Node *declarator, Cn_Type **type_ptr);
 
 typedef struct {
-    Cn_Hook_Ast_Parsed         *ast_parsed_hooks;
-    Cn_Hook_Analyze_Declarator *analyze_declarator_hooks;
+    Cn_Hook_Ast_Parsed         **ast_parsed_hooks;
+    Cn_Hook_Parse              **parse_hooks;
+    Cn_Hook_Analyze_Declarator **analyze_declarator_hooks;
 } Cn_Hooks;
 
 extern Cn_Hooks cn_hooks;
+
+
+typedef bool (Cn_Extension)(Cn_Hooks *, Cn_Ast_Info_Array [256]);
+
+/**
+ * Registers all supplied extensions.
+ *
+ * IMPORTANT: Must be called only once, all memory allocated inside this function is expected
+ * to live throughout the program`s life time, no freeing is required.
+ *
+ * RETURNS: `true` on success, `false` on error.
+ */
+#define cn_extension_register(...) cn__extension_register((Cn_Extension *[]) { __VA_ARGS__ }, sizeof((Cn_Extension *[]) { __VA_ARGS__ }) / sizeof(Cn_Extension *))
+
+CNDEF bool cn__extension_register(Cn_Extension *extensions[], int64_t length);
 
 /**
  * ============================================
@@ -3287,11 +3497,11 @@ typedef struct {
 } Cn_Emitter;
 
 /**
- * Emits C source code of `node_ptr` to the output of `e`.
+ * Emits C source code of `node` to the output of `e`.
  *
  * Reconstructs valid C source code from the ast representation.
  */
-CNDEF void cn_emit(Cn_Emitter *e, void * node_ptr);
+CNDEF void cn_emit(Cn_Emitter *e, void *node);
 
 
 /**
@@ -3336,9 +3546,9 @@ CNDEF Cn_Ast_Translation_Unit *cn_parse_translation_unit(Cn_Lexer *lexer);
  *
  * ```
  *  external_declaration
- *          : gnu_extensions (
+ *          : slot(EXTERNAL_DECLARATION_PREFIX) (
  *              ';'                         // Stray ';'
- *              | gnu_asm_statement         // File-scope basic asm, without qualifiers.
+ *              | slot(EXTERNAL_DECLARATION)
  *              | function
  *              | declaration ';'
  *              )
@@ -3346,8 +3556,6 @@ CNDEF Cn_Ast_Translation_Unit *cn_parse_translation_unit(Cn_Lexer *lexer);
  * ```
  *
  * RETURNS: Parsed external declaration, `NULL` on error.
- *
- * NOTE: If `gnu_extensions` are present, `CN_AST_GNU_EXTENSION` flag is set on the external declaration.
  */
 CNDEF Cn_Ast_External_Declaration *cn_parse_external_declaration(Cn_Lexer *lexer);
 
@@ -3426,6 +3634,7 @@ CNDEF bool cn_parse_starts_type(Cn_Lexer *lexer);
  *          | jump_statement
  *          | labeled_statement
  *          | expression_statement
+ *          | slot(STATEMENT)
  *          ;
  * ```
  *
@@ -3447,6 +3656,7 @@ CNDEF Cn_Ast_Node *cn_parse_statement(Cn_Lexer *lexer);
  *          | jump_statement
  *          | labeled_statement
  *          | expression_statement
+ *          | slot(STATEMENT)
  *          ;
  * ```
  *
@@ -3477,7 +3687,7 @@ CNDEF Cn_Ast_Block *cn_parse_block(Cn_Lexer *lexer, bool use_current_scope);
  *
  * ```
  *  block_item
- *          : gnu_extensions declaration ';'
+ *          : slot(DECLARATION_PREFIX) declaration ';'
  *          | statement
  *          ;
  * ```
@@ -3547,15 +3757,11 @@ CNDEF Cn_Ast_Node *cn_parse_do_while(Cn_Lexer *lexer);
  *
  * ```
  *  for_statement
- *          : 'for' '(' (gnu_extensions declaration | expression)? ';' expression? ';' expression? ')' statement
+ *          : 'for' '(' (slot(DECLARATION_PREFIX) declaration | expression)? ';' expression? ';' expression? ')' statement
  *          ;
  * ```
  *
  * RETURNS: Parsed `for` statement, `NULL` on error.
- *
- * NOTE: If `gnu_extensions` are present, `CN_AST_GNU_EXTENSION` flag is set on the initialization
- * declaration. If `gnu_extensions` aren't followed by a declaration, they are a part of the
- * initialization expression, see `cn_parse_expression`.
  */
 CNDEF Cn_Ast_Node *cn_parse_for_statement(Cn_Lexer *lexer);
 
@@ -3790,13 +3996,13 @@ typedef enum : uint8_t {
  *          : expression '.' identifier
  *          | expression '->' identifier
  *          ;
- *
+ *  
  *  unary_expression
  *          : cast_expression
  *          | '(' expression ')'
  *          | sizeof_expression
  *          | unary_operator expression
- *          | gnu_extensions expression
+ *          | slot(EXPRESSION_PREFIX) expression
  *          ;
  *
  *  cast_expression
@@ -3814,7 +4020,8 @@ typedef enum : uint8_t {
  *          ;
  *
  *  primary_expression
- *          : identifier
+ *          : slot(PRIMARY)
+ *          | identifier
  *          | integer
  *          | float
  *          | string
@@ -3837,9 +4044,6 @@ typedef enum : uint8_t {
  * PARAM min_precedence: Lowest precedence of binary operators that are parsed, `-1` to parse all of them.
  *
  * RETURNS: Parsed expression, `NULL` on error.
- *
- * NOTE: `gnu_extensions expression` binds as a unary operator, but doesn't produce its own node,
- * instead `CN_AST_GNU_EXTENSION` flag is set on the operand expression.
  */
 CNDEF Cn_Ast_Node *cn_parse_expression(Cn_Lexer *lexer, int min_precedence, Cn_Parse_Expression_Flags flags);
 
@@ -3966,9 +4170,6 @@ CNDEF Cn_Ast_Node *cn_parse_expression_increasing_precedence(Cn_Lexer *lexer, vo
  * Detects and parses unary operators, but doesn't parse binary or postfix expressions.
  *
  * RETURNS: Parsed expression, `NULL` on error.
- *
- * NOTE: Leading `gnu_extensions` are parsed as a unary operator, setting `CN_AST_GNU_EXTENSION`
- * flag on the operand expression.
  */
 CNDEF Cn_Ast_Node *cn_parse_expression_leaf(Cn_Lexer *lexer, Cn_Parse_Expression_Flags flags);
 
@@ -4009,7 +4210,7 @@ CNDEF Cn_Ast_Nodes cn_parse_init_declarators(Cn_Lexer *lexer, bool *ok, void *de
  *
  * ```
  *  init_declarator
- *          : declarator gnu_attribute_specifiers gnu_asm_label? ('=' initializer)?
+ *          : declarator slot(AFTER_DECLARATOR) ('=' initializer)?
  *          ;
  * ```
  *
@@ -4022,7 +4223,7 @@ CNDEF Cn_Ast_Init_Declarator *cn_parse_finish_init_declarator(Cn_Lexer *lexer, C
  *
  * ```
  *  init_declarator
- *          : declarator gnu_attribute_specifiers gnu_asm_label? ('=' initializer)?
+ *          : declarator slot(AFTER_DECLARATOR) ('=' initializer)?
  *          ;
  * ```
  *
@@ -4137,7 +4338,7 @@ CNDEF Cn_Ast_Declarator *cn_parse_declarator(Cn_Lexer *lexer, bool *ok);
  *
  * ```
  *  pointer
- *          : '*' (qualifier | gnu_attribute_specifier)* pointer?
+ *          : '*' (qualifier | slot(POINTER))* pointer?
  *          ;
  * ```
  *
@@ -4212,7 +4413,7 @@ CNDEF Cn_Ast_String *cn_parse_string(Cn_Lexer *lexer);
  *              storage_specifier
  *              | qualifier
  *              | function_specifier
- *              | gnu_attribute_specifier
+ *              | slot(DECLARATION_SPECIFIERS)
  *              | type_specifier
  *              )+
  *          ;
@@ -4305,7 +4506,7 @@ typedef struct {
  *          | union_specifier
  *          | enum_specifier
  *          | typedef
- *          | gnu_typeof
+ *          | slot(TYPE_SPECIFIER)
  *          ;
  * ```
  *
@@ -4392,13 +4593,13 @@ CNDEF Cn_Ast_Parameter_Declaration *cn_parse_parameter_declaration(Cn_Lexer *lex
  *
  * ```
  *  struct_specifier
- *          : 'struct' attribute_specifiers gnu_attribute_specifiers
+ *          : 'struct' attribute_specifiers slot(TAG)
  *          ( identifier? '{' member_declaration* '}' )
  *          | identifier
  *          ;
  *
  *  union_specifier
- *          : 'union' attribute_specifiers gnu_attribute_specifiers
+ *          : 'union' attribute_specifiers slot(TAG)
  *          ( identifier? '{' member_declaration* '}' )
  *          | identifier
  *          ;
@@ -4413,13 +4614,11 @@ CNDEF Cn_Ast_Node *cn_parse_struct_or_union_specifier(Cn_Lexer *lexer);
  *
  * ```
  *  member_declaration
- *          : gnu_extensions attribute_specifiers specifier_qualifier member_declarators ';'
+ *          : slot(MEMBER_DECLARATION_PREFIX) attribute_specifiers specifier_qualifier member_declarators ';'
  *          ;
  * ```
  *
  * RETURNS: Parsed member declaration, `NULL` on error.
- *
- * NOTE: If `gnu_extensions` are present, `CN_AST_GNU_EXTENSION` flag is set on the member declaration.
  */
 CNDEF Cn_Ast_Member_Declaration *cn_parse_member_declaration(Cn_Lexer *lexer);
 
@@ -4443,8 +4642,8 @@ CNDEF Cn_Ast_Nodes cn_parse_member_declarators(Cn_Lexer *lexer, bool *ok);
  *
  * ```
  *  member_declarator
- *          : declarator gnu_attribute_specifiers
- *          | declarator? ':' expression gnu_attribute_specifiers
+ *          : declarator slot(MEMBER_DECLARATOR)
+ *          | declarator? ':' expression slot(MEMBER_DECLARATOR)
  *          ;
  * ```
  *
@@ -4457,7 +4656,7 @@ CNDEF Cn_Ast_Member_Declarator *cn_parse_member_declarator(Cn_Lexer *lexer);
  *
  * ```
  *  enum_specifier
- *          : 'enum' attribute_specifiers gnu_attribute_specifiers
+ *          : 'enum' attribute_specifiers slot(TAG)
  *          ( identifier? (':' specifier_qualifier)? '{' ( enumerator (',' enumerator)* ','? )? '}' )
  *          | identifier  (':' specifier_qualifier)?
  *          ;
@@ -4472,7 +4671,7 @@ CNDEF Cn_Ast_Node *cn_parse_enum_specifier(Cn_Lexer *lexer);
  *
  * ```
  *  enumerator
- *          : identifier attribute_specifiers gnu_attribute_specifiers ('=' expression)?
+ *          : identifier attribute_specifiers slot(ENUMERATOR) ('=' expression)?
  *          ;
  * ```
  *
@@ -4994,6 +5193,13 @@ typedef struct {
      */
     Cn_Ast_Node **ptr_stack;
     /**
+     * Stack of `Cn_Ast_Extension` used by subparsers to add custom ast extensions to the node.
+     *
+     * Parsing functions push extensions onto this stack, then finalize ranges
+     * into `Cn_Ast_Extensions` when the list is complete.
+     */
+    Cn_Ast_Extension *ext_stack;
+    /**
      * Error and warning count, incremented by `cn_diagnostic`
      * every time an error or a warning is reported.
      */
@@ -5030,6 +5236,7 @@ typedef struct {
     int64_t                 saved_scope_length;
     int64_t                 saved_function_scope_idx;
     int64_t                 saved_ptr_stack_length;
+    int64_t                 saved_ext_stack_length;
     uint64_t                saved_counter;
 } Cn_Tu_Saved;
 
@@ -5065,6 +5272,7 @@ CNDEF Cn_String cn__tu_emit_and_rollback(Cn_Ast_Node *node, Cn_Tu_Saved *state);
 #define CN_AST_PERMANENT_STRINGS_ARENA_BLOCK_CAP    4096
 #define CN_AST_SCOPE_STACK_INITIAL_CAP              32
 #define CN_AST_PTR_STACK_INITIAL_CAP                128
+#define CN_AST_EXT_STACK_INITIAL_CAP                32
 
 extern const Cn_Lexer_Blacklist cn_default_blacklist;
 
@@ -5135,8 +5343,6 @@ CNDEF int cn_tu_process(Cn_Translation_Unit *tu);
  * Frees all memory used by translation unit `tu`, including closing previously opened file.
  */
 CNDEF void cn_tu_free(Cn_Translation_Unit *tu);
-
-
 
 
 #endif // CN_H_
@@ -6877,7 +7083,7 @@ CNDEF bool cn__valid_number(char c) {
 }
 
 /**
- * RETURNS: True if newline character was eaten.
+ * RETURNS: `true` if newline character was eaten.
  */
 CNDEF bool cn__lexer_eat_char(Cn_Lexer *l) {
     l->cursor++;
@@ -6891,7 +7097,7 @@ CNDEF bool cn__lexer_eat_char(Cn_Lexer *l) {
 }
 
 /**
- * RETURNS: True if stopped right after after newline character was eaten.
+ * RETURNS: `true` if stopped right after after newline character was eaten.
  */
 CNDEF void cn__lexer_consume_spaces(Cn_Lexer *l) {
 
@@ -6902,7 +7108,7 @@ CNDEF void cn__lexer_consume_spaces(Cn_Lexer *l) {
 }
 
 /**
- * RETURNS: True if reached end of file.
+ * RETURNS: `true` if reached end of file.
  */
 CNDEF bool cn__lexer_eof(Cn_Lexer *l) {
     return l->cursor >= l->content.length;
@@ -6964,7 +7170,7 @@ CNDEF void cn__lexer_backtrack_token(Cn_Lexer *l, Cn_Token *token) {
 }
 
 /**
- * RETURNS: True if token is blacklisted.
+ * RETURNS: `true` if token is blacklisted.
  */
 CNDEF bool cn__lexer_blacklisted(Cn_Token *token, Cn_Lexer_Blacklist *blacklist) {
     for (int64_t i = 0; i < blacklist->length; i++) {
@@ -7353,6 +7559,17 @@ CNDEF void cn_lexer_log_tokens(Cn_Lexer *lexer, int64_t n) {
     fprintf(stderr, CN_ANSI_RESET"\n");
 }
 
+CNDEF bool cn_lexer_changed(Cn_Lexer *lexer, Cn_Lexer *saved) {
+    if (lexer->cursor != saved->cursor) return true;
+
+    // Checking queue.
+    for (int i = 0; i < CN_LEXER_QUEUE_COUNT; i++) {
+        if (!cn_token_equals(&lexer->queue[i], &saved->queue[i])) return true;
+    }
+
+    return false;
+}
+
 CNDEF const char *cn_token_kind_name(Cn_Token_Type type) {
     switch(type) {
         case CN_TOKEN_EOF:              return "<eof>";
@@ -7462,6 +7679,19 @@ CNDEF const char *cn_token_kind_name(Cn_Token_Type type) {
     }
 
     return "<invalid token>";
+}
+
+CNDEF bool cn_token_equals(Cn_Token *a, Cn_Token *b) {
+    if (a == b) return true;
+
+    return  a->type == b->type                              &&
+            a->loc.column == b->loc.column                  &&
+            a->loc.line == b->loc.line                      &&
+            a->src.length == b->src.length                  &&
+            a->src.offset == b->src.offset                  &&
+            cn_str_equals(&a->loc.file, &b->loc.file)       &&
+            cn_str_equals(&a->src.source, &b->src.source)
+            ;
 }
 
 CNDEF void cn_lexer_print_snippet(Cn_Lexer *lexer, uint64_t index, int64_t length) {
@@ -8021,7 +8251,7 @@ CNDEF Cn_Type_Flags cn__type_qualifier_flags(const Cn_Type *type) {
  * in a prototype: top-level qualifiers are dropped, arrays decay to pointers to
  * their element type and functions decay to pointers to function.
  *
- * RETURNS: True if adjusted parameter types are compatible.
+ * RETURNS: `true` if adjusted parameter types are compatible.
  */
 CNDEF bool cn__type_is_compatible_param(const Cn_Type *a, const Cn_Type *b) {
     // TODO: This function might be unnecessary. C does perfom decaying of arrays to pointers, and functions to pointers to the functions.
@@ -8588,6 +8818,65 @@ CNDEF uint64_t cn_ast_type_ptr_hash(const Cn_Type **type_ptr) {
     return cn_type_hash(*type_ptr);
 }
 
+CNDEF Cn_Ast_Extensions cn_ast_ext_merge(Cn_Ast_Extensions a, Cn_Ast_Extensions b) {
+    Cn_Ast_Extension *exts = cn_chained_arena_alloc(&cn__tu_data->ast_arena, (a.length + b.length) * sizeof(Cn_Ast_Extension));
+    memcpy(exts, a.exts, a.length * sizeof(Cn_Ast_Extension));
+    memcpy(exts + a.length, b.exts, b.length * sizeof(Cn_Ast_Extension));
+
+    return (Cn_Ast_Extensions) {
+        .exts = exts,
+        .length = a.length + b.length,
+    };
+}
+
+/**
+ * Gets current `ext_stack` length, used to mark start of a list.
+ */
+#define cn__ast_ext_stack_mark() cn_array_list_length(&cn__tu_data->ext_stack)
+
+/**
+ * Discards all extensions added after `mark`, by returning the `ext_stack` to it.
+ */
+#define cn__ast_ext_stack_discard(mark) cn_array_list_pop_multiple(&cn__tu_data->ext_stack, cn_array_list_length(&cn__tu_data->ext_stack) - (mark))
+
+/**
+ * Finalizes range of the `ext_stack`, from `mark` to the end, into `Cn_Ast_Extensions`.
+ *
+ * Finalized extensions are popped from the stack.
+ *
+ * NOTE: Is internal function, to prevent user from trying to utilize it.
+ *
+ * RETURNS: Finalized list of extensions, allocated in the ast arena. Empty list if range is empty.
+ */
+CNDEF Cn_Ast_Extensions cn__ast_ext_stack_finalize(int64_t mark) {
+    int64_t stack_len = cn_array_list_length(&cn__tu_data->ext_stack);
+    int64_t count = stack_len - mark;
+
+    if (count <= 0) return (Cn_Ast_Extensions) { .exts = NULL, .length = 0 };
+    
+
+    // Allocated from the ast arena, so the list is rolled back by a checkpoint
+    // together with the nodes it points at.
+    Cn_Ast_Extension *exts = cn_chained_arena_alloc(&cn__tu_data->ast_arena, count * sizeof(Cn_Ast_Extension));
+
+    // Copy pointers from stack.
+    memcpy(exts, cn__tu_data->ext_stack + mark, count * sizeof(Cn_Ast_Extension));
+
+    // Pop the finalized indices from stack.
+    cn_array_list_pop_multiple(&cn__tu_data->ext_stack, count);
+
+    return (Cn_Ast_Extensions) { .exts = exts, .length = count };
+}
+
+CNDEF Cn_Ast_Info *cn_ast_info(Cn_Ast_Id id) {
+    uint8_t extension_id = CN_AST_KIND_EXTENSION_ID(id);
+    CN_ASSERT(cn_ast_info_table[extension_id].infos != NULL);
+    CN_ASSERT(id - CN_AST_KIND_EXTENSION_BASE(extension_id) < cn_ast_info_table[extension_id].length);
+    return &cn_ast_info_table[extension_id].infos[id - CN_AST_KIND_EXTENSION_BASE(extension_id)];
+}
+
+Cn_Ast_Info_Array cn_ast_info_table[256] = {0};
+
 
 CNDEF void *cn__ast_new(Cn_Ast_Node *node, size_t size) {
     void *data = cn_chained_arena_alloc(&cn__tu_data->ast_arena, size);
@@ -8625,389 +8914,128 @@ CNDEF void cn__ast_print_list(Cn_Ast_Nodes list, const char *list_name, int dept
     cn__ast_print_prefixes[depth] = NULL;
 }
 
+CNDEF void cn__ast_print_extension(Cn_Ast_Extension *e, int depth) {
+    CN_ASSERT(e->kind < 2);
+
+    if (e->kind == CN_AST_EXTENSION_NODE) {
+        cn_ast_print(e->node, depth);
+    } else {
+        cn__ast_print_list(e->list, "", depth);
+    }
+}
+
+CNDEF void cn__ast_print_extensions(Cn_Ast_Extensions extensions, int depth) {
+    CN_ASSERT(depth < (int)CN_ARRAY_LENGTH(cn__ast_print_prefixes));
+
+    cn__ast_print_prefixes[depth] = CN__AST_PRINT_FLAT_TAB;
+
+    if (extensions.length > 0) {
+        fprintf(stderr, "EXTENSIONS:"CN_LINE_END);
+        for (int64_t i = 0; i < extensions.length - 1; i++) {
+            CN__AST_PRINT_SPLIT();
+
+            cn__ast_print_extension(extensions.exts + i, depth + 1);
+        }
+
+        CN__AST_PRINT_LAST();
+        cn__ast_print_extension(extensions.exts + (extensions.length - 1), depth + 1);
+    }
+    cn__ast_print_prefixes[depth] = NULL;
+}
+
 CNDEF void cn_ast_print(void * idx, int depth) {
     CN_ASSERT(depth < (int)CN_ARRAY_LENGTH(cn__ast_print_prefixes));
 
     CN_ASSERT(idx != NULL);
     Cn_Ast_Node *node = idx;
+    Cn_Ast_Info *info = cn_ast_info(node->id);
 
-    fprintf(stderr, "%s", cn_ast_node_kind_name(node->kind));
+    fprintf(stderr, "%s", info->name);
     cn__ast_print_prefixes[depth] = CN__AST_PRINT_FLAT_TAB;
-    
-    int             next            = 0;
-    void *          ptrs[8]         = {0};
-    const char *    list_names[8]   = {0};
 
-#define ADD_IDX(idx_ptr) do { if (*(idx_ptr) != NULL) { CN_ASSERT(next < (int)CN_ARRAY_LENGTH(ptrs)); ptrs[next++] = (idx_ptr); } } while(0)
-#define ADD_LIST(list_ptr, name) do { CN_ASSERT(next < (int)CN_ARRAY_LENGTH(ptrs)); ptrs[next] = (list_ptr); list_names[next++] = (name); } while(0)
+    if (node->flags != 0) fprintf(stderr, " flags=0x%x", (unsigned)node->flags);
 
-    switch(node->kind) {
-        case CN_AST_UNKNOWN:
-            break;
-        case CN_AST_CODE:
-            break;
-        case CN_AST_TRANSLATION_UNIT:
-            ADD_LIST(&cn_ast_as(Translation_Unit, node)->external_declarations, "external_declarations");
-            break;
-        case CN_AST_EXTERNAL_DECLARATION:
-            ADD_IDX(&cn_ast_as(External_Declaration, node)->child);
-            break;
-        case CN_AST_DECLARATION:
-            ADD_LIST(&cn_ast_as(Declaration, node)->attribute_specifiers, "attribute_specifiers");
-            ADD_IDX(&cn_ast_as(Declaration, node)->declaration_specifiers);
-            ADD_LIST(&cn_ast_as(Declaration, node)->init_declarators, "init_declarators");
-            break;
-        case CN_AST_FUNCTION:
-            ADD_LIST(&cn_ast_as(Function, node)->attribute_specifiers, "attribute_specifiers");
-            ADD_IDX(&cn_ast_as(Function, node)->declaration_specifiers);
-            ADD_IDX(&cn_ast_as(Function, node)->declarator);
-            ADD_IDX(&cn_ast_as(Function, node)->block);
-            break;
-        case CN_AST_BLOCK:
-            ADD_LIST(&cn_ast_as(Block, node)->attribute_specifiers, "attribute_specifiers");
-            ADD_LIST(&cn_ast_as(Block, node)->block_items, "block_items");
-            break;
-        case CN_AST_BLOCK_ITEM:
-            ADD_IDX(&cn_ast_as(Block_Item, node)->declaration_or_statement);
-            break;
-        case CN_AST_IF:
-            ADD_LIST(&cn_ast_as(If, node)->attribute_specifiers, "attribute_specifiers");
-            ADD_IDX(&cn_ast_as(If, node)->condition);
-            ADD_IDX(&cn_ast_as(If, node)->then_statement);
-            ADD_IDX(&cn_ast_as(If, node)->else_statement);
-            break;
-        case CN_AST_SWITCH:
-            ADD_LIST(&cn_ast_as(Switch, node)->attribute_specifiers, "attribute_specifiers");
-            ADD_IDX(&cn_ast_as(Switch, node)->condition);
-            ADD_IDX(&cn_ast_as(Switch, node)->body);
-            break;
-        case CN_AST_WHILE:
-            ADD_LIST(&cn_ast_as(While, node)->attribute_specifiers, "attribute_specifiers");
-            ADD_IDX(&cn_ast_as(While, node)->condition);
-            ADD_IDX(&cn_ast_as(While, node)->body);
-            break;
-        case CN_AST_DO_WHILE:
-            ADD_LIST(&cn_ast_as(Do_While, node)->attribute_specifiers, "attribute_specifiers");
-            ADD_IDX(&cn_ast_as(Do_While, node)->body);
-            ADD_IDX(&cn_ast_as(Do_While, node)->condition);
-            break;
-        case CN_AST_FOR:
-            ADD_LIST(&cn_ast_as(For, node)->attribute_specifiers, "attribute_specifiers");
-            ADD_IDX(&cn_ast_as(For, node)->initialization);
-            ADD_IDX(&cn_ast_as(For, node)->condition);
-            ADD_IDX(&cn_ast_as(For, node)->update);
-            ADD_IDX(&cn_ast_as(For, node)->body);
-            break;
-        case CN_AST_LABEL:
-            ADD_LIST(&cn_ast_as(Label, node)->attribute_specifiers, "attribute_specifiers");
-            ADD_IDX(&cn_ast_as(Label, node)->identifier);
-            ADD_IDX(&cn_ast_as(Label, node)->expression);
-            ADD_IDX(&cn_ast_as(Label, node)->statement);
-            break;
-        case CN_AST_GOTO:
-            ADD_LIST(&cn_ast_as(Goto, node)->attribute_specifiers, "attribute_specifiers");
-            ADD_IDX(&cn_ast_as(Goto, node)->identifier);
-            break;
-        case CN_AST_RETURN:
-            ADD_LIST(&cn_ast_as(Return, node)->attribute_specifiers, "attribute_specifiers");
-            ADD_IDX(&cn_ast_as(Return, node)->expression);
-            break;
-        case CN_AST_BREAK:
-            ADD_LIST(&cn_ast_as(Break, node)->attribute_specifiers, "attribute_specifiers");
-            break;
-        case CN_AST_CONTINUE:
-            ADD_LIST(&cn_ast_as(Continue, node)->attribute_specifiers, "attribute_specifiers");
-            break;
-        case CN_AST_EXPRESSION_STATEMENT:
-            ADD_LIST(&cn_ast_as(Expression_Statement, node)->attribute_specifiers, "attribute_specifiers");
-            ADD_IDX(&cn_ast_as(Expression_Statement, node)->expression);
-            break;
-        case CN_AST_BINARY:
-            ADD_IDX(&cn_ast_as(Binary, node)->left);
-            ADD_IDX(&cn_ast_as(Binary, node)->right);
-            break;
-        case CN_AST_ACCESS:
-            ADD_IDX(&cn_ast_as(Access, node)->expression);
-            ADD_IDX(&cn_ast_as(Access, node)->member);
-            break;
-        case CN_AST_CALL:
-            ADD_IDX(&cn_ast_as(Call, node)->expression);
-            ADD_LIST(&cn_ast_as(Call, node)->arguments, "arguments");
-            break;
-        case CN_AST_UNARY:
-            ADD_IDX(&cn_ast_as(Unary, node)->expression);
-            break;
-        case CN_AST_CAST:
-            ADD_IDX(&cn_ast_as(Cast, node)->type_name);
-            ADD_IDX(&cn_ast_as(Cast, node)->expression);
-            break;
-        case CN_AST_COMPOUND:
-            ADD_IDX(&cn_ast_as(Compound, node)->type_name);
-            ADD_LIST(&cn_ast_as(Compound, node)->designations, "designations");
-            break;
-        case CN_AST_SIZEOF:
-            ADD_IDX(&cn_ast_as(Sizeof, node)->target);
-            break;
-        case CN_AST_TERNARY:
-            ADD_IDX(&cn_ast_as(Ternary, node)->condition);
-            ADD_IDX(&cn_ast_as(Ternary, node)->if_true);
-            ADD_IDX(&cn_ast_as(Ternary, node)->if_false);
-            break;
-        case CN_AST_ASSIGN:
-            ADD_IDX(&cn_ast_as(Assign, node)->left);
-            ADD_IDX(&cn_ast_as(Assign, node)->right);
-            break;
-        case CN_AST_POSTFIX:
-            ADD_IDX(&cn_ast_as(Postfix, node)->expression);
-            break;
-        case CN_AST_PRIMARY:
-            ADD_IDX(&cn_ast_as(Primary, node)->literal);
-            break;
-        case CN_AST_IDENTIFIER:
-            fprintf(stderr, " %.*s", CN_STR_UNPACK(cn_ast_as(Identifier, node)->name));
-            break;
-        case CN_AST_INTEGER:
-            fprintf(stderr, " %lu", cn_ast_as(Integer, node)->value);
-            break;
-        case CN_AST_FLOAT:
-            fprintf(stderr, " %lf", cn_ast_as(Float, node)->value);
-            break;
-        case CN_AST_CHAR:
-            for (int i = cn_ast_as(Char, node)->unit_count - 1; i >= 0; i--)
-                fprintf(stderr, "\\x%02x", (unsigned)(uint8_t)(cn_ast_as(Char, node)->value >> (i * 8)));
-            break;
-        case CN_AST_STRING:
-            fprintf(stderr, " \"%.*s\"", CN_STR_UNPACK(cn_ast_as(String, node)->str));
-            break;
-        case CN_AST_INIT_DECLARATOR:
-            ADD_IDX(&cn_ast_as(Init_Declarator, node)->declarator);
-            // TODO: GNU: ADD_IDX(&cn_ast_as(Init_Declarator, node)->gnu_asm_label);
-            // TODO: GNU: ADD_LIST(&cn_ast_as(Init_Declarator, node)->gnu_attribute_specifiers, "gnu_attribute_specifiers");
-            ADD_IDX(&cn_ast_as(Init_Declarator, node)->initializer);
-            break;
-        case CN_AST_INITIALIZER:
-            ADD_IDX(&cn_ast_as(Initializer, node)->expression);
-            ADD_LIST(&cn_ast_as(Initializer, node)->designations, "designations");
-            break;
-        case CN_AST_DESIGNATION:
-            ADD_LIST(&cn_ast_as(Designation, node)->designators, "designators");
-            ADD_IDX(&cn_ast_as(Designation, node)->initializer);
-            break;
-        case CN_AST_DESIGNATOR:
-            ADD_IDX(&cn_ast_as(Designator, node)->identifier);
-            ADD_IDX(&cn_ast_as(Designator, node)->expression);
-            ADD_IDX(&cn_ast_as(Designator, node)->expression_range_end);
-            break;
-        case CN_AST_DECLARATOR:
-            if (node->flags & CN_AST_DECLARATOR_IS_ABSTRACT)
-                fprintf(stderr, " <abstract>");
-                
-            ADD_IDX(&cn_ast_as(Declarator, node)->pointer);
-            ADD_IDX(&cn_ast_as(Declarator, node)->direct_declarator);
-            break;
-        case CN_AST_POINTER:
-            ADD_IDX(&cn_ast_as(Pointer, node)->pointer);
-            break;
-        case CN_AST_DIRECT_DECLARATOR_GROUPED:
-            ADD_IDX(&cn_ast_as(Direct_Declarator_Grouped, node)->declarator);
-            break;
-        case CN_AST_DIRECT_DECLARATOR_ARRAY:
-            ADD_IDX(&cn_ast_as(Direct_Declarator_Array, node)->direct_declarator);
-            ADD_IDX(&cn_ast_as(Direct_Declarator_Array, node)->expression);
-            break;
-        case CN_AST_DIRECT_DECLARATOR_FUNCTION:
-            ADD_IDX(&cn_ast_as(Direct_Declarator_Function, node)->direct_declarator);
-            ADD_LIST(&cn_ast_as(Direct_Declarator_Function, node)->parameter_declarations, "parameter_declarations");
-            break;
-        case CN_AST_DECLARATION_SPECIFIERS:
-            ADD_LIST(&cn_ast_as(Declaration_Specifiers, node)->gnu_attribute_specifiers, "gnu_attribute_specifiers");
-            ADD_IDX(&cn_ast_as(Declaration_Specifiers, node)->type_specifier);
-            break;
-       // TODO: GNU:         
-       // case CN_AST_GNU_TYPEOF:
-       //     ADD_IDX(&cn_ast_as(Gnu_Typeof, node)->target);
-       //     break;
-        case CN_AST_TYPE_SPECIFIER_PRIMITIVE:
-            switch (cn_ast_as(Type_Specifier_Primitive, node)->sign) {
-                case CN_AST_TYPE_SIGN_NONE: 
-                    break;
-                case CN_AST_TYPE_SIGN_SIGNED:
-                    fprintf(stderr, " signed");
-                    break;
-                case CN_AST_TYPE_SIGN_UNSIGNED:
-                    fprintf(stderr, " unsigned");
-                    break;
-            }
+    // Leaf members are printed inline, child nodes are counted to know which one is last.
+    int child_count = node->extensions.length > 0 ? 1 : 0;
+    for (int64_t i = 0; i < info->members_count; i++) {
+        Cn_Ast_Member_Info *member = &info->members[i];
+        void *field = (char *)node + member->offset;
 
-            switch (cn_ast_as(Type_Specifier_Primitive, node)->width) {
-                case CN_AST_TYPE_WIDTH_NONE:
-                    break;
-                case CN_AST_TYPE_WIDTH_SHORT:
-                    fprintf(stderr, " short");
-                    break;
-                case CN_AST_TYPE_WIDTH_LONG:
-                    fprintf(stderr, " long");
-                    break;
-                case CN_AST_TYPE_WIDTH_LONG_LONG:
-                    fprintf(stderr, " long long");
-                    break;
-            }
-
-            switch (cn_ast_as(Type_Specifier_Primitive, node)->primitive_kind) {
-                case CN_AST_TYPE_NONE:
-                    break;
-                case CN_AST_TYPE_INT:
-                    fprintf(stderr, " int");
-                    break;
-                case CN_AST_TYPE_CHAR:
-                    fprintf(stderr, " char");
-                    break;
-                case CN_AST_TYPE_FLOAT:
-                    fprintf(stderr, " float");
-                    break;
-                case CN_AST_TYPE_DOUBLE:
-                    fprintf(stderr, " double");
-                    break;
-                case CN_AST_TYPE_BOOL:
-                    fprintf(stderr, " _Bool");
-                    break;
-                case CN_AST_TYPE_VOID:
-                    fprintf(stderr, " void");
-                    break;
-            }
-            break;
-        case CN_AST_TYPE_SPECIFIER_TYPEDEF:
-            fprintf(stderr, " %.*s", CN_STR_UNPACK(cn_ast_as(Type_Specifier_Typedef, node)->typedef_name));
-            break;
-        case CN_AST_TYPE_NAME:
-            ADD_IDX(&cn_ast_as(Type_Name, node)->specifier_qualifier);
-            ADD_IDX(&cn_ast_as(Type_Name, node)->abstract_declarator);
-            break;
-        case CN_AST_SPECIFIER_QUALIFIER:
-            ADD_IDX(&cn_ast_as(Specifier_Qualifier, node)->type_specifier);
-            break;
-        case CN_AST_PARAMETER_DECLARATION:
-            ADD_IDX(&cn_ast_as(Parameter_Declaration, node)->declaration_specifiers);
-            ADD_IDX(&cn_ast_as(Parameter_Declaration, node)->declarator);
-            break;
-        case CN_AST_STRUCT_SPECIFIER:
-            ADD_LIST(&cn_ast_as(Struct_Specifier, node)->attribute_specifiers, "attribute_specifiers");
-            ADD_LIST(&cn_ast_as(Struct_Specifier, node)->gnu_attribute_specifiers, "gnu_attribute_specifiers");
-            ADD_IDX(&cn_ast_as(Struct_Specifier, node)->identifier);
-            ADD_LIST(&cn_ast_as(Struct_Specifier, node)->member_declarations, "member_declarations");
-            break;
-        case CN_AST_UNION_SPECIFIER:
-            ADD_LIST(&cn_ast_as(Union_Specifier, node)->attribute_specifiers, "attribute_specifiers");
-            ADD_LIST(&cn_ast_as(Union_Specifier, node)->gnu_attribute_specifiers, "gnu_attribute_specifiers");
-            ADD_IDX(&cn_ast_as(Union_Specifier, node)->identifier);
-            ADD_LIST(&cn_ast_as(Union_Specifier, node)->member_declarations, "member_declarations");
-            break;
-        case CN_AST_MEMBER_DECLARATION:
-            ADD_IDX(&cn_ast_as(Member_Declaration, node)->specifier_qualifier);
-            ADD_LIST(&cn_ast_as(Member_Declaration, node)->member_declarators, "member_declarators");
-            break;
-        case CN_AST_MEMBER_DECLARATOR:
-            ADD_IDX(&cn_ast_as(Member_Declarator, node)->declarator);
-            ADD_IDX(&cn_ast_as(Member_Declarator, node)->bitfield);
-            break;
-        case CN_AST_ENUM_SPECIFIER:
-            ADD_LIST(&cn_ast_as(Enum_Specifier, node)->attribute_specifiers, "attribute_specifiers");
-            ADD_LIST(&cn_ast_as(Enum_Specifier, node)->gnu_attribute_specifiers, "gnu_attribute_specifiers");
-            ADD_IDX(&cn_ast_as(Enum_Specifier, node)->identifier);
-            ADD_IDX(&cn_ast_as(Enum_Specifier, node)->specifier_qualifier);
-            ADD_LIST(&cn_ast_as(Enum_Specifier, node)->enumerators, "enumerators");
-            break;
-        case CN_AST_ENUMERATOR:
-            ADD_IDX(&cn_ast_as(Enumerator, node)->identifier);
-            ADD_LIST(&cn_ast_as(Enumerator, node)->attribute_specifiers, "attribute_specifiers");
-            ADD_LIST(&cn_ast_as(Enumerator, node)->gnu_attribute_specifiers, "gnu_attribute_specifiers");
-            ADD_IDX(&cn_ast_as(Enumerator, node)->expression);
-            break;
-        case CN_AST_ATTRIBUTE_SPECIFIER:
-            ADD_LIST(&cn_ast_as(Attribute_Specifier, node)->attributes, "attributes");
-            break;
-        case CN_AST_ATTRIBUTE:
-            ADD_IDX(&cn_ast_as(Attribute, node)->vendor_identifier);
-            ADD_IDX(&cn_ast_as(Attribute, node)->identifier);
-            ADD_LIST(&cn_ast_as(Attribute, node)->arguments, "arguments");
-            break;
-        // TODO: GNU:         
-        // case CN_AST_GNU_ATTRIBUTE_SPECIFIER:
-        //     ADD_LIST(&cn_ast_as(Gnu_Attribute_Specifier, node)->gnu_attributes, "gnu_attributes");
-        //     break;
-        // case CN_AST_GNU_ATTRIBUTE:
-        //     ADD_IDX(&cn_ast_as(Gnu_Attribute, node)->identifier);
-        //     ADD_LIST(&cn_ast_as(Gnu_Attribute, node)->arguments, "arguments");
-        //     break;
-        // case CN_AST_GNU_ASM_STATEMENT:
-        //     // TODO: Print qualifiers.
-        //     ADD_IDX(&cn_ast_as(Gnu_Asm_Statement, node)->template);
-        //     ADD_LIST(&cn_ast_as(Gnu_Asm_Statement, node)->outputs, "outputs");
-        //     ADD_LIST(&cn_ast_as(Gnu_Asm_Statement, node)->inputs, "inputs");
-        //     ADD_LIST(&cn_ast_as(Gnu_Asm_Statement, node)->clobbers, "clobbers");
-        //     ADD_LIST(&cn_ast_as(Gnu_Asm_Statement, node)->goto_labels, "goto_labels");
-        //     break;
-        // case CN_AST_GNU_ASM_OPERAND:
-        //     ADD_IDX(&cn_ast_as(Gnu_Asm_Operand, node)->identifier);
-        //     ADD_IDX(&cn_ast_as(Gnu_Asm_Operand, node)->string);
-        //     ADD_IDX(&cn_ast_as(Gnu_Asm_Operand, node)->expression);
-        //     break;
-        // case CN_AST_GNU_ASM_LABEL:
-        //     ADD_IDX(&cn_ast_as(Gnu_Asm_Label, node)->string);
-        //     break;
+        switch (member->kind) {
+            case CN_AST_MEMBER_INFO_NODE:
+                if (*(Cn_Ast_Node **)field != NULL) child_count++;
+                break;
+            case CN_AST_MEMBER_INFO_NODES:
+                child_count++;
+                break;
+            case CN_AST_MEMBER_INFO_STRING:
+                fprintf(stderr, " %s=\"%.*s\"", member->name, CN_STR_UNPACK(*(Cn_String *)field));
+                break;
+            case CN_AST_MEMBER_INFO_UINT64:
+                fprintf(stderr, " %s=%llu", member->name, (unsigned long long)*(uint64_t *)field);
+                break;
+            case CN_AST_MEMBER_INFO_INT32:
+                fprintf(stderr, " %s=%d", member->name, (int)*(int32_t *)field);
+                break;
+            case CN_AST_MEMBER_INFO_DOUBLE:
+                fprintf(stderr, " %s=%lf", member->name, *(double *)field);
+                break;
+            case CN_AST_MEMBER_INFO_TYPE:
+                if (*(Cn_Type **)field != NULL) {
+                    fprintf(stderr, " %s=", member->name);
+                    cn_type_print(*(Cn_Type **)field);
+                }
+                break;
+        }
     }
-
-#undef ADD_IDX
-#undef ADD_LIST
 
     fputs(CN_LINE_END, stderr);
 
-    for (int i = 0; i < next; i++) {
-        if (i == next - 1) {
-            CN__AST_PRINT_LAST();
-            if (list_names[i] != NULL) 
-                cn__ast_print_list(*((Cn_Ast_Nodes *)ptrs[i]), list_names[i], depth + 1);
-            else 
-                cn_ast_print(*((Cn_Ast_Node **)ptrs[i]), depth + 1);
-        } else {
-            CN__AST_PRINT_SPLIT();
-            if (list_names[i] != NULL) 
-                cn__ast_print_list(*((Cn_Ast_Nodes *)ptrs[i]), list_names[i],  depth + 1);
-            else 
-                cn_ast_print(*((Cn_Ast_Node **)ptrs[i]), depth + 1);
+    int printed = 0;
+    for (int64_t i = 0; i < info->members_count; i++) {
+        Cn_Ast_Member_Info *member = &info->members[i];
+        void *field = (char *)node + member->offset;
+
+        if (member->kind == CN_AST_MEMBER_INFO_NODE) {
+            Cn_Ast_Node *child = *(Cn_Ast_Node **)field;
+            if (child == NULL) continue;
+
+            if (++printed == child_count) CN__AST_PRINT_LAST();
+            else                          CN__AST_PRINT_SPLIT();
+
+            fprintf(stderr, "%s: ", member->name);
+            cn_ast_print(child, depth + 1);
+        } else if (member->kind == CN_AST_MEMBER_INFO_NODES) {
+            if (++printed == child_count) CN__AST_PRINT_LAST();
+            else                          CN__AST_PRINT_SPLIT();
+
+            cn__ast_print_list(*(Cn_Ast_Nodes *)field, member->name, depth + 1);
         }
+    }
+
+    if (node->extensions.length > 0) {
+        CN__AST_PRINT_LAST();
+        cn__ast_print_extensions(node->extensions, depth + 1);
+
     }
 
     cn__ast_print_prefixes[depth] = NULL;
 }
 
-CNDEF const char *cn_ast_node_kind_name(Cn_Ast_Kind kind) {
-    switch (kind) {
-        case CN_AST_UNKNOWN:    return "UNKNOWN";
-#define X(K, T, m) case CN_AST_##K: return #K;
-    CN_AST_GEN_LIST(X)
-#undef X
-    }
-    return "<invalid kind>";
+CNDEF const char *cn_ast_node_kind_name(Cn_Ast_Id id) {
+    return cn_ast_info(id)->name;
 }
 
-CNDEF size_t cn_ast_node_size(Cn_Ast_Kind kind) {
-    switch (kind) {
-        case CN_AST_UNKNOWN:
-            return sizeof(Cn_Ast_Node);
-#define X(K, T, m) case CN_AST_##K: return sizeof(Cn_Ast_##T);
-    CN_AST_GEN_LIST(X)
-#undef X
-    }
-    return sizeof(Cn_Ast_Node);
+CNDEF size_t cn_ast_node_size(Cn_Ast_Id id) {
+    return cn_ast_info(id)->size;
 }
 
 CNDEF bool cn_ast_is_primary(void * node_ptr) {
     Cn_Ast_Node *node = node_ptr;
-    return node->kind == CN_AST_IDENTIFIER || 
-        node->kind == CN_AST_INTEGER ||
-        node->kind == CN_AST_FLOAT || 
-        node->kind == CN_AST_STRING;
+    return node->id == CN_AST_IDENTIFIER || 
+        node->id == CN_AST_INTEGER ||
+        node->id == CN_AST_FLOAT || 
+        node->id == CN_AST_STRING;
 }
 
 CNDEF Cn_Ast_Nodes cn_ast_stack_finalize(int64_t mark) {
@@ -9049,285 +9077,56 @@ CNDEF Cn_Ast_Nodes cn_ast_copy_list(Cn_Ast_Nodes list) {
     return cn_ast_stack_finalize(mark);
 }
 
+CNDEF Cn_Ast_Extensions cn_ast_copy_extensions(Cn_Ast_Extensions extensions) {
+    int64_t mark = cn__ast_ext_stack_mark();
+
+    for (int64_t i = 0; i < extensions.length; i++) {
+        if (extensions.exts[i].kind == CN_AST_EXTENSION_NODE) {
+            cn_ast_ext_stack_push(((Cn_Ast_Extension) { .kind = CN_AST_EXTENSION_NODE, .node = cn_ast_copy(extensions.exts[i].node) }));
+        } else {
+            cn_ast_ext_stack_push(((Cn_Ast_Extension) { .kind = CN_AST_EXTENSION_LIST, .list = cn_ast_copy_list(extensions.exts[i].list) }));
+        }
+    }
+
+    return cn__ast_ext_stack_finalize(mark);
+}
+
 CNDEF void *cn_ast_copy(void * idx) {
     if (idx == NULL) return NULL;
 
     Cn_Ast_Node *node = idx;
+    Cn_Ast_Info *info = cn_ast_info(node->id);
 
     // Nodes are allocated at their own size, so a copy has to know the size of
     // the concrete kind it is copying.
-    Cn_Ast_Node *copy = cn__ast_new(node, cn_ast_node_size(node->kind));
+    Cn_Ast_Node *copy = cn__ast_new(node, info->size);
 
     copy->flags |= CN_AST_SYNTHETIC;
 
-#define COPY_LIST(T, field) cn_ast_as(T, copy)->field = cn_ast_copy_list(cn_ast_as(T, copy)->field)
-#define COPY_PTR(T, field)  cn_ast_as(T, copy)->field = cn_ast_copy(cn_ast_as(T, copy)->field)
+    // Leaf members are already copied by value, only node branches need a deep copy.
+    for (int64_t i = 0; i < info->members_count; i++) {
+        Cn_Ast_Member_Info *member = &info->members[i];
+        void *field = (char *)copy + member->offset;
 
-    switch (copy->kind) {
-        case CN_AST_TRANSLATION_UNIT:
-            COPY_LIST(Translation_Unit, external_declarations);
-            return copy;
-        case CN_AST_CODE:
-            return copy;
-        case CN_AST_EXTERNAL_DECLARATION:
-            COPY_PTR(External_Declaration, child);
-            return copy;
-        case CN_AST_DECLARATION:
-            COPY_LIST(Declaration, attribute_specifiers);
-            COPY_PTR(Declaration, declaration_specifiers);
-            COPY_LIST(Declaration, init_declarators);
-            return copy;
-        case CN_AST_FUNCTION:
-            COPY_LIST(Function, attribute_specifiers);
-            COPY_PTR(Function, declaration_specifiers);
-            COPY_PTR(Function, declarator);
-            COPY_PTR(Function, block);
-            return copy;
-        case CN_AST_BLOCK:
-            COPY_LIST(Block, attribute_specifiers);
-            COPY_LIST(Block, block_items);
-            return copy;
-        case CN_AST_BLOCK_ITEM:
-            COPY_PTR(Block_Item, declaration_or_statement);
-            return copy;
-        case CN_AST_IF:
-            COPY_LIST(If, attribute_specifiers);
-            COPY_PTR(If, condition);
-            COPY_PTR(If, then_statement);
-            COPY_PTR(If, else_statement);
-            return copy;
-        case CN_AST_SWITCH:
-            COPY_LIST(Switch, attribute_specifiers);
-            COPY_PTR(Switch, condition);
-            COPY_PTR(Switch, body);
-            return copy;
-        case CN_AST_WHILE:
-            COPY_LIST(While, attribute_specifiers);
-            COPY_PTR(While, condition);
-            COPY_PTR(While, body);
-            return copy;
-        case CN_AST_DO_WHILE:
-            COPY_LIST(Do_While, attribute_specifiers);
-            COPY_PTR(Do_While, condition);
-            COPY_PTR(Do_While, body);
-            return copy;
-        case CN_AST_FOR:
-            COPY_LIST(For, attribute_specifiers);
-            COPY_PTR(For, initialization);
-            COPY_PTR(For, condition);
-            COPY_PTR(For, update);
-            COPY_PTR(For, body);
-            return copy;
-        case CN_AST_LABEL:
-            COPY_LIST(Label, attribute_specifiers);
-            COPY_PTR(Label, identifier);
-            COPY_PTR(Label, expression);
-            COPY_PTR(Label, statement);
-            return copy;
-        case CN_AST_GOTO:
-            COPY_LIST(Goto, attribute_specifiers);
-            COPY_PTR(Goto, identifier);
-            return copy;
-        case CN_AST_RETURN:
-            COPY_LIST(Return, attribute_specifiers);
-            COPY_PTR(Return, expression);
-            return copy;
-        case CN_AST_BREAK:
-            COPY_LIST(Break, attribute_specifiers);
-            return copy;
-        case CN_AST_CONTINUE:
-            COPY_LIST(Continue, attribute_specifiers);
-            return copy;
-        case CN_AST_EXPRESSION_STATEMENT:
-            COPY_LIST(Expression_Statement, attribute_specifiers);
-            COPY_PTR(Expression_Statement, expression);
-            return copy;
-        case CN_AST_BINARY:
-            COPY_PTR(Binary, left);
-            COPY_PTR(Binary, right);
-            return copy;
-        case CN_AST_ACCESS:
-            COPY_PTR(Access, expression);
-            COPY_PTR(Access, member);
-            return copy;
-        case CN_AST_CALL:
-            COPY_PTR(Call, expression);
-            COPY_LIST(Call, arguments);
-            return copy;
-        case CN_AST_UNARY:
-            COPY_PTR(Unary, expression);
-            return copy;
-        case CN_AST_CAST:
-            COPY_PTR(Cast, type_name);
-            COPY_PTR(Cast, expression);
-            return copy;
-        case CN_AST_COMPOUND:
-            COPY_PTR(Compound, type_name);
-            COPY_LIST(Compound, designations);
-            return copy;
-        case CN_AST_SIZEOF:
-            COPY_PTR(Sizeof, target);
-            return copy;
-        case CN_AST_TERNARY:
-            COPY_PTR(Ternary, condition);
-            COPY_PTR(Ternary, if_true);
-            COPY_PTR(Ternary, if_false);
-            return copy;
-        case CN_AST_ASSIGN:
-            COPY_PTR(Assign, left);
-            COPY_PTR(Assign, right);
-            return copy;
-        case CN_AST_POSTFIX:
-            COPY_PTR(Postfix, expression);
-            return copy;
-        case CN_AST_PRIMARY:
-            COPY_PTR(Primary, literal);
-            return copy;
-        case CN_AST_IDENTIFIER:
-            return copy;
-        case CN_AST_INTEGER:
-            return copy;
-        case CN_AST_FLOAT:
-            return copy;
-        case CN_AST_STRING:
-            return copy;
-        case CN_AST_CHAR:
-            return copy;
-        case CN_AST_INIT_DECLARATOR:
-            COPY_PTR(Init_Declarator, declarator);
-            // TODO: GNU: COPY_LIST(Init_Declarator, gnu_attribute_specifiers);
-            // TODO: GNU: COPY_PTR(Init_Declarator, gnu_asm_label);
-            COPY_PTR(Init_Declarator, initializer);
-            return copy;
-        case CN_AST_INITIALIZER:
-            COPY_PTR(Initializer, expression);
-            COPY_LIST(Initializer, designations);
-            return copy;
-        case CN_AST_DESIGNATION:
-            COPY_LIST(Designation, designators);
-            COPY_PTR(Designation, initializer);
-            return copy;
-        case CN_AST_DESIGNATOR:
-            COPY_PTR(Designator, identifier);
-            COPY_PTR(Designator, expression);
-            COPY_PTR(Designator, expression_range_end);
-            return copy;
-        case CN_AST_DECLARATOR:
-            COPY_PTR(Declarator, pointer);
-            COPY_PTR(Declarator, direct_declarator);
-            return copy;
-        case CN_AST_POINTER:
-            COPY_PTR(Pointer, pointer);
-            return copy;
-        case CN_AST_DIRECT_DECLARATOR_GROUPED:
-            COPY_PTR(Direct_Declarator_Grouped, declarator);
-            return copy;
-        case CN_AST_DIRECT_DECLARATOR_ARRAY:
-            COPY_PTR(Direct_Declarator_Array, direct_declarator);
-            COPY_PTR(Direct_Declarator_Array, expression);
-            return copy;
-        case CN_AST_DIRECT_DECLARATOR_FUNCTION:
-            COPY_PTR(Direct_Declarator_Function, direct_declarator);
-            COPY_LIST(Direct_Declarator_Function, parameter_declarations);
-            return copy;
-        case CN_AST_DECLARATION_SPECIFIERS:
-            COPY_LIST(Declaration_Specifiers, gnu_attribute_specifiers);
-            COPY_PTR(Declaration_Specifiers, type_specifier);
-            return copy;
-        // TODO: GNU: 
-        // case CN_AST_GNU_TYPEOF:
-        //     COPY_PTR(Gnu_Typeof, target);
-        //     return copy;
-        case CN_AST_TYPE_SPECIFIER_PRIMITIVE:
-            return copy;
-        case CN_AST_TYPE_SPECIFIER_TYPEDEF:
-            return copy;
-        case CN_AST_TYPE_NAME:
-            COPY_PTR(Type_Name, specifier_qualifier);
-            COPY_PTR(Type_Name, abstract_declarator);
-            return copy;
-        case CN_AST_SPECIFIER_QUALIFIER:
-            COPY_PTR(Specifier_Qualifier, type_specifier);
-            return copy;
-        case CN_AST_PARAMETER_DECLARATION:
-            COPY_PTR(Parameter_Declaration, declaration_specifiers);
-            COPY_PTR(Parameter_Declaration, declarator);
-            return copy;
-        case CN_AST_STRUCT_SPECIFIER:
-            COPY_LIST(Struct_Specifier, attribute_specifiers);
-            COPY_LIST(Struct_Specifier, gnu_attribute_specifiers);
-            COPY_PTR(Struct_Specifier, identifier);
-            COPY_LIST(Struct_Specifier, member_declarations);
-            return copy;
-        case CN_AST_UNION_SPECIFIER:
-            COPY_LIST(Union_Specifier, attribute_specifiers);
-            COPY_LIST(Union_Specifier, gnu_attribute_specifiers);
-            COPY_PTR(Union_Specifier, identifier);
-            COPY_LIST(Union_Specifier, member_declarations);
-            return copy;
-        case CN_AST_MEMBER_DECLARATION:
-            COPY_LIST(Member_Declaration, attribute_specifiers);
-            COPY_PTR(Member_Declaration, specifier_qualifier);
-            COPY_LIST(Member_Declaration, member_declarators);
-            return copy;
-        case CN_AST_MEMBER_DECLARATOR:
-            COPY_PTR(Member_Declarator, declarator);
-            COPY_PTR(Member_Declarator, bitfield);
-            COPY_LIST(Member_Declarator, gnu_attribute_specifiers);
-            return copy;
-        case CN_AST_ENUM_SPECIFIER:
-            COPY_LIST(Enum_Specifier, attribute_specifiers);
-            COPY_LIST(Enum_Specifier, gnu_attribute_specifiers);
-            COPY_PTR(Enum_Specifier, identifier);
-            COPY_PTR(Enum_Specifier, specifier_qualifier);
-            COPY_LIST(Enum_Specifier, enumerators);
-            return copy;
-        case CN_AST_ENUMERATOR:
-            COPY_PTR(Enumerator, identifier);
-            COPY_LIST(Enumerator, attribute_specifiers);
-            COPY_LIST(Enumerator, gnu_attribute_specifiers);
-            COPY_PTR(Enumerator, expression);
-            return copy;
-        case CN_AST_ATTRIBUTE_SPECIFIER:
-            COPY_LIST(Attribute_Specifier, attributes);
-            return copy;
-        case CN_AST_ATTRIBUTE:
-            COPY_PTR(Attribute, vendor_identifier);
-            COPY_PTR(Attribute, identifier);
-            COPY_LIST(Attribute, arguments);
-            return copy;
-        // TODO: GNU: 
-        // case CN_AST_GNU_ATTRIBUTE_SPECIFIER:
-        //     COPY_LIST(Gnu_Attribute_Specifier, gnu_attributes);
-        //     return copy;
-        // case CN_AST_GNU_ATTRIBUTE:
-        //     COPY_PTR(Gnu_Attribute, identifier);
-        //     COPY_LIST(Gnu_Attribute, arguments);
-        //     return copy;
-        // case CN_AST_GNU_ASM_STATEMENT:
-        //     COPY_PTR(Gnu_Asm_Statement, template);
-        //     COPY_LIST(Gnu_Asm_Statement, outputs);
-        //     COPY_LIST(Gnu_Asm_Statement, inputs);
-        //     COPY_LIST(Gnu_Asm_Statement, clobbers);
-        //     COPY_LIST(Gnu_Asm_Statement, goto_labels);
-        //     return copy;
-        // case CN_AST_GNU_ASM_OPERAND:
-        //     COPY_PTR(Gnu_Asm_Operand, identifier);
-        //     COPY_PTR(Gnu_Asm_Operand, string);
-        //     COPY_PTR(Gnu_Asm_Operand, expression);
-        //     return copy;
-        // case CN_AST_GNU_ASM_LABEL:
-        //     COPY_PTR(Gnu_Asm_Label, string);
-        //     return copy;
-        case CN_AST_UNKNOWN:
-            cn_log(CN_ERROR, "Unsupported copy ast node kind.");
-            return copy;
+        switch (member->kind) {
+            case CN_AST_MEMBER_INFO_NODE:
+                *(Cn_Ast_Node **)field = cn_ast_copy(*(Cn_Ast_Node **)field);
+                break;
+            case CN_AST_MEMBER_INFO_NODES:
+                *(Cn_Ast_Nodes *)field = cn_ast_copy_list(*(Cn_Ast_Nodes *)field);
+                break;
+            case CN_AST_MEMBER_INFO_STRING:
+            case CN_AST_MEMBER_INFO_UINT64:
+            case CN_AST_MEMBER_INFO_INT32:
+            case CN_AST_MEMBER_INFO_DOUBLE:
+            case CN_AST_MEMBER_INFO_TYPE:
+                break;
+        }
     }
 
-#undef COPY_LIST
-#undef COPY_PTR
+    copy->extensions = cn_ast_copy_extensions(copy->extensions);
 
-    return NULL;
+    return copy;
 }
 
 
@@ -9362,7 +9161,7 @@ CNDEF void cn_get_declarator_info(Cn_Ast_Declarator *declarator, Cn_Ast_Node **l
     while (next != NULL) {
         dd = next;
 
-        switch (dd->kind) {
+        switch (dd->id) {
             case CN_AST_IDENTIFIER:
                 *last_declarator = dd;
                 return;
@@ -9398,7 +9197,7 @@ CNDEF bool cn_get_function_declarator_info(Cn_Ast_Declarator *declarator, Cn_Ast
     while (next != NULL) {
         dd = next;
 
-        switch (dd->kind) {
+        switch (dd->id) {
             // If identifier case, then declarator is not function declarator.
             case CN_AST_IDENTIFIER:
                 *last_declarator = dd;
@@ -9413,7 +9212,7 @@ CNDEF bool cn_get_function_declarator_info(Cn_Ast_Declarator *declarator, Cn_Ast
                 next = cn_ast_as(Direct_Declarator_Function, dd)->direct_declarator;
 
                 // If followed by identifier, then return true, and get all outputs.
-                if (next != NULL && next->kind == CN_AST_IDENTIFIER) {
+                if (next != NULL && next->id == CN_AST_IDENTIFIER) {
                     if (function_direct_declarator != NULL) *function_direct_declarator = dd;
                     *last_declarator = next;
                     return true;
@@ -9437,7 +9236,7 @@ CNDEF Cn_Ast_Attribute *cn_get_attribute_info(void *target, Cn_String attribute_
     Cn_Ast_Node *node = target;
     Cn_Ast_Nodes attribute_specifiers;
 
-    switch (node->kind) {
+    switch (node->id) {
         case CN_AST_DECLARATION:
             attribute_specifiers = cn_ast_as(Declaration, node)->attribute_specifiers;
             break;
@@ -9528,7 +9327,7 @@ CNDEF Cn_Type *cn_get_expression_type(void * expression) {
     CN_ASSERT(expression != NULL);
     Cn_Ast_Node *node = expression;
 
-    switch(node->kind) {
+    switch(node->id) {
         case CN_AST_BINARY:
             return cn_ast_as(Binary, node)->type;
         case CN_AST_ACCESS:
@@ -9803,7 +9602,7 @@ CNDEF Cn_Binding_Idx cn_binding_table_get(Cn_String name, Cn_Binding_Idx **bindi
  * on kind or type.
  * NOTE: Expects a and b to be in the same scope and contain the same name.
  *
- * RETURNS: True if there is conflict, false otherwise.
+ * RETURNS: `true` if there is conflict, `false` otherwise.
  */
 CNDEF bool cn__binding_conflict(Cn_Binding *a, Cn_Binding *b) {
     CN_ASSERT(cn_str_equals(&a->name, &b->name));
@@ -9874,7 +9673,7 @@ CNDEF Cn_Binding_Idx cn_binding_declare_function(Cn_String name, void * source, 
             Cn_Ast_Node *param_identifier;
             cn_get_declarator_info(p->declarator, &param_identifier);
 
-            if (param_identifier != NULL && param_identifier->kind == CN_AST_IDENTIFIER) {
+            if (param_identifier != NULL && param_identifier->id == CN_AST_IDENTIFIER) {
                 binding.b_function.parameter_names[i] = cn__scope_save_string(((Cn_Ast_Identifier *)param_identifier)->name);
             }
         }
@@ -10169,6 +9968,61 @@ Cn_Message_Handler *cn_message_handler = NULL;
 
 /**
  * ============================================
+ * IMPLEMENTATION SECTION: Hook
+ * ============================================
+ */
+
+Cn_Hooks cn_hooks = {0};
+
+CNDEF bool cn__hook_parse(Cn_Ast_Slot_Id slot, Cn_Ast_Node **target, Cn_Lexer *lexer) {
+    Cn_Hook_Response response;
+
+    int64_t mark = cn__ast_ext_stack_mark();
+
+    for (int64_t i = 0; i < cn_array_list_length(&cn_hooks.parse_hooks); i++) {
+        response = cn_hooks.parse_hooks[i](slot, target, lexer);
+
+        if (response & CN_HOOK_RESPONSE_ERROR) return false;
+        
+        // Condition signifies that some new reference to some node was outputted.
+        if (target != NULL && *target != NULL) {
+            (*target)->slot = slot;
+            break; 
+        }
+    }
+
+    // Making sure all extensions that were added pertain to respective slot.
+    for (; mark < cn_array_list_length(&cn__tu_data->ext_stack); mark++) {
+        cn__tu_data->ext_stack[mark].slot = slot;
+    }
+
+    return true;
+}
+
+
+CNDEF bool cn__extension_register(Cn_Extension *extensions[], int64_t length) {
+    static bool enabled = false;
+    if (!enabled) {
+        // Allocating hook lists.
+        cn_hooks.ast_parsed_hooks           = cn_array_list_make(Cn_Hook_Ast_Parsed *, 8);
+        cn_hooks.parse_hooks                = cn_array_list_make(Cn_Hook_Parse *, 8);
+        cn_hooks.analyze_declarator_hooks   = cn_array_list_make(Cn_Hook_Analyze_Declarator *, 8);
+
+        // Registring core ast meta info.
+        CN_AST_INFO_TABLE_REGISTER(cn_ast_info_table, 0, CORE);
+
+
+        for (int64_t i = 0; i < length; i++) {
+            if (!extensions[i](&cn_hooks, cn_ast_info_table)) return false;
+        }
+        
+        enabled = true;
+    }
+    return true;
+}
+
+/**
+ * ============================================
  * IMPLEMENTATION SECTION: Analyze
  * ============================================
  */
@@ -10217,7 +10071,7 @@ CNDEF bool cn__analyze_declaration_opt(void *declaration_specifiers, Cn_Analyze_
     Cn_Ast_Node *identifier;
     cn_get_declarator_info(decl, &identifier);
 
-    if (identifier->kind == CN_AST_IDENTIFIER) {
+    if (identifier->id == CN_AST_IDENTIFIER) {
         Cn_String name = cn_ast_as(Identifier, identifier)->name;
 
         // Typedef declaration case.
@@ -10745,7 +10599,7 @@ CNDEF Cn_Type *cn__analyze_base_type_from_specifier(Cn_Ast_Node *type_specifier)
 
     // TODO: CN_MESSAGE_ANALYZE_BASE_TYPE
  
-    switch (ts->kind) {
+    switch (ts->id) {
         case CN_AST_TYPE_SPECIFIER_PRIMITIVE:
             result = cn__analyze_type_from_primitive(type_specifier);
             break;
@@ -10815,7 +10669,7 @@ CNDEF Cn_Type *cn__analyze_type_apply_array(Cn_Type *result, Cn_Ast_Node *dd, bo
     // Casting down to pointer type if adjusting parameter.
     // TODO: Add qualifiers to pointer, 
     // once parsing qualifiers in array declarator is supported.
-    if (apply_parameter_adjustment && (arr->direct_declarator == NULL || arr->direct_declarator->kind == CN_AST_IDENTIFIER)) {
+    if (apply_parameter_adjustment && (arr->direct_declarator == NULL || arr->direct_declarator->id == CN_AST_IDENTIFIER)) {
         Cn_Type ptr_type = cn_type_make_pointer(result);
         result = cn__ast_add_type_if_not((Cn_Type *)&ptr_type);
         return result;
@@ -10944,7 +10798,7 @@ CNDEF Cn_Type *cn__analyze_type_apply_function(Cn_Type *result, Cn_Ast_Node *dd,
     result = cn__ast_add_type_if_not((Cn_Type *)&type);
     
     // Casting up to pointer type if adjusting parameter.
-    if (apply_parameter_adjustment && (fn->direct_declarator == NULL || fn->direct_declarator->kind == CN_AST_IDENTIFIER)) {
+    if (apply_parameter_adjustment && (fn->direct_declarator == NULL || fn->direct_declarator->id == CN_AST_IDENTIFIER)) {
         Cn_Type ptr_type = cn_type_make_pointer(result);
         result = cn__ast_add_type_if_not((Cn_Type *)&ptr_type);
     }
@@ -10977,16 +10831,16 @@ CNDEF Cn_Type *cn__analyze_type_apply_declarator(Cn_Type *result, Cn_Ast_Node *d
         Cn_Ast_Node *next_declarator = NULL;
  
         while (dd != NULL) {
-            if (dd->kind == CN_AST_IDENTIFIER) {
+            if (dd->id == CN_AST_IDENTIFIER) {
                 break;
             }
  
-            if (dd->kind == CN_AST_DIRECT_DECLARATOR_GROUPED) {
+            if (dd->id == CN_AST_DIRECT_DECLARATOR_GROUPED) {
                 next_declarator = cn_ast_node(((Cn_Ast_Direct_Declarator_Grouped *)dd)->declarator);
                 break;
             }
  
-            switch (dd->kind) {
+            switch (dd->id) {
                 case CN_AST_DIRECT_DECLARATOR_ARRAY:
                     result = cn__analyze_type_apply_array(result, dd, flags & CN_ANALYZE_APPLY_PARAMETER_ADJUSTMENT);
                     if (result == NULL) goto error;
@@ -11067,9 +10921,9 @@ CNDEF void cn__analyze_error_illegal_binary(Cn_Ast_Node *node, Cn_Type *left, Cn
 CNDEF bool cn__analyze_is_null_pointer_constant(Cn_Ast_Node *expression) {
     Cn_Ast_Primary *node = cn_ast_as(Primary, expression);
 
-    if (node->kind == CN_AST_PRIMARY) {
+    if (node->id == CN_AST_PRIMARY) {
         Cn_Ast_Integer *integer = cn_ast_as(Integer, node->literal);
-        if (integer->kind == CN_AST_INTEGER) {
+        if (integer->id == CN_AST_INTEGER) {
             return integer->value == 0;
         }
     }
@@ -11080,10 +10934,10 @@ CNDEF bool cn__analyze_is_null_pointer_constant(Cn_Ast_Node *expression) {
 CNDEF bool cn__analyze_is_lvalue(Cn_Ast_Node *expression) {
     Cn_Ast_Node *node = expression;
 
-    switch (node->kind) {
+    switch (node->id) {
         case CN_AST_PRIMARY:
             // Only identifiers denote objects; integer/float/string literals don't.
-            return ((Cn_Ast_Node *)(cn_ast_as(Primary, node)->literal))->kind == CN_AST_IDENTIFIER;
+            return ((Cn_Ast_Node *)(cn_ast_as(Primary, node)->literal))->id == CN_AST_IDENTIFIER;
 
         case CN_AST_UNARY:
             // *p is an lvalue; -x, !x, &x, etc. are not.
@@ -11091,7 +10945,7 @@ CNDEF bool cn__analyze_is_lvalue(Cn_Ast_Node *expression) {
 
         case CN_AST_ACCESS:
             // p->m is always an lvalue; s.m is an lvalue iff s is one.
-            if (!cn_ast_as(Access, node)->pointer) {
+            if (!(node->flags & CN_AST_ACCESS_IS_POINTER)) {
                 return cn__analyze_is_lvalue(cn_ast_as(Access, node)->expression);
             }
             return true;
@@ -11116,9 +10970,9 @@ CNDEF bool cn__analyze_is_modifiable_lvalue(Cn_Ast_Node *expression) {
     Cn_Ast_Node *node = expression;
     Cn_Type *type = NULL;
 
-    switch (node->kind) {
+    switch (node->id) {
         case CN_AST_PRIMARY:
-            if (((Cn_Ast_Node *)(cn_ast_as(Primary, node)->literal))->kind == CN_AST_IDENTIFIER) {
+            if (((Cn_Ast_Node *)(cn_ast_as(Primary, node)->literal))->id == CN_AST_IDENTIFIER) {
                 // Only non-constant identifiers denote objects; integer/float/string literals don't.
                 type = cn_ast_as(Primary, node)->type;
 
@@ -11149,7 +11003,7 @@ CNDEF bool cn__analyze_is_modifiable_lvalue(Cn_Ast_Node *expression) {
             type = cn_ast_as(Access, node)->type;
             if (cn_type_is_constant(type)) return false;
 
-            if (!cn_ast_as(Access, node)->pointer) {
+            if (!(node->flags & CN_AST_ACCESS_IS_POINTER)) {
                 return cn__analyze_is_modifiable_lvalue(cn_ast_as(Access, node)->expression);
             } 
 
@@ -11180,7 +11034,7 @@ CNDEF bool cn__analyze_is_modifiable_lvalue(Cn_Ast_Node *expression) {
 }
 
 CNDEF Cn_Type *cn__analyze_typecheck_binary(Cn_Ast_Node *node) {
-    CN_ASSERT(node->kind == CN_AST_BINARY);
+    CN_ASSERT(node->id == CN_AST_BINARY);
 
     Cn_Type *left = cn_analyze_typecheck_expression(cn_ast_as(Binary, node)->left);
     if (left == NULL) goto error;
@@ -11369,7 +11223,7 @@ error:
 }
 
 CNDEF Cn_Type *cn__analyze_typecheck_access(Cn_Ast_Node *node) {
-    CN_ASSERT(node->kind == CN_AST_ACCESS);
+    CN_ASSERT(node->id == CN_AST_ACCESS);
 
     Cn_Type *base = cn_analyze_typecheck_expression(cn_ast_as(Access, node)->expression);
     if (base == NULL) goto error;
@@ -11382,7 +11236,7 @@ CNDEF Cn_Type *cn__analyze_typecheck_access(Cn_Ast_Node *node) {
     if (base->kind == CN_OPAQUE) return base;
 
     Cn_Type *struct_or_union_type;
-    if (cn_ast_as(Access, node)->pointer) {
+    if (node->flags & CN_AST_ACCESS_IS_POINTER) {
         // '->' : operand must be a pointer to a struct/union.
         if (base->kind != CN_POINTER) {
             cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, node, CN_DC_ILLEGAL_TYPE, "'->' requires a pointer operand.");
@@ -11439,7 +11293,7 @@ error:
 }
 
 CNDEF Cn_Type *cn__analyze_typecheck_call(Cn_Ast_Node *node) {
-    CN_ASSERT(node->kind == CN_AST_CALL);
+    CN_ASSERT(node->id == CN_AST_CALL);
 
     Cn_Type *callee = cn_analyze_typecheck_expression(cn_ast_as(Call, node)->expression);
     if (callee == NULL) goto error;
@@ -11514,7 +11368,7 @@ error:
 }
 
 CNDEF Cn_Type *cn__analyze_typecheck_unary(Cn_Ast_Node *node) {
-    CN_ASSERT(node->kind == CN_AST_UNARY);
+    CN_ASSERT(node->id == CN_AST_UNARY);
 
     Cn_Ast_Node *operand_node = cn_ast_as(Unary, node)->expression;
     Cn_Type *operand = cn_analyze_typecheck_expression(operand_node);
@@ -11615,7 +11469,7 @@ error:
 }
 
 CNDEF Cn_Type *cn__analyze_typecheck_cast(Cn_Ast_Node *node) {
-    CN_ASSERT(node->kind == CN_AST_CAST);
+    CN_ASSERT(node->id == CN_AST_CAST);
 
     // Resolve the target type from the typename.
     Cn_Ast_Node *type_name = cn_ast_node((cn_ast_as(Cast, node)->type_name));
@@ -11666,7 +11520,7 @@ error:
 }
 
 CNDEF Cn_Type *cn__analyze_typecheck_compound(Cn_Ast_Node *node) {
-    CN_ASSERT(node->kind == CN_AST_COMPOUND);
+    CN_ASSERT(node->id == CN_AST_COMPOUND);
 
     // Resolve the target type from the typename.
     Cn_Ast_Node *type_name = cn_ast_node((cn_ast_as(Compound, node)->type_name));
@@ -11691,12 +11545,12 @@ error:
 }
 
 CNDEF Cn_Type *cn__analyze_typecheck_sizeof(Cn_Ast_Node *node) {
-    CN_ASSERT(node->kind == CN_AST_SIZEOF);
+    CN_ASSERT(node->id == CN_AST_SIZEOF);
 
     Cn_Ast_Node *child = (cn_ast_as(Sizeof, node)->target);
 
     Cn_Type *operand;
-    if (child->kind == CN_AST_TYPE_NAME) {
+    if (child->id == CN_AST_TYPE_NAME) {
         // Case: sizeof typename.
         Cn_Ast_Specifier_Qualifier *spec_qual = (cn_ast_as(Type_Name, child)->specifier_qualifier);
         operand = cn_analyze_to_type(
@@ -11736,7 +11590,7 @@ error:
 }
 
 CNDEF Cn_Type *cn__analyze_typecheck_ternary(Cn_Ast_Node *node) {
-    CN_ASSERT(node->kind == CN_AST_TERNARY);
+    CN_ASSERT(node->id == CN_AST_TERNARY);
 
     Cn_Type *cond = cn_analyze_typecheck_expression(cn_ast_as(Ternary, node)->condition);
     if (cond == NULL) goto error;
@@ -11807,7 +11661,7 @@ error:
 }
 
 CNDEF Cn_Type *cn__analyze_typecheck_assignment(Cn_Ast_Node *node) {
-    CN_ASSERT(node->kind == CN_AST_ASSIGN);
+    CN_ASSERT(node->id == CN_AST_ASSIGN);
 
     Cn_Type *left = cn_analyze_typecheck_expression(cn_ast_as(Assign, node)->left);
     if (left == NULL) goto error;
@@ -11888,7 +11742,7 @@ error:
 }
 
 CNDEF Cn_Type *cn__analyze_typecheck_postfix(Cn_Ast_Node *node) {
-    CN_ASSERT(node->kind == CN_AST_POSTFIX);
+    CN_ASSERT(node->id == CN_AST_POSTFIX);
 
     Cn_Ast_Node *operand_node = cn_ast_as(Postfix, node)->expression;
     Cn_Type *operand = cn_analyze_typecheck_expression(operand_node);
@@ -11928,7 +11782,7 @@ CNDEF Cn_Type *cn_analyze_typecheck_expression(void * expression) {
 
     Cn_Type *result = NULL;
 
-    switch(node->kind) {
+    switch(node->id) {
         case CN_AST_BINARY: 
             {   
                 result = cn__analyze_typecheck_binary(node);
@@ -11992,7 +11846,7 @@ CNDEF Cn_Type *cn_analyze_typecheck_expression(void * expression) {
         case CN_AST_PRIMARY:
             {
                 Cn_Ast_Node *literal = (cn_ast_as(Primary, node)->literal);
-                switch(literal->kind) {
+                switch(literal->id) {
                     case CN_AST_IDENTIFIER:
                         {
                             Cn_Binding_Idx idx = cn_binding_table_get(cn_ast_as(Identifier, literal)->name, &cn__tu_data->symbol_binding_table);
@@ -12429,7 +12283,7 @@ CNDEF Cn_Any cn__analyze_evaluate_sizeof(Cn_Ast_Node *node, void *buffer) {
     Cn_Ast_Node *child = (cn_ast_as(Sizeof, node)->target);
 
     Cn_Type *operand_type;
-    if (child->kind == CN_AST_TYPE_NAME) {
+    if (child->id == CN_AST_TYPE_NAME) {
         Cn_Ast_Specifier_Qualifier *sq = (Cn_Ast_Specifier_Qualifier *)cn_ast_node((cn_ast_as(Type_Name, child)->specifier_qualifier));
         operand_type    = cn_analyze_to_type(cn_ast_as(Specifier_Qualifier, sq)->qualifiers, cn_ast_as(Specifier_Qualifier, sq)->type_specifier, cn_ast_as(Type_Name, child)->abstract_declarator, 0);
     } else {
@@ -12497,7 +12351,7 @@ CNDEF Cn_Any cn__analyze_evaluate_primary(Cn_Ast_Node *node, void *buffer) {
     any.type = cn_ast_as(Primary, node)->type;
 
     Cn_Ast_Node *literal = (cn_ast_as(Primary, node)->literal);
-    switch (literal->kind) {
+    switch (literal->id) {
         case CN_AST_INTEGER:
             {
                 any = cn_any_write_int(any, cn_ast_as(Integer, literal)->value);
@@ -12548,7 +12402,7 @@ CNDEF Cn_Any cn_analyze_evaluate_expression(void *expression, void *buffer) {
 
     Cn_Ast_Node *node = expression;
 
-    switch(node->kind) {
+    switch(node->id) {
         case CN_AST_BINARY: 
             {   
                 return cn__analyze_evaluate_binary(node, buffer);
@@ -12945,7 +12799,7 @@ CNDEF void cn__emit_external_declaration(Cn_Emitter *e, Cn_Ast_External_Declarat
         cn__emit_str_lit(e, ";");
         cn__emit_newline(e);
     } else {
-        if ((node->child)->kind == CN_AST_DECLARATION)
+        if ((node->child)->id == CN_AST_DECLARATION)
             e->flags |= CN_EMITTER_END_DECLARATION_WITH_SEMICOLON;
 
         cn_emit(e, node->child);
@@ -13006,7 +12860,7 @@ CNDEF void cn__emit_block(Cn_Emitter *e, Cn_Ast_Block *node) {
 }
 
 CNDEF void cn__emit_block_item(Cn_Emitter *e, Cn_Ast_Block_Item *node) {
-    if ((node->declaration_or_statement)->kind == CN_AST_DECLARATION)
+    if ((node->declaration_or_statement)->id == CN_AST_DECLARATION)
         e->flags |= CN_EMITTER_END_DECLARATION_WITH_SEMICOLON;
     cn_emit(e, node->declaration_or_statement);
 }
@@ -13018,7 +12872,7 @@ CNDEF void cn__emit_if_statement(Cn_Emitter *e, Cn_Ast_If *node) {
     cn__emit_str_lit(e, ") ");
 
     Cn_Ast_Node *then_stmt = node->then_statement;
-    if (then_stmt->kind == CN_AST_BLOCK) {
+    if (then_stmt->id == CN_AST_BLOCK) {
         e->flags |= CN_EMITTER_SKIP_ENDING_NEWLINE_IN_BLOCK;
         cn_emit(e, node->then_statement);
 
@@ -13038,7 +12892,7 @@ CNDEF void cn__emit_if_statement(Cn_Emitter *e, Cn_Ast_If *node) {
     if (node->else_statement != NULL) {
         cn__emit_str_lit(e, "else ");
         Cn_Ast_Node *else_stmt = node->else_statement;
-        if (else_stmt->kind == CN_AST_BLOCK || else_stmt->kind == CN_AST_IF) {
+        if (else_stmt->id == CN_AST_BLOCK || else_stmt->id == CN_AST_IF) {
             cn_emit(e, node->else_statement);
         } else {
             e->indent++;
@@ -13057,7 +12911,7 @@ CNDEF void cn__emit_switch_statement(Cn_Emitter *e, Cn_Ast_Switch *node) {
     cn__emit_str_lit(e, ") ");
 
     Cn_Ast_Node *body = node->body;
-    if (body->kind == CN_AST_BLOCK) {
+    if (body->id == CN_AST_BLOCK) {
         cn_emit(e, node->body);
     } else {
         e->indent++;
@@ -13075,7 +12929,7 @@ CNDEF void cn__emit_while_statement(Cn_Emitter *e, Cn_Ast_While *node) {
     cn__emit_str_lit(e, ") ");
 
     Cn_Ast_Node *body = node->body;
-    if (body->kind == CN_AST_BLOCK) {
+    if (body->id == CN_AST_BLOCK) {
         cn_emit(e, node->body);
     } else {
         e->indent++;
@@ -13091,7 +12945,7 @@ CNDEF void cn__emit_do_while(Cn_Emitter *e, Cn_Ast_Do_While *node) {
     cn__emit_str_lit(e, "do ");
 
     Cn_Ast_Node *body = node->body;
-    if (body->kind == CN_AST_BLOCK) {
+    if (body->id == CN_AST_BLOCK) {
         // "while" part has to stay on the same line as the closing brace.
         e->flags |= CN_EMITTER_SKIP_ENDING_NEWLINE_IN_BLOCK;
         cn_emit(e, node->body);
@@ -13134,7 +12988,7 @@ CNDEF void cn__emit_for_statement(Cn_Emitter *e, Cn_Ast_For *node) {
     cn__emit_str_lit(e, ") ");
 
     Cn_Ast_Node *body = node->body;
-    if (body->kind == CN_AST_BLOCK) {
+    if (body->id == CN_AST_BLOCK) {
         cn_emit(e, node->body);
     } else {
         e->indent++;
@@ -13160,7 +13014,7 @@ CNDEF void cn__emit_label(Cn_Emitter *e, Cn_Ast_Label *node) {
 
     cn__emit_str_lit(e, ": ");
 
-    if ((node->statement)->kind == CN_AST_BLOCK) {
+    if ((node->statement)->id == CN_AST_BLOCK) {
         cn_emit(e, node->statement);
     } else {
         e->indent++;
@@ -13286,7 +13140,7 @@ CNDEF void cn__emit_binary(Cn_Emitter *e, Cn_Ast_Binary *node) {
 CNDEF void cn__emit_access(Cn_Emitter *e, Cn_Ast_Access *node) {
     cn_emit(e, node->expression);
 
-    if (node->pointer) {
+    if (node->id) {
         cn__emit_str_lit(e, "->");
     } else {
         cn__emit_str_lit(e, ".");
@@ -13644,7 +13498,7 @@ CNDEF void cn__emit_member_declaration(Cn_Emitter *e, Cn_Ast_Member_Declaration 
 
     // AI: Generated.
     // Emitted here instead of `cn_emit`, so it is placed after the newline.
-    if (node->flags & CN_AST_GNU_EXTENSION) cn__emit_str_lit(e, "__extension__ ");
+    // TODO: GNU: if (node->flags & CN_AST_GNU_EXTENSION) cn__emit_str_lit(e, "__extension__ ");
 
     cn__emit_attribute_specifiers(e, node->attribute_specifiers);
 
@@ -13847,39 +13701,29 @@ CNDEF void cn__emit_attribute(Cn_Emitter *e, Cn_Ast_Attribute *node) {
 //     cn__emit_str_lit(e, ")");
 // }
 
-CNDEF void cn_emit(Cn_Emitter *e, void * node_ptr) {
-    if (node_ptr == NULL) return;
+CNDEF void cn_emit(Cn_Emitter *e, void *n) {
+    if (n == NULL) return;
 
-    Cn_Ast_Node *node = node_ptr;
+    Cn_Ast_Node *node = n;
 
+    // TODO: GNU:
     // AI: Generated.
     // Any node can be preceded by '__extension__', except member declaration, which emits it itself.
     // Expression is parenthesized, so '__extension__' stays on the same operand when parsed back,
     // e.g. `(__extension__ f)(1)` instead of `__extension__ f(1)`, which would flag the call.
     // Expression kinds are contiguous in `CN_AST_GEN_LIST`, from `BINARY` to `PRIMARY`.
-    bool gnu_extension = (node->flags & CN_AST_GNU_EXTENSION) && node->kind != CN_AST_MEMBER_DECLARATION;
-    bool gnu_extension_expression = gnu_extension && node->kind >= CN_AST_BINARY && node->kind <= CN_AST_PRIMARY;
+    // bool gnu_extension = (node->flags & CN_AST_GNU_EXTENSION) && node->kind != CN_AST_MEMBER_DECLARATION;
+    // bool gnu_extension_expression = gnu_extension && node->kind >= CN_AST_BINARY && node->kind <= CN_AST_PRIMARY;
+    // if (gnu_extension_expression) cn__emit_str_lit(e, "(");
+    // if (gnu_extension) cn__emit_str_lit(e, "__extension__ ");
 
-    if (gnu_extension_expression) cn__emit_str_lit(e, "(");
-    if (gnu_extension) cn__emit_str_lit(e, "__extension__ ");
+    void (*emit)(Cn_Emitter *, void *) = cn_ast_info(node->id)->emit_func;
+    emit(e, node);
 
-    switch (node->kind) {
-#define X(K, T, m) case CN_AST_##K: cn__emit_##m(e, (Cn_Ast_##T *)node); break;
-    CN_AST_GEN_LIST(X)
-#undef X
-        default:
-            // For unhandled node types, try to emit source location if available.
-            {
-                Cn_String value = cn_source_to_str(&node->src);
-                if (!cn_str_is_empty(value)) {
-                    cn__emit_str(e, value);
-                }
-            }
-            break;
-    }
 
+    // TODO: GNU:
     // AI: Generated.
-    if (gnu_extension_expression) cn__emit_str_lit(e, ")");
+    // if (gnu_extension_expression) cn__emit_str_lit(e, ")");
 }
 
 
@@ -13911,7 +13755,7 @@ CNDEF bool cn_parse_optional(Cn_Lexer *lexer, Cn_Token_Type type) {
 CNDEF Cn_Ast_Translation_Unit *cn_parse_translation_unit(Cn_Lexer *lexer) {
     Cn_Lexer original_state = *lexer;
 
-    Cn_Ast_Translation_Unit node = { .kind = CN_AST_TRANSLATION_UNIT, .loc = cn_lexer_token(lexer).loc, .src = cn_lexer_token(lexer).src };
+    Cn_Ast_Translation_Unit node = { .id = CN_AST_TRANSLATION_UNIT, .loc = cn_lexer_token(lexer).loc, .src = cn_lexer_token(lexer).src };
 
     // Pushing first scope that will act as a global scope.
     cn_scope_stack_push();
@@ -14025,12 +13869,10 @@ error:
 CNDEF Cn_Ast_External_Declaration *cn_parse_external_declaration(Cn_Lexer *lexer) {
     Cn_Lexer original_state = *lexer;
 
-    Cn_Ast_External_Declaration node = { .kind = CN_AST_EXTERNAL_DECLARATION, .loc = cn_lexer_token(lexer).loc, .src = cn_lexer_token(lexer).src };
+    Cn_Ast_External_Declaration node = { .id = CN_AST_EXTERNAL_DECLARATION, .loc = cn_lexer_token(lexer).loc, .src = cn_lexer_token(lexer).src };
 
-    // TODO: GNU:
-    // AI: Generated.
-    // Optional '__extension__' keywords.
-    // if (cn_parse_gnu_extensions(lexer)) node.flags |= CN_AST_GNU_EXTENSION;
+    // Marking ext stack since this function has subparsing hooks.
+    int64_t ext_mark = cn__ast_ext_stack_mark();
 
     // If stray ';' case.
     if (cn_lexer_token(lexer).type == CN_TOKEN_SEMICOLON) {
@@ -14038,40 +13880,28 @@ CNDEF Cn_Ast_External_Declaration *cn_parse_external_declaration(Cn_Lexer *lexer
         return cn_ast_new(node);
     }
 
-    // TODO: GNU:
-    // AI: Generated.
-    // File-scope asm, basic asm statement without qualifiers, same as GCC and Clang.
-    // if (cn_lexer_token(lexer).type == CN_TOKEN_GNU_ASM) {
-    //     Cn_Ast_Gnu_Asm_Statement *gnu_asm_statement = cn_parse_gnu_asm_statement(lexer);
-    //     if (gnu_asm_statement == NULL) goto error;
+    if (!cn__hook_parse(CN_AST_SLOT_EXTERNAL_DECLARATION_PREFIX, NULL, lexer)) goto error;
 
-    //     if (gnu_asm_statement->flags & CN_AST_GNU_ASM_STATEMENT_IS_EXTENDED) {
-    //         cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, gnu_asm_statement, CN_DC_UNEXPECTED_TOKEN, "Extended asm is not allowed outside of function.");
-    //         goto error;
-    //     }
-    //     if (gnu_asm_statement->qualifiers != 0) {
-    //         cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, gnu_asm_statement, CN_DC_UNEXPECTED_TOKEN, "Asm qualifiers are not allowed outside of function.");
-    //         goto error;
-    //     }
+    if (!cn__hook_parse(CN_AST_SLOT_EXTERNAL_DECLARATION, &node.child, lexer)) goto error;
 
-    //     node.child = cn_ast_node(gnu_asm_statement);
-    //     return cn_ast_new(node);
-    // }
+    node.extensions = cn__ast_ext_stack_finalize(ext_mark);
 
+    if (node.child == NULL) {
+        // Saving state because messages could be send on parsed function or declaration ast nodes.
+        Cn_Lexer saved_lexer    = *lexer;
+        Cn_Tu_Saved saved_state = {0};
+        cn__tu_save(&saved_state);
 
-    // Saving state because messages could be send on parsed function or declaration ast nodes.
-    Cn_Lexer saved_lexer    = *lexer;
-    Cn_Tu_Saved saved_state = {0};
-    cn__tu_save(&saved_state);
+        // Last possible case function definition or declaration.
+        Cn_Ast_Node *function_or_declaration;
+        function_or_declaration = cn_parse_function_or_declaration(lexer);
+        if (function_or_declaration == NULL) goto error;
 
-    // Last possible case function definition or declaration.
-    Cn_Ast_Node *function_or_declaration;
-    function_or_declaration = cn_parse_function_or_declaration(lexer);
-    if (function_or_declaration == NULL) goto error;
+        CN_MESSAGE_AST_PARSED_HOOK(function_or_declaration, saved_state, saved_lexer, cn_parse_function_or_declaration)
 
-    CN_MESSAGE_AST_PARSED_HOOK(function_or_declaration, saved_state, saved_lexer, cn_parse_function_or_declaration)
-    
-    node.child = function_or_declaration;
+        node.child = function_or_declaration;
+    }
+
     Cn_Ast_External_Declaration *parent = cn_ast_new(node);
     return parent;
 
@@ -14110,7 +13940,7 @@ CNDEF Cn_Ast_Node *cn_parse_function_or_declaration(Cn_Lexer *lexer) {
         if (!cn_parse_expect(lexer, CN_TOKEN_SEMICOLON)) goto error;
 
         Cn_Ast_Declaration node = {
-            .kind = CN_AST_DECLARATION,
+            .id = CN_AST_DECLARATION,
             .loc = loc,
             .src = src,
         };
@@ -14137,7 +13967,7 @@ CNDEF Cn_Ast_Node *cn_parse_function_or_declaration(Cn_Lexer *lexer) {
     // Now finally we can decide if next token is '{' it is definitely a function definition because, it is part of function definition body, anything else could be part of init_declarator_list or ';'.
     if (cn_lexer_expect(lexer, CN_TOKEN_CURLY_OPEN)) {
         Cn_Ast_Function node = {
-            .kind = CN_AST_FUNCTION,
+            .id = CN_AST_FUNCTION,
             .loc = loc,
             .src = src,
         };
@@ -14172,7 +14002,7 @@ CNDEF Cn_Ast_Node *cn_parse_function_or_declaration(Cn_Lexer *lexer) {
 
     } else {
         Cn_Ast_Declaration node = {
-            .kind = CN_AST_DECLARATION,
+            .id = CN_AST_DECLARATION,
             .loc = loc,
             .src = src,
         };
@@ -14203,7 +14033,7 @@ CNDEF Cn_Ast_Node *cn_parse_finish_declaration(Cn_Lexer *lexer, Cn_Ast_Nodes att
     Cn_Lexer original_state = *lexer;
 
     Cn_Ast_Declaration node = {
-        .kind = CN_AST_DECLARATION,
+        .id = CN_AST_DECLARATION,
         .loc = cn_lexer_token(lexer).loc,
         .src = cn_lexer_token(lexer).src,
     };
@@ -14320,117 +14150,113 @@ error:
 }
 
 CNDEF Cn_Ast_Node *cn_parse_finish_statement(Cn_Lexer *lexer, Cn_Ast_Nodes attribute_specifiers) {
-    Cn_Ast_Node *statement;
+    Cn_Ast_Node *statement = NULL;
 
-    if (cn_lexer_expect(lexer, CN_TOKEN_CASE) || cn_lexer_peek(lexer, 1).type == CN_TOKEN_COLON) {
-        statement = cn_parse_label(lexer);
-        if (statement == NULL) goto error;
 
-        cn_ast_as(Label, statement)->attribute_specifiers = attribute_specifiers;
-    } else {
-        switch (cn_lexer_token(lexer).type) {
-            case CN_TOKEN_CURLY_OPEN:
-                statement = cn_ast_node(cn_parse_block(lexer, false));
-                if (statement == NULL) goto error;
+    int64_t ext_mark = cn__ast_ext_stack_mark();
 
-                cn_ast_as(Block, statement)->attribute_specifiers = attribute_specifiers;
+    if (!cn__hook_parse(CN_AST_SLOT_STATEMENT, &statement, lexer)) goto error;
 
-                break;
+    if (statement == NULL) {
+        if (cn_lexer_expect(lexer, CN_TOKEN_CASE) || cn_lexer_peek(lexer, 1).type == CN_TOKEN_COLON) {
+            statement = cn_parse_label(lexer);
+            if (statement == NULL) goto error;
 
-            case CN_TOKEN_IF:
-                statement = cn_parse_if_statement(lexer);
-                if (statement == NULL) goto error;
+            cn_ast_as(Label, statement)->attribute_specifiers = attribute_specifiers;
+        } else {
+            switch (cn_lexer_token(lexer).type) {
+                case CN_TOKEN_CURLY_OPEN:
+                    statement = cn_ast_node(cn_parse_block(lexer, false));
+                    if (statement == NULL) goto error;
 
-                cn_ast_as(If, statement)->attribute_specifiers = attribute_specifiers;
-                
-                break;
+                    cn_ast_as(Block, statement)->attribute_specifiers = attribute_specifiers;
 
-            case CN_TOKEN_SWITCH:
-                statement = cn_parse_switch_statement(lexer);
-                if (statement == NULL) goto error;
+                    break;
 
-                cn_ast_as(Switch, statement)->attribute_specifiers = attribute_specifiers;
-                
-                break;
+                case CN_TOKEN_IF:
+                    statement = cn_parse_if_statement(lexer);
+                    if (statement == NULL) goto error;
 
-            case CN_TOKEN_WHILE:
-                statement = cn_parse_while_statement(lexer);
-                if (statement == NULL) goto error;
+                    cn_ast_as(If, statement)->attribute_specifiers = attribute_specifiers;
 
-                cn_ast_as(While, statement)->attribute_specifiers = attribute_specifiers;
-                
-                break;
+                    break;
 
-            case CN_TOKEN_DO:
-                statement = cn_parse_do_while(lexer);
-                if (statement == NULL) goto error;
+                case CN_TOKEN_SWITCH:
+                    statement = cn_parse_switch_statement(lexer);
+                    if (statement == NULL) goto error;
 
-                cn_ast_as(Do_While, statement)->attribute_specifiers = attribute_specifiers;
-                
-                break;
+                    cn_ast_as(Switch, statement)->attribute_specifiers = attribute_specifiers;
 
-            case CN_TOKEN_FOR:
-                statement = cn_parse_for_statement(lexer);
-                if (statement == NULL) goto error;
+                    break;
 
-                cn_ast_as(For, statement)->attribute_specifiers = attribute_specifiers;
-                
-                break;
+                case CN_TOKEN_WHILE:
+                    statement = cn_parse_while_statement(lexer);
+                    if (statement == NULL) goto error;
 
-            case CN_TOKEN_GOTO:
-                statement = cn_parse_goto_statement(lexer);
-                if (statement == NULL) goto error;
+                    cn_ast_as(While, statement)->attribute_specifiers = attribute_specifiers;
 
-                cn_ast_as(Goto, statement)->attribute_specifiers = attribute_specifiers;
-                
-                break;
+                    break;
 
-            case CN_TOKEN_RETURN:
-                statement = cn_parse_return_statement(lexer);
-                if (statement == NULL) goto error;
+                case CN_TOKEN_DO:
+                    statement = cn_parse_do_while(lexer);
+                    if (statement == NULL) goto error;
 
-                cn_ast_as(Return, statement)->attribute_specifiers = attribute_specifiers;
-                
-                break;
+                    cn_ast_as(Do_While, statement)->attribute_specifiers = attribute_specifiers;
 
-            case CN_TOKEN_BREAK:
-                statement = cn_parse_break_statement(lexer);
-                if (statement == NULL) goto error;
+                    break;
 
-                cn_ast_as(Break, statement)->attribute_specifiers = attribute_specifiers;
-                
-                break;
+                case CN_TOKEN_FOR:
+                    statement = cn_parse_for_statement(lexer);
+                    if (statement == NULL) goto error;
 
-            case CN_TOKEN_CONTINUE:
-                statement = cn_parse_continue_statement(lexer);
-                if (statement == NULL) goto error;
+                    cn_ast_as(For, statement)->attribute_specifiers = attribute_specifiers;
 
-                cn_ast_as(Continue, statement)->attribute_specifiers = attribute_specifiers;
+                    break;
 
-                break;
+                case CN_TOKEN_GOTO:
+                    statement = cn_parse_goto_statement(lexer);
+                    if (statement == NULL) goto error;
 
-            // AI: Generated.
-            case CN_TOKEN_GNU_ASM:
-                // Asm statement has no attribute specifiers, same as GCC they are ignored.
-                if (attribute_specifiers.length > 0) {
-                    cn_diagnostic_node(CN_DIAGNOSTIC_WARNING, attribute_specifiers.ptrs[0], CN_DC_ILLEGAL_ATTRIBUTE, "Attributes on asm statement are ignored.");
-                }
+                    cn_ast_as(Goto, statement)->attribute_specifiers = attribute_specifiers;
 
-                // TODO: GNU:
-                // statement = cn_ast_node(cn_parse_gnu_asm_statement(lexer));
-                // if (statement == NULL) goto error;
+                    break;
 
-                break;
+                case CN_TOKEN_RETURN:
+                    statement = cn_parse_return_statement(lexer);
+                    if (statement == NULL) goto error;
 
-            default:
-                statement = cn_parse_expression_statement(lexer);
-                if (statement == NULL) goto error;
+                    cn_ast_as(Return, statement)->attribute_specifiers = attribute_specifiers;
 
-                cn_ast_as(Expression_Statement, statement)->attribute_specifiers = attribute_specifiers;
-                
-                break;
+                    break;
+
+                case CN_TOKEN_BREAK:
+                    statement = cn_parse_break_statement(lexer);
+                    if (statement == NULL) goto error;
+
+                    cn_ast_as(Break, statement)->attribute_specifiers = attribute_specifiers;
+
+                    break;
+
+                case CN_TOKEN_CONTINUE:
+                    statement = cn_parse_continue_statement(lexer);
+                    if (statement == NULL) goto error;
+
+                    cn_ast_as(Continue, statement)->attribute_specifiers = attribute_specifiers;
+
+                    break;
+
+                default:
+                    statement = cn_parse_expression_statement(lexer);
+                    if (statement == NULL) goto error;
+
+                    cn_ast_as(Expression_Statement, statement)->attribute_specifiers = attribute_specifiers;
+
+                    break;
+            }
         }
     }
+
+    statement->extensions = cn__ast_ext_stack_finalize(ext_mark);
 
     return statement;
 
@@ -14442,7 +14268,7 @@ error:
 CNDEF Cn_Ast_Block *cn_parse_block(Cn_Lexer *lexer, bool use_current_scope) {
     Cn_Lexer original_state = *lexer;
 
-    Cn_Ast_Block node = { .kind = CN_AST_BLOCK, .loc = cn_lexer_token(lexer).loc, .src = cn_lexer_token(lexer).src };
+    Cn_Ast_Block node = { .id = CN_AST_BLOCK, .loc = cn_lexer_token(lexer).loc, .src = cn_lexer_token(lexer).src };
 
     if (!cn_parse_expect(lexer, CN_TOKEN_CURLY_OPEN)) goto error;
 
@@ -14473,14 +14299,22 @@ error:
 CNDEF Cn_Ast_Block_Item *cn_parse_block_item(Cn_Lexer *lexer) {
     Cn_Lexer original_state = *lexer;
 
-    Cn_Ast_Block_Item node = { .kind = CN_AST_BLOCK_ITEM, .loc = cn_lexer_token(lexer).loc, .src = cn_lexer_token(lexer).src };
+    Cn_Ast_Block_Item node = { .id = CN_AST_BLOCK_ITEM, .loc = cn_lexer_token(lexer).loc, .src = cn_lexer_token(lexer).src };
 
-    // AI: Generated.
-    // Optional '__extension__' keywords, they only belong to the block item if declaration follows,
-    // otherwise they are a unary operator of the expression statement, so lexer is restored.
-    Cn_Lexer before_gnu_extensions = *lexer;
-    // TODO: GNU:
-    // bool has_gnu_extensions = cn_parse_gnu_extensions(lexer);
+    // We assume we deal with declaration first. If not, we will have to reparse a little.
+    // Thats the best way I see to deal with declaration vs. statement ambiguity without going
+    // worse as of right now.
+    Cn_Lexer before_decl_prefix = *lexer;
+    Cn_Tu_Saved before_decl_state;
+    cn__tu_save(&before_decl_state);
+
+
+    int64_t ext_mark = cn__ast_ext_stack_mark();
+    
+    if (!cn__hook_parse(CN_AST_SLOT_DECLARATION_PREFIX, NULL, lexer)) goto error;
+    bool has_declaration_prefix_changes = cn_lexer_changed(lexer, &before_decl_prefix);
+
+
 
     // Parsing attribute specifiers here in order to get to the tokens that would 
     // disambiguate delcaration vs statement situation.
@@ -14491,18 +14325,22 @@ CNDEF Cn_Ast_Block_Item *cn_parse_block_item(Cn_Lexer *lexer) {
     Cn_Ast_Node *declaration_or_statement;
 
     if (cn_parse_starts_declaration(lexer)) {
+        node.extensions = cn__ast_ext_stack_finalize(ext_mark);
+
         declaration_or_statement = cn_parse_finish_declaration(lexer, attribute_specifiers);
         if (declaration_or_statement == NULL) goto error;
-        // TODO: GNU:
-        // if (has_gnu_extensions) declaration_or_statement->flags |= CN_AST_GNU_EXTENSION;
+
         if (!cn_parse_expect(lexer, CN_TOKEN_SEMICOLON)) goto error;
     } else {
-        // TODO: GNU:
-        // AI: Generated.
-        // if (has_gnu_extensions) {
-        //     *lexer = before_gnu_extensions;
-        //     attribute_specifiers = (Cn_Ast_Nodes) {0};
-        // }
+
+        if (has_declaration_prefix_changes) {
+            // Rollback to before we parsed. But now we know we have statement ahead
+            // so we just handle everything correct from now on.
+            *lexer = before_decl_prefix;
+            cn__tu_rollback(&before_decl_state);
+            
+            attribute_specifiers = (Cn_Ast_Nodes) {0};
+        }
 
         declaration_or_statement = cn_parse_finish_statement(lexer, attribute_specifiers);
     }
@@ -14522,7 +14360,7 @@ error:
 CNDEF Cn_Ast_Node *cn_parse_if_statement(Cn_Lexer *lexer) {
     Cn_Lexer original_state = *lexer;
 
-    Cn_Ast_If node = { .kind = CN_AST_IF, .loc = cn_lexer_token(lexer).loc, .src = cn_lexer_token(lexer).src };
+    Cn_Ast_If node = { .id = CN_AST_IF, .loc = cn_lexer_token(lexer).loc, .src = cn_lexer_token(lexer).src };
 
     if (!cn_lexer_expect(lexer, CN_TOKEN_IF)) {
         cn_diagnostic_src(CN_DIAGNOSTIC_ERROR, &cn_lexer_token(lexer).loc, &cn_lexer_token(lexer).src, CN_DC_EXPECTED_TOKEN, "Expected 'if' keyword.");
@@ -14564,7 +14402,7 @@ error:
 CNDEF Cn_Ast_Node *cn_parse_switch_statement(Cn_Lexer *lexer) {
     Cn_Lexer original_state = *lexer;
 
-    Cn_Ast_Switch node = { .kind = CN_AST_SWITCH, .loc = cn_lexer_token(lexer).loc, .src = cn_lexer_token(lexer).src };
+    Cn_Ast_Switch node = { .id = CN_AST_SWITCH, .loc = cn_lexer_token(lexer).loc, .src = cn_lexer_token(lexer).src };
 
     if (!cn_lexer_expect(lexer, CN_TOKEN_SWITCH)) {
         cn_diagnostic_src(CN_DIAGNOSTIC_ERROR, &cn_lexer_token(lexer).loc, &cn_lexer_token(lexer).src, CN_DC_EXPECTED_TOKEN, "Expected 'switch' keyword.");
@@ -14600,7 +14438,7 @@ error:
 CNDEF Cn_Ast_Node *cn_parse_while_statement(Cn_Lexer *lexer) {
     Cn_Lexer original_state = *lexer;
 
-    Cn_Ast_While node = { .kind = CN_AST_WHILE, .loc = cn_lexer_token(lexer).loc, .src = cn_lexer_token(lexer).src };
+    Cn_Ast_While node = { .id = CN_AST_WHILE, .loc = cn_lexer_token(lexer).loc, .src = cn_lexer_token(lexer).src };
 
     if (!cn_parse_expect(lexer, CN_TOKEN_WHILE)) goto error;
 
@@ -14628,7 +14466,7 @@ error:
 CNDEF Cn_Ast_Node *cn_parse_do_while(Cn_Lexer *lexer) {
     Cn_Lexer original_state = *lexer;
 
-    Cn_Ast_Do_While node = { .kind = CN_AST_DO_WHILE, .loc = cn_lexer_token(lexer).loc, .src = cn_lexer_token(lexer).src };
+    Cn_Ast_Do_While node = { .id = CN_AST_DO_WHILE, .loc = cn_lexer_token(lexer).loc, .src = cn_lexer_token(lexer).src };
 
     if (!cn_parse_expect(lexer, CN_TOKEN_DO)) goto error;
 
@@ -14660,7 +14498,7 @@ error:
 CNDEF Cn_Ast_Node *cn_parse_for_statement(Cn_Lexer *lexer) {
     Cn_Lexer original_state = *lexer;
 
-    Cn_Ast_For node = { .kind = CN_AST_FOR, .loc = cn_lexer_token(lexer).loc, .src = cn_lexer_token(lexer).src };
+    Cn_Ast_For node = { .id = CN_AST_FOR, .loc = cn_lexer_token(lexer).loc, .src = cn_lexer_token(lexer).src };
 
     if (!cn_parse_expect(lexer, CN_TOKEN_FOR)) goto error;
 
@@ -14671,12 +14509,17 @@ CNDEF Cn_Ast_Node *cn_parse_for_statement(Cn_Lexer *lexer) {
     cn_scope_stack_push();
     
     if (!cn_parse_optional(lexer, CN_TOKEN_SEMICOLON)) {
-        // TODO: GNU:
-        // AI: Generated.
-        // Optional '__extension__' keywords, same as in block item, they only belong to the
-        // declaration, otherwise they are a unary operator of the expression, so lexer is restored.
-        // Cn_Lexer before_gnu_extensions = *lexer;
-        // bool has_gnu_extensions = cn_parse_gnu_extensions(lexer);
+
+        // We assume we deal with declaration first. If not, we will have to reparse.
+        // Completely same situation as in declaration vs. statement.
+        Cn_Lexer before_decl_lexer = *lexer;
+        Cn_Tu_Saved before_decl_state;
+        cn__tu_save(&before_decl_state);
+
+        int64_t ext_mark = cn__ast_ext_stack_mark();
+
+        if (!cn__hook_parse(CN_AST_SLOT_DECLARATION_PREFIX, NULL, lexer)) goto error;
+        bool has_declaration_prefix_changes = cn_lexer_changed(lexer, &before_decl_lexer);
 
         bool ok;
         Cn_Ast_Nodes attribute_specifiers = cn_parse_attribute_specifiers(lexer, &ok);
@@ -14684,17 +14527,16 @@ CNDEF Cn_Ast_Node *cn_parse_for_statement(Cn_Lexer *lexer) {
 
         Cn_Ast_Node *declaration_or_expression;
         if (cn_parse_starts_declaration(lexer)) {
+
+            node.extensions = cn__ast_ext_stack_finalize(ext_mark);
             declaration_or_expression = cn_parse_finish_declaration(lexer, attribute_specifiers);
-            // TODO: GNU:
-            // AI: Generated.
-            // if (declaration_or_expression != NULL && has_gnu_extensions) declaration_or_expression->flags |= CN_AST_GNU_EXTENSION;
+
         } else {
-            // TODO: GNU:
-            // AI: Generated.
-            // if (has_gnu_extensions) {
-            //     *lexer = before_gnu_extensions;
-            //     attribute_specifiers = (Cn_Ast_Nodes) {0};
-            // }
+            if (has_declaration_prefix_changes) {
+                *lexer = before_decl_lexer;
+                cn__tu_rollback(&before_decl_state);
+                attribute_specifiers = (Cn_Ast_Nodes) {0};
+            }
 
             if (attribute_specifiers.length > 0) {
                 cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, attribute_specifiers.ptrs[0], CN_DC_ILLEGAL_ATTRIBUTE, "Attribute can't appear in here.");
@@ -14744,7 +14586,7 @@ error:
 CNDEF Cn_Ast_Node *cn_parse_goto_statement(Cn_Lexer *lexer) {
     Cn_Lexer original_state = *lexer;
 
-    Cn_Ast_Goto node = { .kind = CN_AST_GOTO, .loc = cn_lexer_token(lexer).loc, .src = cn_lexer_token(lexer).src };
+    Cn_Ast_Goto node = { .id = CN_AST_GOTO, .loc = cn_lexer_token(lexer).loc, .src = cn_lexer_token(lexer).src };
 
     if (!cn_lexer_expect(lexer, CN_TOKEN_GOTO)) {
         cn_diagnostic_src(CN_DIAGNOSTIC_ERROR, &cn_lexer_token(lexer).loc, &cn_lexer_token(lexer).src, CN_DC_EXPECTED_TOKEN, "Expected 'goto' keyword.");
@@ -14769,7 +14611,7 @@ error:
 CNDEF Cn_Ast_Node *cn_parse_return_statement(Cn_Lexer *lexer) {
     Cn_Lexer original_state = *lexer;
 
-    Cn_Ast_Return node = { .kind = CN_AST_RETURN, .loc = cn_lexer_token(lexer).loc, .src = cn_lexer_token(lexer).src };
+    Cn_Ast_Return node = { .id = CN_AST_RETURN, .loc = cn_lexer_token(lexer).loc, .src = cn_lexer_token(lexer).src };
 
     if (!cn_lexer_expect(lexer, CN_TOKEN_RETURN)) {
         cn_diagnostic_src(CN_DIAGNOSTIC_ERROR, &cn_lexer_token(lexer).loc, &cn_lexer_token(lexer).src, CN_DC_EXPECTED_TOKEN, "Expected 'return' keyword.");
@@ -14799,7 +14641,7 @@ error:
 CNDEF Cn_Ast_Node *cn_parse_break_statement(Cn_Lexer *lexer) {
     Cn_Lexer original_state = *lexer;
 
-    Cn_Ast_Break node = { .kind = CN_AST_BREAK, .loc = cn_lexer_token(lexer).loc, .src = cn_lexer_token(lexer).src };
+    Cn_Ast_Break node = { .id = CN_AST_BREAK, .loc = cn_lexer_token(lexer).loc, .src = cn_lexer_token(lexer).src };
 
     if (!cn_lexer_expect(lexer, CN_TOKEN_BREAK)) {
         cn_diagnostic_src(CN_DIAGNOSTIC_ERROR, &cn_lexer_token(lexer).loc, &cn_lexer_token(lexer).src, CN_DC_EXPECTED_TOKEN, "Expected 'break' keyword.");
@@ -14820,7 +14662,7 @@ error:
 CNDEF Cn_Ast_Node *cn_parse_continue_statement(Cn_Lexer *lexer) {
     Cn_Lexer original_state = *lexer;
 
-    Cn_Ast_Continue node = { .kind = CN_AST_CONTINUE, .loc = cn_lexer_token(lexer).loc, .src = cn_lexer_token(lexer).src };
+    Cn_Ast_Continue node = { .id = CN_AST_CONTINUE, .loc = cn_lexer_token(lexer).loc, .src = cn_lexer_token(lexer).src };
 
     if (!cn_lexer_expect(lexer, CN_TOKEN_CONTINUE)) {
         cn_diagnostic_src(CN_DIAGNOSTIC_ERROR, &cn_lexer_token(lexer).loc, &cn_lexer_token(lexer).src, CN_DC_EXPECTED_TOKEN, "Expected 'continue' keyword.");
@@ -14841,7 +14683,7 @@ error:
 CNDEF Cn_Ast_Node *cn_parse_label(Cn_Lexer *lexer) {
     Cn_Lexer original_state = *lexer;
 
-    Cn_Ast_Label node = { .kind = CN_AST_LABEL, .loc = cn_lexer_token(lexer).loc, .src = cn_lexer_token(lexer).src };
+    Cn_Ast_Label node = { .id = CN_AST_LABEL, .loc = cn_lexer_token(lexer).loc, .src = cn_lexer_token(lexer).src };
     if (cn_parse_optional(lexer, CN_TOKEN_CASE)) {
         node.flags |= CN_AST_LABEL_IS_CASE;
         Cn_Ast_Node *expression = cn_parse_expression(lexer, -1, 0);
@@ -14878,7 +14720,7 @@ error:
 CNDEF Cn_Ast_Node *cn_parse_expression_statement(Cn_Lexer *lexer) {
     Cn_Lexer original_state = *lexer;
 
-    Cn_Ast_Expression_Statement node = { .kind = CN_AST_EXPRESSION_STATEMENT, .loc = cn_lexer_token(lexer).loc, .src = cn_lexer_token(lexer).src };
+    Cn_Ast_Expression_Statement node = { .id = CN_AST_EXPRESSION_STATEMENT, .loc = cn_lexer_token(lexer).loc, .src = cn_lexer_token(lexer).src };
     
     if (!cn_parse_optional(lexer, CN_TOKEN_SEMICOLON)) {
 
@@ -14937,7 +14779,7 @@ CNDEF Cn_Ast_Node *cn_parse_expression_increasing_precedence(Cn_Lexer *lexer, vo
             return left;
         }
 
-        Cn_Ast_Ternary node = { .kind = CN_AST_TERNARY, .loc = cn_lexer_token(lexer).loc, .src = cn_lexer_token(lexer).src };
+        Cn_Ast_Ternary node = { .id = CN_AST_TERNARY, .loc = cn_lexer_token(lexer).loc, .src = cn_lexer_token(lexer).src };
 
         cn_lexer_next_token(lexer);
         
@@ -14977,7 +14819,7 @@ CNDEF Cn_Ast_Node *cn_parse_expression_increasing_precedence(Cn_Lexer *lexer, vo
         
         // Function call case.
         if (cn_lexer_expect(lexer, CN_TOKEN_PARAN_OPEN)) {
-            Cn_Ast_Call node = { .kind = CN_AST_CALL, .loc = cn_lexer_token(lexer).loc, .src = cn_lexer_token(lexer).src };
+            Cn_Ast_Call node = { .id = CN_AST_CALL, .loc = cn_lexer_token(lexer).loc, .src = cn_lexer_token(lexer).src };
             cn_lexer_next_token(lexer);
 
             node.expression = left;
@@ -14996,12 +14838,12 @@ CNDEF Cn_Ast_Node *cn_parse_expression_increasing_precedence(Cn_Lexer *lexer, vo
 
         // Access operator cases.
         if (cn_lexer_expect(lexer, CN_TOKEN_ARROW) || cn_lexer_expect(lexer, CN_TOKEN_DOT)) {
-            Cn_Ast_Access node = { .kind = CN_AST_ACCESS, .loc = cn_lexer_token(lexer).loc, .src = cn_lexer_token(lexer).src };
+            Cn_Ast_Access node = { .id = CN_AST_ACCESS, .loc = cn_lexer_token(lexer).loc, .src = cn_lexer_token(lexer).src };
             cn_lexer_next_token(lexer);
             
             node.expression = left;
 
-            node.pointer = op_kind == CN_AST_BINARY_OP_ARROW;
+            if (op_kind == CN_AST_BINARY_OP_ARROW) node.flags |= CN_AST_ACCESS_IS_POINTER;
 
             Cn_Ast_Identifier *identifier = cn_parse_identifier(lexer);
             if (identifier == NULL) goto error;
@@ -15012,7 +14854,7 @@ CNDEF Cn_Ast_Node *cn_parse_expression_increasing_precedence(Cn_Lexer *lexer, vo
         }
 
         // Array subscript case.
-        Cn_Ast_Binary node = { .kind = CN_AST_BINARY, .loc = cn_lexer_token(lexer).loc, .src = cn_lexer_token(lexer).src };
+        Cn_Ast_Binary node = { .id = CN_AST_BINARY, .loc = cn_lexer_token(lexer).loc, .src = cn_lexer_token(lexer).src };
 
         if (cn_parse_optional(lexer, CN_TOKEN_SQR_BRACES_OPEN)) {
             // nocheck
@@ -15051,7 +14893,7 @@ CNDEF Cn_Ast_Node *cn_parse_expression_increasing_precedence(Cn_Lexer *lexer, vo
             return left;
         }
 
-        Cn_Ast_Assign node = { .kind = CN_AST_ASSIGN, .loc = cn_lexer_token(lexer).loc, .src = cn_lexer_token(lexer).src };
+        Cn_Ast_Assign node = { .id = CN_AST_ASSIGN, .loc = cn_lexer_token(lexer).loc, .src = cn_lexer_token(lexer).src };
 
         cn_lexer_next_token(lexer);
 
@@ -15074,7 +14916,7 @@ CNDEF Cn_Ast_Node *cn_parse_expression_increasing_precedence(Cn_Lexer *lexer, vo
             return left;
         }
 
-        Cn_Ast_Postfix node = { .kind = CN_AST_POSTFIX, .loc = cn_lexer_token(lexer).loc, .src = cn_lexer_token(lexer).src };
+        Cn_Ast_Postfix node = { .id = CN_AST_POSTFIX, .loc = cn_lexer_token(lexer).loc, .src = cn_lexer_token(lexer).src };
 
         cn_lexer_next_token(lexer);
 
@@ -15111,7 +14953,7 @@ CNDEF Cn_Ast_Node *cn_parse_expression(Cn_Lexer *lexer, int min_precedence, Cn_P
     }
 
     Cn_Ast_Node *node = left;
-    CN_ASSERT(node->kind != CN_AST_UNKNOWN);
+    CN_ASSERT(node->id != CN_AST_CORE_UNKNOWN);
     return left;
 
 error:
@@ -15129,7 +14971,7 @@ CNDEF Cn_Ast_Node *cn_parse_expression_leaf(Cn_Lexer *lexer, Cn_Parse_Expression
         
         // Cast expression case.
         if (cn_parse_starts_type(lexer)) {
-            Cn_Ast_Cast node = { .kind = CN_AST_CAST, .loc = cn_lexer_token(lexer).loc, .src = cn_lexer_token(lexer).src };
+            Cn_Ast_Cast node = { .id = CN_AST_CAST, .loc = cn_lexer_token(lexer).loc, .src = cn_lexer_token(lexer).src };
 
             Cn_Ast_Type_Name *type_name = cn_parse_type_name(lexer);
             if (type_name == NULL) goto error;
@@ -15139,7 +14981,7 @@ CNDEF Cn_Ast_Node *cn_parse_expression_leaf(Cn_Lexer *lexer, Cn_Parse_Expression
             // Compound literal case.
             if (cn_lexer_expect(lexer, CN_TOKEN_CURLY_OPEN)) {
                 Cn_Ast_Compound compound = {
-                    .kind = CN_AST_COMPOUND,
+                    .id = CN_AST_COMPOUND,
                     .loc = node.loc,
                     .src = node.src,
                     .type_name = type_name,
@@ -15173,7 +15015,7 @@ CNDEF Cn_Ast_Node *cn_parse_expression_leaf(Cn_Lexer *lexer, Cn_Parse_Expression
 
     // Handling sizeof expression.
     if (cn_lexer_expect(lexer, CN_TOKEN_SIZEOF)) {
-        Cn_Ast_Sizeof node = { .kind = CN_AST_SIZEOF, .loc = cn_lexer_token(lexer).loc, .src = cn_lexer_token(lexer).src };
+        Cn_Ast_Sizeof node = { .id = CN_AST_SIZEOF, .loc = cn_lexer_token(lexer).loc, .src = cn_lexer_token(lexer).src };
         cn_lexer_next_token(lexer);
 
         if (cn_lexer_expect(lexer, CN_TOKEN_PARAN_OPEN)) {
@@ -15219,7 +15061,7 @@ CNDEF Cn_Ast_Node *cn_parse_expression_leaf(Cn_Lexer *lexer, Cn_Parse_Expression
     // Handling unary expression.
     Cn_Ast_Unary_Operator_Kind op_kind = cn_ast_is_unary_operator(lexer);
     if (op_kind != CN_AST_UNARY_OP_NONE) {
-        Cn_Ast_Unary node = { .kind = CN_AST_UNARY, .loc = cn_lexer_token(lexer).loc, .src = cn_lexer_token(lexer).src };
+        Cn_Ast_Unary node = { .id = CN_AST_UNARY, .loc = cn_lexer_token(lexer).loc, .src = cn_lexer_token(lexer).src };
         cn_lexer_next_token(lexer);
 
         Cn_Ast_Node *expression = cn_parse_expression(lexer, CN_AST_UNARY_OPERATOR_PRECEDENCE, flags);
@@ -15231,10 +15073,44 @@ CNDEF Cn_Ast_Node *cn_parse_expression_leaf(Cn_Lexer *lexer, Cn_Parse_Expression
         Cn_Ast_Node *parent = cn_ast_new(node);
         return parent;
     }
+
+    int64_t ext_mark = cn__ast_ext_stack_mark();
+    
+    Cn_Lexer before = *lexer;
+    if (!cn__hook_parse(CN_AST_SLOT_EXPRESSION_PREFIX, NULL, lexer)) goto error;
+    bool has_expression_prefix_changes = cn_lexer_changed(lexer, &before);
+
+    if (has_expression_prefix_changes) {
+        Cn_Ast_Node *expression = cn_parse_expression(lexer, CN_AST_UNARY_OPERATOR_PRECEDENCE, flags);
+        if (expression == NULL) goto error;
+
+        if (expression->extensions.length > 0) {
+            expression->extensions = cn_ast_ext_merge(expression->extensions, cn__ast_ext_stack_finalize(ext_mark));
+        } else {
+            expression->extensions = cn__ast_ext_stack_finalize(ext_mark);
+        }
+
+        return expression;
+    }
+
+
     
     // Primary expression case.
-    Cn_Ast_Primary node = { .kind = CN_AST_PRIMARY, .loc = cn_lexer_token(lexer).loc, .src = cn_lexer_token(lexer).src };
-    Cn_Ast_Node *literal;
+    Cn_Ast_Primary node = { .id = CN_AST_PRIMARY, .loc = cn_lexer_token(lexer).loc, .src = cn_lexer_token(lexer).src };
+    Cn_Ast_Node *literal = NULL;
+    
+    ext_mark = cn__ast_ext_stack_mark();
+
+    if (!cn__hook_parse(CN_AST_SLOT_PRIMARY, &literal, lexer)) goto error;
+
+    node.extensions = cn__ast_ext_stack_finalize(ext_mark);
+    
+    if (literal != NULL) {
+        node.literal = literal;
+        Cn_Ast_Node *parent = cn_ast_new(node);
+        return parent;
+    }
+
 
     switch (cn_lexer_token(lexer).type) {
         case CN_TOKEN_IDENTIFIER:
@@ -15320,9 +15196,15 @@ error:
 CNDEF Cn_Ast_Init_Declarator *cn_parse_finish_init_declarator(Cn_Lexer *lexer, Cn_Ast_Declarator *declarator, void *declaration_specifiers) {
     Cn_Lexer original_state = *lexer;
 
-    Cn_Ast_Init_Declarator node = { .kind = CN_AST_INIT_DECLARATOR, .loc = ((Cn_Ast_Node *)declarator)->loc, .src = ((Cn_Ast_Node *)declarator)->src };
+    Cn_Ast_Init_Declarator node = { .id = CN_AST_INIT_DECLARATOR, .loc = ((Cn_Ast_Node *)declarator)->loc, .src = ((Cn_Ast_Node *)declarator)->src };
 
     node.declarator = cn_ast_as(Declarator, declarator);
+
+    int64_t ext_mark = cn__ast_ext_stack_mark();
+
+    if (!cn__hook_parse(CN_AST_SLOT_AFTER_DECLARATOR, NULL, lexer)) goto error;
+
+    node.extensions = cn__ast_ext_stack_finalize(ext_mark);
 
     // TODO: GNU:
     // if (cn_lexer_expect(lexer, CN_TOKEN_GNU_ASM)) {
@@ -15381,7 +15263,7 @@ error:
 CNDEF Cn_Ast_Initializer *cn_parse_initializer(Cn_Lexer *lexer) {
     Cn_Lexer original_state = *lexer;
 
-    Cn_Ast_Initializer node = { .kind = CN_AST_INITIALIZER, .loc = cn_lexer_token(lexer).loc, .src = cn_lexer_token(lexer).src };
+    Cn_Ast_Initializer node = { .id = CN_AST_INITIALIZER, .loc = cn_lexer_token(lexer).loc, .src = cn_lexer_token(lexer).src };
 
     if (cn_lexer_expect(lexer, CN_TOKEN_CURLY_OPEN)) {
         bool ok;
@@ -15431,7 +15313,7 @@ error:
 CNDEF Cn_Ast_Designation *cn_parse_designation(Cn_Lexer *lexer) {
     Cn_Lexer original_state = *lexer;
 
-    Cn_Ast_Designation node = { .kind = CN_AST_DESIGNATION, .loc = cn_lexer_token(lexer).loc, .src = cn_lexer_token(lexer).src };
+    Cn_Ast_Designation node = { .id = CN_AST_DESIGNATION, .loc = cn_lexer_token(lexer).loc, .src = cn_lexer_token(lexer).src };
 
     if (cn_parse_starts_designator(lexer)) {
 
@@ -15481,7 +15363,7 @@ error:
 CNDEF Cn_Ast_Designator *cn_parse_designator(Cn_Lexer *lexer) {
     Cn_Lexer original_state = *lexer;
 
-    Cn_Ast_Designator node = { .kind = CN_AST_DESIGNATOR, .loc = cn_lexer_token(lexer).loc, .src = cn_lexer_token(lexer).src };
+    Cn_Ast_Designator node = { .id = CN_AST_DESIGNATOR, .loc = cn_lexer_token(lexer).loc, .src = cn_lexer_token(lexer).src };
 
     if (cn_parse_optional(lexer, CN_TOKEN_DOT)) {
         Cn_Ast_Identifier *identifier = cn_parse_identifier(lexer);
@@ -15522,7 +15404,7 @@ CNDEF bool cn_parse_starts_designator(Cn_Lexer *lexer) {
 CNDEF Cn_Ast_Declarator *cn_parse_declarator(Cn_Lexer *lexer, bool *ok) {
     Cn_Lexer original_state = *lexer;
 
-    Cn_Ast_Declarator node = { .kind = CN_AST_DECLARATOR, .loc = cn_lexer_token(lexer).loc, .src = cn_lexer_token(lexer).src };
+    Cn_Ast_Declarator node = { .id = CN_AST_DECLARATOR, .loc = cn_lexer_token(lexer).loc, .src = cn_lexer_token(lexer).src };
 
     Cn_Ast_Node *child;
     
@@ -15568,17 +15450,22 @@ error:
 CNDEF Cn_Ast_Pointer *cn_parse_pointer(Cn_Lexer *lexer) {
     Cn_Lexer original_state = *lexer;
 
-    Cn_Ast_Pointer node = { .kind = CN_AST_POINTER, .loc = cn_lexer_token(lexer).loc, .src = cn_lexer_token(lexer).src };
+    Cn_Ast_Pointer node = { .id = CN_AST_POINTER, .loc = cn_lexer_token(lexer).loc, .src = cn_lexer_token(lexer).src };
     
     if (!cn_parse_expect(lexer, CN_TOKEN_ASTERISK)) goto error;
     
     int64_t gnu_attr_mark = cn_ast_stack_mark();
+    int64_t ext_mark = cn__ast_ext_stack_mark();
 
     int ok;
     while (true) {
         ok = cn_parse_try_qualifier(lexer, &node.qualifiers);
         if (ok == 0) continue;
         if (ok == 2) goto error;
+
+        Cn_Lexer before_slot = *lexer;
+        if (!cn__hook_parse(CN_AST_SLOT_POINTER, NULL, lexer)) goto error;
+        if (cn_lexer_changed(lexer, &before_slot)) continue;
 
         // TODO: GNU:
         // if (cn_lexer_expect(lexer, CN_TOKEN_GNU_ATTRIBUTE)) {
@@ -15592,6 +15479,7 @@ CNDEF Cn_Ast_Pointer *cn_parse_pointer(Cn_Lexer *lexer) {
     }
 
     node.gnu_attribute_specifiers = cn_ast_stack_finalize(gnu_attr_mark);
+    node.extensions = cn__ast_ext_stack_finalize(ext_mark);
 
     if (cn_lexer_expect(lexer, CN_TOKEN_ASTERISK)) {
         Cn_Ast_Node *child;
@@ -15617,7 +15505,7 @@ CNDEF Cn_Ast_Node *cn_parse_direct_declarator(Cn_Lexer *lexer, bool *is_abstract
 
     // '(' declarator ')' case.
     if (cn_lexer_expect(lexer, CN_TOKEN_PARAN_OPEN)) {
-        Cn_Ast_Direct_Declarator_Grouped node = { .kind = CN_AST_DIRECT_DECLARATOR_GROUPED, .loc = cn_lexer_token(lexer).loc, .src = cn_lexer_token(lexer).src };
+        Cn_Ast_Direct_Declarator_Grouped node = { .id = CN_AST_DIRECT_DECLARATOR_GROUPED, .loc = cn_lexer_token(lexer).loc, .src = cn_lexer_token(lexer).src };
 
         cn_lexer_next_token(lexer);
 
@@ -15651,7 +15539,7 @@ CNDEF Cn_Ast_Node *cn_parse_direct_declarator(Cn_Lexer *lexer, bool *is_abstract
     while (true) {
         // direct_declarator '[' expression? ']' case.
         if (cn_lexer_expect(lexer, CN_TOKEN_SQR_BRACES_OPEN)) {
-            Cn_Ast_Direct_Declarator_Array node = { .kind = CN_AST_DIRECT_DECLARATOR_ARRAY, .loc = cn_lexer_token(lexer).loc, .src = cn_lexer_token(lexer).src };
+            Cn_Ast_Direct_Declarator_Array node = { .id = CN_AST_DIRECT_DECLARATOR_ARRAY, .loc = cn_lexer_token(lexer).loc, .src = cn_lexer_token(lexer).src };
 
             cn_lexer_next_token(lexer);
 
@@ -15677,7 +15565,7 @@ CNDEF Cn_Ast_Node *cn_parse_direct_declarator(Cn_Lexer *lexer, bool *is_abstract
         }
         // direct_declarator '(' ('void' | parameter_declarations)? ')' case.
         else if (cn_lexer_expect(lexer, CN_TOKEN_PARAN_OPEN)) {
-            Cn_Ast_Direct_Declarator_Function node = { .kind = CN_AST_DIRECT_DECLARATOR_FUNCTION, .loc = cn_lexer_token(lexer).loc, .src = cn_lexer_token(lexer).src };
+            Cn_Ast_Direct_Declarator_Function node = { .id = CN_AST_DIRECT_DECLARATOR_FUNCTION, .loc = cn_lexer_token(lexer).loc, .src = cn_lexer_token(lexer).src };
 
             cn_lexer_next_token(lexer);
 
@@ -15718,7 +15606,7 @@ error:
 CNDEF Cn_Ast_Identifier *cn_parse_identifier(Cn_Lexer *lexer) {
     Cn_Lexer original_state = *lexer;
 
-    Cn_Ast_Identifier node = { .kind = CN_AST_IDENTIFIER, .loc = cn_lexer_token(lexer).loc, .src = cn_lexer_token(lexer).src };
+    Cn_Ast_Identifier node = { .id = CN_AST_IDENTIFIER, .loc = cn_lexer_token(lexer).loc, .src = cn_lexer_token(lexer).src };
 
     if (!cn_lexer_expect(lexer, CN_TOKEN_IDENTIFIER)) {
         cn_diagnostic_src(CN_DIAGNOSTIC_ERROR, &cn_lexer_token(lexer).loc, &cn_lexer_token(lexer).src, CN_DC_EXPECTED_TOKEN, "Expected identifier token.");
@@ -15740,7 +15628,7 @@ error:
 CNDEF Cn_Ast_Integer *cn_parse_integer(Cn_Lexer *lexer) {
     Cn_Lexer original_state = *lexer;
 
-    Cn_Ast_Integer node = { .kind = CN_AST_INTEGER, .loc = cn_lexer_token(lexer).loc, .src = cn_lexer_token(lexer).src };
+    Cn_Ast_Integer node = { .id = CN_AST_INTEGER, .loc = cn_lexer_token(lexer).loc, .src = cn_lexer_token(lexer).src };
 
     if (!cn_lexer_expect(lexer, CN_TOKEN_INTEGER_VALUE)) {
         cn_diagnostic_src(CN_DIAGNOSTIC_ERROR, &cn_lexer_token(lexer).loc, &cn_lexer_token(lexer).src, CN_DC_EXPECTED_TOKEN, "Expected integer token.");
@@ -15766,7 +15654,7 @@ error:
 CNDEF Cn_Ast_Float *cn_parse_float(Cn_Lexer *lexer) {
     Cn_Lexer original_state = *lexer;
 
-    Cn_Ast_Float node = { .kind = CN_AST_FLOAT, .loc = cn_lexer_token(lexer).loc, .src = cn_lexer_token(lexer).src };
+    Cn_Ast_Float node = { .id = CN_AST_FLOAT, .loc = cn_lexer_token(lexer).loc, .src = cn_lexer_token(lexer).src };
 
     if (!cn_lexer_expect(lexer, CN_TOKEN_FLOAT_VALUE)) {
         cn_diagnostic_src(CN_DIAGNOSTIC_ERROR, &cn_lexer_token(lexer).loc, &cn_lexer_token(lexer).src, CN_DC_EXPECTED_TOKEN, "Expected or unsupported float token.");
@@ -15792,7 +15680,7 @@ error:
 CNDEF Cn_Ast_Char *cn_parse_character(Cn_Lexer *lexer) {
     Cn_Lexer original_state = *lexer;
 
-    Cn_Ast_Char node = { .kind = CN_AST_CHAR, .loc = cn_lexer_token(lexer).loc, .src = cn_lexer_token(lexer).src };
+    Cn_Ast_Char node = { .id = CN_AST_CHAR, .loc = cn_lexer_token(lexer).loc, .src = cn_lexer_token(lexer).src };
 
     if (!cn_lexer_expect(lexer, CN_TOKEN_CHAR_VALUE)) {
         cn_diagnostic_src(CN_DIAGNOSTIC_ERROR, &cn_lexer_token(lexer).loc, &cn_lexer_token(lexer).src, CN_DC_EXPECTED_TOKEN, "Expected char token.");
@@ -15818,7 +15706,7 @@ error:
 CNDEF Cn_Ast_String *cn_parse_string(Cn_Lexer *lexer) {
     Cn_Lexer original_state = *lexer;
 
-    Cn_Ast_String node = { .kind = CN_AST_STRING, .loc = cn_lexer_token(lexer).loc, .src = cn_lexer_token(lexer).src };
+    Cn_Ast_String node = { .id = CN_AST_STRING, .loc = cn_lexer_token(lexer).loc, .src = cn_lexer_token(lexer).src };
 
     Cn_String_Builder sb = cn_sb_make(CN_SB_STACK_STORAGE_CAP);
     
@@ -15882,7 +15770,7 @@ CNDEF Cn_Ast_Type_Specifier_Primitive *cn__parse_primitive_info_to_type_specifie
     }
 
     Cn_Ast_Type_Specifier_Primitive ts_node = {
-        .kind = CN_AST_TYPE_SPECIFIER_PRIMITIVE,
+        .id = CN_AST_TYPE_SPECIFIER_PRIMITIVE,
         .loc = *loc,
         .src = *src,
         .primitive_kind = info->kind,
@@ -15900,11 +15788,12 @@ error:
 CNDEF Cn_Ast_Declaration_Specifiers *cn_parse_declaration_specifiers(Cn_Lexer *lexer) {
     Cn_Lexer original_state = *lexer;
 
-    Cn_Ast_Declaration_Specifiers node = { .kind = CN_AST_DECLARATION_SPECIFIERS, .loc = cn_lexer_token(lexer).loc, .src = cn_lexer_token(lexer).src };
+    Cn_Ast_Declaration_Specifiers node = { .id = CN_AST_DECLARATION_SPECIFIERS, .loc = cn_lexer_token(lexer).loc, .src = cn_lexer_token(lexer).src };
 
     // For accumulating primitive type info (int, char, signed, unsigned, long, short, etc.)
     Cn_Primitive_Type_Info primitive_info = {0};
     int64_t gnu_attr_mark = cn_ast_stack_mark();
+    int64_t ext_mark = cn__ast_ext_stack_mark();
 
     bool at_least_one = false;
     int ok;
@@ -15933,6 +15822,13 @@ CNDEF Cn_Ast_Declaration_Specifiers *cn_parse_declaration_specifiers(Cn_Lexer *l
         if (ok == 2)
             goto error;
 
+        Cn_Lexer before_slot = *lexer;
+        if (!cn__hook_parse(CN_AST_SLOT_DECLARATION_SPECIFIERS, NULL, lexer)) goto error;
+        if (cn_lexer_changed(lexer, &before_slot)) {
+            at_least_one = true;
+            continue;
+        }
+
         // TODO: GNU:
         // if (cn_lexer_expect(lexer, CN_TOKEN_GNU_ATTRIBUTE)) {
         //     Cn_Ast_Gnu_Attribute_Specifier *gnu_attribute_specifier = cn_parse_gnu_attribute_specifier(lexer);
@@ -15954,6 +15850,7 @@ CNDEF Cn_Ast_Declaration_Specifiers *cn_parse_declaration_specifiers(Cn_Lexer *l
     }
 
     node.gnu_attribute_specifiers = cn_ast_stack_finalize(gnu_attr_mark);
+    node.extensions = cn__ast_ext_stack_finalize(ext_mark);
 
     // If at least one other declaration specifier present continue, if not error.
     if (!at_least_one) {
@@ -16126,7 +16023,7 @@ CNDEF int cn_parse_try_type_specifier(Cn_Lexer *lexer, Cn_Primitive_Type_Info *p
             }
 
             Cn_Ast_Type_Specifier_Typedef node = {
-                .kind = CN_AST_TYPE_SPECIFIER_TYPEDEF,
+                .id = CN_AST_TYPE_SPECIFIER_TYPEDEF,
                 .loc = cn_lexer_token(lexer).loc,
                 .src = cn_lexer_token(lexer).src,
                 .typedef_name = str,
@@ -16165,6 +16062,24 @@ CNDEF int cn_parse_try_type_specifier(Cn_Lexer *lexer, Cn_Primitive_Type_Info *p
         *type_specifier = enum_node;
         return 0;
     }
+
+    // Checking if custom type specifier.
+    Cn_Lexer before_slot = *lexer;
+    Cn_Ast_Node *custom_type_specifier = NULL;
+
+    if (!cn__hook_parse(CN_AST_SLOT_TYPE_SPECIFIER, &custom_type_specifier, lexer)) goto error;
+
+    if (custom_type_specifier != NULL) {
+        if (primitive_info->kind != CN_AST_TYPE_NONE || *type_specifier != NULL) {
+            cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, custom_type_specifier, CN_DC_INVALID_TYPE_SPECIFIER, "Only single type specifier kind is allowed.");
+            goto error;
+        }
+
+        *type_specifier = custom_type_specifier;
+        return 0;
+    }
+
+    if (cn_lexer_changed(lexer, &before_slot)) return 0;
 
     // TODO: GNU:
     // Checking if typeof.
@@ -16247,7 +16162,7 @@ error:
 CNDEF Cn_Ast_Type_Name *cn_parse_type_name(Cn_Lexer *lexer) {
     Cn_Lexer original_state = *lexer;
 
-    Cn_Ast_Type_Name node = { .kind = CN_AST_TYPE_NAME, .loc = cn_lexer_token(lexer).loc, .src = cn_lexer_token(lexer).src };
+    Cn_Ast_Type_Name node = { .id = CN_AST_TYPE_NAME, .loc = cn_lexer_token(lexer).loc, .src = cn_lexer_token(lexer).src };
 
     Cn_Ast_Specifier_Qualifier *specifier_qualifier = cn_parse_specifier_qualifier(lexer);
     if (specifier_qualifier == NULL) goto error;
@@ -16278,7 +16193,7 @@ error:
 CNDEF Cn_Ast_Specifier_Qualifier *cn_parse_specifier_qualifier(Cn_Lexer *lexer) {
     Cn_Lexer original_state = *lexer;
 
-    Cn_Ast_Specifier_Qualifier node = { .kind = CN_AST_SPECIFIER_QUALIFIER, .loc = cn_lexer_token(lexer).loc, .src = cn_lexer_token(lexer).src };
+    Cn_Ast_Specifier_Qualifier node = { .id = CN_AST_SPECIFIER_QUALIFIER, .loc = cn_lexer_token(lexer).loc, .src = cn_lexer_token(lexer).src };
 
     // For accumulating primitive type info.
     Cn_Primitive_Type_Info primitive_info = {0};
@@ -16368,7 +16283,7 @@ error:
 CNDEF Cn_Ast_Parameter_Declaration *cn_parse_parameter_declaration(Cn_Lexer *lexer) {
     Cn_Lexer original_state = *lexer;
 
-    Cn_Ast_Parameter_Declaration node = { .kind = CN_AST_PARAMETER_DECLARATION, .loc = cn_lexer_token(lexer).loc, .src = cn_lexer_token(lexer).src };
+    Cn_Ast_Parameter_Declaration node = { .id = CN_AST_PARAMETER_DECLARATION, .loc = cn_lexer_token(lexer).loc, .src = cn_lexer_token(lexer).src };
 
     node.declaration_specifiers = cn_parse_declaration_specifiers(lexer);
     if (node.declaration_specifiers == NULL) goto error;
@@ -16400,12 +16315,12 @@ CNDEF Cn_Ast_Node *cn_parse_struct_or_union_specifier(Cn_Lexer *lexer) {
     switch (cn_lexer_token(lexer).type) {
         case CN_TOKEN_STRUCT:
             {
-                node.kind = CN_AST_STRUCT_SPECIFIER;
+                node.id = CN_AST_STRUCT_SPECIFIER;
                 break;
             }
         case CN_TOKEN_UNION:
             {
-                node.kind = CN_AST_UNION_SPECIFIER;
+                node.id = CN_AST_UNION_SPECIFIER;
                 break;
             }
         default:
@@ -16423,6 +16338,12 @@ CNDEF Cn_Ast_Node *cn_parse_struct_or_union_specifier(Cn_Lexer *lexer) {
     node.attribute_specifiers = cn_parse_attribute_specifiers(lexer, &ok);
     if (!ok) goto error;
 
+    int64_t ext_mark = cn__ast_ext_stack_mark();
+
+    if (!cn__hook_parse(CN_AST_SLOT_TAG, NULL, lexer)) goto error;
+
+    node.extensions = cn__ast_ext_stack_finalize(ext_mark);
+
     // TODO: GNU:
     // node.gnu_attribute_specifiers = cn_parse_gnu_attribute_specifiers(lexer, &ok);
     // if (!ok) goto error;
@@ -16436,7 +16357,7 @@ CNDEF Cn_Ast_Node *cn_parse_struct_or_union_specifier(Cn_Lexer *lexer) {
         // Generating unique tag name for anonymous struct or union.
         Cn_String_Builder sb = cn_sb_make(CN_SB_STACK_STORAGE_CAP);
 
-        if (node.kind == CN_AST_STRUCT_SPECIFIER)
+        if (node.id == CN_AST_STRUCT_SPECIFIER)
             cn_sb_append_format(&sb, "cn__struct_%lu", cn_ast_counter_next());
         else 
             cn_sb_append_format(&sb, "cn__union_%lu", cn_ast_counter_next());
@@ -16448,7 +16369,7 @@ CNDEF Cn_Ast_Node *cn_parse_struct_or_union_specifier(Cn_Lexer *lexer) {
         tag.data = data;
 
         Cn_Ast_Node *identifier = cn_ast_new((Cn_Ast_Identifier) {
-                    .kind = CN_AST_IDENTIFIER,
+                    .id = CN_AST_IDENTIFIER,
                     .loc = cn_lexer_token(lexer).loc,
                     .name = tag,
                 });
@@ -16474,7 +16395,7 @@ CNDEF Cn_Ast_Node *cn_parse_struct_or_union_specifier(Cn_Lexer *lexer) {
 
         node.member_declarations = cn_ast_stack_finalize(mark);
 
-        node.kind == CN_AST_STRUCT_SPECIFIER ? 
+        node.id == CN_AST_STRUCT_SPECIFIER ? 
             (node.flags |= CN_AST_STRUCT_HAS_DEFINITION) : 
             (node.flags |= CN_AST_UNION_HAS_DEFINITION);
     }
@@ -16491,9 +16412,15 @@ error:
 CNDEF Cn_Ast_Member_Declaration *cn_parse_member_declaration(Cn_Lexer *lexer) {
     Cn_Lexer original_state = *lexer;
 
-    Cn_Ast_Member_Declaration node = { .kind = CN_AST_MEMBER_DECLARATION, .loc = cn_lexer_token(lexer).loc, .src = cn_lexer_token(lexer).src };
+    Cn_Ast_Member_Declaration node = { .id = CN_AST_MEMBER_DECLARATION, .loc = cn_lexer_token(lexer).loc, .src = cn_lexer_token(lexer).src };
 
     bool ok;
+
+    int64_t ext_mark = cn__ast_ext_stack_mark();
+
+    if (!cn__hook_parse(CN_AST_SLOT_MEMBER_DECLARATION_PREFIX, NULL, lexer)) goto error;
+
+    node.extensions = cn__ast_ext_stack_finalize(ext_mark);
 
     // TODO: GNU:
     // AI: Generated.
@@ -16548,7 +16475,7 @@ error:
 CNDEF Cn_Ast_Member_Declarator *cn_parse_member_declarator(Cn_Lexer *lexer) {
     Cn_Lexer original_state = *lexer;
 
-    Cn_Ast_Member_Declarator node = { .kind = CN_AST_MEMBER_DECLARATOR, .loc = cn_lexer_token(lexer).loc, .src = cn_lexer_token(lexer).src };
+    Cn_Ast_Member_Declarator node = { .id = CN_AST_MEMBER_DECLARATOR, .loc = cn_lexer_token(lexer).loc, .src = cn_lexer_token(lexer).src };
 
     if (!cn_lexer_expect(lexer, CN_TOKEN_COLON)) {
         bool ok;
@@ -16571,6 +16498,12 @@ CNDEF Cn_Ast_Member_Declarator *cn_parse_member_declarator(Cn_Lexer *lexer) {
         node.bitfield = expression;
     }
 
+    int64_t ext_mark = cn__ast_ext_stack_mark();
+
+    if (!cn__hook_parse(CN_AST_SLOT_MEMBER_DECLARATOR, NULL, lexer)) goto error;
+
+    node.extensions = cn__ast_ext_stack_finalize(ext_mark);
+
     // TODO: GNU:
     // bool ok;
     // node.gnu_attribute_specifiers = cn_parse_gnu_attribute_specifiers(lexer, &ok);
@@ -16588,7 +16521,7 @@ error:
 CNDEF Cn_Ast_Node *cn_parse_enum_specifier(Cn_Lexer *lexer) {
     Cn_Lexer original_state = *lexer;
 
-    Cn_Ast_Enum_Specifier node = { .kind = CN_AST_ENUM_SPECIFIER, .loc = cn_lexer_token(lexer).loc, .src = cn_lexer_token(lexer).src };
+    Cn_Ast_Enum_Specifier node = { .id = CN_AST_ENUM_SPECIFIER, .loc = cn_lexer_token(lexer).loc, .src = cn_lexer_token(lexer).src };
     
     if (!cn_parse_expect(lexer, CN_TOKEN_ENUM)) goto error;
     
@@ -16596,6 +16529,12 @@ CNDEF Cn_Ast_Node *cn_parse_enum_specifier(Cn_Lexer *lexer) {
 
     node.attribute_specifiers = cn_parse_attribute_specifiers(lexer, &ok);
     if (!ok) goto error;
+
+    int64_t ext_mark = cn__ast_ext_stack_mark();
+
+    if (!cn__hook_parse(CN_AST_SLOT_TAG, NULL, lexer)) goto error;
+
+    node.extensions = cn__ast_ext_stack_finalize(ext_mark);
 
     // TODO: GNU:
     // node.gnu_attribute_specifiers = cn_parse_gnu_attribute_specifiers(lexer, &ok);
@@ -16623,7 +16562,7 @@ CNDEF Cn_Ast_Node *cn_parse_enum_specifier(Cn_Lexer *lexer) {
          tag.data = data;
 
          Cn_Ast_Node *identifier = cn_ast_new((Cn_Ast_Identifier) {
-                 .kind = CN_AST_IDENTIFIER,
+                 .id = CN_AST_IDENTIFIER,
                  .loc = cn_lexer_token(lexer).loc,
                  .name = tag,
                  });
@@ -16674,7 +16613,7 @@ error:
 CNDEF Cn_Ast_Enumerator *cn_parse_enumerator(Cn_Lexer *lexer) {
     Cn_Lexer original_state = *lexer;
 
-    Cn_Ast_Enumerator node = { .kind = CN_AST_ENUMERATOR, .loc = cn_lexer_token(lexer).loc, .src = cn_lexer_token(lexer).src };
+    Cn_Ast_Enumerator node = { .id = CN_AST_ENUMERATOR, .loc = cn_lexer_token(lexer).loc, .src = cn_lexer_token(lexer).src };
 
     if (cn_lexer_expect(lexer, CN_TOKEN_IDENTIFIER)) {
         Cn_Ast_Identifier *identifier = cn_parse_identifier(lexer);
@@ -16686,6 +16625,12 @@ CNDEF Cn_Ast_Enumerator *cn_parse_enumerator(Cn_Lexer *lexer) {
 
     node.attribute_specifiers = cn_parse_attribute_specifiers(lexer, &ok);
     if (!ok) goto error;
+
+    int64_t ext_mark = cn__ast_ext_stack_mark();
+
+    if (!cn__hook_parse(CN_AST_SLOT_ENUMERATOR, NULL, lexer)) goto error;
+
+    node.extensions = cn__ast_ext_stack_finalize(ext_mark);
 
     // TODO: GNU:
     // node.gnu_attribute_specifiers = cn_parse_gnu_attribute_specifiers(lexer, &ok);
@@ -16732,7 +16677,7 @@ error:
 CNDEF Cn_Ast_Attribute_Specifier *cn_parse_attribute_specifier(Cn_Lexer *lexer) {
     Cn_Lexer original_state = *lexer;
 
-    Cn_Ast_Attribute_Specifier node = { .kind = CN_AST_ATTRIBUTE_SPECIFIER, .loc = cn_lexer_token(lexer).loc, .src = cn_lexer_token(lexer).src };
+    Cn_Ast_Attribute_Specifier node = { .id = CN_AST_ATTRIBUTE_SPECIFIER, .loc = cn_lexer_token(lexer).loc, .src = cn_lexer_token(lexer).src };
     
     if (!cn_parse_expect(lexer, CN_TOKEN_SQR_BRACES_OPEN)) goto error;
     if (!cn_parse_expect(lexer, CN_TOKEN_SQR_BRACES_OPEN)) goto error;
@@ -16785,7 +16730,7 @@ error:
 CNDEF Cn_Ast_Attribute *cn_parse_attribute(Cn_Lexer *lexer) {
     Cn_Lexer original_state = *lexer;
 
-    Cn_Ast_Attribute node = { .kind = CN_AST_ATTRIBUTE, .loc = cn_lexer_token(lexer).loc, .src = cn_lexer_token(lexer).src };
+    Cn_Ast_Attribute node = { .id = CN_AST_ATTRIBUTE, .loc = cn_lexer_token(lexer).loc, .src = cn_lexer_token(lexer).src };
     
     // Extracting vendor identifier.
     if (cn_lexer_peek(lexer, 1).type == CN_TOKEN_COLON && cn_lexer_peek(lexer, 2).type == CN_TOKEN_COLON) {
@@ -17081,7 +17026,7 @@ CNDEF Cn_Ast_Node *cn__build_wrap_if_primary(void * idx) {
     if (cn_ast_is_primary(idx)) {
         Cn_Ast_Node *node = idx;
         Cn_Ast_Node *parent = cn_ast_new((Cn_Ast_Primary) { 
-                    .kind        = CN_AST_PRIMARY, 
+                    .id          = CN_AST_PRIMARY, 
                     .loc         = node->loc, 
                     .src         = node->src, 
                     .literal = (idx), 
@@ -17104,7 +17049,7 @@ CNDEF Cn_String cn__build_make_location(const char *func, const char *file, int6
 
 CNDEF Cn_Ast_Code *cn__build_format(const char *file, int64_t line, const char *format, ...) {
     Cn_Ast_Code node = {
-        .kind = CN_AST_CODE,
+        .id = CN_AST_CODE,
         .flags = CN_AST_SYNTHETIC,
         .loc.file = cn__build_make_location(__FUNCTION__, file, line),
     };
@@ -17145,7 +17090,7 @@ CNDEF Cn_Ast_Nodes cn_build_list_from(void *ptrs[], int64_t length) {
 
 CNDEF Cn_Ast_Identifier *cn__build_identifier(Cn_String name, Cn_Build_Opt opt) {
     Cn_Ast_Identifier node = {
-        .kind = CN_AST_IDENTIFIER,
+        .id = CN_AST_IDENTIFIER,
         .flags = CN_AST_SYNTHETIC,
         .loc.file = cn__build_make_location(__FUNCTION__, opt.file, opt.line),
     };
@@ -17161,7 +17106,7 @@ CNDEF Cn_Ast_Identifier *cn__build_identifier(Cn_String name, Cn_Build_Opt opt) 
 
 CNDEF Cn_Ast_Integer *cn__build_integer(uint64_t value, Cn_Build_Opt opt) {
     Cn_Ast_Integer node = {
-        .kind = CN_AST_INTEGER,
+        .id = CN_AST_INTEGER,
         .flags = CN_AST_SYNTHETIC,
         .loc.file = cn__build_make_location(__FUNCTION__, opt.file, opt.line),
     };
@@ -17173,7 +17118,7 @@ CNDEF Cn_Ast_Integer *cn__build_integer(uint64_t value, Cn_Build_Opt opt) {
 
 CNDEF Cn_Ast_Float *cn__build_float(double value, Cn_Build_Opt opt) {
     Cn_Ast_Float node = {
-        .kind = CN_AST_FLOAT,
+        .id = CN_AST_FLOAT,
         .flags = CN_AST_SYNTHETIC,
         .loc.file = cn__build_make_location(__FUNCTION__, opt.file, opt.line),
     };
@@ -17185,7 +17130,7 @@ CNDEF Cn_Ast_Float *cn__build_float(double value, Cn_Build_Opt opt) {
 
 CNDEF Cn_Ast_String *cn__build_string(Cn_String str, Cn_Build_Opt opt) {
     Cn_Ast_String node = {
-        .kind = CN_AST_STRING,
+        .id = CN_AST_STRING,
         .flags = CN_AST_SYNTHETIC,
         .loc.file = cn__build_make_location(__FUNCTION__, opt.file, opt.line),
     };
@@ -17201,7 +17146,7 @@ CNDEF Cn_Ast_String *cn__build_string(Cn_String str, Cn_Build_Opt opt) {
 
 CNDEF Cn_Ast_Binary *cn__build_binary(Cn_Ast_Binary_Operator_Kind op, void *left, void *right, Cn_Build_Opt opt) {
     Cn_Ast_Binary node = {
-        .kind = CN_AST_BINARY,
+        .id = CN_AST_BINARY,
         .flags = CN_AST_SYNTHETIC,
         .loc.file = cn__build_make_location(__FUNCTION__, opt.file, opt.line),
     };
@@ -17215,7 +17160,7 @@ CNDEF Cn_Ast_Binary *cn__build_binary(Cn_Ast_Binary_Operator_Kind op, void *left
 
 CNDEF Cn_Ast_Assign *cn__build_assign(Cn_Ast_Assignment_Operator_Kind op, void *left, void *right, Cn_Build_Opt opt) {
     Cn_Ast_Assign node = {
-        .kind = CN_AST_ASSIGN,
+        .id = CN_AST_ASSIGN,
         .flags = CN_AST_SYNTHETIC,
         .loc.file = cn__build_make_location(__FUNCTION__, opt.file, opt.line),
     };
@@ -17229,7 +17174,7 @@ CNDEF Cn_Ast_Assign *cn__build_assign(Cn_Ast_Assignment_Operator_Kind op, void *
 
 CNDEF Cn_Ast_Unary *cn__build_unary(Cn_Ast_Unary_Operator_Kind op, void *expression, Cn_Build_Opt opt) {
     Cn_Ast_Unary node = {
-        .kind = CN_AST_UNARY,
+        .id = CN_AST_UNARY,
         .flags = CN_AST_SYNTHETIC,
         .loc.file = cn__build_make_location(__FUNCTION__, opt.file, opt.line),
     };
@@ -17242,7 +17187,7 @@ CNDEF Cn_Ast_Unary *cn__build_unary(Cn_Ast_Unary_Operator_Kind op, void *express
 
 CNDEF Cn_Ast_Call *cn__build_func_call(void *callee, Cn_Ast_Nodes arguments, Cn_Build_Opt opt) {
     Cn_Ast_Call node = {
-        .kind = CN_AST_CALL,
+        .id = CN_AST_CALL,
         .flags = CN_AST_SYNTHETIC,
         .loc.file = cn__build_make_location(__FUNCTION__, opt.file, opt.line),
     };
@@ -17260,7 +17205,7 @@ CNDEF Cn_Ast_Call *cn__build_func_call(void *callee, Cn_Ast_Nodes arguments, Cn_
 
 CNDEF Cn_Ast_Expression_Statement *cn__build_expr_statement(void *expression, Cn_Build_Opt opt) {
     Cn_Ast_Expression_Statement node = {
-        .kind = CN_AST_EXPRESSION_STATEMENT,
+        .id = CN_AST_EXPRESSION_STATEMENT,
         .flags = CN_AST_SYNTHETIC,
         .loc.file = cn__build_make_location(__FUNCTION__, opt.file, opt.line),
     };
@@ -17272,7 +17217,7 @@ CNDEF Cn_Ast_Expression_Statement *cn__build_expr_statement(void *expression, Cn
 
 CNDEF Cn_Ast_Goto *cn__build_goto_statement(Cn_Ast_Identifier *identifier, Cn_Build_Opt opt) {
     Cn_Ast_Goto node = {
-        .kind = CN_AST_GOTO,
+        .id = CN_AST_GOTO,
         .flags = CN_AST_SYNTHETIC,
         .loc.file = cn__build_make_location(__FUNCTION__, opt.file, opt.line),
     };
@@ -17284,7 +17229,7 @@ CNDEF Cn_Ast_Goto *cn__build_goto_statement(Cn_Ast_Identifier *identifier, Cn_Bu
 
 CNDEF Cn_Ast_Return *cn__build_return_statement(void *expression, Cn_Build_Opt opt) {
     Cn_Ast_Return node = {
-        .kind = CN_AST_RETURN,
+        .id = CN_AST_RETURN,
         .flags = CN_AST_SYNTHETIC,
         .loc.file = cn__build_make_location(__FUNCTION__, opt.file, opt.line),
     };
@@ -17296,7 +17241,7 @@ CNDEF Cn_Ast_Return *cn__build_return_statement(void *expression, Cn_Build_Opt o
 
 CNDEF Cn_Ast_Label *cn__build_label(Cn_Ast_Identifier *identifier, void *statement, Cn_Build_Opt opt) {
     Cn_Ast_Label node = {
-        .kind = CN_AST_LABEL,
+        .id = CN_AST_LABEL,
         .flags = CN_AST_SYNTHETIC,
         .loc.file = cn__build_make_location(__FUNCTION__, opt.file, opt.line),
     };
@@ -17309,7 +17254,7 @@ CNDEF Cn_Ast_Label *cn__build_label(Cn_Ast_Identifier *identifier, void *stateme
 
 CNDEF Cn_Ast_Block_Item *cn__build_block_item(void *declaration_or_statement, Cn_Build_Opt opt) {
     Cn_Ast_Block_Item node = {
-        .kind = CN_AST_BLOCK_ITEM,
+        .id = CN_AST_BLOCK_ITEM,
         .flags = CN_AST_SYNTHETIC,
         .loc.file = cn__build_make_location(__FUNCTION__, opt.file, opt.line),
     };
@@ -17323,7 +17268,7 @@ CNDEF bool cn__build_is_abstract(Cn_Ast_Node *direct_declarator) {
     while (direct_declarator != NULL) {
         Cn_Ast_Node *node = direct_declarator;
 
-        switch (node->kind) {
+        switch (node->id) {
             case CN_AST_IDENTIFIER:
                 return false;
             case CN_AST_DIRECT_DECLARATOR_GROUPED:
@@ -17345,7 +17290,7 @@ CNDEF bool cn__build_is_abstract(Cn_Ast_Node *direct_declarator) {
 
 CNDEF Cn_Ast_Pointer *cn__build_pointer(Cn_Ast_Qualifier_Flags qualifiers, Cn_Ast_Pointer *pointer, Cn_Build_Opt opt) {
     Cn_Ast_Pointer node = {
-        .kind = CN_AST_POINTER,
+        .id = CN_AST_POINTER,
         .flags = CN_AST_SYNTHETIC,
         .loc.file = cn__build_make_location(__FUNCTION__, opt.file, opt.line),
     };
@@ -17358,7 +17303,7 @@ CNDEF Cn_Ast_Pointer *cn__build_pointer(Cn_Ast_Qualifier_Flags qualifiers, Cn_As
 
 CNDEF Cn_Ast_Direct_Declarator_Grouped *cn__build_direct_declarator_grouped(Cn_Ast_Declarator *declarator, Cn_Build_Opt opt) {
     Cn_Ast_Direct_Declarator_Grouped node = {
-        .kind = CN_AST_DIRECT_DECLARATOR_GROUPED,
+        .id = CN_AST_DIRECT_DECLARATOR_GROUPED,
         .flags = CN_AST_SYNTHETIC,
         .loc.file = cn__build_make_location(__FUNCTION__, opt.file, opt.line),
     };
@@ -17370,7 +17315,7 @@ CNDEF Cn_Ast_Direct_Declarator_Grouped *cn__build_direct_declarator_grouped(Cn_A
 
 CNDEF Cn_Ast_Direct_Declarator_Array *cn__build_direct_declarator_array(void *direct_declarator, void *expression, Cn_Build_Opt opt) {
     Cn_Ast_Direct_Declarator_Array node = {
-        .kind = CN_AST_DIRECT_DECLARATOR_ARRAY,
+        .id = CN_AST_DIRECT_DECLARATOR_ARRAY,
         .flags = CN_AST_SYNTHETIC,
         .loc.file = cn__build_make_location(__FUNCTION__, opt.file, opt.line),
     };
@@ -17386,7 +17331,7 @@ CNDEF Cn_Ast_Direct_Declarator_Array *cn__build_direct_declarator_array(void *di
 
 CNDEF Cn_Ast_Direct_Declarator_Function *cn__build_direct_declarator_function(void *direct_declarator, Cn_Ast_Nodes parameter_declarations, bool variadic, Cn_Build_Opt opt) {
     Cn_Ast_Direct_Declarator_Function node = {
-        .kind = CN_AST_DIRECT_DECLARATOR_FUNCTION,
+        .id = CN_AST_DIRECT_DECLARATOR_FUNCTION,
         .flags = CN_AST_SYNTHETIC,
         .loc.file = cn__build_make_location(__FUNCTION__, opt.file, opt.line),
     };
@@ -17401,7 +17346,7 @@ CNDEF Cn_Ast_Direct_Declarator_Function *cn__build_direct_declarator_function(vo
 
 CNDEF Cn_Ast_Declarator *cn__build_declarator(Cn_Ast_Pointer *pointer, void *direct_declarator, Cn_Build_Opt opt) {
     Cn_Ast_Declarator node = {
-        .kind = CN_AST_DECLARATOR,
+        .id = CN_AST_DECLARATOR,
         .flags = CN_AST_SYNTHETIC,
         .loc.file = cn__build_make_location(__FUNCTION__, opt.file, opt.line),
     };
@@ -17416,7 +17361,7 @@ CNDEF Cn_Ast_Declarator *cn__build_declarator(Cn_Ast_Pointer *pointer, void *dir
 
 CNDEF Cn_Ast_Init_Declarator *cn__build_init_declarator(Cn_Ast_Declarator *declarator, Cn_Ast_Initializer *initializer, Cn_Build_Opt opt) {
     Cn_Ast_Init_Declarator node = {
-        .kind = CN_AST_INIT_DECLARATOR,
+        .id = CN_AST_INIT_DECLARATOR,
         .flags = CN_AST_SYNTHETIC,
         .loc.file = cn__build_make_location(__FUNCTION__, opt.file, opt.line),
     };
@@ -17429,7 +17374,7 @@ CNDEF Cn_Ast_Init_Declarator *cn__build_init_declarator(Cn_Ast_Declarator *decla
 
 CNDEF Cn_Ast_Declaration *cn__build_declaration(Cn_Ast_Declaration_Specifiers *declaration_specifiers, Cn_Ast_Nodes init_declarators, Cn_Build_Opt opt) {
     Cn_Ast_Declaration node = {
-        .kind = CN_AST_DECLARATION,
+        .id = CN_AST_DECLARATION,
         .flags = CN_AST_SYNTHETIC,
         .loc.file = cn__build_make_location(__FUNCTION__, opt.file, opt.line),
     };
@@ -17520,6 +17465,7 @@ CNDEF void cn__tu_save(Cn_Tu_Saved *state) {
     state->saved_scope_length = cn_array_list_length(&cn__tu_data->scope_stack);
     state->saved_function_scope_idx = cn__tu_data->function_scope_idx;
     state->saved_ptr_stack_length = cn_array_list_length(&cn__tu_data->ptr_stack);
+    state->saved_ext_stack_length = cn_array_list_length(&cn__tu_data->ext_stack);
     state->saved_counter = cn__tu_data->counter;
 }
 
@@ -17628,6 +17574,7 @@ CNDEF void cn__tu_rollback(Cn_Tu_Saved *state) {
     cn_array_list_pop_multiple(&cn__tu_data->scope_stack, cn_array_list_length(&cn__tu_data->scope_stack) - state->saved_scope_length);
     cn__tu_data->function_scope_idx = state->saved_function_scope_idx;
     cn_array_list_pop_multiple(&cn__tu_data->ptr_stack, cn_array_list_length(&cn__tu_data->ptr_stack) - state->saved_ptr_stack_length);
+    cn_array_list_pop_multiple(&cn__tu_data->ext_stack, cn_array_list_length(&cn__tu_data->ext_stack) - state->saved_ext_stack_length);
     cn__tu_data->counter = state->saved_counter;
 }
 
@@ -17674,6 +17621,7 @@ CNDEF bool cn__tu_data_init(Cn_Tu_Data *data) {
     data->permanent_strings_arena = cn_chained_arena_make(CN_AST_PERMANENT_STRINGS_ARENA_BLOCK_CAP);
     data->scope_stack = cn_array_list_make(Cn_Scope, CN_AST_SCOPE_STACK_INITIAL_CAP);
     data->ptr_stack = cn_array_list_make(Cn_Ast_Node *, CN_AST_PTR_STACK_INITIAL_CAP);
+    data->ext_stack = cn_array_list_make(Cn_Ast_Extension, CN_AST_EXT_STACK_INITIAL_CAP);
     data->warning_count = 0;
     data->error_count = 0;
 
@@ -17704,6 +17652,9 @@ CNDEF void cn__tu_data_free(Cn_Tu_Data *data) {
 }
 
 CNDEF bool cn__tu_init_opt(Cn_Translation_Unit *tu, char *intermidiate_path, Cn_Tu_Make_Opt opt) {
+    // TEMPORARY:
+    cn_extension_register();
+
     *tu = (Cn_Translation_Unit) {0};
 
     // Copying flags.
@@ -17844,8 +17795,9 @@ CNDEF void cn_tu_free(Cn_Translation_Unit *tu) {
     *tu = (Cn_Translation_Unit) {0};
 }
 
-
-
+// Defining ast meta info array at the very end, so that all
+// declarations and bindings are in the namespace, and can be used.
+CN_AST_INFO_DEFINE_ARRAY(CORE, 0, CN_AST_GEN_LIST);
 
 #endif // CN_IMPLEMENTATION
 

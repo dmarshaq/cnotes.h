@@ -16,6 +16,19 @@
     This file demonstrates how such cnotes extensions can be built,
     and also shows how strong core cnotes API can be.
 
+    # Usage
+
+    Include `cnotes.h` first, and then this file. Implementation is enabled by defining
+    `CN_GNU_IMPLEMENTATION` in exactly one file, separately from `CN_IMPLEMENTATION`:
+
+    ```
+        #define CN_IMPLEMENTATION
+        #include "cnotes.h"
+
+        #define CN_GNU_IMPLEMENTATION
+        #include "cnotes_gnu.h"
+    ```
+  
     # API Conventions
 
     This file follows the same convetions as cnotes, as it extends its functionality.
@@ -32,11 +45,15 @@
 #include "cnotes.h"
 
 
-typedef enum : uint8_t {
+typedef enum {
     CN_AST_ASM_QUALIFIER_VOLATILE   = 0x01,
     CN_AST_ASM_QUALIFIER_INLINE     = 0x02,
     CN_AST_ASM_QUALIFIER_GOTO       = 0x04,
 } Cn_Ast_Gnu_Asm_Qualifier_Flags;
+
+typedef enum {
+    CN_AST_GNU_ASM_STATEMENT_IS_EXTENDED = 0x100,
+} Cn_Ast_Gnu_Flags;
 
 #define CN_AST_GNU_GEN_LIST(X)\
     X(GNU_TYPEOF,                       Gnu_Typeof,                         gnu_typeof)                     \
@@ -46,16 +63,10 @@ typedef enum : uint8_t {
     X(GNU_ASM_OPERAND,                  Gnu_Asm_Operand,                    gnu_asm_operand)                \
     X(GNU_ASM_LABEL,                    Gnu_Asm_Label,                      gnu_asm_label)
 
-typedef enum : uint32_t {
-    CN_AST_GNU_UNKNOWN = 0x01000000,
-#define X(K, T, m) CN_AST_##K,
-    CN_AST_GNU_GEN_LIST(X)
-#undef X
-} Cn_Ast_Gnu_Kind;
 
-#define X(K, T, m) typedef struct cn_ast_##m Cn_Ast_##T;
-    CN_AST_GNU_GEN_LIST(X)
-#undef X
+CN_AST_DECLARE_KINDS(GNU, Gnu, CN_GNU_EXTENSION_ID, CN_AST_GNU_GEN_LIST)
+
+CN_AST_DECLARE_STRUCTS(CN_AST_GNU_GEN_LIST)
 
 struct cn_ast_gnu_typeof { CN_AST_BASE;
     Cn_Ast_Node *target; // Could be expression or type name.
@@ -321,9 +332,18 @@ CNDEF Cn_Ast_Nodes cn_parse_gnu_asm_goto_labels(Cn_Lexer *lexer, bool *ok);
  */
 CNDEF Cn_Ast_Gnu_Asm_Label *cn_parse_gnu_asm_label(Cn_Lexer *lexer);
 
+/**
+ * GNU extension, registers every hook and ast node kind of GNU C.
+ *
+ * ```
+ *  cn_extension_register(&cn_gnu_extension, ...);
+ * ```
+ *
+ * RETURNS: `true` on success, `false` on error.
+ */
+CNDEF bool cn_gnu_extension(Cn_Hooks *hooks, Cn_Ast_Info_Array ast_info_table[256]);
+
 #endif // CN_GNU_H_
-
-
 
 
 
@@ -331,7 +351,7 @@ CNDEF Cn_Ast_Gnu_Asm_Label *cn_parse_gnu_asm_label(Cn_Lexer *lexer);
 
 CNDEF Cn_Ast_Gnu_Typeof *cn_parse_gnu_typeof(Cn_Lexer *lexer) {
     Cn_Lexer original_state = *lexer;
-    Cn_Ast_Gnu_Typeof node = { .kind = CN_AST_GNU_TYPEOF, .loc = cn_lexer_token(lexer).loc, .src = cn_lexer_token(lexer).src };
+    Cn_Ast_Gnu_Typeof node = { .id = CN_AST_GNU_TYPEOF, .loc = cn_lexer_token(lexer).loc, .src = cn_lexer_token(lexer).src };
 
     if (!cn_parse_expect(lexer, CN_TOKEN_GNU_TYPEOF)) goto error;
     if (!cn_parse_expect(lexer, CN_TOKEN_PARAN_OPEN)) goto error;
@@ -393,7 +413,7 @@ error:
 CNDEF Cn_Ast_Gnu_Attribute_Specifier *cn_parse_gnu_attribute_specifier(Cn_Lexer *lexer) {
     Cn_Lexer original_state = *lexer;
 
-    Cn_Ast_Gnu_Attribute_Specifier node = { .kind = CN_AST_GNU_ATTRIBUTE_SPECIFIER, .loc = cn_lexer_token(lexer).loc, .src = cn_lexer_token(lexer).src };
+    Cn_Ast_Gnu_Attribute_Specifier node = { .id = CN_AST_GNU_ATTRIBUTE_SPECIFIER, .loc = cn_lexer_token(lexer).loc, .src = cn_lexer_token(lexer).src };
     
     if (!cn_parse_expect(lexer, CN_TOKEN_GNU_ATTRIBUTE)) goto error;
     if (!cn_parse_expect(lexer, CN_TOKEN_PARAN_OPEN)) goto error;
@@ -447,7 +467,7 @@ error:
 CNDEF Cn_Ast_Gnu_Attribute *cn_parse_gnu_attribute(Cn_Lexer *lexer) {
     Cn_Lexer original_state = *lexer;
 
-    Cn_Ast_Gnu_Attribute node = { .kind = CN_AST_GNU_ATTRIBUTE, .loc = cn_lexer_token(lexer).loc, .src = cn_lexer_token(lexer).src };
+    Cn_Ast_Gnu_Attribute node = { .id = CN_AST_GNU_ATTRIBUTE, .loc = cn_lexer_token(lexer).loc, .src = cn_lexer_token(lexer).src };
     
     Cn_Ast_Identifier *identifier = cn_parse_identifier(lexer);
     if (identifier == NULL) goto error;
@@ -473,7 +493,7 @@ error:
 CNDEF Cn_Ast_Gnu_Asm_Statement *cn_parse_gnu_asm_statement(Cn_Lexer *lexer) {
     Cn_Lexer original_state = *lexer;
 
-    Cn_Ast_Gnu_Asm_Statement node = { .kind = CN_AST_GNU_ASM_STATEMENT, .loc = cn_lexer_token(lexer).loc, .src = cn_lexer_token(lexer).src };
+    Cn_Ast_Gnu_Asm_Statement node = { .id = CN_AST_GNU_ASM_STATEMENT, .loc = cn_lexer_token(lexer).loc, .src = cn_lexer_token(lexer).src };
 
     if (!cn_parse_expect(lexer, CN_TOKEN_GNU_ASM)) goto error;
 
@@ -610,7 +630,7 @@ error:
 CNDEF Cn_Ast_Gnu_Asm_Operand *cn_parse_gnu_asm_operand(Cn_Lexer *lexer) {
     Cn_Lexer original_state = *lexer;
 
-    Cn_Ast_Gnu_Asm_Operand node = { .kind = CN_AST_GNU_ASM_OPERAND, .loc = cn_lexer_token(lexer).loc, .src = cn_lexer_token(lexer).src };
+    Cn_Ast_Gnu_Asm_Operand node = { .id = CN_AST_GNU_ASM_OPERAND, .loc = cn_lexer_token(lexer).loc, .src = cn_lexer_token(lexer).src };
 
     // Optional symbolic name.
     if (cn_parse_optional(lexer, CN_TOKEN_SQR_BRACES_OPEN)) {
@@ -752,6 +772,10 @@ CNDEF Cn_Type *cn__analyze_type_from_gnu_typeof(Cn_Ast_Node *ts) {
 error:
     CN__TRACE_ERROR
     return NULL;
+}
+
+CNDEF bool cn_gnu_extension(Cn_Hooks *hooks, Cn_Ast_Info_Array ast_info_table[256]) {
+    CN_AST_INFO_TABLE_REGISTER(ast_info_table, GNU, CN_GNU_EXTENSION_ID, CN_AST_GNU_GEN_LIST);
 }
 
 #endif // CN_IMPLEMENTATION

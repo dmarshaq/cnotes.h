@@ -59,8 +59,7 @@ The documentation tool then picks it up and renders it nicely.
 
 `cnotes.h` doesn't take a harsh stance against **AI**, but requires developers to be aware of **AI-written** code. A single tag, `AI`, with a fixed vocabulary is used to signify **AI Usage** in code:
 
-* `AI: Generated`---written by AI, not yet fully reviewed or tested by the author.
-* `AI: Assisted`---written by the author with AI help, or AI code that has been fully reviewed, tested and taken over by the author.
+* `AI: Generated`---written by AI, not yet fully reviewed or tested by the author. This tag can be removed if the code has been fully reviewed, tested and taken over by the author.
 
 The `AI` tag can be used in both **Documentation** and **In-Code Comments**. It can be scoped to the whole function, or, if only small pieces of code are written by AI, placed in comments inside the implementation.
 
