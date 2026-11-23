@@ -1,4 +1,10 @@
-// Test: Expression parsing - binary, unary, sizeof, etc.
+/**
+ * TEST: Expression parsing, binary, unary, `sizeof` and others.
+ *
+ * All binary arithmetic/bitwise/shift operators, all comparison operators, logical `&&`/`||`/`!`,
+ * unary `-`/`+`/`~`/`!`, `sizeof` on type and expression, ternary operator, every compound
+ * assignment operator.
+ */
 int test_binary_ops(int a, int b) {
     int x;
     x = a + b;

@@ -1,4 +1,15 @@
-// Test: Array declarators in parameters adjusted to pointers
+/**
+ * TEST: Array declarators in parameters adjusted to pointers.
+ *
+ * Array declarators in parameters adjusted to pointers: `int arr[]`, `int arr[10]`, prototypes
+ * with `[]`, `*` and `[10]` agreeing with each other, assigning, incrementing and doing arithmetic
+ * on the parameter, `sizeof` of a parameter yielding pointer size, `[static 4]`, qualifiers inside
+ * brackets (`[const 4]`, `[volatile]`, `[static const 2]`), multi dimensional parameters (`int
+ * m[][4]`, `int c[2][3][4]`) adjusted to pointer to array, `char *argv[]`, `const char
+ * names[][8]`, function parameters adjusted to function pointers (`int fn(int arr[])`). Call sites
+ * passing arrays, which decay to pointers, and assigning a function with an array parameter to an
+ * `int (*)(int *)`.
+ */
 int first(int arr[]);
 int first(int *arr);
 int first(int arr[10]);

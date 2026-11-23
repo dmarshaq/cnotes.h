@@ -1,4 +1,9 @@
-// Test: Increment/decrement operators
+/**
+ * TEST: Increment and decrement operators.
+ *
+ * Prefix and postfix `++`/`--` as statements and as sub-expressions of an assignment, on both
+ * integers and pointers.
+ */
 int test_increment(void) {
     int x = 0;
     int y;

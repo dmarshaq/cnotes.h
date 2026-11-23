@@ -1,4 +1,10 @@
-// Test: goto statement and identifier labels
+/**
+ * TEST: `goto` statement and identifier labels.
+ *
+ * `goto` with forward and backward jumps, multiple labels in one function, labels on empty
+ * statements, blocks and loops, chained labels, labels inside nested blocks, jumping out of nested
+ * loops, and the same label name reused in a different function.
+ */
 int test_goto_forward(int x) {
     if (x > 0) goto done;
     x = -x;

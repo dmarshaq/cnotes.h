@@ -1,4 +1,13 @@
-// Test: Variable length array parsing
+/**
+ * TEST: Variable length array parsing.
+ *
+ * Variable length arrays: block scope VLAs with variable and expression lengths, 2D VLAs with both
+ * dimensions variable and mixed with constant dimensions, `const` element VLAs, pointers to VLAs
+ * (`int (*p)[n]`), block scope VLA `typedef`s, run time `sizeof` on VLA objects, `int[n]` and VLA
+ * typedefs, VLAs scoped to loop bodies. VLA parameters `int arr[n]`, `int m[n][n]`, `int
+ * m[rows][cols]` referencing earlier parameters, `[*]` and `[*][*]` in prototypes, and passing
+ * VLAs as arguments.
+ */
 int sum(int n, int arr[n]);
 // Uncomment once unspecified array lengths are allowed.
 // int sum_unspecified(int n, int arr[*]);

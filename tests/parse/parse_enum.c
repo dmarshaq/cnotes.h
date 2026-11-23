@@ -1,4 +1,14 @@
-// Test: Enum specifiers, enumerators and enum constants
+/**
+ * TEST: Enum specifiers, enumerators and enum constants.
+ *
+ * `enum` definitions with implicit, explicit and mixed enumerator values; 
+ * values from constant expressions referencing earlier enumerators, `sizeof` and negatives; 
+ * trailing comma; single enumerator; anonymous enums; named and anonymous `typedef enum`; 
+ * fixed underlying type (`enum E : unsigned int`) in both definition and use; enums as globals, locals, 
+ * parameters, return types and struct members; block scoped enum definitions; 
+ * enum constants in initializers, array sizes, conditions and expressions; `sizeof` of enum types 
+ * and constants.
+ */
 enum Color {
     RED,
     GREEN,

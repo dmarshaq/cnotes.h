@@ -26,6 +26,7 @@ Tags are written inside comments to signify the importance of certain informatio
 | `LEAK`            | Known memory leak, usually one done on purpose.                           | **No**                 |
 | `TEMPORARY`       | Code meant to be replaced.                                                | **No**                 |
 | `FIXME`           | Known bug.                                                                | **No**                 |
+| `TEST`            | Signifies that doc comment is for the test. See **Testing**.              | **Yes**                |
 
 By default, all tags should be renderable by the documentation tool---documentation-specific tags are simply the ones used only inside documentation blocks.
 
@@ -62,6 +63,60 @@ The documentation tool then picks it up and renders it nicely.
 * `AI: Generated`---written by AI, not yet fully reviewed or tested by the author. This tag can be removed if the code has been fully reviewed, tested and taken over by the author.
 
 The `AI` tag can be used in both **Documentation** and **In-Code Comments**. It can be scoped to the whole function, or, if only small pieces of code are written by AI, placed in comments inside the implementation.
+
+
+## Testing
+
+The project relies heavely on **single execution**  tests.
+
+### Commands
+
+```bash
+./nob test                      # Run all tests.
+```
+
+### How It Works
+
+1. **Recording**: Each tests result is checked against the golden file created by the user: `.stdout.txt` file.
+2. **Testing**: `./nob test` compiles and runs the test, comparing stdout against the recorded `.stdout.txt`.
+3. **Results**: `SUCCESS`, `BUILD_FAIL`, `RUNTIME_FAIL`, `UNEXPECTED_OUTPUT` or `TIMEOUT`.
+
+### Tests Structure
+
+This section is specifically applied to `tests/parse/` tests since they will be primary testing
+way for this library.
+
+Each test gets one `.c` file. On the very top of the file optional doc `/**...*/` comment can be inserted that
+starts with `TEST: ...` tag. It will be scanned by the testing tool for the `--flags`.
+
+Flags are written on the last line of the comment, on their own, without any other text. A line
+whose first non space characters are `--` is parsed as a flags line; any non flag text on it is an error.
+
+```c
+/**
+ * TEST: One-sentence summary.
+ *
+ * Description of what the test covers.
+ *
+ * --gnu
+ */
+```
+
+Upon completion the test will be ran with all flags accounted for. If no comment or no flags are written
+the test will be ran in default configuration.
+
+Once test is ran, the output is compared against `.stdout.txt` golden file that **MUST** be located next to
+the test file.
+
+| FLAG              | Meaning                                                                   |
+|-------------------|---------------------------------------------------------------------------|
+| `--gnu`           | Test will be ran with cnotes gnu extension attached.                      |
+
+
+### Known tool feature limitation are all stated in README.md.
+
+Everything else should be a fair ground to cover with testing.
+
 
 ## Personal Note
 

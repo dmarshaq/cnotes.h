@@ -1,4 +1,9 @@
-// Test: Struct and union parsing
+/**
+ * TEST: Struct and union parsing.
+ *
+ * `struct` definitions, structs nested by value, `union` definitions, self referencing structs via
+ * pointer, a global of struct type, member access via `.` and `->`.
+ */
 struct Point {
     int x;
     int y;

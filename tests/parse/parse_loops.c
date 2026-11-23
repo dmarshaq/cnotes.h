@@ -1,4 +1,10 @@
-// Test: Iteration statements - while, do while, for
+/**
+ * TEST: Iteration statements, `while`, `do while` and `for`.
+ *
+ * `while`, `do while` and `for` in block, non-block and empty body forms; complex and bare
+ * conditions; `for` with expression init, declaration init, multiple declarators, comma clauses,
+ * each clause omitted and `for (;;)`; nested and mixed loops; declarations scoped to loop bodies.
+ */
 int test_while(int x) {
     while (x > 0) {
         x = x - 1;

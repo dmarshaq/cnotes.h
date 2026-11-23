@@ -1,4 +1,10 @@
-// Test: Compound literal expression parsing
+/**
+ * TEST: Compound literal expression parsing.
+ *
+ * Compound literals: scalar (`(int){42}`, `(float){3.14}`), array (`(int[3]){1, 2, 3}`) with
+ * subscripting, struct with designated initializers, address of a compound literal followed by
+ * `->` access.
+ */
 struct point { int x; int y; };
 
 int test_compound_literals(void) {

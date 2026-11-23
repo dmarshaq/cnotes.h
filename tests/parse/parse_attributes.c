@@ -1,4 +1,18 @@
-// Test: Attribute specifiers - C style [[...]] and GNU style __attribute__((...))
+/**
+ * TEST: Attribute specifiers, C style `[[...]]` and GNU style `__attribute__((...))`.
+ *
+ * `[[...]]` specifiers on external declarations, function definitions and declarations, block
+ * scoped declarations, and every statement kind (expression, empty, block, `if`, `switch`,
+ * `while`, `do while`, `for` including its init declaration, `goto`, `break`, `continue`,
+ * `return`, labels); empty `[[]]`, multiple specifiers, multiple attributes per specifier,
+ * attribute arguments, string arguments, and `vendor::name` namespaced attributes; on `enum`
+ * specifiers and enumerators. GNU `__attribute__((...))` leading and trailing on declarations, on
+ * function definitions, `struct`/`union` specifiers and members, `enum` specifiers and
+ * enumerators, locals, with arguments and string arguments; both styles combined on one
+ * declaration.
+ *
+ * --gnu
+ */
 /* --- [[...]] on external declarations and definitions ---------------- */
 [[note]] int attributed_global;
 [[note]] static int attributed_static_global = 1;

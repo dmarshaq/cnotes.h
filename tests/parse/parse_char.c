@@ -1,4 +1,14 @@
-// Test: Char literal parsing
+/**
+ * TEST: Char literal parsing.
+ *
+ * Char literals: plain characters including `' '` and an unescaped `'"'`; every simple escape
+ * (`\n`, `\t`, `\r`, `\0`, `\\`, `\'`, `\"`, `\?`, `\a`, `\b`, `\f`, `\v`); octal (`'\101'`,
+ * `'\7'`) and hex (`'\x41'`, `'\x7F'`) escapes. Used in global and local initializers, array
+ * initializers, an array size constant expression (`'A' - '0'`), `char`/`signed char`/`unsigned
+ * char`/`int` targets, arithmetic, comparisons, casts, ternaries, function arguments,
+ * `sizeof('a')`, `if` conditions, and `switch` case labels including the constant expression `'z'
+ * - 1`.
+ */
 char global_c = 'g';
 char global_arr[3] = { 'x', 'y', 'z' };
 

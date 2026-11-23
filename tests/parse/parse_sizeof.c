@@ -1,4 +1,9 @@
-// Test: Sizeof expressions
+/**
+ * TEST: `sizeof` expressions.
+ *
+ * `sizeof` on primitive types, pointer types, single and double pointers, declared variables,
+ * arrays, struct variables, and `struct` type names.
+ */
 struct Point { int x; int y; };
 
 int test_sizeof(void) {

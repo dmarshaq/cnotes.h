@@ -1,4 +1,9 @@
-// Test: Pointer operations and arithmetic
+/**
+ * TEST: Pointer operations and arithmetic.
+ *
+ * Address-of and dereference, double pointers and double dereference as assignment target, pointer
+ * arithmetic (`p + 1`, `p - 1`, `*(arr + 2)`), array subscript.
+ */
 int test_pointers(void) {
     int x = 10;
     int *p = &x;

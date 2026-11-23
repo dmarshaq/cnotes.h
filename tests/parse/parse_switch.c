@@ -1,4 +1,10 @@
-// Test: Switch statement with case and default labels
+/**
+ * TEST: `switch` statement with `case` and `default` labels.
+ *
+ * `switch` with `case` and `default` labels, stacked labels, fallthrough, `default` before `case`,
+ * empty body, non-block body, declaration inside the switch body, nested switches, expression
+ * conditions, and constant expression case labels (`sizeof`, `1 << 4`, negative).
+ */
 int test_switch(int x) {
     int r = 0;
     switch (x) {

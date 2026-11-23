@@ -1,5 +1,20 @@
-// Test: GNU asm statements - basic, extended, qualifiers, operands, clobbers, goto labels, file-scope asm.
-// AI: Generated.
+/**
+ * TEST: GNU `asm` statements, basic, extended, qualifiers, operands, clobbers, goto labels, file-scope asm.
+ *
+ * GNU `asm` statements: `asm`/`__asm__`/`__asm` spellings, file-scope basic asm without
+ * qualifiers, block scope basic asm, `volatile`/`inline` qualifiers in either order, concatenated
+ * and empty (`""`) template strings. Extended asm with every section empty (`:`, `: :`, `: : :`)
+ * and with trailing empty sections omitted (`::: "memory"`), output and input operands, multiple
+ * operands per section, symbolic `[name]` operands, constraint expressions (`x + 1`, `*p`, `p[1]`,
+ * `sizeof(int)`), clobber lists. `asm goto` with one and multiple labels, combined with
+ * `volatile`, inputs, clobbers and outputs, labels referenced by `%l[name]`. Asm as a non-block
+ * `if` body.
+ *
+ * AI: Generated.
+ *
+ * --gnu
+ */
+
 /* --- file-scope asm --------------------------------------------------- */
 asm(".globl file_scope_symbol");
 __asm__(".text");

@@ -1,4 +1,24 @@
-// Test: GNU __extension__ keyword in every position it can appear
+/**
+ * TEST: GNU `__extension__` keyword in every position it can appear.
+ *
+ * GNU `__extension__` in every position GCC accepts it. Before external declarations: globals with
+ * and without initializers, multiple declarators, `static`/`extern`/`const`, `typedef`s,
+ * `struct`/`union`/`enum` definitions, prototypes, function definitions including `static inline`,
+ * followed by `[[...]]` and GNU attributes, stray `;` and file-scope `asm`. Before member
+ * declarations of structs and unions, including bit-fields, nested struct and union members and
+ * `[[...]]` attributes. Before block scope declarations: `static`/`register`/`const` locals, block
+ * `typedef`s and their use, local struct definitions, nested blocks. Before `for` initialization
+ * declarations, including multiple declarators, and as part of `for` initialization, condition and
+ * update expressions. As a unary operator on expressions: expression statements, assignment
+ * targets, after `[[...]]` on an expression statement, binary operands, compound assignment,
+ * parenthesized expressions, after unary `-`/`!`/`~`/`*`/`&`/`++`, cast and `sizeof` operands,
+ * subscripts, `.`/`->` access, call arguments and callee, ternary, comma, compound literal and
+ * initializer elements, array sizes, enumerator values, GNU attribute arguments, asm operands,
+ * `if`/`while`/`do while`/`switch` conditions, `case` labels and `return`. Repeated `__extension__
+ * __extension__` in every declaration position.
+ *
+ * --gnu
+ */
 // AI: Generated.
 /* --- external declarations ------------------------------------------- */
 __extension__ int extension_global;

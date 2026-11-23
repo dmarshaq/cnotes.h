@@ -1,4 +1,10 @@
-// Test: break and continue jump statements
+/**
+ * TEST: `break` and `continue` jump statements.
+ *
+ * `break` and `continue` in `while`, `do while` and `for` loops, `break` in `switch`, both inside
+ * non-block loop bodies and `if`/`else` branches, nested loops, and nested plain blocks inside a
+ * loop.
+ */
 int test_break_in_while(int x) {
     while (x > 0) {
         if (x == 5) break;

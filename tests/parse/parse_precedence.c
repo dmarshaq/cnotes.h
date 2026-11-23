@@ -1,4 +1,9 @@
-// Test: Operator precedence parsing
+/**
+ * TEST: Operator precedence parsing.
+ *
+ * Precedence and associativity: `*` vs `+`, parenthesised override, `+`/`-` left associativity,
+ * `<<` vs `+`, `&` vs `|`, `&&` vs `||`, nested and chained ternaries.
+ */
 int test_precedence(int a, int b, int c) {
     int x;
 

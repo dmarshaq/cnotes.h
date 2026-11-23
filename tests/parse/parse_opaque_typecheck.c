@@ -1,4 +1,20 @@
-// Test: Typechecking trusts opaque type, builtins and __builtin_va_list, in every typecheck
+/**
+ * TEST: Typechecking trusts opaque types, builtins and `__builtin_va_list`, in every typecheck.
+ *
+ * Typechecking trusting opaque types, from `__builtin_*` identifiers and `__builtin_va_list`.
+ * `sizeof` of opaque not being a constant, so it sizes a block scope array. Binary: pointer
+ * `+`/`-` opaque on either side, arithmetic with opaque, opaque and pointer subscripts, chained
+ * subscripts, integer-only operators (`%`, `&`, `|`, `^`, shifts), relational and equality against
+ * pointers and arithmetic, logical, comma. `.` and `->` access on opaque, chained access,
+ * assigning through opaque `->`, access through dereferenced opaque. Calls of opaque functions
+ * with any arguments, nested calls, `(*opaque)()`, access and subscript on call results. Unary
+ * `-`/`+`/`~`/`!`, single and double dereference, assigning through dereference, address of opaque
+ * variable, prefix and postfix `++`/`--`. Casts to and from opaque. Ternary with opaque against
+ * pointer, struct, arithmetic and `void` operands, opaque condition. Simple and every compound
+ * assignment with opaque on either side. Initializers: opaque initializer values, positional,
+ * member, array, range and nested designators on opaque type, opaque compound literal, opaque
+ * values in struct and array initializers.
+ */
 // AI: Generated.
 struct Opaque_Test { int x; };
 struct Opaque_Test opaque_test_struct;

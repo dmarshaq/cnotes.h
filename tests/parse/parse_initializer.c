@@ -1,4 +1,10 @@
-// Test: Initializer, designators and designations.
+/**
+ * TEST: Initializers, designators and designations.
+ *
+ * Scalar initializers, array initializers mixing positional and `[0] =` designators, compound
+ * literal initializer, struct initializers mixing `.field =` designations with positional values
+ * through a `typedef struct`.
+ */
 typedef struct vec3 {
     int x, y;
     int z;

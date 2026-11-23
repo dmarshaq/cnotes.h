@@ -1,4 +1,8 @@
-// Test: Function call parsing
+/**
+ * TEST: Function call parsing.
+ *
+ * Calls with multiple arguments, single argument, no arguments, and nested calls as arguments.
+ */
 int add(int a, int b) { return a + b; }
 int negate(int x) { return -x; }
 void noop(void) { }

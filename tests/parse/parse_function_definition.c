@@ -1,4 +1,9 @@
-// Test: Basic function definition parsing
+/**
+ * TEST: Basic function definition parsing.
+ *
+ * Function definition with parameters, `void` parameter list, empty body, `static inline`
+ * specifiers.
+ */
 int add(int a, int b) {
     return a + b;
 }

@@ -1,4 +1,10 @@
-// Test: Variable declaration parsing with various types
+/**
+ * TEST: Variable declaration parsing with various types.
+ *
+ * Global, `static`, `extern` and `const` declarations; `char`/`short`/`long`/`long
+ * long`/`unsigned`/`signed`, float and double; pointers, pointer-to-pointer, pointer-to-const,
+ * const-pointer; 1D and 2D arrays; block scope locals including `register`.
+ */
 int global_int;
 static int static_int;
 extern int extern_int;
