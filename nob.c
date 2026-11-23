@@ -1,3 +1,4 @@
+#include "cnotes.h"
 #define nob_cc_flags(cmd) nob_cmd_append(cmd, "-g", "-Wall", "-Wextra", "-std=c99")
 
 #define NOB_IMPLEMENTATION
@@ -55,7 +56,9 @@ void arena_free(Arena *arena) {
     *arena = (Arena) {0};
 }
 
+//
 // Async proc test setup to detect timeout and report.
+//
 #ifdef _WIN32
 #  define WIN32_LEAN_AND_MEAN
 #  include <windows.h>
@@ -273,7 +276,70 @@ Proc_Result build_proc_wait(Build_Proc *p, unsigned timeout_ms) {
 }
 #endif // _WIN32
 
+//
+// Testing tools.
+//
 
+bool        is_c_file(const char *path);
+const char *get_file_name(const char *path);
+const char *cut_file_extension(const char *path);
+bool        compare_files(const char *expected, const char *actual);
+
+#define CSTR_BUFFER(name, len)          char name[len + 1] = {0}
+#define CSTR_BUFFER_APPEND(buf, str)    NOB_ASSERT((sizeof(buf) - 1 - strlen(buf)) >= strlen(str)); strcat((buf), (str))
+
+
+bool is_c_file(const char *path) {
+    return strcmp(path + strlen(path) - 2, ".c") == 0;
+}
+
+const char *get_file_name(const char *path) {
+    const char *name = strrchr(path, '/');
+    if (name == NULL) name = path;
+    else name++;
+    return name;
+}
+
+const char *cut_file_extension(const char *path) {
+    char *dot = strrchr(path, '.');
+    if (dot == NULL) return path;
+
+    *dot = '\0';
+    return path;
+}
+
+bool compare_files(const char *expected, const char *actual) {
+    Nob_String_Builder src = {0}, dst = {0};
+
+    if (!read_entire_file(actual, &src)) {
+        nob_log(NOB_ERROR, "compare: actual file not found.");
+        return false;
+    }
+
+    if (!read_entire_file(expected, &dst)) {
+        nob_log(NOB_ERROR, "compare: expected file not found.");
+        NOB_FREE(src.items);
+        return false;
+    }
+
+    Nob_String_View src_sv = sb_to_sv(src);
+    Nob_String_View dst_sv = sb_to_sv(dst);
+
+    if (!sv_eq(src_sv, dst_sv)) {
+        nob_log(NOB_ERROR, "compare: expected:");
+        fprintf(stderr, SV_Fmt, SV_Arg(dst_sv));
+        nob_log(NOB_ERROR, "compare: actual:");
+        fprintf(stderr, SV_Fmt, SV_Arg(src_sv));
+
+        NOB_FREE(dst.items);
+        NOB_FREE(src.items);
+        return false;
+    }
+
+    NOB_FREE(dst.items);
+    NOB_FREE(src.items);
+    return true;
+}
 
 
 bool confirm(const char *prompt) {
@@ -307,6 +373,8 @@ bool confirm(const char *prompt) {
 #define SRC_DIR         "src"
 #define DOC_DIR         "doc"
 #define TESTS_DIR       "tests"
+#define PARSE_DIR       "parse"
+#define EXEC_DIR        "exec"
 #define HOW_TO_DIR      "how_to"
 
 /**
@@ -352,8 +420,11 @@ void clean(Nob_Cmd *cmd) {
 
 static Arena arena_strings;
 
+//
+// Testing.
+//
 typedef enum : uint8_t {
-    PENDING = 0,
+    PENDING             = 0,
     BUILD_FAIL,
     RUNTIME_FAIL,
     UNEXPECTED_OUTPUT,
@@ -361,7 +432,13 @@ typedef enum : uint8_t {
     SUCCESS,
 } Test_Status;
 
+typedef enum : uint8_t {
+    PARSE   = 0,
+    EXEC,
+} Test_Kind;
+
 typedef struct {
+    Test_Kind   kind;
     const char *path;
     Test_Status status;
 } Test_Record;
@@ -372,118 +449,100 @@ typedef struct {
     size_t capacity;
 } Test_Records;
 
-bool test_prepare_entry(Nob_Walk_Entry entry) {
+bool test_prepare_parse_entry(Nob_Walk_Entry entry);
+bool test_prepare_exec_entry(Nob_Walk_Entry entry);
+void test_execute_parse(Test_Record *r, Nob_Cmd *cmd, const char *runner);
+void test_execute_exec(Test_Record *r, Nob_Cmd *cmd);
+void test_print_results(Test_Records *record);
+
+bool test_prepare_parse_entry(Nob_Walk_Entry entry) {
     Test_Records *records = (Test_Records *)entry.data;
     if (entry.type == FILE_REGULAR && strcmp(entry.path + strlen(entry.path) - 2, ".c") == 0) {
         char *saved_path = arena_alloc(&arena_strings, strlen(entry.path) + 1);
         strcpy(saved_path, entry.path);
-        nob_da_append(records, ((Test_Record) { .path = saved_path, .status = PENDING }));
-        nob_log(NOB_INFO, "test: added '%s' test.", entry.path);
+        nob_da_append(records, ((Test_Record) { .kind = PARSE, .path = saved_path, .status = PENDING }));
+        nob_log(NOB_INFO, "test: added '%s' parse test.", entry.path);
     }
 
     return true;
 }
 
-void test_record(const char *source, Nob_Cmd *cmd);
-
-bool test_record_entry(Nob_Walk_Entry entry) {
-    Nob_Cmd *cmd = (Nob_Cmd *)entry.data;
+bool test_prepare_exec_entry(Nob_Walk_Entry entry) {
+    Test_Records *records = (Test_Records *)entry.data;
     if (entry.type == FILE_REGULAR && strcmp(entry.path + strlen(entry.path) - 2, ".c") == 0) {
-        test_record(entry.path, cmd);
+        char *saved_path = arena_alloc(&arena_strings, strlen(entry.path) + 1);
+        strcpy(saved_path, entry.path);
+        nob_da_append(records, ((Test_Record) { .kind = EXEC, .path = saved_path, .status = PENDING }));
+        nob_log(NOB_INFO, "test: added '%s' exec test.", entry.path);
     }
 
     return true;
 }
 
-/**
- * This function does following things:
- * First it copies the source file .c into tests directory, compiles and runs it there. 
- * Generating .stdout.txt which contains information about expected output.
- * After that it cleans up generated executable leaving only expected .stdout.txt.
- * TODO: Sanitize test files.
- */
-void test_record(const char *source, Nob_Cmd *cmd) {
-    Nob_String_Builder sb = {0};
+void test_execute_parse(Test_Record *r, Nob_Cmd *cmd, const char *runner) {
+    NOB_ASSERT(r->kind == PARSE);
 
-    if (strcmp(source + strlen(source) - 2, ".c") != 0) {
-        nob_log(NOB_ERROR, "record: '%s' is not a C file.", source);
+    nob_log(NOB_INFO, "test: '%s':", r->path);
+
+    // Running test.
+    nob_log(NOB_INFO, "    : parsing '%s'.", r->path);
+
+    CSTR_BUFFER(stdout_path, 64);
+    CSTR_BUFFER_APPEND(stdout_path, BUILD_DIR"/");
+    CSTR_BUFFER_APPEND(stdout_path, r->path);
+    cut_file_extension(stdout_path);
+    CSTR_BUFFER_APPEND(stdout_path, STDOUT_TXT_FILE_EXTENSION);
+
+    nob_cmd_append(cmd, runner);
+    nob_cmd_append(cmd, r->path);
+    Build_Proc proc = {0};
+    if (!build_proc_spawn(&proc, cmd, stdout_path)) {
+        r->status = RUNTIME_FAIL;
         return;
     }
 
-    if (!nob_read_entire_file(source, &sb)) {
+    switch (build_proc_wait(&proc, TEST_TIMEOUT_MS)) {
+    case PROC_TIMEOUT:
+        nob_log(NOB_ERROR, "test: '%s' timed out after %d ms", r->path, TEST_TIMEOUT_MS);
+        r->status = TIMEOUT;
         return;
+    case PROC_FAIL:
+        nob_log(NOB_ERROR, "test: '%s' fail.", r->path);
+        r->status = RUNTIME_FAIL;
+        return;
+    case PROC_OK:
+        nob_log(NOB_INFO, "test: '%s' ok.", r->path);
+        break;
     }
 
-    const char *name = strrchr(source, '/');
-    if (name == NULL) name = source;
-    else name++;
+    // Comparing output against golden.
+    CSTR_BUFFER(expected_stdout_path, 64);
+    CSTR_BUFFER_APPEND(expected_stdout_path, r->path);
+    cut_file_extension(expected_stdout_path);
+    CSTR_BUFFER_APPEND(expected_stdout_path, STDOUT_TXT_FILE_EXTENSION);
     
-    char test_path[strlen(TESTS_DIR"/") + strlen(name) + 1];
-    test_path[0] = '\0';
-    strcat(test_path, TESTS_DIR"/");
-    strcat(test_path, name);
-
-    if (!nob_write_entire_file(test_path, sb.items, sb.count)) {
-        nob_log(NOB_ERROR, "record: couldn't write '%s' file.", test_path);
-        NOB_FREE(sb.items);
+    if (!compare_files(expected_stdout_path, stdout_path)) {
+        nob_log(NOB_ERROR, "test: unexpected output.");
+        r->status = UNEXPECTED_OUTPUT;
         return;
     }
 
-
-    // Copypasta from test_execute.
-    char output_path_buffer[64];
-    int output_path_length;
-
-    output_path_length = snprintf(output_path_buffer, sizeof(output_path_buffer), "%s", test_path);
-    if (output_path_length < 0 && output_path_length >= sizeof(output_path_buffer)) {
-        nob_log(NOB_ERROR, "record: test path is too long exceeds %lu buffer size.", sizeof(output_path_buffer));
-        NOB_FREE(sb.items);
-        return;
-    }
-    output_path_buffer[output_path_length - 2] = '\0';
-    
-    nob_cc(cmd);
-    nob_cc_flags(cmd);
-
-    nob_cc_output(cmd, output_path_buffer);
-    nob_cc_inputs(cmd, test_path);
-    nob_cmd_append(cmd, BIN_DIR"/libcnotes.a");
-
-    if (!nob_cmd_run(cmd)) {
-        NOB_FREE(sb.items);
-        return;
-    }
-
-    nob_cmd_append(cmd, output_path_buffer);
-
-    char stdout_path[strlen(output_path_buffer) + strlen(STDOUT_TXT_FILE_EXTENSION) + 1];
-    stdout_path[0] = '\0';
-    strcat(stdout_path, output_path_buffer);
-    strcat(stdout_path, STDOUT_TXT_FILE_EXTENSION);
-
-    if (!nob_cmd_run(cmd, .stdout_path = stdout_path)) {
-        nob_delete_file(output_path_buffer);
-        NOB_FREE(sb.items);
-        return;
-    }
-
-    nob_delete_file(output_path_buffer);
-    NOB_FREE(sb.items);
-    nob_log(NOB_INFO, "record: successfuly recorded '%s' file.", test_path);
+    r->status = SUCCESS;
 }
 
-void test_execute(Test_Record *r, Nob_Cmd *cmd) {
-    char output_path_buffer[64];
-    int output_path_length;
+void test_execute_exec(Test_Record *r, Nob_Cmd *cmd) {
+    NOB_ASSERT(r->kind == EXEC);
 
-    output_path_length = snprintf(output_path_buffer, sizeof(output_path_buffer), BUILD_DIR"/%s", r->path);
-    if (output_path_length < 0 || output_path_length >= sizeof(output_path_buffer)) {
-        nob_log(NOB_ERROR, "test: test path is too long exceeds %lu buffer size.", sizeof(output_path_buffer));
-        r->status = BUILD_FAIL;
-        return;
-    }
-    output_path_buffer[output_path_length - 2] = '\0';
+    nob_log(NOB_INFO, "test: '%s':", r->path);
 
+    // Making executable output path for the test.
+    CSTR_BUFFER(output_path_buffer, 64);
+    CSTR_BUFFER_APPEND(output_path_buffer, BUILD_DIR"/");
+    CSTR_BUFFER_APPEND(output_path_buffer, r->path);
+    cut_file_extension(output_path_buffer);
+
+    // Building test executable.
+    nob_log(NOB_INFO, "    : building '%s'.", output_path_buffer);
 
     nob_cc(cmd);
     nob_cc_flags(cmd);
@@ -497,16 +556,14 @@ void test_execute(Test_Record *r, Nob_Cmd *cmd) {
         return;
     }
 
-    nob_log(NOB_INFO, "test: running '%s' test.", output_path_buffer);
+    // Running test.
+    nob_log(NOB_INFO, "    : running '%s'.", output_path_buffer);
+
+    CSTR_BUFFER(stdout_path, 64);
+    CSTR_BUFFER_APPEND(stdout_path, output_path_buffer);
+    CSTR_BUFFER_APPEND(stdout_path, STDOUT_TXT_FILE_EXTENSION);
 
     nob_cmd_append(cmd, output_path_buffer);
-
-    char stdout_path[strlen(output_path_buffer) + strlen(STDOUT_TXT_FILE_EXTENSION) + 1];
-    stdout_path[0] = '\0';
-    strcat(stdout_path, output_path_buffer);
-    strcat(stdout_path, STDOUT_TXT_FILE_EXTENSION);
-
-
     Build_Proc proc = {0};
     if (!build_proc_spawn(&proc, cmd, stdout_path)) {
         r->status = RUNTIME_FAIL;
@@ -515,52 +572,158 @@ void test_execute(Test_Record *r, Nob_Cmd *cmd) {
 
     switch (build_proc_wait(&proc, TEST_TIMEOUT_MS)) {
     case PROC_TIMEOUT:
-        nob_log(NOB_ERROR, "test: '%s' timed out after %d ms",
-                output_path_buffer, TEST_TIMEOUT_MS);
+        nob_log(NOB_ERROR, "test: '%s' timed out after %d ms", output_path_buffer, TEST_TIMEOUT_MS);
         r->status = TIMEOUT;
         return;
     case PROC_FAIL:
+        nob_log(NOB_ERROR, "test: '%s' fail.", output_path_buffer);
         r->status = RUNTIME_FAIL;
         return;
     case PROC_OK:
+        nob_log(NOB_INFO, "test: '%s' ok.", output_path_buffer);
         break;
     }
 
-    char expected_stdout_path[strlen(r->path) - 2 + strlen(STDOUT_TXT_FILE_EXTENSION) + 1];
-    expected_stdout_path[0] = '\0';
-    strncat(expected_stdout_path, r->path, strlen(r->path) - 2);
-    strcat(expected_stdout_path, STDOUT_TXT_FILE_EXTENSION);
+
+    // Comparing output against golden.
+    CSTR_BUFFER(expected_stdout_path, 64);
+    CSTR_BUFFER_APPEND(expected_stdout_path, r->path);
+    cut_file_extension(expected_stdout_path);
+    CSTR_BUFFER_APPEND(expected_stdout_path, STDOUT_TXT_FILE_EXTENSION);
     
-    Nob_String_Builder src = {0}, dst = {0};
-
-    if (!read_entire_file(stdout_path, &src)) {
+    if (!compare_files(expected_stdout_path, stdout_path)) {
+        nob_log(NOB_ERROR, "test: unexpected output.");
         r->status = UNEXPECTED_OUTPUT;
         return;
     }
-
-    if (!read_entire_file(expected_stdout_path, &dst)) {
-        r->status = UNEXPECTED_OUTPUT;
-        return;
-    }
-
-    Nob_String_View src_sv = sb_to_sv(src);
-    Nob_String_View dst_sv = sb_to_sv(dst);
-
-    if (!sv_eq(src_sv, dst_sv)) {
-        nob_log(NOB_ERROR, "test: unexpected output!");
-        nob_log(NOB_ERROR, "test: expected:");
-        fprintf(stderr, SV_Fmt, SV_Arg(dst_sv));
-        nob_log(NOB_ERROR, "test: actual:");
-        fprintf(stderr, SV_Fmt, SV_Arg(src_sv));
-        r->status = UNEXPECTED_OUTPUT;
-        return;
-    }
-
-    NOB_FREE(dst.items);
-    NOB_FREE(src.items);
 
     r->status = SUCCESS;
 }
+
+void test_print_results(Test_Records *records) {
+    nob_da_foreach(Test_Record, r, records) {
+        fprintf(stderr, "%64s : ", r->path);
+    
+        switch (r->status) {
+            case PENDING:
+                fprintf(stderr, "\033[1;33mIGNORED\033[0m       ");
+                break;
+        
+            case BUILD_FAIL:
+                fprintf(stderr, "\033[1;31mBUILD FAIL\033[0m    ");
+                break;
+        
+            case RUNTIME_FAIL:
+                fprintf(stderr, "\033[31mRUNTIME FAIL\033[0m    ");
+                break;
+
+            case UNEXPECTED_OUTPUT:
+                fprintf(stderr, "\033[31mUNEXPECTED OUTPUT\033[0m    ");
+                break;
+
+            case TIMEOUT:
+                fprintf(stderr, "\033[31mTIMEOUT\033[0m    ");
+                break;
+        
+            case SUCCESS:
+                fprintf(stderr, "\033[1;32mSUCCESS\033[0m       ");
+                break;
+        }
+    
+        fprintf(stderr, "\n");
+    }
+}
+
+// void test_record(const char *source, Nob_Cmd *cmd);
+// 
+// bool test_record_entry(Nob_Walk_Entry entry) {
+//     Nob_Cmd *cmd = (Nob_Cmd *)entry.data;
+//     if (entry.type == FILE_REGULAR && strcmp(entry.path + strlen(entry.path) - 2, ".c") == 0) {
+//         test_record(entry.path, cmd);
+//     }
+// 
+//     return true;
+// }
+// 
+// /**
+//  * This function does following things:
+//  * First it copies the source file .c into tests directory, compiles and runs it there. 
+//  * Generating .stdout.txt which contains information about expected output.
+//  * After that it cleans up generated executable leaving only expected .stdout.txt.
+//  * TODO: Sanitize test files.
+//  */
+// void test_record(const char *source, Nob_Cmd *cmd) {
+//     Nob_String_Builder sb = {0};
+// 
+//     if (strcmp(source + strlen(source) - 2, ".c") != 0) {
+//         nob_log(NOB_ERROR, "record: '%s' is not a C file.", source);
+//         return;
+//     }
+// 
+//     if (!nob_read_entire_file(source, &sb)) {
+//         return;
+//     }
+// 
+//     const char *name = strrchr(source, '/');
+//     if (name == NULL) name = source;
+//     else name++;
+//     
+//     char test_path[strlen(TESTS_DIR"/") + strlen(name) + 1];
+//     test_path[0] = '\0';
+//     strcat(test_path, TESTS_DIR"/");
+//     strcat(test_path, name);
+// 
+//     if (!nob_write_entire_file(test_path, sb.items, sb.count)) {
+//         nob_log(NOB_ERROR, "record: couldn't write '%s' file.", test_path);
+//         NOB_FREE(sb.items);
+//         return;
+//     }
+// 
+// 
+//     // Copypasta from test_execute.
+//     char output_path_buffer[64];
+//     int output_path_length;
+// 
+//     output_path_length = snprintf(output_path_buffer, sizeof(output_path_buffer), "%s", test_path);
+//     if (output_path_length < 0 && output_path_length >= sizeof(output_path_buffer)) {
+//         nob_log(NOB_ERROR, "record: test path is too long exceeds %lu buffer size.", sizeof(output_path_buffer));
+//         NOB_FREE(sb.items);
+//         return;
+//     }
+//     output_path_buffer[output_path_length - 2] = '\0';
+//     
+//     nob_cc(cmd);
+//     nob_cc_flags(cmd);
+// 
+//     nob_cc_output(cmd, output_path_buffer);
+//     nob_cc_inputs(cmd, test_path);
+//     nob_cmd_append(cmd, BIN_DIR"/libcnotes.a");
+// 
+//     if (!nob_cmd_run(cmd)) {
+//         NOB_FREE(sb.items);
+//         return;
+//     }
+// 
+//     nob_cmd_append(cmd, output_path_buffer);
+// 
+//     char stdout_path[strlen(output_path_buffer) + strlen(STDOUT_TXT_FILE_EXTENSION) + 1];
+//     stdout_path[0] = '\0';
+//     strcat(stdout_path, output_path_buffer);
+//     strcat(stdout_path, STDOUT_TXT_FILE_EXTENSION);
+// 
+//     if (!nob_cmd_run(cmd, .stdout_path = stdout_path)) {
+//         nob_delete_file(output_path_buffer);
+//         NOB_FREE(sb.items);
+//         return;
+//     }
+// 
+//     nob_delete_file(output_path_buffer);
+//     NOB_FREE(sb.items);
+//     nob_log(NOB_INFO, "record: successfuly recorded '%s' file.", test_path);
+// }
+
+
+
 
 Proc_Result how_to_execute(char *path, Nob_Cmd *cmd) {
     nob_log(NOB_INFO, "how_to: running '%s' how_to.", path);
@@ -616,7 +779,7 @@ typedef struct {
 
 int help_command(int *argc, char ***argv);
 int test_command(int *argc, char ***argv);
-int record_command(int *argc, char ***argv);
+// int record_command(int *argc, char ***argv);
 int clean_command(int *argc, char ***argv);
 int lib_command(int *argc, char ***argv);
 int doc_command(int *argc, char ***argv);
@@ -624,8 +787,8 @@ int all_command(int *argc, char ***argv);
 
 const static Command commands[] = {
     { "help",       "",             "List all available commands.", help_command },
-    { "test",       "[FILE...]",    "Run the tests and check their output.", test_command },
-    { "record",     "[FILE...]",    "Record file as a test and generate it's expected output.", record_command },
+    { "test",       "",             "Run the tests and check their output.", test_command },
+    // { "record",     "[FILE...]",    "Record file as a test and generate it's expected output.", record_command },
     { "clean",      "",             "Recursivly deletes "BUILD_DIR"/ and "BIN_DIR"/ directories.", clean_command },
     { "lib",        "",             "Will compile whole library into .o file and then produce static library.", lib_command },
     { "doc",        "",             "Will run documentation renderer on whole library API.", doc_command },
@@ -667,83 +830,71 @@ int help_command(int *argc, char ***argv) {
 }
 
 int test_command(int *argc, char ***argv) {
-    if (!nob_mkdir_if_not_exists(TESTS_DIR)) return 1;
-    if (!nob_mkdir_if_not_exists(BUILD_DIR)) return 1;
-    if (!nob_mkdir_if_not_exists(BUILD_DIR"/"TESTS_DIR)) return 1;
+    if (!nob_mkdir_if_not_exists(TESTS_DIR))                            return 1;
+    if (!nob_mkdir_if_not_exists(TESTS_DIR"/"PARSE_DIR))                return 1;
+    if (!nob_mkdir_if_not_exists(TESTS_DIR"/"EXEC_DIR))                 return 1;
+    if (!nob_mkdir_if_not_exists(BUILD_DIR))                            return 1;
+    if (!nob_mkdir_if_not_exists(BUILD_DIR"/"TESTS_DIR))                return 1;
+    if (!nob_mkdir_if_not_exists(BUILD_DIR"/"TESTS_DIR"/"PARSE_DIR))    return 1;
+    if (!nob_mkdir_if_not_exists(BUILD_DIR"/"TESTS_DIR"/"EXEC_DIR))     return 1;
 
-    arena_strings = arena_make(1024);
-    Test_Records records = {0};
+    arena_strings = arena_make(4096);
+
+    Test_Records parse_records  = {0};
+    Test_Records exec_records   = {0};
 
     if (*argc == 0) {
         // Find all available tests.
-        if (!nob_walk_dir(TESTS_DIR, test_prepare_entry, .data = &records)) 
-            return 1;
+        if (!nob_walk_dir(TESTS_DIR"/"PARSE_DIR, test_prepare_parse_entry, .data = &parse_records)) return 1;
+        if (!nob_walk_dir(TESTS_DIR"/"EXEC_DIR, test_prepare_exec_entry, .data = &exec_records)) return 1;
 
     } else {
         // Use test files provided by the arguments.
         while (*argc > 0) {
             const char *file = nob_shift(*argv, *argc);
-
-            // Validating file.
-            if (strncmp(TESTS_DIR"/", file, strlen(TESTS_DIR"/")) != 0 && (strrchr(file, '/') - file) != strlen(TESTS_DIR)) {
-                nob_log(NOB_ERROR, "test: invalid input file '%s'.", file);
-                return 1;
-            }
-
-            // Reusing test_prepare_entry because why not.
-            if (!test_prepare_entry((Nob_Walk_Entry) { .path = file, .type = FILE_REGULAR, .data = &records })) {
-                return 1;
-            }
+            NOB_TODO("Implement separate test execution for test command.");
         }
     }
 
     // Executing tests
     Nob_Cmd cmd = {0};
 
+    nob_log(NOB_INFO, "test: building parse runner.");
+
+    nob_cc(&cmd);
+    nob_cc_flags(&cmd);
+
+    nob_cc_output(&cmd, BUILD_DIR"/"TESTS_DIR"/runner");
+    nob_cc_inputs(&cmd, TESTS_DIR"/runner.c");
+    nob_cmd_append(&cmd, BIN_DIR"/libcnotes.a");
+
+    if (!nob_cmd_run(&cmd)) {
+        return -1;
+    }
+
     int failed = 0;
     
-    nob_da_foreach(Test_Record, r, &records) {
-        test_execute(r, &cmd);
+    nob_da_foreach(Test_Record, r, &parse_records) {
+        test_execute_parse(r, &cmd, BUILD_DIR"/"TESTS_DIR"/runner");
+        if (r->status != SUCCESS) failed += 1;
+    }
+
+    nob_da_foreach(Test_Record, r, &exec_records) {
+        test_execute_exec(r, &cmd);
         if (r->status != SUCCESS) failed += 1;
     }
     
     // Showing test results
-    nob_da_foreach(Test_Record, r, &records) {
-        fprintf(stderr, "%64s : ", r->path);
+    fprintf(stderr, "PARSE:\n");
+    test_print_results(&parse_records);
+    fprintf(stderr, "EXEC:\n");
+    test_print_results(&exec_records);
     
-        switch (r->status) {
-            case PENDING:
-                fprintf(stderr, "\033[1;33mIGNORED\033[0m       ");
-                break;
-        
-            case BUILD_FAIL:
-                fprintf(stderr, "\033[1;31mBUILD FAIL\033[0m    ");
-                break;
-        
-            case RUNTIME_FAIL:
-                fprintf(stderr, "\033[31mRUNTIME FAIL\033[0m    ");
-                break;
-
-            case UNEXPECTED_OUTPUT:
-                fprintf(stderr, "\033[31mUNEXPECTED OUTPUT\033[0m    ");
-                break;
-
-            case TIMEOUT:
-                fprintf(stderr, "\033[31mTIMEOUT\033[0m    ");
-                break;
-        
-            case SUCCESS:
-                fprintf(stderr, "\033[1;32mSUCCESS\033[0m       ");
-                break;
-        }
-    
-        fprintf(stderr, "\n");
-    }
-    
+    int64_t total = parse_records.count + exec_records.count;
     if (failed > 0) {
-        nob_log(NOB_ERROR, "test: [%lu/%lu] passed.", records.count - failed, records.count);
+        nob_log(NOB_ERROR, "test: total [%lu/%lu] passed.", total - failed, total);
     } else {
-        nob_log(NOB_INFO, "test: [%lu/%lu] passed.", records.count - failed, records.count);
+        nob_log(NOB_INFO, "test: total [%lu/%lu] passed.", total - failed, total);
     }
 
 
@@ -753,33 +904,33 @@ int test_command(int *argc, char ***argv) {
     return failed > 0;
 }
 
-int record_command(int *argc, char ***argv) {
-    if (!nob_mkdir_if_not_exists(SRC_DIR)) return 1;
-    if (!nob_mkdir_if_not_exists(TESTS_DIR)) return 1;
-    if (!nob_mkdir_if_not_exists(BIN_DIR)) return 1;
-
-    Nob_Cmd cmd = {0};
-
-    if (*argc == 0) {
-
-        if (!confirm("Are you sure you want to re-record ALL tests again?")) return 1;
-        
-        // Rerecord all available tests.
-        if (!nob_walk_dir(TESTS_DIR, test_record_entry, .data = &cmd)) 
-            return 1;
-    } else {
-        // Use test files provided by the arguments.
-        while (*argc > 0) {
-            const char *file = nob_shift(*argv, *argc);
-
-            test_record(file, &cmd);
-        }
-    }   
-    
-    NOB_FREE(cmd.items);
-
-    return 0;
-}
+// int record_command(int *argc, char ***argv) {
+//     if (!nob_mkdir_if_not_exists(SRC_DIR)) return 1;
+//     if (!nob_mkdir_if_not_exists(TESTS_DIR)) return 1;
+//     if (!nob_mkdir_if_not_exists(BIN_DIR)) return 1;
+// 
+//     Nob_Cmd cmd = {0};
+// 
+//     if (*argc == 0) {
+// 
+//         if (!confirm("Are you sure you want to re-record ALL tests again?")) return 1;
+//         
+//         // Rerecord all available tests.
+//         if (!nob_walk_dir(TESTS_DIR, test_record_entry, .data = &cmd)) 
+//             return 1;
+//     } else {
+//         // Use test files provided by the arguments.
+//         while (*argc > 0) {
+//             const char *file = nob_shift(*argv, *argc);
+// 
+//             test_record(file, &cmd);
+//         }
+//     }   
+//     
+//     NOB_FREE(cmd.items);
+// 
+//     return 0;
+// }
 
 int how_to_command(int *argc, char ***argv) {
     arena_strings = arena_make(1024);
