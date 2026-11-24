@@ -17,6 +17,7 @@ Tags are written inside comments to signify the importance of certain informatio
 |-------------------|---------------------------------------------------------------------------|------------------------|
 | `RETURNS`         | Return value semantics, including failure values.                         | **Yes**                |
 | `PARAM`           | Optional. Use it only when a parameter needs explaining.                  | **Yes**                |
+| `MEMBER`          | Optional. Use it only when a member needs explaining.                     | **Yes**                |
 | `OUTPUTS`         | When a paramemeter value is used as output.                               | **Yes**                |
 | `SINCE`           | Version that introduced the symbol, e.g. `SINCE: 0.2.0`.                  | **Yes**                |
 | `NOTE`            | Useful detail the user might need to know, not a contract.                | **No**                 |
