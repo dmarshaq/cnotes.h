@@ -1319,7 +1319,7 @@ int test_command(int *argc, char ***argv) {
 
     nob_cc_output(&cmd, BUILD_DIR"/"TESTS_DIR"/runner");
     nob_cc_inputs(&cmd, TESTS_DIR"/runner.c");
-    nob_cmd_append(&cmd, BIN_DIR"/libcnotes.a");
+    // nob_cmd_append(&cmd, BIN_DIR"/libcnotes.a");
 
     if (!nob_cmd_run(&cmd)) {
         return -1;
@@ -1333,7 +1333,7 @@ int test_command(int *argc, char ***argv) {
 
     nob_cc_output(&cmd, BUILD_DIR"/"TESTS_DIR"/gnu_runner");
     nob_cc_inputs(&cmd, TESTS_DIR"/gnu_runner.c");
-    nob_cmd_append(&cmd, BIN_DIR"/libcnotes.a");
+    // nob_cmd_append(&cmd, BIN_DIR"/libcnotes.a");
 
     if (!nob_cmd_run(&cmd)) {
         return -1;

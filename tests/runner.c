@@ -1,3 +1,6 @@
+#define CN_IMPLEMENTATION
+#include "../cnotes.h"
+
 #include "../testing_utility.h"
 
 int main(int argc, char **argv) {

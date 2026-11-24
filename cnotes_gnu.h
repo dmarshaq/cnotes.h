@@ -64,41 +64,38 @@ typedef enum {
     X(GNU_ASM_LABEL,                    Gnu_Asm_Label,                      gnu_asm_label)
 
 
+#define CN_AST_GNU_TYPEOF_MEMBERS(F, X)                 \
+    F(X, NODE,  Cn_Ast_Node *,      target)             \
+
+#define CN_AST_GNU_ATTRIBUTE_SPECIFIER_MEMBERS(F, X)    \
+    F(X, NODES, Cn_Ast_Nodes,       gnu_attributes)     \
+
+#define CN_AST_GNU_ATTRIBUTE_MEMBERS(F, X)              \
+    F(X, NODE,  Cn_Ast_Identifier *,    identifier)     \
+    F(X, NODES, Cn_Ast_Nodes,           arguments)      \
+
+#define CN_AST_GNU_ASM_STATEMENT_MEMBERS(F, X)                      \
+    F(X, INT32, Cn_Ast_Gnu_Asm_Qualifier_Flags,     qualifiers)     \
+    F(X, NODE,  Cn_Ast_String *,                    template)       \
+    F(X, NODES, Cn_Ast_Nodes,                       outputs)        \
+    F(X, NODES, Cn_Ast_Nodes,                       inputs)         \
+    F(X, NODES, Cn_Ast_Nodes,                       clobbers)       \
+    F(X, NODES, Cn_Ast_Nodes,                       goto_labels)    \
+
+#define CN_AST_GNU_ASM_OPERAND_MEMBERS(F, X)            \
+    F(X, NODE,  Cn_Ast_Identifier *,    identifier)     \
+    F(X, NODE,  Cn_Ast_String *,        string)         \
+    F(X, NODE,  Cn_Ast_Node *,          expression)     \
+
+#define CN_AST_GNU_ASM_LABEL_MEMBERS(F, X)              \
+    F(X, NODE,  Cn_Ast_String *,        string)         \
+
+
 CN_AST_DECLARE_KINDS(GNU, Gnu, CN_GNU_EXTENSION_ID, CN_AST_GNU_GEN_LIST)
-
 CN_AST_DECLARE_STRUCTS(CN_AST_GNU_GEN_LIST)
+CN_AST_DEFINE_STRUCTS(CN_AST_GNU_GEN_LIST)
+CN_AST_INFO_DECLARE_ARRAY(GNU)
 
-struct cn_ast_gnu_typeof { CN_AST_BASE;
-    Cn_Ast_Node *target; // Could be expression or type name.
-};
-
-struct cn_ast_gnu_attribute_specifier { CN_AST_BASE;
-    Cn_Ast_Nodes gnu_attributes; // List of Cn_Ast_Gnu_Attribute.
-};
-
-struct cn_ast_gnu_attribute { CN_AST_BASE;
-    Cn_Ast_Identifier *identifier;
-    Cn_Ast_Nodes       arguments;
-};
-
-struct cn_ast_gnu_asm_statement { CN_AST_BASE;
-    Cn_Ast_Gnu_Asm_Qualifier_Flags qualifiers;
-    Cn_Ast_String *template;
-    Cn_Ast_Nodes   outputs;
-    Cn_Ast_Nodes   inputs;
-    Cn_Ast_Nodes   clobbers;
-    Cn_Ast_Nodes   goto_labels;
-};
-
-struct cn_ast_gnu_asm_operand { CN_AST_BASE;
-    Cn_Ast_Identifier *identifier;
-    Cn_Ast_String     *string;
-    Cn_Ast_Node       *expression;
-};
-
-struct cn_ast_gnu_asm_label { CN_AST_BASE;
-    Cn_Ast_String *string;
-};
 
 /**
  * Parses GNU `typeof` specifier from the current token of `lexer`.
@@ -348,6 +345,8 @@ CNDEF bool cn_gnu_extension(Cn_Hooks *hooks, Cn_Ast_Info_Array ast_info_table[25
 
 
 #ifdef CN_IMPLEMENTATION
+#ifndef CN_GNU_IMPLEMENTATION_GUARD_
+#define CN_GNU_IMPLEMENTATION_GUARD_
 
 CNDEF Cn_Ast_Gnu_Typeof *cn_parse_gnu_typeof(Cn_Lexer *lexer) {
     Cn_Lexer original_state = *lexer;
@@ -726,7 +725,7 @@ error:
 CNDEF Cn_Ast_Gnu_Asm_Label *cn_parse_gnu_asm_label(Cn_Lexer *lexer) {
     Cn_Lexer original_state = *lexer;
 
-    Cn_Ast_Gnu_Asm_Label node = { .kind = CN_AST_GNU_ASM_LABEL, .loc = cn_lexer_token(lexer).loc, .src = cn_lexer_token(lexer).src };
+    Cn_Ast_Gnu_Asm_Label node = { .id = CN_AST_GNU_ASM_LABEL, .loc = cn_lexer_token(lexer).loc, .src = cn_lexer_token(lexer).src };
 
     if (!cn_parse_expect(lexer, CN_TOKEN_GNU_ASM)) goto error;
     if (!cn_parse_expect(lexer, CN_TOKEN_PARAN_OPEN)) goto error;
@@ -758,7 +757,7 @@ CNDEF Cn_Type *cn__analyze_type_from_gnu_typeof(Cn_Ast_Node *ts) {
     Cn_Ast_Node *typeof_child = typeof_spec->target;
     Cn_Type *result;
  
-    if (typeof_child->kind == CN_AST_TYPE_NAME) {
+    if (typeof_child->id == CN_AST_TYPE_NAME) {
         Cn_Ast_Type_Name *tn = cn_ast_as(Type_Name, typeof_spec->target);
         Cn_Ast_Specifier_Qualifier *sq = tn->specifier_qualifier;
         result = cn_analyze_to_type(sq->qualifiers, sq->type_specifier, tn->abstract_declarator, 0);
@@ -774,10 +773,118 @@ error:
     return NULL;
 }
 
-CNDEF bool cn_gnu_extension(Cn_Hooks *hooks, Cn_Ast_Info_Array ast_info_table[256]) {
-    CN_AST_INFO_TABLE_REGISTER(ast_info_table, GNU, CN_GNU_EXTENSION_ID, CN_AST_GNU_GEN_LIST);
+CNDEF void cn__emit_gnu_typeof(Cn_Emitter *e, Cn_Ast_Gnu_Typeof *node) {
+    cn__emit_str_lit(e, "__typeof__(");
+    cn_emit(e, node->target);
+    cn__emit_str_lit(e, ")");
 }
 
+CNDEF void cn__emit_gnu_attribute_specifiers(Cn_Emitter *e, Cn_Ast_Nodes specifiers) {
+    for (int64_t i = 0; i < specifiers.length; i++) {
+        cn__emit_str_lit(e, " ");
+        cn_emit(e, specifiers.ptrs[i]);
+    }
+}
+
+CNDEF void cn__emit_gnu_attribute_specifier(Cn_Emitter *e, Cn_Ast_Gnu_Attribute_Specifier *node) {
+    cn__emit_str_lit(e, "__attribute__((");
+    for (int64_t i = 0; i < node->gnu_attributes.length; i++) {
+        if (i > 0) cn__emit_str_lit(e, ", ");
+        cn_emit(e, node->gnu_attributes.ptrs[i]);
+    }
+    cn__emit_str_lit(e, "))");
+}
+
+CNDEF void cn__emit_gnu_attribute(Cn_Emitter *e, Cn_Ast_Gnu_Attribute *node) {
+    // Emit attribute identifier.
+    cn_emit(e, node->identifier);
+
+    // Emit arguments if present.
+    if (node->arguments.length > 0) {
+        cn__emit_str_lit(e, "(");
+        for (int64_t i = 0; i < node->arguments.length; i++) {
+            if (i > 0) cn__emit_str_lit(e, ", ");
+            cn_emit(e, node->arguments.ptrs[i]);
+        }
+        cn__emit_str_lit(e, ")");
+    }
+}
+
+// AI: Generated.
+CNDEF void cn__emit_gnu_asm_qualifiers(Cn_Emitter *e, Cn_Ast_Gnu_Asm_Qualifier_Flags qualifiers) {
+    if (qualifiers & CN_AST_ASM_QUALIFIER_VOLATILE) cn__emit_str_lit(e, "volatile ");
+    if (qualifiers & CN_AST_ASM_QUALIFIER_INLINE)   cn__emit_str_lit(e, "inline ");
+    if (qualifiers & CN_AST_ASM_QUALIFIER_GOTO)     cn__emit_str_lit(e, "goto ");
+}
+
+// AI: Generated.
+CNDEF void cn__emit_gnu_asm_section(Cn_Emitter *e, Cn_Ast_Nodes list) {
+    cn__emit_str_lit(e, " :");
+    for (int64_t i = 0; i < list.length; i++) {
+        if (i > 0) cn__emit_str_lit(e, ",");
+        cn__emit_str_lit(e, " ");
+        cn_emit(e, list.ptrs[i]);
+    }
+}
+
+// AI: Generated.
+CNDEF void cn__emit_gnu_asm_statement(Cn_Emitter *e, Cn_Ast_Gnu_Asm_Statement *node) {
+    cn__emit_str_lit(e, "__asm__ ");
+    cn__emit_gnu_asm_qualifiers(e, node->qualifiers);
+
+    cn__emit_str_lit(e, "(");
+    cn_emit(e, node->template);
+
+    // Basic and extended asm differ semantically (e.g. '%' escaping in template), so
+    // an extended asm keeps at least one ':' even when all of its sections are empty.
+    // Trailing empty sections are omitted, but a section is always emitted if any later one is not empty.
+    int sections = 0;
+    if (node->goto_labels.length > 0)   sections = 4;
+    else if (node->clobbers.length > 0) sections = 3;
+    else if (node->inputs.length > 0)   sections = 2;
+    else if (node->outputs.length > 0 || (node->flags & CN_AST_GNU_ASM_STATEMENT_IS_EXTENDED)) sections = 1;
+
+    if (sections >= 1) cn__emit_gnu_asm_section(e, node->outputs);
+    if (sections >= 2) cn__emit_gnu_asm_section(e, node->inputs);
+    if (sections >= 3) cn__emit_gnu_asm_section(e, node->clobbers);
+    if (sections >= 4) cn__emit_gnu_asm_section(e, node->goto_labels);
+
+    cn__emit_str_lit(e, ");");
+    cn__emit_newline(e);
+}
+
+// AI: Generated.
+CNDEF void cn__emit_gnu_asm_operand(Cn_Emitter *e, Cn_Ast_Gnu_Asm_Operand *node) {
+    if (node->identifier != NULL) {
+        cn__emit_str_lit(e, "[");
+        cn_emit(e, node->identifier);
+        cn__emit_str_lit(e, "] ");
+    }
+
+    cn_emit(e, node->string);
+
+    cn__emit_str_lit(e, " (");
+    cn_emit(e, node->expression);
+    cn__emit_str_lit(e, ")");
+}
+
+CNDEF void cn__emit_gnu_asm_label(Cn_Emitter *e, Cn_Ast_Gnu_Asm_Label *node) {
+    cn__emit_str_lit(e, "__asm__(");
+    cn_emit(e, node->string);
+    cn__emit_str_lit(e, ")");
+}
+
+CN_AST_INFO_DEFINE_ARRAY(GNU, CN_GNU_EXTENSION_ID, CN_AST_GNU_GEN_LIST);
+
+CNDEF bool cn_gnu_extension(Cn_Hooks *hooks, Cn_Ast_Info_Array ast_info_table[256]) {
+
+    // Registring gnu ast meta info.
+    CN_AST_INFO_TABLE_REGISTER(cn_ast_info_table, CN_GNU_EXTENSION_ID, GNU);
+
+    return true;
+}
+
+#endif // CN_GNU_IMPLEMENTATION_GUARD_
 #endif // CN_IMPLEMENTATION
 
 

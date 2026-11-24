@@ -23,7 +23,7 @@ const Cn_String src = CN_STR_BUFFER(
     "int helper(int a, int b);\n"
     "int variadic(const char *fmt, ...);\n"
     "\n"
-    "[[reparse]] __attribute__((unused)) int helper(int a, int b) {\n"
+    "[[reparse]] int helper(int a, int b) {\n"
     "    return a + b;\n"
     "}\n"
     "\n"

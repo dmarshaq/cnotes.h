@@ -5349,6 +5349,8 @@ CNDEF void cn_tu_free(Cn_Translation_Unit *tu);
        
 
 #ifdef CN_IMPLEMENTATION
+#ifndef CN_IMPLEMENTATION_GUARD_
+#define CN_IMPLEMENTATION_GUARD_
 
 /**
  * ============================================
@@ -12784,7 +12786,7 @@ CNDEF void cn__emit_code(Cn_Emitter *e, Cn_Ast_Code *node) {
 CNDEF void cn__emit_storage_specifiers(Cn_Emitter *e, Cn_Ast_Storage_Specifier_Flags storage);
 CNDEF void cn__emit_qualifiers(Cn_Emitter *e, Cn_Ast_Qualifier_Flags qualifiers);
 CNDEF void cn__emit_function_specifiers(Cn_Emitter *e, Cn_Ast_Function_Specifier_Flags func_spec);
-CNDEF void cn__emit_gnu_attribute_specifiers(Cn_Emitter *e, Cn_Ast_Nodes specifiers);
+// CNDEF void cn__emit_gnu_attribute_specifiers(Cn_Emitter *e, Cn_Ast_Nodes specifiers);
 CNDEF void cn__emit_attribute_specifiers(Cn_Emitter *e, Cn_Ast_Nodes specifiers);
 CNDEF void cn__emit_designations(Cn_Emitter *e, Cn_Ast_Nodes designations);
 
@@ -13317,7 +13319,7 @@ CNDEF void cn__emit_direct_declarator_function(Cn_Emitter *e, Cn_Ast_Direct_Decl
 CNDEF void cn__emit_declaration_specifiers(Cn_Emitter *e, Cn_Ast_Declaration_Specifiers *node) {
     cn__emit_storage_specifiers(e, node->storage_specifiers);
     cn__emit_function_specifiers(e, node->function_specifiers);
-    cn__emit_gnu_attribute_specifiers(e, node->gnu_attribute_specifiers);
+    // cn__emit_gnu_attribute_specifiers(e, node->gnu_attribute_specifiers);
     cn__emit_qualifiers(e, node->qualifiers);
     cn_emit(e, node->type_specifier);
 }
@@ -13378,7 +13380,7 @@ CNDEF void cn__emit_struct_specifier(Cn_Emitter *e, Cn_Ast_Struct_Specifier *nod
     cn__emit_str_lit(e, "struct ");
 
     cn__emit_attribute_specifiers(e, node->attribute_specifiers);
-    cn__emit_gnu_attribute_specifiers(e, node->gnu_attribute_specifiers);
+    // cn__emit_gnu_attribute_specifiers(e, node->gnu_attribute_specifiers);
 
     cn_emit(e, node->identifier);
 
@@ -13401,7 +13403,7 @@ CNDEF void cn__emit_union_specifier(Cn_Emitter *e, Cn_Ast_Union_Specifier *node)
     cn__emit_str_lit(e, "union ");
 
     cn__emit_attribute_specifiers(e, node->attribute_specifiers);
-    cn__emit_gnu_attribute_specifiers(e, node->gnu_attribute_specifiers);
+    // cn__emit_gnu_attribute_specifiers(e, node->gnu_attribute_specifiers);
 
     cn_emit(e, node->identifier);
 
@@ -13423,7 +13425,7 @@ CNDEF void cn__emit_enum_specifier(Cn_Emitter *e, Cn_Ast_Enum_Specifier *node) {
     cn__emit_str_lit(e, "enum ");
 
     cn__emit_attribute_specifiers(e, node->attribute_specifiers);
-    cn__emit_gnu_attribute_specifiers(e, node->gnu_attribute_specifiers);
+    // cn__emit_gnu_attribute_specifiers(e, node->gnu_attribute_specifiers);
 
     cn_emit(e, node->identifier);
 
@@ -13445,13 +13447,6 @@ CNDEF void cn__emit_enum_specifier(Cn_Emitter *e, Cn_Ast_Enum_Specifier *node) {
         cn__emit_str_lit(e, "}");
     }
 }
-
-// TODO: GNU:
-// CNDEF void cn__emit_gnu_typeof(Cn_Emitter *e, Cn_Ast_Gnu_Typeof *node) {
-//     cn__emit_str_lit(e, "__typeof__(");
-//     cn_emit(e, node->target);
-//     cn__emit_str_lit(e, ")");
-// }
 
 CNDEF void cn__emit_type_name(Cn_Emitter *e, Cn_Ast_Type_Name *node) {
     cn_emit(e, node->specifier_qualifier);
@@ -13523,37 +13518,6 @@ CNDEF void cn__emit_member_declarator(Cn_Emitter *e, Cn_Ast_Member_Declarator *n
     cn__emit_attribute_specifiers(e, node->gnu_attribute_specifiers);
 }
 
-CNDEF void cn__emit_gnu_attribute_specifiers(Cn_Emitter *e, Cn_Ast_Nodes specifiers) {
-    for (int64_t i = 0; i < specifiers.length; i++) {
-        cn__emit_str_lit(e, " ");
-        cn_emit(e, specifiers.ptrs[i]);
-    }
-}
-
-// TODO: GNU:
-// CNDEF void cn__emit_gnu_attribute_specifier(Cn_Emitter *e, Cn_Ast_Gnu_Attribute_Specifier *node) {
-//     cn__emit_str_lit(e, "__attribute__((");
-//     for (int64_t i = 0; i < node->gnu_attributes.length; i++) {
-//         if (i > 0) cn__emit_str_lit(e, ", ");
-//         cn_emit(e, node->gnu_attributes.ptrs[i]);
-//     }
-//     cn__emit_str_lit(e, "))");
-// }
-// 
-// CNDEF void cn__emit_gnu_attribute(Cn_Emitter *e, Cn_Ast_Gnu_Attribute *node) {
-//     // Emit attribute identifier.
-//     cn_emit(e, node->identifier);
-// 
-//     // Emit arguments if present.
-//     if (node->arguments.length > 0) {
-//         cn__emit_str_lit(e, "(");
-//         for (int64_t i = 0; i < node->arguments.length; i++) {
-//             if (i > 0) cn__emit_str_lit(e, ", ");
-//             cn_emit(e, node->arguments.ptrs[i]);
-//         }
-//         cn__emit_str_lit(e, ")");
-//     }
-// }
 
 CNDEF void cn__emit_init_declarator(Cn_Emitter *e, Cn_Ast_Init_Declarator *node) {
     cn_emit(e, node->declarator);
@@ -13564,7 +13528,7 @@ CNDEF void cn__emit_init_declarator(Cn_Emitter *e, Cn_Ast_Init_Declarator *node)
     //     cn_emit(e, node->gnu_asm_label);
     // }
 
-    cn__emit_gnu_attribute_specifiers(e, node->gnu_attribute_specifiers);
+    // cn__emit_gnu_attribute_specifiers(e, node->gnu_attribute_specifiers);
 
     if (node->initializer != NULL) {
         cn__emit_str_lit(e, " = ");
@@ -13587,7 +13551,7 @@ CNDEF void cn__emit_enumerator(Cn_Emitter *e, Cn_Ast_Enumerator *node) {
     cn_emit(e, node->identifier);
 
     cn__emit_attribute_specifiers(e, node->attribute_specifiers);
-    cn__emit_gnu_attribute_specifiers(e, node->gnu_attribute_specifiers);
+    // cn__emit_gnu_attribute_specifiers(e, node->gnu_attribute_specifiers);
 
     if (node->expression != NULL) {
         cn__emit_str_lit(e, " = ");
@@ -13636,70 +13600,6 @@ CNDEF void cn__emit_attribute(Cn_Emitter *e, Cn_Ast_Attribute *node) {
     }
 }
 
-// TODO: GNU:
-// AI: Generated.
-// CNDEF void cn__emit_gnu_asm_qualifiers(Cn_Emitter *e, Cn_Ast_Gnu_Asm_Qualifier_Flags qualifiers) {
-//     if (qualifiers & CN_AST_ASM_QUALIFIER_VOLATILE) cn__emit_str_lit(e, "volatile ");
-//     if (qualifiers & CN_AST_ASM_QUALIFIER_INLINE)   cn__emit_str_lit(e, "inline ");
-//     if (qualifiers & CN_AST_ASM_QUALIFIER_GOTO)     cn__emit_str_lit(e, "goto ");
-// }
-// 
-// // AI: Generated.
-// CNDEF void cn__emit_gnu_asm_section(Cn_Emitter *e, Cn_Ast_Nodes list) {
-//     cn__emit_str_lit(e, " :");
-//     for (int64_t i = 0; i < list.length; i++) {
-//         if (i > 0) cn__emit_str_lit(e, ",");
-//         cn__emit_str_lit(e, " ");
-//         cn_emit(e, list.ptrs[i]);
-//     }
-// }
-// 
-// // AI: Generated.
-// CNDEF void cn__emit_gnu_asm_statement(Cn_Emitter *e, Cn_Ast_Gnu_Asm_Statement *node) {
-//     cn__emit_str_lit(e, "__asm__ ");
-//     cn__emit_gnu_asm_qualifiers(e, node->qualifiers);
-// 
-//     cn__emit_str_lit(e, "(");
-//     cn_emit(e, node->template);
-// 
-//     // Basic and extended asm differ semantically (e.g. '%' escaping in template), so
-//     // an extended asm keeps at least one ':' even when all of its sections are empty.
-//     // Trailing empty sections are omitted, but a section is always emitted if any later one is not empty.
-//     int sections = 0;
-//     if (node->goto_labels.length > 0)   sections = 4;
-//     else if (node->clobbers.length > 0) sections = 3;
-//     else if (node->inputs.length > 0)   sections = 2;
-//     else if (node->outputs.length > 0 || (node->flags & CN_AST_GNU_ASM_STATEMENT_IS_EXTENDED)) sections = 1;
-// 
-//     if (sections >= 1) cn__emit_gnu_asm_section(e, node->outputs);
-//     if (sections >= 2) cn__emit_gnu_asm_section(e, node->inputs);
-//     if (sections >= 3) cn__emit_gnu_asm_section(e, node->clobbers);
-//     if (sections >= 4) cn__emit_gnu_asm_section(e, node->goto_labels);
-// 
-//     cn__emit_str_lit(e, ");");
-//     cn__emit_newline(e);
-// }
-// 
-// // AI: Generated.
-// CNDEF void cn__emit_gnu_asm_operand(Cn_Emitter *e, Cn_Ast_Gnu_Asm_Operand *node) {
-//     if (node->identifier != NULL) {
-//         cn__emit_str_lit(e, "[");
-//         cn_emit(e, node->identifier);
-//         cn__emit_str_lit(e, "] ");
-//     }
-// 
-//     cn_emit(e, node->string);
-// 
-//     cn__emit_str_lit(e, " (");
-//     cn_emit(e, node->expression);
-//     cn__emit_str_lit(e, ")");
-// }
-// 
-// CNDEF void cn__emit_gnu_asm_label(Cn_Emitter *e, Cn_Ast_Gnu_Asm_Label *node) {
-//     cn__emit_str_lit(e, "__asm__(");
-//     cn_emit(e, node->string);
-//     cn__emit_str_lit(e, ")");
-// }
 
 CNDEF void cn_emit(Cn_Emitter *e, void *n) {
     if (n == NULL) return;
@@ -17799,6 +17699,7 @@ CNDEF void cn_tu_free(Cn_Translation_Unit *tu) {
 // declarations and bindings are in the namespace, and can be used.
 CN_AST_INFO_DEFINE_ARRAY(CORE, 0, CN_AST_GEN_LIST);
 
+#endif // CN_IMPLEMENTATION_GUARD_
 #endif // CN_IMPLEMENTATION
 
 
