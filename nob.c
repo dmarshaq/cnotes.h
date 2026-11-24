@@ -431,6 +431,7 @@ static Arena arena_strings;
 #define DOC_TAG_GEN_LIST(X)                 \
     X(RETURNS,      Returns,    returns)    \
     X(PARAM,        Param,      param)      \
+    X(MEMBER,       Member,     member)     \
     X(OUTPUTS,      Outputs,    outputs)    \
     X(SINCE,        Since,      since)      \
     X(NOTE,         Note,       note)       \
@@ -470,8 +471,29 @@ typedef enum {
 #undef X
 } Doc_Flags;
 
+/**
+ * Kinds of declarations doc scanner recognizes, see `doc_classify_declaration`.
+ */
+#define DOC_KIND_GEN_LIST(X)                \
+    X(FUNCTION,     "function")             \
+    X(MACRO,        "macro")                \
+    X(STRUCT,       "struct")               \
+    X(UNION,        "union")                \
+    X(ENUM,         "enum")                 \
+    X(TYPEDEF,      "typedef")              \
+    X(VARIABLE,     "variable")             \
+
+typedef enum {
+    DOC_KIND_NONE = 0,
+#define X(K, lit) DOC_KIND_##K,
+    DOC_KIND_GEN_LIST(X)
+#undef X
+} Doc_Kind;
+
 typedef struct {
     Nob_String_View symbol;
+    Doc_Kind        kind;
+    Nob_String_View module;     // Name of the "SECTION:" the entry is declared in.
     Nob_String_View decl;
     Nob_String_View summary;
     Nob_String_View description;
@@ -494,13 +516,26 @@ Nob_String_View doc_get_sv_till(Nob_String_View sv, Nob_String_View target);
 void            doc_print_json_string(FILE *f, Nob_String_View sv);
 Doc_Tag_Kind    doc_sv_to_tag(Nob_String_View sv);
 const char     *doc_tag_to_lit(Doc_Tag_Kind tag);
+const char     *doc_kind_to_lit(Doc_Kind kind);
 Doc_Flags       doc_sv_to_flag(Nob_String_View sv);
 bool            doc_parse_flags(Nob_String_View symbol, Nob_String_View line, Doc_Flags *flags);
+bool            doc_is_identifier_char(char c);
 bool            doc_sv_is_identifier(Nob_String_View sv);
+bool            doc_sv_starts_with_word(Nob_String_View sv, Nob_String_View word);
+Nob_String_View doc_sv_first_identifier(Nob_String_View sv);
+Nob_String_View doc_sv_last_identifier(Nob_String_View sv);
+bool            doc_sv_has_library_prefix(Nob_String_View symbol);
 void            doc_append_line(Nob_String_Builder *sb, size_t *count, Nob_String_View line);
 void            doc_append_to_target(Doc_Entry *entry, Nob_String_Builder *text_sb, Nob_String_Builder *description_sb, Doc_Target target, Nob_String_View line);
 void            doc_print_json_entry(FILE *f, Doc_Entry *entry);
 Nob_String_View doc_get_next_comment(Nob_String_View *content);
+Nob_String_View doc_get_section(Nob_String_View doc);
+size_t          doc_skip_literal_or_comment(Nob_String_View sv, size_t i);
+Nob_String_View doc_get_declaration(Nob_String_View *content);
+bool            doc_classify_declaration(Nob_String_View decl, Doc_Kind *kind, Nob_String_View *symbol);
+Nob_String_View doc_make_signature(Nob_String_View decl, Doc_Kind kind, Nob_String_Builder *sb);
+Nob_String_View doc_get_block_comment(Nob_String_View *content);
+bool            doc_write_library_json(Nob_String_View file, const char *path);
 bool            doc_parse_entry(Nob_String_View symbol, Nob_String_View signature, Nob_String_View doc, Doc_Entry *entry);
 
 Nob_String_View doc_trim_sv_till(Nob_String_View sv, Nob_String_View target) {
@@ -553,6 +588,16 @@ const char *doc_tag_to_lit(Doc_Tag_Kind tag) {
     }
 }
 
+const char *doc_kind_to_lit(Doc_Kind kind) {
+    switch (kind) {
+#define X(K, lit) case DOC_KIND_##K: return lit;
+    DOC_KIND_GEN_LIST(X)
+#undef X
+        default:
+            return "<UNKNOWN>";
+    }
+}
+
 /**
  * Maps flag literal, like "--gnu", to its flag value, DOC_NO_FLAGS if flag is unknown.
  */
@@ -599,15 +644,69 @@ bool doc_parse_flags(Nob_String_View symbol, Nob_String_View line, Doc_Flags *fl
     return ok;
 }
 
+bool doc_is_identifier_char(char c) {
+    return isalnum((unsigned char)c) || c == '_';
+}
+
 /**
  * Checks whether sv is a C identifier: letter or '_', followed by letters, digits or '_'.
  */
 bool doc_sv_is_identifier(Nob_String_View sv) {
-    if (sv.count == 0 || !(isalpha((unsigned char)sv.data[0]) || sv.data[0] == '_')) return false;
-    for (size_t i = 1; i < sv.count; i++) {
-        if (!(isalnum((unsigned char)sv.data[i]) || sv.data[i] == '_')) return false;
+    if (sv.count == 0 || isdigit((unsigned char)sv.data[0])) return false;
+    for (size_t i = 0; i < sv.count; i++) {
+        if (!doc_is_identifier_char(sv.data[i])) return false;
     }
     return true;
+}
+
+/**
+ * Checks whether sv starts with the whole word, so "struct" matches "struct {" but not "struct_x".
+ */
+bool doc_sv_starts_with_word(Nob_String_View sv, Nob_String_View word) {
+    return nob_sv_starts_with(sv, word) && (sv.count == word.count || !doc_is_identifier_char(sv.data[word.count]));
+}
+
+/**
+ * Identifier sv starts with, empty if it doesn't start with one.
+ */
+Nob_String_View doc_sv_first_identifier(Nob_String_View sv) {
+    size_t length = 0;
+    while (length < sv.count && doc_is_identifier_char(sv.data[length])) length++;
+
+    Nob_String_View identifier = nob_sv_from_parts(sv.data, length);
+    return doc_sv_is_identifier(identifier) ? identifier : (Nob_String_View) {0};
+}
+
+/**
+ * Last identifier in sv, skipping any trailing `[...]` array sizes, so "int names[16];" gives "names".
+ * Empty if there is none.
+ */
+Nob_String_View doc_sv_last_identifier(Nob_String_View sv) {
+    size_t end = sv.count;
+    int brackets = 0;
+    while (end > 0) {
+        char c = sv.data[end - 1];
+        if      (c == ']') brackets++;
+        else if (c == '[') brackets--;
+        else if (brackets == 0 && doc_is_identifier_char(c)) break;
+        end--;
+    }
+
+    size_t start = end;
+    while (start > 0 && doc_is_identifier_char(sv.data[start - 1])) start--;
+
+    Nob_String_View identifier = nob_sv_from_parts(sv.data + start, end - start);
+    return doc_sv_is_identifier(identifier) ? identifier : (Nob_String_View) {0};
+}
+
+/**
+ * Checks whether symbol has one of the library prefixes: `cn_`, `Cn_` or `CN_`.
+ * Internal `cn__` symbols have it too, they are told apart by the 4th character being '_'.
+ */
+bool doc_sv_has_library_prefix(Nob_String_View symbol) {
+    return nob_sv_starts_with(symbol, DOC_SV_LIT("cn_"))
+        || nob_sv_starts_with(symbol, DOC_SV_LIT("Cn_"))
+        || nob_sv_starts_with(symbol, DOC_SV_LIT("CN_"));
 }
 
 /**
@@ -652,6 +751,12 @@ void doc_print_json_entry(FILE *f, Doc_Entry *entry) {
 
     fputs("    \"symbol\": ", f);
     doc_print_json_string(f, entry->symbol);
+    fputs(",\n", f);
+
+    fprintf(f, "    \"kind\": \"%s\",\n", doc_kind_to_lit(entry->kind));
+
+    fputs("    \"module\": ", f);
+    doc_print_json_string(f, entry->module);
     fputs(",\n", f);
 
     fputs("    \"decl\": ", f);
@@ -703,6 +808,284 @@ Nob_String_View doc_get_next_comment(Nob_String_View *content) {
     nob_sv_chop_left(content, doc.count + 2); // +2 for "*/".
 
     return doc;
+}
+
+/**
+ * If doc is a section banner, returns the section name, otherwise returns empty view.
+ * Banner is a doc comment that has a line starting with "SECTION:", like:
+ * ```
+ * ==========================
+ * SECTION: String Builder
+ * ==========================
+ * ```
+ */
+Nob_String_View doc_get_section(Nob_String_View doc) {
+    while (doc.count > 0) {
+        Nob_String_View line = nob_sv_trim(nob_sv_chop_by_delim(&doc, '\n'));
+        if (nob_sv_starts_with(line, DOC_SV_LIT("*"))) line = nob_sv_trim_left(nob_sv_from_parts(line.data + 1, line.count - 1));
+
+        if (nob_sv_starts_with(line, DOC_SV_LIT("SECTION:"))) {
+            return nob_sv_trim(nob_sv_from_parts(line.data + 8, line.count - 8));
+        }
+    }
+
+    return (Nob_String_View) {0};
+}
+
+/**
+ * If sv has string or char literal, or a comment, starting at index i, returns index right after it.
+ * Otherwise returns i itself. Used so that braces, parens and ';' inside them are not counted.
+ */
+size_t doc_skip_literal_or_comment(Nob_String_View sv, size_t i) {
+    char c    = sv.data[i];
+    char next = i + 1 < sv.count ? sv.data[i + 1] : '\0';
+
+    if (c == '"' || c == '\'') {
+        for (i++; i < sv.count && sv.data[i] != c; i++) {
+            if (sv.data[i] == '\\') i++; // Escaped character, like \" or \\.
+        }
+        return i < sv.count ? i + 1 : sv.count;
+    }
+
+    if (c == '/' && next == '*') {
+        Nob_String_View end = doc_trim_sv_till(nob_sv_from_parts(sv.data + i + 2, sv.count - i - 2), DOC_SV_LIT("*/"));
+        return end.data == NULL ? sv.count : (size_t)(end.data - sv.data) + 2;
+    }
+
+    if (c == '/' && next == '/') {
+        while (i < sv.count && sv.data[i] != '\n') i++;
+        return i;
+    }
+
+    return i;
+}
+
+/**
+ * Gets full text of the declaration that content starts with, content is advanced past it.
+ * That way doc comments nested in the declaration, like on struct members, are skipped too.
+ *
+ * Preprocessor line continues to the next line as long as it ends with '\', so multiline macros are complete.
+ * Anything else ends with the first ';' outside of braces, parens and brackets, so whole struct bodies are included,
+ * or right before the next doc comment outside of them, if there is no such ';'.
+ *
+ * RETURNS: Declaration including its ';', empty if content starts with another comment instead.
+ */
+Nob_String_View doc_get_declaration(Nob_String_View *content) {
+    *content = nob_sv_trim_left(*content);
+    Nob_String_View decl = nob_sv_from_parts(content->data, 0);
+
+    // Doc comment that is not followed by declaration, next comment must stay for doc_get_next_comment.
+    if (nob_sv_starts_with(*content, DOC_SV_LIT("/*")) || nob_sv_starts_with(*content, DOC_SV_LIT("//"))) {
+        return decl;
+    }
+
+    if (nob_sv_starts_with(*content, DOC_SV_LIT("#"))) {
+        while (content->count > 0) {
+            Nob_String_View line = nob_sv_chop_by_delim(content, '\n');
+            decl.count = (size_t)(line.data + line.count - decl.data);
+            if (!nob_sv_ends_with(nob_sv_trim_right(line), DOC_SV_LIT("\\"))) break;
+        }
+        return decl;
+    }
+
+    int depth = 0;
+    size_t i = 0;
+    while (i < content->count) {
+        // Doc comment outside of any body starts the next entry, for example after a macro call without ';'.
+        if (depth == 0 && nob_sv_starts_with(nob_sv_from_parts(content->data + i, content->count - i), DOC_SV_LIT("/**"))) break;
+
+        size_t skipped = doc_skip_literal_or_comment(*content, i);
+        if (skipped != i) {
+            i = skipped;
+            continue;
+        }
+
+        char c = content->data[i++];
+        if      (c == '{' || c == '(' || c == '[') depth++;
+        else if (c == '}' || c == ')' || c == ']') depth--;
+
+        // ';' ends declaration, unmatched closing brace means doc comment was the last thing in some body.
+        if ((c == ';' && depth == 0) || depth < 0) break;
+    }
+
+    decl.count = i;
+    nob_sv_chop_left(content, i);
+    return decl;
+}
+
+/**
+ * Determines kind and symbol name of the declaration, by how it starts:
+ * ```
+ * #define NAME ...                         macro, name right after define
+ * CNDEF ... name(...);                     function, name right before first '('
+ * CNDEF Function_Type name;                function, declared through function typedef, last name
+ * extern ... name;                         variable, last name, or function if it has '('
+ * typedef struct|union|enum {...} Name;    struct, union or enum, last name
+ * typedef R (Name)(...);                   typedef, name inside first parens, (*Name) works too
+ * typedef ... Name;                        typedef, last name
+ * struct|union|enum Name {...};            struct, union or enum, name right after keyword
+ * ```
+ * RETURNS: `true` if declaration is one of the above and has a name, `false` otherwise.
+ */
+bool doc_classify_declaration(Nob_String_View decl, Doc_Kind *kind, Nob_String_View *symbol) {
+    static const struct { Nob_String_View keyword; Doc_Kind kind; } tags[] = {
+        { DOC_SV_LIT("struct"), DOC_KIND_STRUCT },
+        { DOC_SV_LIT("union"),  DOC_KIND_UNION  },
+        { DOC_SV_LIT("enum"),   DOC_KIND_ENUM   },
+    };
+
+    // Part of the declaration before first '(', whole declaration if there is no '('.
+    Nob_String_View before_paren = doc_get_sv_till(decl, DOC_SV_LIT("("));
+    bool has_paren = before_paren.count < decl.count;
+
+    *kind   = DOC_KIND_NONE;
+    *symbol = (Nob_String_View) {0};
+
+    if (nob_sv_starts_with(decl, DOC_SV_LIT("#"))) {
+        Nob_String_View directive = nob_sv_trim_left(nob_sv_from_parts(decl.data + 1, decl.count - 1));
+        if (!doc_sv_starts_with_word(directive, DOC_SV_LIT("define"))) return false;
+        nob_sv_chop_left(&directive, 6);
+
+        *kind   = DOC_KIND_MACRO;
+        *symbol = doc_sv_first_identifier(nob_sv_trim_left(directive));
+
+    } else if (doc_sv_starts_with_word(decl, DOC_SV_LIT("CNDEF"))) {
+        *kind   = DOC_KIND_FUNCTION;
+        *symbol = doc_sv_last_identifier(before_paren);
+
+    } else if (doc_sv_starts_with_word(decl, DOC_SV_LIT("extern"))) {
+        *kind   = has_paren ? DOC_KIND_FUNCTION : DOC_KIND_VARIABLE;
+        *symbol = doc_sv_last_identifier(before_paren);
+
+    } else if (doc_sv_starts_with_word(decl, DOC_SV_LIT("typedef"))) {
+        Nob_String_View type = nob_sv_trim_left(nob_sv_from_parts(decl.data + 7, decl.count - 7));
+        bool has_body = doc_trim_sv_till(decl, DOC_SV_LIT("{")).data != NULL;
+
+        *kind   = DOC_KIND_TYPEDEF;
+        *symbol = doc_sv_last_identifier(decl);
+
+        for (size_t i = 0; i < NOB_ARRAY_LEN(tags); i++) {
+            if (has_body && doc_sv_starts_with_word(type, tags[i].keyword)) *kind = tags[i].kind;
+        }
+
+        // Function typedef, name is inside first parens: "typedef R (Name)(...)".
+        if (*kind == DOC_KIND_TYPEDEF && has_paren) {
+            Nob_String_View in_parens = nob_sv_from_parts(decl.data + before_paren.count + 1, decl.count - before_paren.count - 1);
+            *symbol = doc_sv_last_identifier(doc_get_sv_till(in_parens, DOC_SV_LIT(")")));
+        }
+
+    } else {
+        for (size_t i = 0; i < NOB_ARRAY_LEN(tags); i++) {
+            if (!doc_sv_starts_with_word(decl, tags[i].keyword)) continue;
+
+            *kind   = tags[i].kind;
+            *symbol = doc_sv_first_identifier(nob_sv_trim_left(nob_sv_from_parts(decl.data + tags[i].keyword.count, decl.count - tags[i].keyword.count)));
+        }
+    }
+
+    return *kind != DOC_KIND_NONE && symbol->count > 0;
+}
+
+/**
+ * Makes signature that is displayed from the declaration, written into sb, which is cleared first.
+ * Leading "CNDEF" and trailing ';' are removed.
+ * Functions, variables and typedefs are joined into a single line, whitespace collapsed.
+ * Macros, structs, unions and enums keep their lines, with trailing whitespace of each line trimmed.
+ *
+ * RETURNS: View into sb, valid until sb is changed.
+ */
+Nob_String_View doc_make_signature(Nob_String_View decl, Doc_Kind kind, Nob_String_Builder *sb) {
+    sb->count = 0;
+
+    decl = nob_sv_trim(decl);
+    if (nob_sv_ends_with(decl, DOC_SV_LIT(";"))) decl.count--;
+    if (doc_sv_starts_with_word(decl, DOC_SV_LIT("CNDEF"))) decl = nob_sv_from_parts(decl.data + 5, decl.count - 5);
+    decl = nob_sv_trim(decl);
+
+    bool single_line = kind == DOC_KIND_FUNCTION || kind == DOC_KIND_VARIABLE || kind == DOC_KIND_TYPEDEF;
+
+    if (single_line) {
+        for (size_t i = 0; i < decl.count; i++) {
+            if (!isspace((unsigned char)decl.data[i])) {
+                nob_da_append(sb, decl.data[i]);
+            } else if (sb->count > 0 && sb->items[sb->count - 1] != ' ') {
+                nob_da_append(sb, ' ');
+            }
+        }
+    } else {
+        while (decl.count > 0) {
+            Nob_String_View line = nob_sv_trim_right(nob_sv_chop_by_delim(&decl, '\n'));
+            if (sb->count > 0) nob_da_append(sb, '\n');
+            nob_sb_append_buf(sb, line.data, line.count);
+        }
+    }
+
+    return nob_sb_to_sv(*sb);
+}
+
+/**
+ * Gets text inside of the block comment that content starts with, whitespace before it is skipped.
+ * Content is advanced past the comment.
+ *
+ * RETURNS: Text between comment opening and closing, view with NULL data if content doesn't start with a block comment.
+ */
+Nob_String_View doc_get_block_comment(Nob_String_View *content) {
+    *content = nob_sv_trim_left(*content);
+    if (!nob_sv_starts_with(*content, DOC_SV_LIT("/*"))) return (Nob_String_View) {0};
+    nob_sv_chop_left(content, 2);
+
+    Nob_String_View text = doc_get_sv_till(*content, DOC_SV_LIT("*/"));
+    nob_sv_chop_left(content, text.count < content->count ? text.count + 2 : text.count); // +2 for "*/".
+
+    return text;
+}
+
+/**
+ * Writes json with the comments describing library as a whole, they are not documentation entries:
+ * ```
+ * {
+ *   "header":  "comment cnotes.h starts with: name, version, license, macro interface, conventions...",
+ *   "trailer": ["comments after the last #endif: revision history, version conventions, license..."]
+ * }
+ * ```
+ * Comment text is kept as is, frontend formats it.
+ */
+bool doc_write_library_json(Nob_String_View file, const char *path) {
+    FILE *f = fopen(path, "wb");
+    if (f == NULL) {
+        nob_log(NOB_ERROR, "Could not open '%s' for writing: %s", path, strerror(errno));
+        return false;
+    }
+
+    Nob_String_View content = file;
+    Nob_String_View header  = doc_get_block_comment(&content);
+
+    // Trailer starts on the line after the last #endif, empty if there is none.
+    Nob_String_View trailer = {0};
+    for (Nob_String_View rest = doc_trim_sv_till(file, DOC_SV_LIT("#endif")); rest.data != NULL; rest = doc_trim_sv_till(rest, DOC_SV_LIT("#endif"))) {
+        nob_sv_chop_by_delim(&rest, '\n');
+        trailer = rest;
+    }
+
+    fputs("{\n  \"header\": ", f);
+    doc_print_json_string(f, header);
+    fputs(",\n  \"trailer\": [", f);
+
+    size_t count = 0;
+    while (true) {
+        Nob_String_View comment = doc_get_block_comment(&trailer);
+        if (comment.data == NULL) break;
+
+        fputs(count == 0 ? "\n    " : ",\n    ", f);
+        doc_print_json_string(f, comment);
+        count++;
+    }
+
+    fputs(count > 0 ? "\n  ]\n}\n" : "]\n}\n", f);
+    fclose(f);
+
+    nob_log(NOB_INFO, "Wrote library header and %zu trailing comments to '%s'.", count, path);
+    return true;
 }
 
 bool doc_parse_entry(Nob_String_View symbol, Nob_String_View signature, Nob_String_View doc, Doc_Entry *entry_out) {
@@ -767,10 +1150,13 @@ bool doc_parse_entry(Nob_String_View symbol, Nob_String_View signature, Nob_Stri
         Nob_String_View tag_sv = doc_get_sv_till(line, DOC_SV_LIT(":"));
         size_t tag_length = tag_sv.count + 1; // +1 for ':'.
 
-        // "PARAM name: text", name of the parameter is kept in the text as "name: text".
-        if (nob_sv_starts_with(tag_sv, DOC_SV_LIT("PARAM ")) && doc_sv_is_identifier(nob_sv_from_parts(tag_sv.data + 6, tag_sv.count - 6))) {
-            tag_sv.count = 5;
-            tag_length = 6;
+        // "PARAM name: text" and "MEMBER name: text", the name is kept in the text as "name: text".
+        Nob_String_View tag_word = doc_get_sv_till(tag_sv, DOC_SV_LIT(" "));
+        bool is_named_tag = tag_word.count < tag_sv.count &&
+            (nob_sv_eq(tag_word, DOC_SV_LIT("PARAM")) || nob_sv_eq(tag_word, DOC_SV_LIT("MEMBER")));
+        if (is_named_tag && doc_sv_is_identifier(nob_sv_from_parts(tag_sv.data + tag_word.count + 1, tag_sv.count - tag_word.count - 1))) {
+            tag_sv     = tag_word;
+            tag_length = tag_word.count + 1; // +1 for ' ', name itself stays in the line.
         }
 
         Doc_Tag_Kind tag_kind = is_fence ? UNKNOWN : doc_sv_to_tag(tag_sv);
@@ -1472,81 +1858,60 @@ int doc_command(int *argc, char ***argv) {
 
     Nob_String_View content = nob_sb_to_sv(sb);
 
+    // Comments about the library as a whole go into their own json.
+    if (!doc_write_library_json(content, DOC_DIR"/library.json")) return 1;
 
     // Cutting content down to the needed size.
     content = doc_get_sv_till(content, DOC_SV_LIT("#ifdef CN_IMPLEMENTATION"));
 
-    // Will be used on every doc. Cleared on every new doc.
-    Nob_String_Builder doc_text_sb = {0};           // Summary and tag texts, back to back.
-    Nob_String_Builder doc_description_sb = {0};
-    Doc_Entry doc_entry = {0};
+    // Every doc comment is followed by declaration it documents, unless it is a section banner,
+    // which switches the module of all following entries.
+    Nob_String_View    module       = DOC_SV_LIT("misc");
+    Nob_String_Builder signature_sb = {0};  // Cleared for every entry, it is printed right away.
+    Doc_Entry          doc_entry    = {0};
 
     while (true) {
-        // Getting doc comment.
         Nob_String_View doc = doc_get_next_comment(&content);
         if (doc.data == NULL) break;
 
-        // Getting declaration.
-        Nob_String_View decl = content;
-        decl = nob_sv_trim_left(decl);  // Removing any white space (newline, etc...).
-
-        decl = doc_get_sv_till(decl, DOC_SV_LIT("\n"));
-
-        // Skipping declarations without CNDEF, #define.
-        if (!nob_sv_starts_with(decl, DOC_SV_LIT("CNDEF")) && !nob_sv_starts_with(decl, DOC_SV_LIT("#define"))) {
+        Nob_String_View section = doc_get_section(doc);
+        if (section.count > 0) {
+            module = section;
             continue;
         }
 
-        // Geting name based on `cn_` and detecting if it is a function, if not skipping it too.
-        // Internal `cn__` names are omitted too.
-        Nob_String_View symbol = decl;
-        symbol = doc_trim_sv_till(symbol, DOC_SV_LIT("cn_"));
+        Nob_String_View decl = doc_get_declaration(&content);
 
-        // Gettting symbol based on prefix.
-        if (symbol.data == NULL) {
-            nob_log(NOB_WARNING, "Non-prefixed symbol name, is not detected in declaration: '%.*s'.", DOC_SV_UNPACK(decl));
+        Doc_Kind        kind;
+        Nob_String_View symbol;
+        if (!doc_classify_declaration(decl, &kind, &symbol)) continue;
+
+        if (!doc_sv_has_library_prefix(symbol)) {
+            nob_log(NOB_WARNING, "Documented symbol '%.*s' is not prefixed with 'cn_', 'Cn_' or 'CN_', skipping it.", DOC_SV_UNPACK(symbol));
             continue;
         }
 
-        // Internal declaration skipped.
-        if (symbol.count < 4 || symbol.data[3] == '_') {
-            continue;
-        }
+        // Internal `cn__` declarations are not documented.
+        if (symbol.data[3] == '_') continue;
 
-        // Getting end of the symbol.
-        Nob_String_View symbol_end = doc_trim_sv_till(symbol, DOC_SV_LIT("("));
-        if (symbol_end.data == NULL) {
-            symbol_end = doc_trim_sv_till(symbol, DOC_SV_LIT(";"));
-            if (symbol_end.data == NULL) {
-                nob_log(NOB_WARNING, "Unidentified symbol name, '(' or ';' is not detected in declaration: '%.*s'.", DOC_SV_UNPACK(decl));
-                continue;
-            }
-        }
-        symbol.count -= symbol_end.count;
+        Nob_String_View signature = doc_make_signature(decl, kind, &signature_sb);
+        if (!doc_parse_entry(symbol, signature, doc, &doc_entry)) return -1;
+        doc_entry.kind   = kind;
+        doc_entry.module = module;
 
-        
-
-        // Signature for display: without CNDEF prefix and trailing ';'.
-        Nob_String_View signature = decl;
-        signature = nob_sv_trim(signature);
-        if (signature.count > 0 && signature.data[signature.count - 1] == ';') signature.count--;
-
-        bool ok = doc_parse_entry(symbol, nob_sv_trim_right(signature), doc, &doc_entry);
-        if (!ok) return -1;
-
-        // Printing json.
         if (entry_count > 0) fputs(",\n", json);
         doc_print_json_entry(json, &doc_entry);
         entry_count++;
+
+        // Tags are appended by doc_parse_entry into a fresh list every time.
+        nob_da_free(doc_entry.tags);
     }
 
     fputs(entry_count > 0 ? "\n]\n" : "]\n", json);
     fclose(json);
     nob_log(NOB_INFO, "Wrote %zu documentation entries to '%s'.", entry_count, json_path);
 
-    nob_da_free(doc_entry.tags);
-    nob_sb_free(doc_text_sb);
-    nob_sb_free(doc_description_sb);
+    nob_sb_free(signature_sb);
 
     nob_sb_free(sb);
 

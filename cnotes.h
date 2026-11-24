@@ -1,4 +1,4 @@
-/*  cnotes - v0.2.0 - MIT License - https://github.com/dmarshaq/cnotes.h
+/*  cnotes - v0.3.0 - MIT License - https://github.com/dmarshaq/cnotes.h
 
     A header-only library for building C meta programs, static analysis tools, 
     and source transformation pipelines - operating directly on pre-processed .i files.
@@ -204,6 +204,8 @@ CNDEF Cn_Log_Handler cn_null_log_handler;
  * Passes formatted log message to the current log handler.
  *
  * Message is printed by calling `cn_log_handler` with `level`, `format` and its arguments.
+ *
+ * SINCE: 0.3.0
  */
 CNDEF void cn_log(Cn_Log_Level level, const char *format, ...);
 
@@ -218,6 +220,8 @@ typedef bool (Cn_Equals_Function)(const void *a, const void *b);
 
 /**
  * Hashes unsigned 64-bit integer using the splitmix64 algorithm.
+ *
+ * SINCE: 0.3.0
  */
 CNDEF uint64_t cn_hash_u64(uint64_t value);
 
@@ -225,6 +229,8 @@ CNDEF uint64_t cn_hash_u64(uint64_t value);
  * Hashes the address of `ptr`.
  *
  * NOTE: Wraps around `cn_hash_u64`.
+ *
+ * SINCE: 0.3.0
  */
 CNDEF uint64_t cn_hash_ptr(void *ptr);
 
@@ -998,18 +1004,35 @@ typedef struct {
     int64_t item_size;
 } Cn_Array_List_Header;
 
+/**
+ * Makes new array list allocated dynamically with a `Cn_Array_List_Header` included.
+ * 
+ * RETURNS: Pointer of specified `type` that can passed to `cn_array_*` functionality.
+ */
 #define cn_array_list_make(type, capacity)\
     (type *)cn__array_list_make(sizeof(type), capacity)
 
+/**
+ * RETURNS: `int64_t` length of an array.
+ */
 #define cn_array_list_length(ptr_list)\
     cn__array_list_length((void *)*ptr_list)
 
+/**
+ * RETURNS: `int64_t` capacity of an array.
+ */
 #define cn_array_list_capacity(ptr_list)\
     cn__array_list_capacity((void *)*ptr_list)
 
+/**
+ * RETURNS: `int64_t` item size of an array.
+ */
 #define cn_array_list_item_size(ptr_list)\
     cn__array_list_item_size((void *)*ptr_list)
 
+/**
+ * Appends `item` to the specified array list.
+ */
 #define cn_array_list_append(ptr_list, item)\
     do {\
         cn__array_list_resize_to_fit((void **)(ptr_list), cn_array_list_length(ptr_list) + 1);\
@@ -1017,27 +1040,49 @@ typedef struct {
         (*ptr_list)[cn__h_->length++] = item;\
     } while(0)
 
+/**
+ * Appends array of items, `item_arr`, to the specified array list.
+ */
 #define cn_array_list_append_multiple(ptr_list, item_arr, count)\
     cn__array_list_append_multiple((void **)ptr_list, (void *)item_arr, count)
 
+/**
+ * Adds `item` to the specified `index` in array list, shifting all other items one place to the right.
+ */
 #define cn_array_list_add(ptr_list, index, item)\
     do {\
         cn__array_list_shift_to_fit((void **)(ptr_list), index, 1);\
         (*ptr_list)[index] = item;\
     } while(0)
 
+/**
+ * Removes last item from specified array list.
+ */
 #define cn_array_list_pop(ptr_list)\
     cn__array_list_pop((void *)*ptr_list, 1)
 
+/**
+ * Removes `count` of items from the end of specified array list.
+ */
 #define cn_array_list_pop_multiple(ptr_list, count)\
     cn__array_list_pop((void *)*ptr_list, count)
 
+/**
+ * Sets array list length to `0`, clearing all its items.
+ */
 #define cn_array_list_clear(ptr_list)\
     cn__array_list_clear((void *)*ptr_list)
 
+/**
+ * Removes item at `index` from the specified array list in constant time,
+ * by swapping item with the last item, and decreasing length by -1.
+ */
 #define cn_array_list_unordered_remove(ptr_list, index)\
     cn__array_list_unordered_remove((void *)*ptr_list, index)
 
+/**
+ * Frees all memory occupied the array list.
+ */
 #define cn_array_list_free(ptr_list)\
     cn__array_list_free((void **)ptr_list)
 
@@ -10173,7 +10218,9 @@ CNDEF bool cn__extension_register(Cn_Extension *extensions[], int64_t length) {
 
 
         for (int64_t i = 0; i < length; i++) {
-            if (!extensions[i](&cn_hooks, cn_ast_info_table)) return false;
+            if (extensions[i] != NULL) {
+                if (!extensions[i](&cn_hooks, cn_ast_info_table)) return false;
+            }
         }
         
         enabled = true;
@@ -17823,7 +17870,7 @@ CNDEF void cn__tu_data_free(Cn_Tu_Data *data) {
 
 CNDEF bool cn__tu_init_opt(Cn_Translation_Unit *tu, char *intermidiate_path, Cn_Tu_Make_Opt opt) {
     // TEMPORARY:
-    cn_extension_register();
+    cn_extension_register(0);
 
     *tu = (Cn_Translation_Unit) {0};
 
@@ -17975,6 +18022,9 @@ CN_AST_INFO_DEFINE_ARRAY(CORE, 0, CN_AST_GEN_LIST);
 
 /* 
     Revision history:
+        0.3.0 (2026-11-24) Removed `message_` interface, now it is replaced by `hook_`.
+                           Added 
+
         0.2.0 (2026-11-11) Added variable length array support, as well as incomplete array support.
                            Added parameter adjustments in to type conversions from AST.
                            Added basic char parsing, typechecking and evaluation.
