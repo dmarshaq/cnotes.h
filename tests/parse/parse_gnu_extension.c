@@ -17,9 +17,11 @@
  * `if`/`while`/`do while`/`switch` conditions, `case` labels and `return`. Repeated `__extension__
  * __extension__` in every declaration position.
  *
+ * AI: Generated.
+ *
  * --gnu
  */
-// AI: Generated.
+
 /* --- external declarations ------------------------------------------- */
 __extension__ int extension_global;
 __extension__ int extension_initialized_global = 1;
