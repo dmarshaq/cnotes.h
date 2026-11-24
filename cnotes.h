@@ -7564,6 +7564,10 @@ CNDEF void cn_lexer_log_tokens(Cn_Lexer *lexer, int64_t n) {
 CNDEF bool cn_lexer_changed(Cn_Lexer *lexer, Cn_Lexer *saved) {
     if (lexer->cursor != saved->cursor) return true;
 
+    // Once EOF is lexed into the queue, cursor stops moving and consuming tokens only moves queue indices.
+    if (lexer->current_idx != saved->current_idx) return true;
+    if (lexer->head_idx != saved->head_idx || lexer->tail_idx != saved->tail_idx) return true;
+
     // Checking queue.
     for (int i = 0; i < CN_LEXER_QUEUE_COUNT; i++) {
         if (!cn_token_equals(&lexer->queue[i], &saved->queue[i])) return true;
@@ -9084,9 +9088,9 @@ CNDEF Cn_Ast_Extensions cn_ast_copy_extensions(Cn_Ast_Extensions extensions) {
 
     for (int64_t i = 0; i < extensions.length; i++) {
         if (extensions.exts[i].kind == CN_AST_EXTENSION_NODE) {
-            cn_ast_ext_stack_push(((Cn_Ast_Extension) { .kind = CN_AST_EXTENSION_NODE, .node = cn_ast_copy(extensions.exts[i].node) }));
+            cn_ast_ext_stack_push(((Cn_Ast_Extension) { .kind = CN_AST_EXTENSION_NODE, .slot = extensions.exts[i].slot, .node = cn_ast_copy(extensions.exts[i].node) }));
         } else {
-            cn_ast_ext_stack_push(((Cn_Ast_Extension) { .kind = CN_AST_EXTENSION_LIST, .list = cn_ast_copy_list(extensions.exts[i].list) }));
+            cn_ast_ext_stack_push(((Cn_Ast_Extension) { .kind = CN_AST_EXTENSION_LIST, .slot = extensions.exts[i].slot, .list = cn_ast_copy_list(extensions.exts[i].list) }));
         }
     }
 
@@ -10598,9 +10602,6 @@ CNDEF Cn_Type *cn__analyze_base_type_from_specifier(Cn_Ast_Node *type_specifier)
     Cn_Ast_Node *ts = type_specifier;
     Cn_Type *result;
 
-
-    // TODO: CN_MESSAGE_ANALYZE_BASE_TYPE
- 
     switch (ts->id) {
         case CN_AST_TYPE_SPECIFIER_PRIMITIVE:
             result = cn__analyze_type_from_primitive(type_specifier);
@@ -12782,11 +12783,52 @@ CNDEF void cn__emit_code(Cn_Emitter *e, Cn_Ast_Code *node) {
     cn__emit_str(e, left);
 }
 
+/**
+ * Helper to emit every extension of `node` that was parsed at `slot`, in the order it was parsed.
+ *
+ * Each extension is surrounded by `before` and `after`, so the caller decides how it is
+ * separated from the code around the slot. Extension lists have their nodes separated by a space.
+ *
+ * NOTE: Emitter of every node kind that has slots is responsible for calling this at the exact
+ * location of each slot, so the extensions are reparsed by the same subparsing hooks.
+ */
+CNDEF void cn__emit_slot(Cn_Emitter *e, void *n, Cn_Ast_Slot_Id slot, Cn_String before, Cn_String after) {
+    Cn_Ast_Node *node = n;
+    if (node == NULL) return;
+
+    for (int64_t i = 0; i < node->extensions.length; i++) {
+        Cn_Ast_Extension *ext = &node->extensions.exts[i];
+        if (ext->slot != slot) continue;
+
+        if (before.length > 0) cn__emit_str(e, before);
+
+        if (ext->kind == CN_AST_EXTENSION_NODE) {
+            cn_emit(e, ext->node);
+        } else {
+            for (int64_t j = 0; j < ext->list.length; j++) {
+                if (j > 0) cn__emit_str_lit(e, " ");
+                cn_emit(e, ext->list.ptrs[j]);
+            }
+        }
+
+        if (after.length > 0) cn__emit_str(e, after);
+    }
+}
+
+/**
+ * Emits extensions of the slot that precedes code, each followed by a space.
+ */
+#define cn__emit_slot_prefix(e, n, slot) cn__emit_slot((e), (n), (slot), CN_STR_LIT(""), CN_STR_LIT(" "))
+
+/**
+ * Emits extensions of the slot that follows code, each preceded by a space.
+ */
+#define cn__emit_slot_suffix(e, n, slot) cn__emit_slot((e), (n), (slot), CN_STR_LIT(" "), CN_STR_LIT(""))
+
 // Forward declarations of internal emit functions.
 CNDEF void cn__emit_storage_specifiers(Cn_Emitter *e, Cn_Ast_Storage_Specifier_Flags storage);
 CNDEF void cn__emit_qualifiers(Cn_Emitter *e, Cn_Ast_Qualifier_Flags qualifiers);
 CNDEF void cn__emit_function_specifiers(Cn_Emitter *e, Cn_Ast_Function_Specifier_Flags func_spec);
-// CNDEF void cn__emit_gnu_attribute_specifiers(Cn_Emitter *e, Cn_Ast_Nodes specifiers);
 CNDEF void cn__emit_attribute_specifiers(Cn_Emitter *e, Cn_Ast_Nodes specifiers);
 CNDEF void cn__emit_designations(Cn_Emitter *e, Cn_Ast_Nodes designations);
 
@@ -12798,9 +12840,14 @@ CNDEF void cn__emit_translation_unit(Cn_Emitter *e, Cn_Ast_Translation_Unit *nod
 
 CNDEF void cn__emit_external_declaration(Cn_Emitter *e, Cn_Ast_External_Declaration *node) {
     if (node->child == NULL) {
+        cn__emit_slot_prefix(e, node, CN_AST_SLOT_EXTERNAL_DECLARATION_PREFIX);
         cn__emit_str_lit(e, ";");
         cn__emit_newline(e);
     } else {
+        // Both slots are parsed before the child, child itself can be substituted by the second one.
+        cn__emit_slot_prefix(e, node, CN_AST_SLOT_EXTERNAL_DECLARATION_PREFIX);
+        cn__emit_slot_prefix(e, node, CN_AST_SLOT_EXTERNAL_DECLARATION);
+
         if ((node->child)->id == CN_AST_DECLARATION)
             e->flags |= CN_EMITTER_END_DECLARATION_WITH_SEMICOLON;
 
@@ -12838,6 +12885,7 @@ CNDEF void cn__emit_function(Cn_Emitter *e, Cn_Ast_Function *node) {
 
 CNDEF void cn__emit_block(Cn_Emitter *e, Cn_Ast_Block *node) {
     cn__emit_attribute_specifiers(e, node->attribute_specifiers);
+    cn__emit_slot_prefix(e, node, CN_AST_SLOT_STATEMENT);
 
     cn__emit_str_lit(e, "{");
 
@@ -12862,6 +12910,9 @@ CNDEF void cn__emit_block(Cn_Emitter *e, Cn_Ast_Block *node) {
 }
 
 CNDEF void cn__emit_block_item(Cn_Emitter *e, Cn_Ast_Block_Item *node) {
+    // Only present when item is a declaration, parsed before its attribute specifiers.
+    cn__emit_slot_prefix(e, node, CN_AST_SLOT_DECLARATION_PREFIX);
+
     if ((node->declaration_or_statement)->id == CN_AST_DECLARATION)
         e->flags |= CN_EMITTER_END_DECLARATION_WITH_SEMICOLON;
     cn_emit(e, node->declaration_or_statement);
@@ -12869,6 +12920,7 @@ CNDEF void cn__emit_block_item(Cn_Emitter *e, Cn_Ast_Block_Item *node) {
 
 CNDEF void cn__emit_if_statement(Cn_Emitter *e, Cn_Ast_If *node) {
     cn__emit_attribute_specifiers(e, node->attribute_specifiers);
+    cn__emit_slot_prefix(e, node, CN_AST_SLOT_STATEMENT);
     cn__emit_str_lit(e, "if (");
     cn_emit(e, node->condition);
     cn__emit_str_lit(e, ") ");
@@ -12908,6 +12960,7 @@ CNDEF void cn__emit_if_statement(Cn_Emitter *e, Cn_Ast_If *node) {
 
 CNDEF void cn__emit_switch_statement(Cn_Emitter *e, Cn_Ast_Switch *node) {
     cn__emit_attribute_specifiers(e, node->attribute_specifiers);
+    cn__emit_slot_prefix(e, node, CN_AST_SLOT_STATEMENT);
     cn__emit_str_lit(e, "switch (");
     cn_emit(e, node->condition);
     cn__emit_str_lit(e, ") ");
@@ -12926,6 +12979,7 @@ CNDEF void cn__emit_switch_statement(Cn_Emitter *e, Cn_Ast_Switch *node) {
 
 CNDEF void cn__emit_while_statement(Cn_Emitter *e, Cn_Ast_While *node) {
     cn__emit_attribute_specifiers(e, node->attribute_specifiers);
+    cn__emit_slot_prefix(e, node, CN_AST_SLOT_STATEMENT);
     cn__emit_str_lit(e, "while (");
     cn_emit(e, node->condition);
     cn__emit_str_lit(e, ") ");
@@ -12944,6 +12998,7 @@ CNDEF void cn__emit_while_statement(Cn_Emitter *e, Cn_Ast_While *node) {
 
 CNDEF void cn__emit_do_while(Cn_Emitter *e, Cn_Ast_Do_While *node) {
     cn__emit_attribute_specifiers(e, node->attribute_specifiers);
+    cn__emit_slot_prefix(e, node, CN_AST_SLOT_STATEMENT);
     cn__emit_str_lit(e, "do ");
 
     Cn_Ast_Node *body = node->body;
@@ -12970,7 +13025,11 @@ CNDEF void cn__emit_do_while(Cn_Emitter *e, Cn_Ast_Do_While *node) {
 
 CNDEF void cn__emit_for_statement(Cn_Emitter *e, Cn_Ast_For *node) {
     cn__emit_attribute_specifiers(e, node->attribute_specifiers);
+    cn__emit_slot_prefix(e, node, CN_AST_SLOT_STATEMENT);
     cn__emit_str_lit(e, "for (");
+
+    // Only present when initialization is a declaration.
+    cn__emit_slot_prefix(e, node, CN_AST_SLOT_DECLARATION_PREFIX);
 
     // Initialization can be a declaration, but its semicolon is emitted here
     // as a part of the for clause, so the declaration flag is left unset.
@@ -13003,6 +13062,7 @@ CNDEF void cn__emit_for_statement(Cn_Emitter *e, Cn_Ast_For *node) {
 
 CNDEF void cn__emit_label(Cn_Emitter *e, Cn_Ast_Label *node) {
     cn__emit_attribute_specifiers(e, node->attribute_specifiers);
+    cn__emit_slot_prefix(e, node, CN_AST_SLOT_STATEMENT);
 
     if (node->flags & CN_AST_LABEL_IS_CASE) {
         cn__emit_str_lit(e, "case ");
@@ -13029,6 +13089,7 @@ CNDEF void cn__emit_label(Cn_Emitter *e, Cn_Ast_Label *node) {
 
 CNDEF void cn__emit_goto_statement(Cn_Emitter *e, Cn_Ast_Goto *node) {
     cn__emit_attribute_specifiers(e, node->attribute_specifiers);
+    cn__emit_slot_prefix(e, node, CN_AST_SLOT_STATEMENT);
 
     cn__emit_str_lit(e, "goto ");
     cn_emit(e, node->identifier);
@@ -13038,6 +13099,7 @@ CNDEF void cn__emit_goto_statement(Cn_Emitter *e, Cn_Ast_Goto *node) {
 
 CNDEF void cn__emit_return_statement(Cn_Emitter *e, Cn_Ast_Return *node) {
     cn__emit_attribute_specifiers(e, node->attribute_specifiers);
+    cn__emit_slot_prefix(e, node, CN_AST_SLOT_STATEMENT);
 
     cn__emit_str_lit(e, "return");
     if (node->expression != NULL) {
@@ -13050,6 +13112,7 @@ CNDEF void cn__emit_return_statement(Cn_Emitter *e, Cn_Ast_Return *node) {
 
 CNDEF void cn__emit_break_statement(Cn_Emitter *e, Cn_Ast_Break *node) {
     cn__emit_attribute_specifiers(e, node->attribute_specifiers);
+    cn__emit_slot_prefix(e, node, CN_AST_SLOT_STATEMENT);
 
     cn__emit_str_lit(e, "break;");
     cn__emit_newline(e);
@@ -13057,6 +13120,7 @@ CNDEF void cn__emit_break_statement(Cn_Emitter *e, Cn_Ast_Break *node) {
 
 CNDEF void cn__emit_continue_statement(Cn_Emitter *e, Cn_Ast_Continue *node) {
     cn__emit_attribute_specifiers(e, node->attribute_specifiers);
+    cn__emit_slot_prefix(e, node, CN_AST_SLOT_STATEMENT);
 
     cn__emit_str_lit(e, "continue;");
     cn__emit_newline(e);
@@ -13064,6 +13128,7 @@ CNDEF void cn__emit_continue_statement(Cn_Emitter *e, Cn_Ast_Continue *node) {
 
 CNDEF void cn__emit_expression_statement(Cn_Emitter *e, Cn_Ast_Expression_Statement *node) {
     cn__emit_attribute_specifiers(e, node->attribute_specifiers);
+    cn__emit_slot_prefix(e, node, CN_AST_SLOT_STATEMENT);
 
     cn_emit(e, node->expression);
     cn__emit_str_lit(e, ";");
@@ -13142,7 +13207,7 @@ CNDEF void cn__emit_binary(Cn_Emitter *e, Cn_Ast_Binary *node) {
 CNDEF void cn__emit_access(Cn_Emitter *e, Cn_Ast_Access *node) {
     cn_emit(e, node->expression);
 
-    if (node->id) {
+    if (node->flags & CN_AST_ACCESS_IS_POINTER) {
         cn__emit_str_lit(e, "->");
     } else {
         cn__emit_str_lit(e, ".");
@@ -13221,6 +13286,8 @@ CNDEF void cn__emit_assign(Cn_Emitter *e, Cn_Ast_Assign *node) {
 }
 
 CNDEF void cn__emit_primary(Cn_Emitter *e, Cn_Ast_Primary *node) {
+    // Literal itself can be substituted by this slot.
+    cn__emit_slot_prefix(e, node, CN_AST_SLOT_PRIMARY);
     cn_emit(e, node->literal);
 }
 
@@ -13286,6 +13353,10 @@ CNDEF void cn__emit_declarator(Cn_Emitter *e, Cn_Ast_Declarator *node) {
 CNDEF void cn__emit_pointer(Cn_Emitter *e, Cn_Ast_Pointer *node) {
     cn__emit_str_lit(e, "*");
     cn__emit_qualifiers(e, node->qualifiers);
+
+    // Slot is parsed interleaved with qualifiers, which can be freely reordered, so it goes after them.
+    cn__emit_slot_prefix(e, node, CN_AST_SLOT_POINTER);
+
     cn_emit(e, node->pointer);
 }
 
@@ -13321,6 +13392,12 @@ CNDEF void cn__emit_declaration_specifiers(Cn_Emitter *e, Cn_Ast_Declaration_Spe
     cn__emit_function_specifiers(e, node->function_specifiers);
     // cn__emit_gnu_attribute_specifiers(e, node->gnu_attribute_specifiers);
     cn__emit_qualifiers(e, node->qualifiers);
+
+    // Both slots are parsed interleaved with other specifiers, which can be freely reordered,
+    // so they go right before the type specifier, which can be substituted by the second one.
+    cn__emit_slot_prefix(e, node, CN_AST_SLOT_DECLARATION_SPECIFIERS);
+    cn__emit_slot_prefix(e, node, CN_AST_SLOT_TYPE_SPECIFIER);
+
     cn_emit(e, node->type_specifier);
 }
 
@@ -13382,6 +13459,8 @@ CNDEF void cn__emit_struct_specifier(Cn_Emitter *e, Cn_Ast_Struct_Specifier *nod
     cn__emit_attribute_specifiers(e, node->attribute_specifiers);
     // cn__emit_gnu_attribute_specifiers(e, node->gnu_attribute_specifiers);
 
+    cn__emit_slot_prefix(e, node, CN_AST_SLOT_TAG);
+
     cn_emit(e, node->identifier);
 
     // Only emit body if there are members.
@@ -13405,6 +13484,8 @@ CNDEF void cn__emit_union_specifier(Cn_Emitter *e, Cn_Ast_Union_Specifier *node)
     cn__emit_attribute_specifiers(e, node->attribute_specifiers);
     // cn__emit_gnu_attribute_specifiers(e, node->gnu_attribute_specifiers);
 
+    cn__emit_slot_prefix(e, node, CN_AST_SLOT_TAG);
+
     cn_emit(e, node->identifier);
 
     if (node->member_declarations.length > 0) {
@@ -13426,6 +13507,8 @@ CNDEF void cn__emit_enum_specifier(Cn_Emitter *e, Cn_Ast_Enum_Specifier *node) {
 
     cn__emit_attribute_specifiers(e, node->attribute_specifiers);
     // cn__emit_gnu_attribute_specifiers(e, node->gnu_attribute_specifiers);
+
+    cn__emit_slot_prefix(e, node, CN_AST_SLOT_TAG);
 
     cn_emit(e, node->identifier);
 
@@ -13459,6 +13542,7 @@ CNDEF void cn__emit_type_name(Cn_Emitter *e, Cn_Ast_Type_Name *node) {
 
 CNDEF void cn__emit_specifier_qualifier(Cn_Emitter *e, Cn_Ast_Specifier_Qualifier *node) {
     cn__emit_qualifiers(e, node->qualifiers);
+    cn__emit_slot_prefix(e, node, CN_AST_SLOT_TYPE_SPECIFIER);
     cn_emit(e, node->type_specifier);
 }
 
@@ -13491,9 +13575,7 @@ CNDEF void cn__emit_string(Cn_Emitter *e, Cn_Ast_String *node) {
 CNDEF void cn__emit_member_declaration(Cn_Emitter *e, Cn_Ast_Member_Declaration *node) {
     cn__emit_newline(e);
 
-    // AI: Generated.
-    // Emitted here instead of `cn_emit`, so it is placed after the newline.
-    // TODO: GNU: if (node->flags & CN_AST_GNU_EXTENSION) cn__emit_str_lit(e, "__extension__ ");
+    cn__emit_slot_prefix(e, node, CN_AST_SLOT_MEMBER_DECLARATION_PREFIX);
 
     cn__emit_attribute_specifiers(e, node->attribute_specifiers);
 
@@ -13515,6 +13597,8 @@ CNDEF void cn__emit_member_declarator(Cn_Emitter *e, Cn_Ast_Member_Declarator *n
         cn_emit(e, node->bitfield);
     }
 
+    cn__emit_slot_suffix(e, node, CN_AST_SLOT_MEMBER_DECLARATOR);
+
     cn__emit_attribute_specifiers(e, node->gnu_attribute_specifiers);
 }
 
@@ -13522,13 +13606,7 @@ CNDEF void cn__emit_member_declarator(Cn_Emitter *e, Cn_Ast_Member_Declarator *n
 CNDEF void cn__emit_init_declarator(Cn_Emitter *e, Cn_Ast_Init_Declarator *node) {
     cn_emit(e, node->declarator);
 
-    // TODO: GNU:
-    // if (node->gnu_asm_label != NULL) {
-    //     cn__emit_str_lit(e, " ");
-    //     cn_emit(e, node->gnu_asm_label);
-    // }
-
-    // cn__emit_gnu_attribute_specifiers(e, node->gnu_attribute_specifiers);
+    cn__emit_slot_suffix(e, node, CN_AST_SLOT_AFTER_DECLARATOR);
 
     if (node->initializer != NULL) {
         cn__emit_str_lit(e, " = ");
@@ -13553,6 +13631,8 @@ CNDEF void cn__emit_enumerator(Cn_Emitter *e, Cn_Ast_Enumerator *node) {
     cn__emit_attribute_specifiers(e, node->attribute_specifiers);
     // cn__emit_gnu_attribute_specifiers(e, node->gnu_attribute_specifiers);
 
+    cn__emit_slot_suffix(e, node, CN_AST_SLOT_ENUMERATOR);
+
     if (node->expression != NULL) {
         cn__emit_str_lit(e, " = ");
         cn_emit(e, node->expression);
@@ -13563,6 +13643,9 @@ CNDEF void cn__emit_enumerator(Cn_Emitter *e, Cn_Ast_Enumerator *node) {
 
 CNDEF void cn__emit_attribute_specifiers(Cn_Emitter *e, Cn_Ast_Nodes specifiers) {
     for (int64_t i = 0; i < specifiers.length; i++) {
+        // Empty attribute specifiers emit nothing, so no separator either.
+        if (specifiers.ptrs[i]->id == CN_AST_ATTRIBUTE_SPECIFIER && cn_ast_as(Attribute_Specifier, specifiers.ptrs[i])->attributes.length == 0) continue;
+
         cn_emit(e, specifiers.ptrs[i]);
         cn__emit_str_lit(e, " ");
     }
@@ -13606,24 +13689,22 @@ CNDEF void cn_emit(Cn_Emitter *e, void *n) {
 
     Cn_Ast_Node *node = n;
 
-    // TODO: GNU:
-    // AI: Generated.
-    // Any node can be preceded by '__extension__', except member declaration, which emits it itself.
-    // Expression is parenthesized, so '__extension__' stays on the same operand when parsed back,
-    // e.g. `(__extension__ f)(1)` instead of `__extension__ f(1)`, which would flag the call.
-    // Expression kinds are contiguous in `CN_AST_GEN_LIST`, from `BINARY` to `PRIMARY`.
-    // bool gnu_extension = (node->flags & CN_AST_GNU_EXTENSION) && node->kind != CN_AST_MEMBER_DECLARATION;
-    // bool gnu_extension_expression = gnu_extension && node->kind >= CN_AST_BINARY && node->kind <= CN_AST_PRIMARY;
-    // if (gnu_extension_expression) cn__emit_str_lit(e, "(");
-    // if (gnu_extension) cn__emit_str_lit(e, "__extension__ ");
+    // Expression prefix slot is attached to whichever expression follows it, of any kind,
+    // and nothing is emitted before an expression, so it is handled here for every node.
+    cn__emit_slot_prefix(e, node, CN_AST_SLOT_EXPRESSION_PREFIX);
+
+    // TODO: Trace and figure how much feature of statement replacing is actually needed.
+    // It is very inconvenient right now to handle whole statement ast node replacement.
+    // Either drop support of custom statement handling or drop this idea as a whole.
+    //
+    // Core statements emit statement slot themselves, after their attribute specifiers.
+    // Custom nodes substituted at statement slot get it emitted here, right before them.
+    if (CN_AST_KIND_EXTENSION_ID(node->id) != 0) {
+        cn__emit_slot_prefix(e, node, CN_AST_SLOT_STATEMENT);
+    }
 
     void (*emit)(Cn_Emitter *, void *) = cn_ast_info(node->id)->emit_func;
     emit(e, node);
-
-
-    // TODO: GNU:
-    // AI: Generated.
-    // if (gnu_extension_expression) cn__emit_str_lit(e, ")");
 }
 
 
@@ -13774,13 +13855,14 @@ CNDEF Cn_Ast_External_Declaration *cn_parse_external_declaration(Cn_Lexer *lexer
     // Marking ext stack since this function has subparsing hooks.
     int64_t ext_mark = cn__ast_ext_stack_mark();
 
-    // If stray ';' case.
+    if (!cn__hook_parse(CN_AST_SLOT_EXTERNAL_DECLARATION_PREFIX, NULL, lexer)) goto error;
+
+    // If stray ';' case, it still can be prefixed.
     if (cn_lexer_token(lexer).type == CN_TOKEN_SEMICOLON) {
         cn_lexer_next_token(lexer);
+        node.extensions = cn__ast_ext_stack_finalize(ext_mark);
         return cn_ast_new(node);
     }
-
-    if (!cn__hook_parse(CN_AST_SLOT_EXTERNAL_DECLARATION_PREFIX, NULL, lexer)) goto error;
 
     if (!cn__hook_parse(CN_AST_SLOT_EXTERNAL_DECLARATION, &node.child, lexer)) goto error;
 
@@ -14156,7 +14238,13 @@ CNDEF Cn_Ast_Node *cn_parse_finish_statement(Cn_Lexer *lexer, Cn_Ast_Nodes attri
         }
     }
 
-    statement->extensions = cn__ast_ext_stack_finalize(ext_mark);
+    // Merging, since statement could already carry extensions of its own slots, e.g. `for` declaration prefix.
+    Cn_Ast_Extensions statement_extensions = cn__ast_ext_stack_finalize(ext_mark);
+    if (statement->extensions.length > 0) {
+        statement->extensions = cn_ast_ext_merge(statement->extensions, statement_extensions);
+    } else {
+        statement->extensions = statement_extensions;
+    }
 
     return statement;
 
@@ -14947,17 +15035,6 @@ CNDEF Cn_Ast_Node *cn_parse_expression_leaf(Cn_Lexer *lexer, Cn_Parse_Expression
         return parent;
     }
 
-    // TODO: GNU:
-    // AI: Generated.
-    // Handling '__extension__' unary operator, no node is made for it, operand is flagged instead.
-    // if (cn_parse_gnu_extensions(lexer)) {
-    //     Cn_Ast_Node *expression = cn_parse_expression(lexer, CN_AST_UNARY_OPERATOR_PRECEDENCE, flags);
-    //     if (expression == NULL) goto error;
-
-    //     expression->flags |= CN_AST_GNU_EXTENSION;
-    //     return expression;
-    // }
-
     // Handling unary expression.
     Cn_Ast_Unary_Operator_Kind op_kind = cn_ast_is_unary_operator(lexer);
     if (op_kind != CN_AST_UNARY_OP_NONE) {
@@ -15106,17 +15183,7 @@ CNDEF Cn_Ast_Init_Declarator *cn_parse_finish_init_declarator(Cn_Lexer *lexer, C
 
     node.extensions = cn__ast_ext_stack_finalize(ext_mark);
 
-    // TODO: GNU:
-    // if (cn_lexer_expect(lexer, CN_TOKEN_GNU_ASM)) {
-    //     Cn_Ast_Gnu_Asm_Label *gnu_asm_label = cn_parse_gnu_asm_label(lexer);
-    //     if (gnu_asm_label == NULL) goto error;
-    //     node.gnu_asm_label = gnu_asm_label;
-    // }
-
     bool ok;
-    // TODO: GNU:
-    // node.gnu_attribute_specifiers = cn_parse_gnu_attribute_specifiers(lexer, &ok);
-    // if (!ok) goto error;
 
     if (cn_lexer_expect(lexer, CN_TOKEN_ASSIGN)) {
         cn_lexer_next_token(lexer);
@@ -15366,14 +15433,6 @@ CNDEF Cn_Ast_Pointer *cn_parse_pointer(Cn_Lexer *lexer) {
         Cn_Lexer before_slot = *lexer;
         if (!cn__hook_parse(CN_AST_SLOT_POINTER, NULL, lexer)) goto error;
         if (cn_lexer_changed(lexer, &before_slot)) continue;
-
-        // TODO: GNU:
-        // if (cn_lexer_expect(lexer, CN_TOKEN_GNU_ATTRIBUTE)) {
-        //     Cn_Ast_Gnu_Attribute_Specifier *gnu_attribute_specifier = cn_parse_gnu_attribute_specifier(lexer);
-        //     if (gnu_attribute_specifier == NULL) goto error;
-        //     cn_ast_stack_push(gnu_attribute_specifier);
-        //     continue;
-        // }
 
         break;
     }
@@ -15729,15 +15788,6 @@ CNDEF Cn_Ast_Declaration_Specifiers *cn_parse_declaration_specifiers(Cn_Lexer *l
             continue;
         }
 
-        // TODO: GNU:
-        // if (cn_lexer_expect(lexer, CN_TOKEN_GNU_ATTRIBUTE)) {
-        //     Cn_Ast_Gnu_Attribute_Specifier *gnu_attribute_specifier = cn_parse_gnu_attribute_specifier(lexer);
-        //     if (gnu_attribute_specifier == NULL) goto error;
-        //     cn_ast_stack_push(gnu_attribute_specifier);
-        //     at_least_one = true;
-        //     continue;
-        // }
-
         ok = cn_parse_try_type_specifier(lexer, &primitive_info, &node.type_specifier);
         if (ok == 0) {
             at_least_one = true;
@@ -15981,21 +16031,6 @@ CNDEF int cn_parse_try_type_specifier(Cn_Lexer *lexer, Cn_Primitive_Type_Info *p
 
     if (cn_lexer_changed(lexer, &before_slot)) return 0;
 
-    // TODO: GNU:
-    // Checking if typeof.
-    // if (cn_lexer_expect(lexer, CN_TOKEN_GNU_TYPEOF)) {
-    //     if (primitive_info->kind != CN_AST_TYPE_NONE || *type_specifier != NULL) {
-    //         cn_diagnostic_src(CN_DIAGNOSTIC_ERROR, &cn_lexer_token(lexer).loc, &cn_lexer_token(lexer).src, CN_DC_INVALID_TYPE_SPECIFIER, "Only single type specifier kind is allowed.");
-    //         goto error;
-    //     }
-
-    //     Cn_Ast_Gnu_Typeof *gnu_typeof = cn_parse_gnu_typeof(lexer);
-    //     if (gnu_typeof == NULL) goto error;
-
-    //     *type_specifier = cn_ast_node(gnu_typeof);
-    //     return 0;
-    // }
-
     // Checking if token is type sign.
     if (cn_lexer_expect(lexer, CN_TOKEN_SIGNED)) {
         if (primitive_info->sign != CN_AST_TYPE_SIGN_NONE) {
@@ -16098,6 +16133,9 @@ CNDEF Cn_Ast_Specifier_Qualifier *cn_parse_specifier_qualifier(Cn_Lexer *lexer) 
     // For accumulating primitive type info.
     Cn_Primitive_Type_Info primitive_info = {0};
 
+    // Marking ext stack since type specifier has subparsing hooks.
+    int64_t ext_mark = cn__ast_ext_stack_mark();
+
     bool at_least_one = false;
     int ok;
     while (true) {
@@ -16119,6 +16157,8 @@ CNDEF Cn_Ast_Specifier_Qualifier *cn_parse_specifier_qualifier(Cn_Lexer *lexer) 
 
         break;
     }
+
+    node.extensions = cn__ast_ext_stack_finalize(ext_mark);
 
     // If at least one specifier/qualifier present continue, if not error.
     if (!at_least_one) {
@@ -16244,10 +16284,6 @@ CNDEF Cn_Ast_Node *cn_parse_struct_or_union_specifier(Cn_Lexer *lexer) {
 
     node.extensions = cn__ast_ext_stack_finalize(ext_mark);
 
-    // TODO: GNU:
-    // node.gnu_attribute_specifiers = cn_parse_gnu_attribute_specifiers(lexer, &ok);
-    // if (!ok) goto error;
-    
     // Parse tag identifier.
     if (!cn_lexer_expect(lexer, CN_TOKEN_CURLY_OPEN)) {
         Cn_Ast_Identifier *identifier = cn_parse_identifier(lexer); 
@@ -16321,11 +16357,6 @@ CNDEF Cn_Ast_Member_Declaration *cn_parse_member_declaration(Cn_Lexer *lexer) {
     if (!cn__hook_parse(CN_AST_SLOT_MEMBER_DECLARATION_PREFIX, NULL, lexer)) goto error;
 
     node.extensions = cn__ast_ext_stack_finalize(ext_mark);
-
-    // TODO: GNU:
-    // AI: Generated.
-    // Optional '__extension__' keywords.
-    // if (cn_parse_gnu_extensions(lexer)) node.flags |= CN_AST_GNU_EXTENSION;
 
     node.attribute_specifiers = cn_parse_attribute_specifiers(lexer, &ok);
     if (!ok) goto error;
@@ -16404,11 +16435,6 @@ CNDEF Cn_Ast_Member_Declarator *cn_parse_member_declarator(Cn_Lexer *lexer) {
 
     node.extensions = cn__ast_ext_stack_finalize(ext_mark);
 
-    // TODO: GNU:
-    // bool ok;
-    // node.gnu_attribute_specifiers = cn_parse_gnu_attribute_specifiers(lexer, &ok);
-    // if (!ok) goto error;
-
     Cn_Ast_Member_Declarator *parent = cn_ast_new(node);
     return parent;
 
@@ -16435,10 +16461,6 @@ CNDEF Cn_Ast_Node *cn_parse_enum_specifier(Cn_Lexer *lexer) {
     if (!cn__hook_parse(CN_AST_SLOT_TAG, NULL, lexer)) goto error;
 
     node.extensions = cn__ast_ext_stack_finalize(ext_mark);
-
-    // TODO: GNU:
-    // node.gnu_attribute_specifiers = cn_parse_gnu_attribute_specifiers(lexer, &ok);
-    // if (!ok) goto error;
 
     bool is_enum_definition_optional;
     if (cn_lexer_expect(lexer, CN_TOKEN_IDENTIFIER)) {
@@ -16531,10 +16553,6 @@ CNDEF Cn_Ast_Enumerator *cn_parse_enumerator(Cn_Lexer *lexer) {
     if (!cn__hook_parse(CN_AST_SLOT_ENUMERATOR, NULL, lexer)) goto error;
 
     node.extensions = cn__ast_ext_stack_finalize(ext_mark);
-
-    // TODO: GNU:
-    // node.gnu_attribute_specifiers = cn_parse_gnu_attribute_specifiers(lexer, &ok);
-    // if (!ok) goto error;
 
     if (cn_parse_optional(lexer, CN_TOKEN_ASSIGN)) {
         Cn_Ast_Node *expression = cn_parse_expression(lexer, -1, CN_NO_COMMA_OPERATOR);
