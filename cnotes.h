@@ -1705,6 +1705,20 @@ CNDEF Cn_Type *cn_type_greatest_arithmetic_rank(const Cn_Type *a, const Cn_Type 
 CNDEF bool cn_type_is_scalar(Cn_Type *type);
 
 /**
+ * Interns `type` into the type universe of the current translation unit.
+ *
+ * Structurally equal types are stored only once, so interned types can be compared by pointer.
+ *
+ * RETURNS: Interned type that is structurally equal to `type`, newly stored if it wasn't there yet.
+ *
+ * IMPORTANT: Every type created outside the library, for example by analyze hooks,
+ * must be interned before it is used, so it is deduplicated and properly rolled back.
+ *
+ * NOTE: `type` itself can be a temporary, it is copied when stored.
+ */
+CNDEF Cn_Type *cn_type_intern(Cn_Type *type);
+
+/**
  * ============================================
  * SECTION: Any
  * ============================================
@@ -1883,11 +1897,6 @@ CNDEF bool cn_ast_type_ptr_equals(const Cn_Type **type1_ptr, const Cn_Type **typ
  * RETURNS: Hash of the type.
  */
 CNDEF uint64_t cn_ast_type_ptr_hash(const Cn_Type **type_ptr);
-
-/**
- * TODO: Expose to the user and document.
- */
-CNDEF Cn_Type *cn__ast_add_type_if_not(Cn_Type *type);
 
 
 
@@ -2943,6 +2952,9 @@ CNDEF Cn_Ast_Attribute *cn_get_attribute(void *target, Cn_String attribute_name)
 /**
  * Gets resulting type of `expression`.
  *
+ * Type is read from the first `CN_AST_MEMBER_INFO_TYPE` member of the node, so custom
+ * expression nodes are supported too, as long as they declare such member.
+ *
  * RETURNS: Valid type on success, `NULL` if expression wasn't typechecked.
  *
  * IMPORTANT: Expects `expression != NULL`.
@@ -3329,10 +3341,71 @@ typedef Cn_Hook_Response (Cn_Hook_Parse)(Cn_Ast_Slot_Id id, Cn_Ast_Node **null_p
  */
 typedef Cn_Hook_Response (Cn_Hook_Analyze_Declarator)(Cn_Ast_Node *declarator, Cn_Type **type_ptr);
 
+/*
+ * Following analyze hooks share the same rules:
+ *
+ *  - They are called only for what core library can't handle by itself, like custom ast node kinds,
+ *    or where core explicitly delegates the work, like tag type layout.
+ *  - Hooks are tried in the order they were registered, the first hook that produces output wins,
+ *    remaining hooks are not called. If no hook produces output, core default behavior applies.
+ *  - Whether hook produced output is told by its output only, see each hook for what counts as output.
+ *  - Returning `CN_HOOK_RESPONSE_ERROR` aborts analysis, hook is expected to report diagnostic itself.
+ *  - AST must not be modified. Any type made by the hook must be interned with `cn_type_intern`.
+ */
+
+/**
+ * Analyze hook that resolves base type of a custom type specifier node.
+ *
+ * Called for type specifiers of non-core ast node kinds, for example ones substituted by
+ * `CN_AST_SLOT_TYPE_SPECIFIER` subparsing.
+ *
+ * OUTPUTS: Resolved type, written to `type_out`. Left `NULL` if type specifier is not handled by the hook.
+ */
+typedef Cn_Hook_Response (Cn_Hook_Analyze_Type_Specifier)(Cn_Ast_Node *type_specifier, Cn_Type **type_out);
+
+/**
+ * Analyze hook that lays out tag `type` defined by `tag_specifier`: `struct`, `union` or `enum` specifier.
+ *
+ * Called once types and names of all members are resolved into `type`, while it is still incomplete.
+ * Hook lays out the type by filling its `size`, `align` and offsets of struct members, and then marks it
+ * with `CN_TYPE_COMPLETE`. Usually done by calling `cn_analyze_layout_default` with custom options.
+ *
+ * Member at index `i` of the type comes from the `i`-th member declarator of `tag_specifier`, in declaration
+ * order, so member specific extensions can be found on those declarators.
+ *
+ * OUTPUTS: Laid out `type`, marked with `CN_TYPE_COMPLETE`. Left incomplete if not handled by the hook.
+ */
+typedef Cn_Hook_Response (Cn_Hook_Analyze_Layout)(Cn_Ast_Node *tag_specifier, Cn_Type *type);
+
+/**
+ * Analyze hook that typechecks custom `expression` node.
+ *
+ * Called for expressions of non-core ast node kinds, for example ones substituted by `CN_AST_SLOT_PRIMARY`
+ * subparsing. Resulting type is stored by the library into the first `CN_AST_MEMBER_INFO_TYPE`
+ * member of the node, so it can be retrieved with `cn_get_expression_type`.
+ *
+ * OUTPUTS: Resulting type of the expression, written to `type_out`. Left `NULL` if not handled by the hook.
+ */
+typedef Cn_Hook_Response (Cn_Hook_Analyze_Expression)(Cn_Ast_Node *expression, Cn_Type **type_out);
+
+/**
+ * Analyze hook that evaluates custom, already typechecked, `expression` node at compile time.
+ *
+ * Called for expressions of non-core ast node kinds. Not producing value is not an error,
+ * it simply means expression is not a constant expression.
+ *
+ * OUTPUTS: Value of the expression stored in `buffer`, written to `out`. Left `NIL` if not handled or not constant.
+ */
+typedef Cn_Hook_Response (Cn_Hook_Analyze_Evaluate)(Cn_Ast_Node *expression, void *buffer, Cn_Any *out);
+
 typedef struct {
-    Cn_Hook_Ast_Parsed         **ast_parsed_hooks;
-    Cn_Hook_Parse              **parse_hooks;
-    Cn_Hook_Analyze_Declarator **analyze_declarator_hooks;
+    Cn_Hook_Ast_Parsed              **ast_parsed_hooks;
+    Cn_Hook_Parse                   **parse_hooks;
+    Cn_Hook_Analyze_Declarator      **analyze_declarator_hooks;
+    Cn_Hook_Analyze_Type_Specifier  **analyze_type_specifier_hooks;
+    Cn_Hook_Analyze_Layout          **analyze_layout_hooks;
+    Cn_Hook_Analyze_Expression      **analyze_expression_hooks;
+    Cn_Hook_Analyze_Evaluate        **analyze_evaluate_hooks;
 } Cn_Hooks;
 
 extern Cn_Hooks cn_hooks;
@@ -3413,6 +3486,38 @@ CNDEF bool cn_analyze_function_definition(void *declaration_specifiers, void *de
  * RETURNS: Resolved type, `NULL` on error.
  */
 CNDEF Cn_Type *cn_analyze_to_type(Cn_Ast_Qualifier_Flags qualifier, void *type_specifier, void *declarator, Cn_Analyze_Flags flags);
+
+/**
+ * Options of `cn_analyze_layout_default`, zeroed options give natural C layout.
+ */
+typedef struct {
+    /**
+     * Caps natural alignment of every member, `0` for no cap, `1` packs the type.
+     */
+    int64_t max_align;
+    /**
+     * Minimal alignment of the whole type, `0` for none.
+     */
+    int64_t min_align;
+    /**
+     * Optional array with one entry per member, explicit alignment of the member,
+     * `0` entry keeps natural alignment. Explicit alignment is not capped by `max_align`.
+     */
+    int64_t *member_aligns;
+} Cn_Layout_Opt;
+
+/**
+ * Lays out tag `type`, `struct`, `union` or `enum`, whose members are already resolved.
+ *
+ * Struct members are placed in order, each at an offset aligned to its alignment, union members
+ * all start at `0`. Size is padded to the alignment of the type. Enum takes size and alignment
+ * of its member type, only `min_align` option applies to it.
+ *
+ * OUTPUTS: `size`, `align` and struct member offsets of `type`, which is then marked with `CN_TYPE_COMPLETE`.
+ *
+ * NOTE: Meant to be called by layout analyze hooks with custom options, see `Cn_Hook_Analyze_Layout`.
+ */
+CNDEF void cn_analyze_layout_default(Cn_Type *type, Cn_Layout_Opt opt);
 
 /**
  * Typechecks `expression`, assigning appropriate type to every node.
@@ -7012,6 +7117,7 @@ const Cn_Token_Literal CN_KEYWORD_TOKENS[] = {
     { CN_TOKEN_GNU_ATTRIBUTE,   CN_STR_BUFFER("__attribute__") }, 
     { CN_TOKEN_GNU_TYPEOF,      CN_STR_BUFFER("typeof") },
     { CN_TOKEN_GNU_TYPEOF,      CN_STR_BUFFER("__typeof") },
+    { CN_TOKEN_GNU_TYPEOF,      CN_STR_BUFFER("__typeof__") },
 
     { CN_TOKEN_RESTRICT,        CN_STR_BUFFER("__restrict") },
     { CN_TOKEN_INLINE,          CN_STR_BUFFER("__inline") },
@@ -8586,7 +8692,7 @@ CNDEF Cn_String cn__ast_permanent_save_string(Cn_String str) {
     return str;
 }
 
-CNDEF Cn_Type *cn__ast_add_type_if_not(Cn_Type *type) {
+CNDEF Cn_Type *cn_type_intern(Cn_Type *type) {
     if (!cn_hash_set_contains(&cn__tu_data->type_ptr_set, type)) {
         // Arena allocate memory for type.
         Cn_Type *result = cn_chained_arena_alloc(&cn__tu_data->type_arena, sizeof(Cn_Type));
@@ -9329,37 +9435,35 @@ CNDEF Cn_Ast_Attribute *cn_get_attribute(void *target, Cn_String attribute_name)
     return cn_get_attribute_info(target, attribute_name, NULL, NULL);
 }
 
+/**
+ * Helper function, finds the member that stores resulting type of `expression` node,
+ * by its ast meta info, it is the first member of `CN_AST_MEMBER_INFO_TYPE` kind.
+ *
+ * RETURNS: Pointer to the member, `NULL` if node kind has no such member.
+ */
+CNDEF Cn_Type **cn__get_expression_type_member(Cn_Ast_Node *expression) {
+    Cn_Ast_Info *info = cn_ast_info(expression->id);
+
+    for (int64_t i = 0; i < info->members_count; i++) {
+        if (info->members[i].kind == CN_AST_MEMBER_INFO_TYPE) {
+            return (Cn_Type **)((uint8_t *)expression + info->members[i].offset);
+        }
+    }
+
+    return NULL;
+}
+
 CNDEF Cn_Type *cn_get_expression_type(void * expression) {
     CN_ASSERT(expression != NULL);
     Cn_Ast_Node *node = expression;
 
-    switch(node->id) {
-        case CN_AST_BINARY:
-            return cn_ast_as(Binary, node)->type;
-        case CN_AST_ACCESS:
-            return cn_ast_as(Access, node)->type;
-        case CN_AST_CALL:
-            return cn_ast_as(Call, node)->type;
-        case CN_AST_UNARY:
-            return cn_ast_as(Unary, node)->type;
-        case CN_AST_CAST:
-            return cn_ast_as(Cast, node)->type;
-        case CN_AST_COMPOUND:
-            return cn_ast_as(Compound, node)->type;
-        case CN_AST_SIZEOF:
-            return cn_ast_as(Sizeof, node)->type;
-        case CN_AST_TERNARY:
-            return cn_ast_as(Ternary, node)->type;
-        case CN_AST_ASSIGN:
-            return cn_ast_as(Assign, node)->type;
-        case CN_AST_POSTFIX:
-            return cn_ast_as(Postfix, node)->type;
-        case CN_AST_PRIMARY:
-            return cn_ast_as(Primary, node)->type;
-        default:
-            cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, node, CN_DC_EXPECTED_EXPRESSION, "Expected expression to get it's resulting type.");
-            return NULL;
+    Cn_Type **type = cn__get_expression_type_member(node);
+    if (type == NULL) {
+        cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, node, CN_DC_EXPECTED_EXPRESSION, "Expected expression to get it's resulting type.");
+        return NULL;
     }
+
+    return *type;
 }
 
 /**
@@ -9928,7 +10032,7 @@ CNDEF Cn_Binding_Idx cn_binding_declare_label(Cn_String name, void * source) {
 CNDEF Cn_Binding_Idx cn_binding_declare_builtin(Cn_String name, void *source) {
     CN_ASSERT(!cn_str_is_empty(name));
 
-    Cn_Type *opaque = cn__ast_add_type_if_not((Cn_Type *)&CN_TYPE_OPAQUE);
+    Cn_Type *opaque = cn_type_intern((Cn_Type *)&CN_TYPE_OPAQUE);
 
     Cn_Binding binding = { 
         .kind = CN_BINDING_BUILTIN,
@@ -10005,6 +10109,52 @@ CNDEF bool cn__hook_parse(Cn_Ast_Slot_Id slot, Cn_Ast_Node **target, Cn_Lexer *l
     return true;
 }
 
+// Analyze hook dispatchers, every one of them tries hooks in registration order,
+// stopping at the first hook that produced output.
+//
+// RETURNS: `false` if a hook responded with error, `true` otherwise, even if no hook produced output.
+
+CNDEF bool cn__hook_analyze_type_specifier(Cn_Ast_Node *type_specifier, Cn_Type **type_out) {
+    for (int64_t i = 0; i < cn_array_list_length(&cn_hooks.analyze_type_specifier_hooks); i++) {
+        *type_out = NULL;
+        if (cn_hooks.analyze_type_specifier_hooks[i](type_specifier, type_out) & CN_HOOK_RESPONSE_ERROR) return false;
+        if (*type_out != NULL) return true;
+    }
+
+    *type_out = NULL;
+    return true;
+}
+
+CNDEF bool cn__hook_analyze_layout(Cn_Ast_Node *tag_specifier, Cn_Type *type) {
+    for (int64_t i = 0; i < cn_array_list_length(&cn_hooks.analyze_layout_hooks); i++) {
+        if (cn_hooks.analyze_layout_hooks[i](tag_specifier, type) & CN_HOOK_RESPONSE_ERROR) return false;
+        if (type->flags & CN_TYPE_COMPLETE) return true;
+    }
+
+    return true;
+}
+
+CNDEF bool cn__hook_analyze_expression(Cn_Ast_Node *expression, Cn_Type **type_out) {
+    for (int64_t i = 0; i < cn_array_list_length(&cn_hooks.analyze_expression_hooks); i++) {
+        *type_out = NULL;
+        if (cn_hooks.analyze_expression_hooks[i](expression, type_out) & CN_HOOK_RESPONSE_ERROR) return false;
+        if (*type_out != NULL) return true;
+    }
+
+    *type_out = NULL;
+    return true;
+}
+
+CNDEF bool cn__hook_analyze_evaluate(Cn_Ast_Node *expression, void *buffer, Cn_Any *out) {
+    for (int64_t i = 0; i < cn_array_list_length(&cn_hooks.analyze_evaluate_hooks); i++) {
+        *out = (Cn_Any) {0};
+        if (cn_hooks.analyze_evaluate_hooks[i](expression, buffer, out) & CN_HOOK_RESPONSE_ERROR) return false;
+        if (!cn_any_is_empty(*out)) return true;
+    }
+
+    *out = (Cn_Any) {0};
+    return true;
+}
 
 CNDEF bool cn__extension_register(Cn_Extension *extensions[], int64_t length) {
     static bool enabled = false;
@@ -10013,6 +10163,10 @@ CNDEF bool cn__extension_register(Cn_Extension *extensions[], int64_t length) {
         cn_hooks.ast_parsed_hooks           = cn_array_list_make(Cn_Hook_Ast_Parsed *, 8);
         cn_hooks.parse_hooks                = cn_array_list_make(Cn_Hook_Parse *, 8);
         cn_hooks.analyze_declarator_hooks   = cn_array_list_make(Cn_Hook_Analyze_Declarator *, 8);
+        cn_hooks.analyze_type_specifier_hooks = cn_array_list_make(Cn_Hook_Analyze_Type_Specifier *, 8);
+        cn_hooks.analyze_layout_hooks       = cn_array_list_make(Cn_Hook_Analyze_Layout *, 8);
+        cn_hooks.analyze_expression_hooks   = cn_array_list_make(Cn_Hook_Analyze_Expression *, 8);
+        cn_hooks.analyze_evaluate_hooks     = cn_array_list_make(Cn_Hook_Analyze_Evaluate *, 8);
 
         // Registring core ast meta info.
         CN_AST_INFO_TABLE_REGISTER(cn_ast_info_table, 0, CORE);
@@ -10284,7 +10438,7 @@ CNDEF Cn_Type *cn__analyze_type_from_primitive(Cn_Ast_Node *ts) {
             }
             type.integer.align = type.integer.size;
             type.integer.is_signed = prim->sign != CN_AST_TYPE_SIGN_UNSIGNED;
-            return cn__ast_add_type_if_not((Cn_Type *)&type);
+            return cn_type_intern((Cn_Type *)&type);
  
         case CN_AST_TYPE_CHAR:
             type.integer.kind = CN_INTEGER;
@@ -10292,31 +10446,31 @@ CNDEF Cn_Type *cn__analyze_type_from_primitive(Cn_Ast_Node *ts) {
             type.integer.size = sizeof(char);
             type.integer.align = type.integer.size;
             type.integer.is_signed = prim->sign != CN_AST_TYPE_SIGN_UNSIGNED;
-            return cn__ast_add_type_if_not((Cn_Type *)&type);
+            return cn_type_intern((Cn_Type *)&type);
  
         case CN_AST_TYPE_FLOAT:
             type.kind = CN_FLOAT;
             type.flags |= CN_TYPE_COMPLETE;
             type.size = sizeof(float);
             type.align = type.integer.size;
-            return cn__ast_add_type_if_not((Cn_Type *)&type);
+            return cn_type_intern((Cn_Type *)&type);
  
         case CN_AST_TYPE_DOUBLE:
             type.kind = CN_FLOAT;
             type.flags |= CN_TYPE_COMPLETE;
             type.size = sizeof(double);
             type.align = type.size;
-            return cn__ast_add_type_if_not((Cn_Type *)&type);
+            return cn_type_intern((Cn_Type *)&type);
  
         case CN_AST_TYPE_BOOL:
             type.kind = CN_BOOL;
             type.flags |= CN_TYPE_COMPLETE;
             type.size = sizeof(_Bool);
             type.align = type.size;
-            return cn__ast_add_type_if_not((Cn_Type *)&type);
+            return cn_type_intern((Cn_Type *)&type);
  
         case CN_AST_TYPE_VOID:
-            return cn__ast_add_type_if_not((Cn_Type *)&CN_TYPE_VOID);
+            return cn_type_intern((Cn_Type *)&CN_TYPE_VOID);
  
         default:
             cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, ts, CN_DC_INVALID_TYPE_SPECIFIER, "Unknown primitive type specifier.");
@@ -10340,6 +10494,80 @@ CNDEF Cn_Type *cn__analyze_type_from_typedef(Cn_Ast_Node *ts) {
     return cn_binding_get(binding_idx)->type;
 }
  
+CNDEF void cn_analyze_layout_default(Cn_Type *type, Cn_Layout_Opt opt) {
+    CN_ASSERT(type->kind == CN_STRUCT || type->kind == CN_UNION || type->kind == CN_ENUM);
+
+    int64_t size = 0, align = 0;
+
+    switch (type->kind) {
+        case CN_STRUCT:
+        case CN_UNION:
+            {
+                bool is_struct = type->kind == CN_STRUCT;
+                int64_t members_length = is_struct ? type->struct_t.members_length : type->union_t.members_length;
+
+                for (int64_t i = 0; i < members_length; i++) {
+                    Cn_Type *member_type = is_struct ? type->struct_t.members[i].type : type->union_t.members[i].type;
+                    CN_ASSERT(member_type->align != 0);
+
+                    // Explicit member alignment wins, otherwise natural alignment capped by max_align.
+                    int64_t member_align = member_type->align;
+                    if (opt.member_aligns != NULL && opt.member_aligns[i] > 0) {
+                        member_align = opt.member_aligns[i];
+                    } else if (opt.max_align > 0 && member_align > opt.max_align) {
+                        member_align = opt.max_align;
+                    }
+
+                    if (is_struct) {
+                        size = (size + member_align - 1) / member_align * member_align;
+                        type->struct_t.members[i].offset = size;
+                        size += member_type->size;
+                    } else if (member_type->size > size) {
+                        size = member_type->size;
+                    }
+
+                    if (member_align > align) align = member_align;
+                }
+
+                if (opt.min_align > align) align = opt.min_align;
+
+                // Trailing padding, so every element of an array of this type is aligned.
+                if (align > 0) size = (size + align - 1) / align * align;
+                break;
+            }
+        case CN_ENUM:
+            {
+                size = type->enum_t.member_type->size;
+                align = type->enum_t.member_type->align;
+                if (opt.min_align > align) align = opt.min_align;
+                break;
+            }
+        default:
+            break;
+    }
+
+    type->size = size;
+    type->align = align;
+    type->flags |= CN_TYPE_COMPLETE;
+}
+
+/**
+ * Helper function, lays out tag `type` whose members are already resolved, by analyze hooks
+ * or by default layout, and records that binding got defined, so checkpoint rollback undefines it.
+ *
+ * RETURNS: `true` on success, `false` if a hook errored.
+ */
+CNDEF bool cn__analyze_complete_tag(Cn_Ast_Node *tag_specifier, Cn_Binding_Idx binding_idx, Cn_Type *type) {
+    if (!cn__hook_analyze_layout(tag_specifier, type)) return false;
+
+    if (!(type->flags & CN_TYPE_COMPLETE)) {
+        cn_analyze_layout_default(type, (Cn_Layout_Opt) {0});
+    }
+
+    cn_array_list_append(&cn__tu_data->binding_defined_idx_list, binding_idx);
+    return true;
+}
+
 /**
  * Declares/completes the struct tag and builds its type: counts members, lays
  * out offsets and alignment, and marks the type complete when a body is present.
@@ -10352,15 +10580,18 @@ CNDEF Cn_Type *cn__analyze_type_from_struct(Cn_Ast_Node *ts) {
     Cn_Binding_Idx binding_idx = cn_binding_declare_tag(tag, CN_STRUCT);
     if (binding_idx == CN_BINDING_NIL_IDX) goto error;
  
-    Cn_Binding *binding = cn__tu_data->binding_list + binding_idx;
+    // IMPORTANT: Binding itself is not kept, member analysis can add bindings and move binding list.
+    // Type is stored in type arena, so its pointer stays valid.
+    Cn_Binding *binding = cn_binding_get(binding_idx);
+    Cn_Type *type = binding->type;
  
     if (struct_spec->member_declarations.length > 0) {
-        if ((binding->type->flags & CN_TYPE_COMPLETE) && binding->scope_idx == CN_SCOPE_STACK_CURRENT_IDX) {
+        if ((type->flags & CN_TYPE_COMPLETE) && binding->scope_idx == CN_SCOPE_STACK_CURRENT_IDX) {
             cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, ts, CN_DC_REDEFINITION, "Redefinition of 'struct %.*s' is not allowed within the same scope.", CN_STR_UNPACK(tag));
             goto error;
         }
  
-        Cn_Type_Struct *struct_type = (Cn_Type_Struct *)binding->type;
+        Cn_Type_Struct *struct_type = (Cn_Type_Struct *)type;
  
         // Count members across all declarations and their declarators.
         struct_type->members_length = 0;
@@ -10372,7 +10603,6 @@ CNDEF Cn_Type *cn__analyze_type_from_struct(Cn_Ast_Node *ts) {
         struct_type->members = cn_chained_arena_alloc(&cn__tu_data->type_children_arena, struct_type->members_length * sizeof(Cn_Type_Struct_Member));
  
         int i = 0;
-        int64_t offset = 0, max_align = 0;
  
         for (int64_t m = 0; m < struct_spec->member_declarations.length; m++) {
             Cn_Ast_Member_Declaration *md = cn_ast_as(Member_Declaration, struct_spec->member_declarations.ptrs[m]);
@@ -10381,6 +10611,7 @@ CNDEF Cn_Type *cn__analyze_type_from_struct(Cn_Ast_Node *ts) {
             for (int64_t d = 0; d < md->member_declarators.length; d++) {
                 Cn_Ast_Member_Declarator *decl = cn_ast_as(Member_Declarator, md->member_declarators.ptrs[d]);
                 Cn_Type *member_type = cn_analyze_to_type(sq->qualifiers, sq->type_specifier, decl->declarator, 0);
+                if (member_type == NULL) goto error;
  
                 if (!(member_type->flags & CN_TYPE_COMPLETE)) {
                     cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, md->member_declarators.ptrs[d], CN_DC_INCOMPLETE_TYPE, "Cannot have incomplete member type in struct definition.");
@@ -10394,23 +10625,14 @@ CNDEF Cn_Type *cn__analyze_type_from_struct(Cn_Ast_Node *ts) {
                     .type = member_type,
                     .name = cn__ast_permanent_save_string(((Cn_Ast_Identifier *)identifier)->name),
                 };
- 
-                CN_ASSERT(member_type->align != 0);
-                offset = (offset + member_type->align - 1) / member_type->align * member_type->align;
-                struct_type->members[i].offset = offset;
-                offset += member_type->size;
- 
-                if (max_align < member_type->align) max_align = member_type->align;
                 i++;
             }
         }
  
-        binding->type->flags |= CN_TYPE_COMPLETE;
-        binding->type->size = offset;
-        binding->type->align = max_align;
+        if (!cn__analyze_complete_tag(ts, binding_idx, type)) goto error;
     }
  
-    return binding->type;
+    return type;
  
 error:
     CN__TRACE_ERROR
@@ -10429,15 +10651,17 @@ CNDEF Cn_Type *cn__analyze_type_from_union(Cn_Ast_Node *ts) {
     Cn_Binding_Idx binding_idx = cn_binding_declare_tag(tag, CN_UNION);
     if (binding_idx == CN_BINDING_NIL_IDX) goto error;
  
-    Cn_Binding *binding = cn__tu_data->binding_list + binding_idx;
+    // IMPORTANT: Binding itself is not kept, member analysis can add bindings and move binding list.
+    Cn_Binding *binding = cn_binding_get(binding_idx);
+    Cn_Type *type = binding->type;
  
     if (union_spec->member_declarations.length > 0) {
-        if ((binding->type->flags & CN_TYPE_COMPLETE) && binding->scope_idx == CN_SCOPE_STACK_CURRENT_IDX) {
+        if ((type->flags & CN_TYPE_COMPLETE) && binding->scope_idx == CN_SCOPE_STACK_CURRENT_IDX) {
             cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, ts, CN_DC_REDEFINITION, "Redefinition of 'union %.*s' is not allowed within the same scope.", CN_STR_UNPACK(tag));
             goto error;
         }
  
-        Cn_Type_Union *union_type = (Cn_Type_Union *)binding->type;
+        Cn_Type_Union *union_type = (Cn_Type_Union *)type;
  
         union_type->members_length = 0;
         for (int64_t m = 0; m < union_spec->member_declarations.length; m++) {
@@ -10448,7 +10672,6 @@ CNDEF Cn_Type *cn__analyze_type_from_union(Cn_Ast_Node *ts) {
         union_type->members = cn_chained_arena_alloc(&cn__tu_data->type_children_arena, union_type->members_length * sizeof(Cn_Type_Union_Member));
  
         int i = 0;
-        int64_t max_size = 0, max_align = 0;
  
         for (int64_t m = 0; m < union_spec->member_declarations.length; m++) {
             Cn_Ast_Member_Declaration *md = cn_ast_as(Member_Declaration, union_spec->member_declarations.ptrs[m]);
@@ -10457,6 +10680,7 @@ CNDEF Cn_Type *cn__analyze_type_from_union(Cn_Ast_Node *ts) {
             for (int64_t d = 0; d < md->member_declarators.length; d++) {
                 Cn_Ast_Member_Declarator *decl = cn_ast_as(Member_Declarator, md->member_declarators.ptrs[d]);
                 Cn_Type *member_type = cn_analyze_to_type(sq->qualifiers, sq->type_specifier, decl->declarator, 0);
+                if (member_type == NULL) goto error;
  
                 if (!(member_type->flags & CN_TYPE_COMPLETE)) {
                     cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, md->member_declarators.ptrs[d], CN_DC_INCOMPLETE_TYPE, "Cannot have incomplete member type in union definition.");
@@ -10470,23 +10694,14 @@ CNDEF Cn_Type *cn__analyze_type_from_union(Cn_Ast_Node *ts) {
                     .type = member_type,
                     .name = cn__ast_permanent_save_string(((Cn_Ast_Identifier *)identifier)->name),
                 };
- 
-                if (member_type->size > max_size)  max_size  = member_type->size;
-                if (member_type->align > max_align) max_align = member_type->align;
                 i++;
             }
         }
  
-        if (max_align != 0) {
-            max_size = (max_size + max_align - 1) / max_align * max_align;
-        }
- 
-        binding->type->flags |= CN_TYPE_COMPLETE;
-        binding->type->size = max_size;
-        binding->type->align = max_align;
+        if (!cn__analyze_complete_tag(ts, binding_idx, type)) goto error;
     }
  
-    return binding->type;
+    return type;
  
 error:
     CN__TRACE_ERROR
@@ -10506,15 +10721,17 @@ CNDEF Cn_Type *cn__analyze_type_from_enum(Cn_Ast_Node *ts) {
     Cn_Binding_Idx binding_idx = cn_binding_declare_tag(tag, CN_ENUM);
     if (binding_idx == CN_BINDING_NIL_IDX) goto error;
  
+    // IMPORTANT: Binding itself is not kept, enumerators add bindings and can move binding list.
     Cn_Binding *binding = cn_binding_get(binding_idx);
+    Cn_Type *type = binding->type;
  
     if (enum_spec->flags & CN_AST_ENUM_HAS_DEFINITION) {
-        if ((binding->type->flags & CN_TYPE_COMPLETE) && binding->scope_idx == CN_SCOPE_STACK_CURRENT_IDX) {
+        if ((type->flags & CN_TYPE_COMPLETE) && binding->scope_idx == CN_SCOPE_STACK_CURRENT_IDX) {
             cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, ts, CN_DC_REDEFINITION, "Redefinition of 'enum %.*s' is not allowed within the same scope.", CN_STR_UNPACK(tag));
             goto error;
         }
  
-        Cn_Type_Enum *enum_type = (Cn_Type_Enum *)binding->type;
+        Cn_Type_Enum *enum_type = (Cn_Type_Enum *)type;
  
         enum_type->members_length = enum_spec->enumerators.length;
         enum_type->members = cn_chained_arena_alloc(&cn__tu_data->type_children_arena, enum_type->members_length * sizeof(Cn_Type_Enum_Member));
@@ -10531,12 +10748,9 @@ CNDEF Cn_Type *cn__analyze_type_from_enum(Cn_Ast_Node *ts) {
                 goto error;
             }
         } else {
-            enum_base_type = cn__ast_add_type_if_not((Cn_Type *)&CN_TYPE_INT);
+            enum_base_type = cn_type_intern((Cn_Type *)&CN_TYPE_INT);
         }
         enum_type->member_type = enum_base_type;
-
-        enum_type->align = enum_base_type->align;
-        enum_type->size = enum_base_type->size;
 
         int64_t enum_counter = 0;
         for (int64_t e = 0; e < enum_spec->enumerators.length; e++) {
@@ -10583,10 +10797,10 @@ CNDEF Cn_Type *cn__analyze_type_from_enum(Cn_Ast_Node *ts) {
             enum_counter++;
         }
         
-        binding->type->flags |= CN_TYPE_COMPLETE;
+        if (!cn__analyze_complete_tag(ts, binding_idx, type)) goto error;
     }
  
-    return binding->type;
+    return type;
  
 error:
     CN__TRACE_ERROR
@@ -10618,11 +10832,13 @@ CNDEF Cn_Type *cn__analyze_base_type_from_specifier(Cn_Ast_Node *type_specifier)
         case CN_AST_ENUM_SPECIFIER:
             result = cn__analyze_type_from_enum(type_specifier);
             break;
-        // TODO: GNU: 
-        // case CN_AST_GNU_TYPEOF:
-        //     result = cn__analyze_type_from_gnu_typeof(type_specifier);
-        //     break;
         default:
+            // Custom type specifiers are resolved by analyze hooks.
+            if (CN_AST_KIND_EXTENSION_ID(ts->id) != 0) {
+                if (!cn__hook_analyze_type_specifier(ts, &result)) goto error;
+                if (result != NULL) break;
+            }
+
             cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, type_specifier, CN_DC_INVALID_TYPE_SPECIFIER, "Unknown or invalid type specifier.");
             goto error;
     }
@@ -10646,11 +10862,11 @@ CNDEF Cn_Type *cn__analyze_type_apply_pointers(Cn_Type *result, Cn_Ast_Pointer *
         Cn_Ast_Pointer *ptr = pointer;
  
         Cn_Type type = cn_type_make_pointer(result);
-        result = cn__ast_add_type_if_not((Cn_Type *)&type);
+        result = cn_type_intern((Cn_Type *)&type);
  
         if (ptr->qualifiers != 0) {
             type = cn_type_make_qualified(cn_ast_qualifier_flags_to_type(ptr->qualifiers), result);
-            result = cn__ast_add_type_if_not((Cn_Type *)&type);
+            result = cn_type_intern((Cn_Type *)&type);
         }
  
         pointer = ptr->pointer;
@@ -10674,7 +10890,7 @@ CNDEF Cn_Type *cn__analyze_type_apply_array(Cn_Type *result, Cn_Ast_Node *dd, bo
     // once parsing qualifiers in array declarator is supported.
     if (apply_parameter_adjustment && (arr->direct_declarator == NULL || arr->direct_declarator->id == CN_AST_IDENTIFIER)) {
         Cn_Type ptr_type = cn_type_make_pointer(result);
-        result = cn__ast_add_type_if_not((Cn_Type *)&ptr_type);
+        result = cn_type_intern((Cn_Type *)&ptr_type);
         return result;
     }
 
@@ -10696,7 +10912,7 @@ CNDEF Cn_Type *cn__analyze_type_apply_array(Cn_Type *result, Cn_Ast_Node *dd, bo
     // therefore we have incomplete array: '[]' case.
     if (arr->expression == NULL) {
         type.array.flags &= ~CN_TYPE_COMPLETE;
-        return cn__ast_add_type_if_not((Cn_Type *)&type);
+        return cn_type_intern((Cn_Type *)&type);
     }
  
     // Evaluate the constant length expression.
@@ -10707,7 +10923,7 @@ CNDEF Cn_Type *cn__analyze_type_apply_array(Cn_Type *result, Cn_Ast_Node *dd, bo
         // This is the case where expression inside '[...]' cannot be evaluated.
         // Therefore we have VLA.
         type.array.flags |= CN_TYPE_ARRAY_VARIABLE;
-        return cn__ast_add_type_if_not((Cn_Type *)&type);
+        return cn_type_intern((Cn_Type *)&type);
     }
  
     if (any.type->kind != CN_INTEGER) {
@@ -10725,7 +10941,7 @@ CNDEF Cn_Type *cn__analyze_type_apply_array(Cn_Type *result, Cn_Ast_Node *dd, bo
     type.array.length = length;
     type.array.size = length * result->size;
  
-    return cn__ast_add_type_if_not((Cn_Type *)&type);
+    return cn_type_intern((Cn_Type *)&type);
  
 error:
     CN__TRACE_ERROR
@@ -10798,12 +11014,12 @@ CNDEF Cn_Type *cn__analyze_type_apply_function(Cn_Type *result, Cn_Ast_Node *dd,
         
     }
 
-    result = cn__ast_add_type_if_not((Cn_Type *)&type);
+    result = cn_type_intern((Cn_Type *)&type);
     
     // Casting up to pointer type if adjusting parameter.
     if (apply_parameter_adjustment && (fn->direct_declarator == NULL || fn->direct_declarator->id == CN_AST_IDENTIFIER)) {
         Cn_Type ptr_type = cn_type_make_pointer(result);
-        result = cn__ast_add_type_if_not((Cn_Type *)&ptr_type);
+        result = cn_type_intern((Cn_Type *)&ptr_type);
     }
  
     return result;
@@ -10883,7 +11099,7 @@ CNDEF Cn_Type *cn_analyze_to_type(Cn_Ast_Qualifier_Flags qualifier, void *type_s
     // Qualifiers on the base type itself.
     if (qualifier != 0) {
         Cn_Type type = cn_type_make_qualified(cn_ast_qualifier_flags_to_type(qualifier), result);
-        result = cn__ast_add_type_if_not((Cn_Type *)&type);
+        result = cn_type_intern((Cn_Type *)&type);
     }
  
     // Declarator layers (* [] ()).
@@ -10900,10 +11116,10 @@ error:
 CNDEF Cn_Type *cn__analyze_integer_promote(Cn_Type *type) {
     // Integer types of rank lower than int (and _Bool) promote to int.
     if (type->kind == CN_BOOL) {
-        return cn__ast_add_type_if_not((Cn_Type *)&CN_TYPE_INT);
+        return cn_type_intern((Cn_Type *)&CN_TYPE_INT);
     }
     if (type->kind == CN_INTEGER && type->size < (int64_t)sizeof(int)) {
-        return cn__ast_add_type_if_not((Cn_Type *)&CN_TYPE_INT);
+        return cn_type_intern((Cn_Type *)&CN_TYPE_INT);
     }
     return type;
 }
@@ -11088,11 +11304,11 @@ CNDEF Cn_Type *cn__analyze_typecheck_binary(Cn_Ast_Node *node) {
                     // 'opaque - p' is only valid as a difference of two pointers.
                     if (other_type->kind == CN_OPAQUE) {
                         if (left->kind == CN_POINTER) return other_type;
-                        return cn__ast_add_type_if_not((Cn_Type *)&CN_TYPE_PTRDIFF);
+                        return cn_type_intern((Cn_Type *)&CN_TYPE_PTRDIFF);
                     }
                     if (other_type->kind != CN_INTEGER) {
                         if (other_type->kind == CN_POINTER) {
-                            return cn__ast_add_type_if_not((Cn_Type *)&CN_TYPE_PTRDIFF);
+                            return cn_type_intern((Cn_Type *)&CN_TYPE_PTRDIFF);
                         }
                         cn__analyze_error_illegal_binary(node, left, right, "pointer subtraction");
                         goto error;
@@ -11178,7 +11394,7 @@ CNDEF Cn_Type *cn__analyze_typecheck_binary(Cn_Ast_Node *node) {
                     cn__analyze_error_illegal_binary(node, left, right, "relational comparison");
                     goto error;
                 }
-                return cn__ast_add_type_if_not((Cn_Type *)&CN_TYPE_INT);
+                return cn_type_intern((Cn_Type *)&CN_TYPE_INT);
             }
 
         // Equality: as relational, plus pointer vs integer (null constant). Result int.
@@ -11197,14 +11413,14 @@ CNDEF Cn_Type *cn__analyze_typecheck_binary(Cn_Ast_Node *node) {
                     cn__analyze_error_illegal_binary(node, left, right, "equality comparison");
                     goto error;
                 }
-                return cn__ast_add_type_if_not((Cn_Type *)&CN_TYPE_INT);
+                return cn_type_intern((Cn_Type *)&CN_TYPE_INT);
             }
 
         // Logical: scalar operands, no arithmetic conversions, result is int.
         case CN_AST_BINARY_OP_AND:
         case CN_AST_BINARY_OP_OR: {
             if (cn_type_is_scalar(left) && cn_type_is_scalar(right)) {
-                return cn__ast_add_type_if_not((Cn_Type *)&CN_TYPE_INT);
+                return cn_type_intern((Cn_Type *)&CN_TYPE_INT);
             }
             cn__analyze_error_illegal_binary(node, left, right, "logical operation");
             goto error;
@@ -11423,7 +11639,7 @@ CNDEF Cn_Type *cn__analyze_typecheck_unary(Cn_Ast_Node *node) {
                     cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, node, CN_DC_ILLEGAL_TYPE, "Operand of '!' must be of scalar type.");
                     goto error;
                 }
-                return cn__ast_add_type_if_not((Cn_Type *)&CN_TYPE_INT);
+                return cn_type_intern((Cn_Type *)&CN_TYPE_INT);
             }
 
         // *x : pointer operand; result is the pointed-to type (an lvalue).
@@ -11454,9 +11670,9 @@ CNDEF Cn_Type *cn__analyze_typecheck_unary(Cn_Ast_Node *node) {
                     cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, node, CN_DC_ILLEGAL_TYPE, "Cannot take the address of a non-lvalue.");
                     goto error;
                 }
-                Cn_Type *void_t = cn__ast_add_type_if_not((Cn_Type *)&CN_TYPE_VOID);
+                Cn_Type *void_t = cn_type_intern((Cn_Type *)&CN_TYPE_VOID);
                 Cn_Type ptr = cn_type_make_pointer(void_t);
-                return cn__ast_add_type_if_not(&ptr);
+                return cn_type_intern(&ptr);
             }
 
         default: 
@@ -11584,7 +11800,7 @@ CNDEF Cn_Type *cn__analyze_typecheck_sizeof(Cn_Ast_Node *node) {
         goto error;
     }
 
-    return cn__ast_add_type_if_not((Cn_Type *)&CN_TYPE_SIZE);
+    return cn_type_intern((Cn_Type *)&CN_TYPE_SIZE);
 
 error:
     CN__TRACE_ERROR
@@ -11878,29 +12094,40 @@ CNDEF Cn_Type *cn_analyze_typecheck_expression(void * expression) {
                         }
                     case CN_AST_INTEGER:
                         {   
-                            result = cn__ast_add_type_if_not((Cn_Type *)&CN_TYPE_INT);
+                            result = cn_type_intern((Cn_Type *)&CN_TYPE_INT);
                             break;
                         }
                     case CN_AST_FLOAT:
                         {   
-                            result = cn__ast_add_type_if_not((Cn_Type *)&CN_TYPE_FLOAT);
+                            result = cn_type_intern((Cn_Type *)&CN_TYPE_FLOAT);
                             break;
                         }
                     case CN_AST_STRING:
                         {   
-                            result  = cn__ast_add_type_if_not((Cn_Type *)&CN_TYPE_CHAR);
+                            result  = cn_type_intern((Cn_Type *)&CN_TYPE_CHAR);
                             Cn_Type const_char = cn_type_make_qualified(CN_TYPE_QUALIFIED_CONSTANT, result);
-                            result = cn__ast_add_type_if_not(&const_char);
+                            result = cn_type_intern(&const_char);
                             Cn_Type const_char_ptr = cn_type_make_pointer(result);
-                            result = cn__ast_add_type_if_not(&const_char_ptr);
+                            result = cn_type_intern(&const_char_ptr);
                             break;
                         }
                     case CN_AST_CHAR:
                         {   
-                            result = cn__ast_add_type_if_not((Cn_Type *)&CN_TYPE_CHAR);
+                            result = cn_type_intern((Cn_Type *)&CN_TYPE_CHAR);
                             break;
                         }
                     default:
+                        // Custom literals, substituted by `CN_AST_SLOT_PRIMARY` subparsing, are typechecked by analyze hooks.
+                        if (CN_AST_KIND_EXTENSION_ID(literal->id) != 0) {
+                            if (!cn__hook_analyze_expression(literal, &result)) goto error;
+
+                            if (result != NULL) {
+                                Cn_Type **type = cn__get_expression_type_member(literal);
+                                if (type != NULL) *type = result;
+                                break;
+                            }
+                        }
+
                         cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, node, CN_DC_EXPECTED_EXPRESSION, "Expected primary expression to typecheck.");
                         goto error;
                 }
@@ -11909,6 +12136,17 @@ CNDEF Cn_Type *cn_analyze_typecheck_expression(void * expression) {
                 break;
             }
         default:
+            // Custom expressions are typechecked by analyze hooks.
+            if (CN_AST_KIND_EXTENSION_ID(node->id) != 0) {
+                if (!cn__hook_analyze_expression(node, &result)) goto error;
+
+                if (result != NULL) {
+                    Cn_Type **type = cn__get_expression_type_member(node);
+                    if (type != NULL) *type = result;
+                    break;
+                }
+            }
+
             cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, node, CN_DC_EXPECTED_EXPRESSION, "Expected expression to typecheck.");
             goto error;
     }
@@ -12392,6 +12630,13 @@ CNDEF Cn_Any cn__analyze_evaluate_primary(Cn_Ast_Node *node, void *buffer) {
             }
         default:
             {
+                // Custom literals are evaluated by analyze hooks.
+                if (CN_AST_KIND_EXTENSION_ID(literal->id) != 0) {
+                    Cn_Any result;
+                    if (!cn__hook_analyze_evaluate(literal, buffer, &result)) return (Cn_Any) {0};
+                    return result;
+                }
+
                 cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, node, CN_DC_EXPECTED_TOKEN, "Expected identifier, float, integer, char, or string literal in primary expression.");
                 return (Cn_Any) {0};
             }
@@ -12451,6 +12696,13 @@ CNDEF Cn_Any cn_analyze_evaluate_expression(void *expression, void *buffer) {
                 return cn__analyze_evaluate_primary(node, buffer);
             }
         default:
+            // Custom expressions are evaluated by analyze hooks, no value simply means not a constant.
+            if (CN_AST_KIND_EXTENSION_ID(node->id) != 0) {
+                Cn_Any result;
+                if (!cn__hook_analyze_evaluate(node, buffer, &result)) return (Cn_Any) {0};
+                return result;
+            }
+
             cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, node, CN_DC_EXPECTED_EXPRESSION, "Expected expression to evaluate.");
             break;
     }
@@ -13743,7 +13995,7 @@ CNDEF Cn_Ast_Translation_Unit *cn_parse_translation_unit(Cn_Lexer *lexer) {
     // Inject compiler builtins that appear in preprocessed .i files but are
     // never declared by any source.
     {
-        Cn_Type *opaque = cn__ast_add_type_if_not((Cn_Type *)&CN_TYPE_OPAQUE);
+        Cn_Type *opaque = cn_type_intern((Cn_Type *)&CN_TYPE_OPAQUE);
 
         cn_binding_declare_typedef(CN_STR_LIT("__builtin_va_list"),              NULL, opaque);
     }

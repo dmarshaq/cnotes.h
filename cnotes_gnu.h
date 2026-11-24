@@ -763,29 +763,30 @@ error:
 }
 
 /**
- * Resolves typeof(...) to the type of its typename or expression operand.
- *
- * RETURNS: The resolved type, or NULL on error.
+ * Type specifier analyze hook, resolves `typeof(...)` to the type of its type name or expression operand.
  */
-CNDEF Cn_Type *cn__analyze_type_from_gnu_typeof(Cn_Ast_Node *ts) {
-    Cn_Ast_Gnu_Typeof *typeof_spec = cn_ast_as(Gnu_Typeof, ts);
-    Cn_Ast_Node *typeof_child = typeof_spec->target;
+CNDEF Cn_Hook_Response cn__gnu_hook_analyze_type_specifier(Cn_Ast_Node *type_specifier, Cn_Type **type_out) {
+    if (type_specifier->id != CN_AST_GNU_TYPEOF) return CN_HOOK_RESPONSE_NONE;
+
+    Cn_Ast_Gnu_Typeof *typeof_spec = cn_ast_as(Gnu_Typeof, type_specifier);
     Cn_Type *result;
  
-    if (typeof_child->id == CN_AST_TYPE_NAME) {
+    if (typeof_spec->target->id == CN_AST_TYPE_NAME) {
         Cn_Ast_Type_Name *tn = cn_ast_as(Type_Name, typeof_spec->target);
         Cn_Ast_Specifier_Qualifier *sq = tn->specifier_qualifier;
         result = cn_analyze_to_type(sq->qualifiers, sq->type_specifier, tn->abstract_declarator, 0);
     } else {
+        // Expression operand was already typechecked when it was parsed.
         result = cn_get_expression_type(typeof_spec->target);
     }
  
-    if (result == NULL) goto error;
-    return result;
- 
-error:
-    CN__TRACE_ERROR
-    return NULL;
+    if (result == NULL) {
+        CN__TRACE_ERROR
+        return CN_HOOK_RESPONSE_ERROR;
+    }
+
+    *type_out = result;
+    return CN_HOOK_RESPONSE_NONE;
 }
 
 CNDEF void cn__emit_gnu_typeof(Cn_Emitter *e, Cn_Ast_Gnu_Typeof *node) {
@@ -1018,6 +1019,162 @@ CNDEF Cn_Hook_Response cn__gnu_hook_parse(Cn_Ast_Slot_Id slot, Cn_Ast_Node **nul
     }
 }
 
+/**
+ * Alignment used by `aligned` attribute without argument, the biggest alignment of the target.
+ */
+#define CN_GNU_BIGGEST_ALIGNMENT 16
+
+/**
+ * Finds GNU attribute `name` among GNU attribute specifiers attached to `node` at `slot`.
+ * Both `name` and `__name__` spellings are matched.
+ *
+ * RETURNS: Found attribute, `NULL` if there is none.
+ */
+CNDEF Cn_Ast_Gnu_Attribute *cn__gnu_find_attribute(Cn_Ast_Node *node, Cn_Ast_Slot_Id slot, Cn_String name) {
+    for (int64_t i = 0; i < node->extensions.length; i++) {
+        Cn_Ast_Extension *ext = &node->extensions.exts[i];
+        if (ext->slot != slot || ext->kind != CN_AST_EXTENSION_LIST) continue;
+
+        for (int64_t j = 0; j < ext->list.length; j++) {
+            if (ext->list.ptrs[j]->id != CN_AST_GNU_ATTRIBUTE_SPECIFIER) continue;
+            Cn_Ast_Nodes attributes = cn_ast_as(Gnu_Attribute_Specifier, ext->list.ptrs[j])->gnu_attributes;
+
+            for (int64_t k = 0; k < attributes.length; k++) {
+                Cn_Ast_Gnu_Attribute *attribute = cn_ast_as(Gnu_Attribute, attributes.ptrs[k]);
+                Cn_String attribute_name = attribute->identifier->name;
+
+                // Stripping `__` from both sides, for `__name__` spelling.
+                if (attribute_name.length > 4 && cn_str_starts_with(attribute_name, CN_STR_LIT("__")) && cn_str_ends_with(attribute_name, CN_STR_LIT("__"))) {
+                    attribute_name = cn_str_substring(attribute_name, 2, attribute_name.length - 2);
+                }
+
+                if (cn_str_is(attribute_name, name)) return attribute;
+            }
+        }
+    }
+
+    return NULL;
+}
+
+/**
+ * Evaluates alignment requested by `aligned` attribute, `aligned` without argument requests
+ * `CN_GNU_BIGGEST_ALIGNMENT`.
+ *
+ * RETURNS: Requested alignment, `-1` on error.
+ */
+CNDEF int64_t cn__gnu_attribute_alignment(Cn_Ast_Gnu_Attribute *attribute) {
+    if (attribute->arguments.length == 0) return CN_GNU_BIGGEST_ALIGNMENT;
+
+    if (attribute->arguments.length != 1) {
+        cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, attribute, CN_DC_ILLEGAL_ATTRIBUTE, "Attribute 'aligned' takes at most one argument.");
+        return -1;
+    }
+
+    Cn_Ast_Node *expression = attribute->arguments.ptrs[0];
+
+    // Attribute arguments are not typechecked when parsed, since their meaning depends on the attribute.
+    if (cn_analyze_typecheck_expression(expression) == NULL) return -1;
+
+    uint8_t buffer[CN_TYPE_SCALAR_MAX_SIZE];
+    Cn_Any value = cn_analyze_evaluate_expression(expression, buffer);
+    if (cn_any_is_empty(value) || cn_type_unqualified(value.type)->kind != CN_INTEGER) {
+        cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, expression, CN_DC_INVALID_CONSTANT_EXPRESSION, "Argument of attribute 'aligned' must be an integer constant expression.");
+        return -1;
+    }
+
+    int64_t alignment = cn_any_read_int(value);
+    if (alignment <= 0 || (alignment & (alignment - 1)) != 0) {
+        cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, expression, CN_DC_INVALID_CONSTANT_EXPRESSION, "Argument of attribute 'aligned' must be a power of 2, got %lld.", (long long)alignment);
+        return -1;
+    }
+
+    return alignment;
+}
+
+/**
+ * Layout analyze hook, applies `packed` and `aligned` attributes of the tag specifier and of
+ * struct or union members. Leaves type to default layout, if none of them are present.
+ */
+CNDEF Cn_Hook_Response cn__gnu_hook_analyze_layout(Cn_Ast_Node *tag_specifier, Cn_Type *type) {
+    Cn_Ast_Gnu_Attribute *packed  = cn__gnu_find_attribute(tag_specifier, CN_AST_SLOT_TAG, CN_STR_LIT("packed"));
+    Cn_Ast_Gnu_Attribute *aligned = cn__gnu_find_attribute(tag_specifier, CN_AST_SLOT_TAG, CN_STR_LIT("aligned"));
+
+    Cn_Layout_Opt opt = {0};
+
+    if (aligned != NULL) {
+        opt.min_align = cn__gnu_attribute_alignment(aligned);
+        if (opt.min_align < 0) return CN_HOOK_RESPONSE_ERROR;
+    }
+
+    if (type->kind == CN_ENUM) {
+        if (packed == NULL && aligned == NULL) return CN_HOOK_RESPONSE_NONE;
+
+        cn_analyze_layout_default(type, opt);
+
+        // Packed enum shrinks to the smallest integer that holds every enumerator value.
+        if (packed != NULL) {
+            int64_t size = 1;
+            for (int64_t i = 0; i < type->enum_t.members_length; i++) {
+                int64_t v = type->enum_t.members[i].value;
+                while (size < 8 && (v < -(INT64_C(1) << (size * 8 - 1)) || v >= (INT64_C(1) << (size * 8)))) size *= 2;
+            }
+
+            type->size = size;
+            type->align = size > opt.min_align ? size : opt.min_align;
+        }
+
+        return CN_HOOK_RESPONSE_NONE;
+    }
+
+    // Struct and union, both specifiers share the same layout.
+    Cn_Ast_Struct_Specifier *specifier = cn_ast_as(Struct_Specifier, tag_specifier);
+    int64_t members_length = type->kind == CN_STRUCT ? type->struct_t.members_length : type->union_t.members_length;
+
+    int64_t *member_aligns = CN_REALLOC(NULL, sizeof(int64_t) * (members_length > 0 ? members_length : 1));
+    bool any_member_attribute = false;
+
+    // Member `i` comes from `i`-th member declarator, in declaration order.
+    int64_t i = 0;
+    for (int64_t m = 0; m < specifier->member_declarations.length; m++) {
+        Cn_Ast_Member_Declaration *md = cn_ast_as(Member_Declaration, specifier->member_declarations.ptrs[m]);
+
+        for (int64_t d = 0; d < md->member_declarators.length; d++, i++) {
+            Cn_Ast_Node *declarator = md->member_declarators.ptrs[d];
+            Cn_Type *member_type = type->kind == CN_STRUCT ? type->struct_t.members[i].type : type->union_t.members[i].type;
+
+            Cn_Ast_Gnu_Attribute *member_packed  = cn__gnu_find_attribute(declarator, CN_AST_SLOT_MEMBER_DECLARATOR, CN_STR_LIT("packed"));
+            Cn_Ast_Gnu_Attribute *member_aligned = cn__gnu_find_attribute(declarator, CN_AST_SLOT_MEMBER_DECLARATOR, CN_STR_LIT("aligned"));
+
+            // Packed member, or member of packed type, drops to alignment of 1.
+            // Aligned member raises its alignment, but never lowers it unless packed.
+            int64_t member_align = (packed != NULL || member_packed != NULL) ? 1 : member_type->align;
+
+            if (member_aligned != NULL) {
+                int64_t requested = cn__gnu_attribute_alignment(member_aligned);
+                if (requested < 0) {
+                    CN_FREE(member_aligns);
+                    return CN_HOOK_RESPONSE_ERROR;
+                }
+                if (requested > member_align) member_align = requested;
+            }
+
+            if (member_packed != NULL || member_aligned != NULL) any_member_attribute = true;
+            member_aligns[i] = member_align;
+        }
+    }
+
+    if (packed == NULL && aligned == NULL && !any_member_attribute) {
+        CN_FREE(member_aligns);
+        return CN_HOOK_RESPONSE_NONE;
+    }
+
+    opt.member_aligns = member_aligns;
+    cn_analyze_layout_default(type, opt);
+
+    CN_FREE(member_aligns);
+    return CN_HOOK_RESPONSE_NONE;
+}
+
 CN_AST_INFO_DEFINE_ARRAY(GNU, CN_GNU_EXTENSION_ID, CN_AST_GNU_GEN_LIST);
 
 CNDEF bool cn_gnu_extension(Cn_Hooks *hooks, Cn_Ast_Info_Array ast_info_table[256]) {
@@ -1028,6 +1185,13 @@ CNDEF bool cn_gnu_extension(Cn_Hooks *hooks, Cn_Ast_Info_Array ast_info_table[25
     // Registring single parsing hook, it dispatches by slot itself.
     Cn_Hook_Parse *parse_hook = &cn__gnu_hook_parse;
     cn_array_list_append(&hooks->parse_hooks, parse_hook);
+
+    // Registring analyze hooks.
+    Cn_Hook_Analyze_Type_Specifier *type_specifier_hook = &cn__gnu_hook_analyze_type_specifier;
+    cn_array_list_append(&hooks->analyze_type_specifier_hooks, type_specifier_hook);
+
+    Cn_Hook_Analyze_Layout *layout_hook = &cn__gnu_hook_analyze_layout;
+    cn_array_list_append(&hooks->analyze_layout_hooks, layout_hook);
 
     return true;
 }
