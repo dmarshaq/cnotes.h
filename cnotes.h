@@ -1892,7 +1892,7 @@ typedef struct {
 } Cn_Token;
 
 /**
- * Struct to group token kind and its respective string litetal.
+ * Struct to group token kind and its respective string literal.
  *
  * For example:
  * ```c
@@ -2511,40 +2511,34 @@ CNDEF Cn_Type *cn_type_greatest_arithmetic_rank(const Cn_Type *a, const Cn_Type 
 CNDEF bool cn_type_is_scalar(Cn_Type *type);
 
 /**
- * TODO: Move this into `analyze` section is `type` section ideally should remain stateless.
- * Also make sure if exposed to public API, that it properly handles interning of tagged types.
- *
- * Interns `type` into the type universe of the current translation unit.
- *
- * Structurally equal types are stored only once, so interned types can be compared by pointer.
- *
- * RETURNS: Interned type that is structurally equal to `type`, newly stored if it wasn't there yet.
- *
- * IMPORTANT: Every type created outside the library, for example by analyze hooks,
- * must be interned before it is used, so it is deduplicated and properly rolled back.
- *
- * NOTE: `type` itself can be a temporary, it is copied when stored.
- *
- * SINCE: 0.3.0
- */
-CNDEF Cn_Type *cn_type_intern(Cn_Type *type);
-
-/**
  * ============================================
  * SECTION: Any
  * ============================================
+ */
+
+/**
+ * Struct that groups `data` and its `type`.
+ *
+ * SINCE: 0.3.0
  */
 typedef struct {
     Cn_Type *type;
     void *data;
 } Cn_Any;
 
+/**
+ * Maximum size in bytes that scalar type can be.
+ *
+ * SINCE: 0.3.0
+ */
 #define CN_TYPE_SCALAR_MAX_SIZE 16
 
 /**
  * Reads contents of `any`, interpreting them as integer.
  *
  * RETURNS: Integer value of `any`.
+ *
+ * SINCE: 0.3.0
  */
 CNDEF int64_t cn_any_read_int(Cn_Any any);
 
@@ -2552,6 +2546,8 @@ CNDEF int64_t cn_any_read_int(Cn_Any any);
  * Reads contents of `any`, interpreting them as floating point.
  *
  * RETURNS: Floating point value of `any`.
+ *
+ * SINCE: 0.3.0
  */
 CNDEF double cn_any_read_float(Cn_Any any);
 
@@ -2559,6 +2555,8 @@ CNDEF double cn_any_read_float(Cn_Any any);
  * Writes integer `value` to contents of `any`, using its type to properly size the integer.
  *
  * RETURNS: Resulting any.
+ *
+ * SINCE: 0.3.0
  */
 CNDEF Cn_Any cn_any_write_int(Cn_Any any, int64_t value);
 
@@ -2566,6 +2564,8 @@ CNDEF Cn_Any cn_any_write_int(Cn_Any any, int64_t value);
  * Writes floating point `value` to contents of `any`, using its type to properly size the floating point.
  *
  * RETURNS: Resulting any.
+ *
+ * SINCE: 0.3.0
  */
 CNDEF Cn_Any cn_any_write_float(Cn_Any any, double value);
 
@@ -2573,6 +2573,8 @@ CNDEF Cn_Any cn_any_write_float(Cn_Any any, double value);
  * Checks whether value of `any` is zero.
  *
  * RETURNS: `true` if `any` is `0`, `false` otherwise.
+ *
+ * SINCE: 0.3.0
  */
 CNDEF bool cn_any_is_zero(Cn_Any any);
 
@@ -2582,6 +2584,8 @@ CNDEF bool cn_any_is_zero(Cn_Any any);
  * RETURNS: Resulting `double` value.
  *
  * NOTE: If `any` is not of a scalar type, it is still read as a raw integer and converted to `double`.
+ *
+ * SINCE: 0.3.0
  */
 CNDEF double cn_any_as_double(Cn_Any any);
 
@@ -2593,6 +2597,8 @@ CNDEF double cn_any_as_double(Cn_Any any);
  * RETURNS: `true` on success, `false` on failure.
  *
  * OUTPUTS: Converted value, written to `out`.
+ *
+ * SINCE: 0.3.0
  */
 CNDEF bool cn_double_to_int64(double d, int64_t *out);
 
@@ -2603,6 +2609,8 @@ CNDEF bool cn_double_to_int64(double d, int64_t *out);
  * foldable scalar, or when a float to int conversion would be out of range.
  *
  * NOTE: Converted value is stored in the supplied `buffer`.
+ *
+ * SINCE: 0.3.0
  */
 CNDEF Cn_Any cn_any_convert(Cn_Any src, Cn_Type *target, void *buffer);
 
@@ -2610,6 +2618,8 @@ CNDEF Cn_Any cn_any_convert(Cn_Any src, Cn_Type *target, void *buffer);
  * Checks whether `any` is empty, meaning its data and type are both `NULL`.
  *
  * RETURNS: `true` if `any` is empty, `false` otherwise.
+ *
+ * SINCE: 0.3.0
  */
 CNDEF bool cn_any_is_empty(Cn_Any any);
 
@@ -2621,35 +2631,27 @@ CNDEF bool cn_any_is_empty(Cn_Any any);
 
 /**
  * Information that each scope has.
+ *
+ * SINCE: 0.3.0
  */
 typedef struct {
     int64_t saved_strings_length;
     int64_t binding_idx;
     int64_t label_binding_idx;
     int64_t binding_defined_idx;
-
-    /**
-     * If set to `true`, there is a checkpoint set in this scope.
-     *
-     * Therefore it cannot be removed, because doing so would invalidate
-     * state saved by the checkpoint. If locked scope is removed, an error occurs.
-     *
-     * NOTE: This is a workaround to avoid storing massive deep copies of
-     * scoped data structures like bindings hash tables, or scoped string arenas.
-     * It assumes that ast functionality won't require processor to
-     * jump into a completely different scope that no longer exists.
-     * In other words, all jumps can only occur from current to previous active scopes.
-     */
-    bool    is_checkpoint_locked;
 } Cn_Scope;
 
 /**
  * Index of the currently active scope.
+ *
+ * SINCE: 0.3.0
  */
 #define CN_SCOPE_STACK_CURRENT_IDX (cn_array_list_length(&cn__tu_data->scope_stack) - 1)
 
 /**
  * Index of the file scope.
+ *
+ * SINCE: 0.3.0
  */
 #define CN_SCOPE_FILE_IDX 0
 
@@ -2657,16 +2659,22 @@ typedef struct {
  * Peeks scope at the top of the scope stack.
  *
  * RETURNS: Scope that sits at the top of the scope stack.
+ *
+ * SINCE: 0.3.0
  */
 CNDEF Cn_Scope *cn_scope_stack_peek();
 
 /**
  * Pushes new scope to the top of the scope stack.
+ *
+ * SINCE: 0.3.0
  */
 CNDEF void cn_scope_stack_push();
 
 /**
  * Pops scope from the top of the scope stack.
+ *
+ * SINCE: 0.3.0
  */
 CNDEF void cn_scope_stack_pop();
 
@@ -2686,6 +2694,8 @@ CNDEF void cn_scope_stack_pop();
  * Gets next fresh counter value, incrementing the counter.
  *
  * RETURNS: Counter value before increment.
+ *
+ * SINCE: 0.3.0
  */
 #define cn_ast_counter_next() (cn__tu_data->counter++)
 
@@ -2696,6 +2706,8 @@ CNDEF void cn_scope_stack_pop();
  * so that actual type data stays at the same memory addresses.
  *
  * RETURNS: `true` if types are identical, `false` otherwise.
+ *
+ * SINCE: 0.3.0
  */
 CNDEF bool cn_ast_type_ptr_equals(const Cn_Type **type1_ptr, const Cn_Type **type2_ptr);
 
@@ -2706,49 +2718,91 @@ CNDEF bool cn_ast_type_ptr_equals(const Cn_Type **type1_ptr, const Cn_Type **typ
  * so that actual type data stays at the same memory addresses.
  *
  * RETURNS: Hash of the type.
+ *
+ * SINCE: 0.3.0
  */
 CNDEF uint64_t cn_ast_type_ptr_hash(const Cn_Type **type_ptr);
 
 
 
 
-
-typedef enum : uint8_t {
-    CN_AST_TYPE_QUALIFIER_CONST         = 0x01,
-    CN_AST_TYPE_QUALIFIER_RESTRICT      = 0x02,
-    CN_AST_TYPE_QUALIFIER_VOLATILE      = 0x04,
-    CN_AST_TYPE_QUALIFIER_ATOMIC        = 0x08,
+/**
+ * Enum to store type qualifier information.
+ *
+ * When qualifiers are parsed these flags are set on type specifier.
+ * 
+ * SINCE: 0.3.0
+ */
+typedef enum {
+    CN_AST_TYPE_QUALIFIER_CONST    = 0x1,
+    CN_AST_TYPE_QUALIFIER_RESTRICT = 0x2,
+    CN_AST_TYPE_QUALIFIER_VOLATILE = 0x4,
+    // TEMPORARY: CN_AST_TYPE_QUALIFIER_ATOMIC        = 0x8,
 } Cn_Ast_Qualifier_Flags;
 
+/**
+ * Simple helper that maps ast qualifiers to type qualifiers.
+ * 
+ * SINCE: 0.3.0
+ */
 CNDEF Cn_Type_Flags cn_ast_qualifier_flags_to_type(Cn_Ast_Qualifier_Flags flags);
 
-typedef enum : uint8_t {
-    CN_AST_FUNCTION_SPECIFIER_INLINE    = 0x01,
-    CN_AST_FUNCTION_SPECIFIER_NORETURN  = 0x02,
+/**
+ * Enum to store function specifier information.
+ * 
+ * SINCE: 0.3.0
+ */
+typedef enum {
+    CN_AST_FUNCTION_SPECIFIER_INLINE = 0x1,
+    // TEMPORARY: CN_AST_FUNCTION_SPECIFIER_NORETURN  = 0x2,
 } Cn_Ast_Function_Specifier_Flags;
 
-typedef enum : uint8_t {
-    CN_AST_STORAGE_SPECIFIER_STATIC         = 0x01,
-    CN_AST_STORAGE_SPECIFIER_EXTERN         = 0x02,
-    CN_AST_STORAGE_SPECIFIER_REGISTER       = 0x04,
-    CN_AST_STORAGE_SPECIFIER_AUTO           = 0x08,
-    CN_AST_STORAGE_SPECIFIER_TYPEDEF        = 0x10,
+/**
+ * Enum to store storage specifier information.
+ * 
+ * SINCE: 0.3.0
+ */
+typedef enum {
+    CN_AST_STORAGE_SPECIFIER_STATIC   = 0x1,
+    CN_AST_STORAGE_SPECIFIER_EXTERN   = 0x2,
+    CN_AST_STORAGE_SPECIFIER_REGISTER = 0x4,
+    CN_AST_STORAGE_SPECIFIER_AUTO     = 0x8,
+    CN_AST_STORAGE_SPECIFIER_TYPEDEF  = 0x10,
 } Cn_Ast_Storage_Specifier_Flags;
 
-typedef enum : uint8_t {
-    CN_AST_TYPE_SIGN_NONE = 0,
-    CN_AST_TYPE_SIGN_SIGNED,
-    CN_AST_TYPE_SIGN_UNSIGNED,
+/**
+ * Enum to store signess on type specifier.
+ *
+ * NOTE: `CN_AST_TYPE_SIGN_NONE` means that signess was not explicitly specified.
+ *
+ * SINCE: 0.3.0
+ */
+typedef enum {
+    CN_AST_TYPE_SIGN_NONE     = 0,
+    CN_AST_TYPE_SIGN_SIGNED   = 1,
+    CN_AST_TYPE_SIGN_UNSIGNED = 2,
 } Cn_Ast_Type_Sign;
 
-typedef enum : uint8_t {
-    CN_AST_TYPE_WIDTH_NONE = 0,
-    CN_AST_TYPE_WIDTH_SHORT,
-    CN_AST_TYPE_WIDTH_LONG,
-    CN_AST_TYPE_WIDTH_LONG_LONG,
+/**
+ * Enum that store width on type specifier.
+ *
+ * NOTE: `CN_AST_TYPE_WIDTH_NONE` means that width was not explicitly specified.
+ *
+ * SINCE: 0.3.0
+ */
+typedef enum {
+    CN_AST_TYPE_WIDTH_NONE      = 0,
+    CN_AST_TYPE_WIDTH_SHORT     = 1,
+    CN_AST_TYPE_WIDTH_LONG      = 2,
+    CN_AST_TYPE_WIDTH_LONG_LONG = 3,
 } Cn_Ast_Type_Width;
 
-typedef enum : uint8_t {
+/**
+ * Enum that indicates primitive base type on type specifier.
+ *
+ * SINCE: 0.3.0
+ */
+typedef enum {
     CN_AST_TYPE_NONE    = 0,
     CN_AST_TYPE_INT     = 1,
     CN_AST_TYPE_CHAR    = 2,
@@ -2758,7 +2812,12 @@ typedef enum : uint8_t {
     CN_AST_TYPE_VOID    = 6,
 } Cn_Ast_Type_Kind;
 
-static const Cn_Token_Kind CN_AST_TYPE_KINDS[] = {
+/**
+ * Constant array that respectively maps `Cn_Ast_Type_Kind` values to `Cn_Token_Kind`.
+ *
+ * SINCE: 0.3.0
+ */
+const Cn_Token_Kind CN_AST_TYPE_KINDS[] = {
     CN_TOKEN_UNKNOWN,
     CN_TOKEN_INT,
     CN_TOKEN_CHAR,
@@ -2769,6 +2828,8 @@ static const Cn_Token_Kind CN_AST_TYPE_KINDS[] = {
 };
 
 /**
+ * Enum that stores binary operator kinds.
+ *
  * ```
  *  binary_operator
  *          : '['
@@ -2796,8 +2857,10 @@ static const Cn_Token_Kind CN_AST_TYPE_KINDS[] = {
  *          | ','
  *          ;
  * ```
+ *
+ * SINCE: 0.3.0
  */
-typedef enum : int8_t {
+typedef enum {
     CN_AST_BINARY_OP_NONE           = -1,
     CN_AST_BINARY_OP_ARRAY_SUB      = 0,
     CN_AST_BINARY_OP_FUNCTION       = 1,
@@ -2824,20 +2887,31 @@ typedef enum : int8_t {
     CN_AST_BINARY_OP_COMMA          = 22,
 } Cn_Ast_Binary_Operator_Kind;
 
+/**
+ * Struct that defines single binary operator.
+ *
+ * MEMBER token_identifier: `Cn_Token_Kind` that is associated with the operator.
+ *
+ * SINCE: 0.3.0
+ */
 typedef struct {
-    Cn_Ast_Binary_Operator_Kind kind;   // Kind of operator.
-    Cn_Token_Kind token_identifier; // Token which identifies binary operator.
-    int precedence;                 // Precedence.
+    Cn_Ast_Binary_Operator_Kind kind;
+    Cn_Token_Kind token_identifier;
+    int precedence;
 } Cn_Ast_Binary_Operator;
 
 /**
- * Checks table whether current token of `lexer` is a binary operator.
+ * Checks table of binary operators, compares whether current token of `lexer` is a binary operator.
  *
  * RETURNS: Kind of the binary operator, `CN_AST_BINARY_OP_NONE` if token is not one.
+ *
+ * SINCE: 0.3.0
  */
 CNDEF Cn_Ast_Binary_Operator_Kind cn_ast_is_binary_operator(Cn_Lexer *lexer);
 
 /**
+ * Enum that stores unary operator kinds.
+ *
  * ```
  *  unary_operator
  *          : '++'
@@ -2850,10 +2924,10 @@ CNDEF Cn_Ast_Binary_Operator_Kind cn_ast_is_binary_operator(Cn_Lexer *lexer);
  *          | '&'
  *          ;
  * ```
+ *
+ * SINCE: 0.3.0
  */
-#define CN_AST_UNARY_OPERATOR_PRECEDENCE 13
-
-typedef enum : int8_t {
+typedef enum {
     CN_AST_UNARY_OP_NONE           = -1,
     CN_AST_UNARY_OP_INCREMENT      = 0,
     CN_AST_UNARY_OP_DECREMENT      = 1,
@@ -2865,19 +2939,37 @@ typedef enum : int8_t {
     CN_AST_UNARY_OP_ADDROF         = 7,
 } Cn_Ast_Unary_Operator_Kind;
 
+/**
+ * Precedence value for all unary operators.
+ *
+ * SINCE: 0.3.0
+ */
+#define CN_AST_UNARY_OPERATOR_PRECEDENCE 13
+
+/**
+ * Struct that defines single unary operator.
+ *
+ * MEMBER token_identifier: `Cn_Token_Kind` that is associated with the operator.
+ *
+ * SINCE: 0.3.0
+ */
 typedef struct {
-    Cn_Ast_Unary_Operator_Kind kind;         // Kind of operator.
-    Cn_Token_Kind token_identifier;      // Token which identifies unary operator, if such present.
+    Cn_Ast_Unary_Operator_Kind kind;
+    Cn_Token_Kind token_identifier;
 } Cn_Ast_Unary_Operator;
 
 /**
- * Checks table whether current token of `lexer` is a unary operator.
+ * Checks table of unary operators, compares whether current token of `lexer` is a unary operator.
  *
  * RETURNS: Kind of the unary operator, `CN_AST_UNARY_OP_NONE` if token is not one.
+ *
+ * SINCE: 0.3.0
  */
 CNDEF Cn_Ast_Unary_Operator_Kind cn_ast_is_unary_operator(Cn_Lexer *lexer);
 
 /**
+ * Enum that stores assignment operator kinds.
+ *
  * ```
  *  assignment_operator
  *          : '='
@@ -2893,10 +2985,10 @@ CNDEF Cn_Ast_Unary_Operator_Kind cn_ast_is_unary_operator(Cn_Lexer *lexer);
  *          | '|='
  *          ;
  * ```
+ *
+ * SINCE: 0.3.0
  */
-#define CN_AST_ASSIGNMENT_OPERATOR_PRECEDENCE 1
-
-typedef enum : int8_t {
+typedef enum {
     CN_AST_ASSIGNMENT_OP_NONE           = -1,
     CN_AST_ASSIGNMENT_OP_ASSIGN         = 0,
     CN_AST_ASSIGNMENT_OP_MULTIPLY       = 1,
@@ -2911,65 +3003,105 @@ typedef enum : int8_t {
     CN_AST_ASSIGNMENT_OP_BIT_OR         = 10,
 } Cn_Ast_Assignment_Operator_Kind;
 
+/**
+ * Precedence value for all assignment operators.
+ *
+ * SINCE: 0.3.0
+ */
+#define CN_AST_ASSIGNMENT_OPERATOR_PRECEDENCE 1
+
+/**
+ * Struct that defines single assignment operator.
+ *
+ * MEMBER token_identifier: `Cn_Token_Kind` that is associated with the operator.
+ *
+ * SINCE: 0.3.0
+ */
 typedef struct {
-    Cn_Ast_Assignment_Operator_Kind kind;    // Kind of operator.
-    Cn_Token_Kind token_identifier;      // Token which identifies assignment operator, if such present.
+    Cn_Ast_Assignment_Operator_Kind kind;
+    Cn_Token_Kind token_identifier;
 } Cn_Ast_Assignment_Operator;
 
 /**
- * Checks table whether current token of `lexer` is an assignment operator.
+ * Checks table of assignment operators, compares whether current token of `lexer` is an assignment operator.
  *
  * RETURNS: Kind of the assignment operator, `CN_AST_ASSIGNMENT_OP_NONE` if token is not one.
+ *
+ * SINCE: 0.3.0
  */
 CNDEF Cn_Ast_Assignment_Operator_Kind cn_ast_is_assignment_operator(Cn_Lexer *lexer);
 
 /**
+ * Enum that stores postfix operator kinds.
+ *
  * ```
  *  postfix_operator
  *          : '++'
  *          | '--'
  *          ;
  * ```
+ *
+ * SINCE: 0.3.0
  */
-#define CN_AST_POSTFIX_OPERATOR_PRECEDENCE 14
-
-typedef enum : int8_t {
+typedef enum {
     CN_AST_POSTFIX_OP_NONE              = -1,
     CN_AST_POSTFIX_OP_INCREMENT         = 0,
     CN_AST_POSTFIX_OP_DECREMENT         = 1,
 } Cn_Ast_Postfix_Operator_Kind;
 
+/**
+ * Precedence value for all postfix operators.
+ *
+ * SINCE: 0.3.0
+ */
+#define CN_AST_POSTFIX_OPERATOR_PRECEDENCE 14
+
+/**
+ * Struct that defines single postfix operator.
+ *
+ * MEMBER token_identifier: `Cn_Token_Kind` that is associated with the operator.
+ *
+ * SINCE: 0.3.0
+ */
 typedef struct {
-    Cn_Ast_Postfix_Operator_Kind kind;       // Kind of operator.
-    Cn_Token_Kind token_identifier;      // Token which identifies postfix operator, if such present.
+    Cn_Ast_Postfix_Operator_Kind kind;
+    Cn_Token_Kind token_identifier;
 } Cn_Ast_Postfix_Operator;
 
 /**
- * Checks table whether current token of `lexer` is a postfix operator.
+ * Checks table of postfix operators, compares whether current token of `lexer` is a postfix operator.
  *
  * RETURNS: Kind of the postfix operator, `CN_AST_POSTFIX_OP_NONE` if token is not one.
+ *
+ * SINCE: 0.3.0
  */
 CNDEF Cn_Ast_Postfix_Operator_Kind cn_ast_is_postfix_operator(Cn_Lexer *lexer);
 
 /**
- * Extension id of the `kind`, `0` for the core library kinds.
+ * Extension id of any 32-bit `kind`, `0` for the core library kinds.
+ *
+ * SINCE: 0.3.0
  */
 #define CN_AST_KIND_EXTENSION_ID(kind) ((uint8_t)((uint32_t)(kind) >> 24))
 
 /**
- * First kind value of the extension with id `id`, every custom kind of that extension
+ * First kind value of the extension with 32-bit id `id`, every custom kind of that extension
  * must be greater than it. See `Cn_Ast_Kind`.
+ *
+ * SINCE: 0.3.0
  */
 #define CN_AST_KIND_EXTENSION_BASE(id) ((uint32_t)(id) << 24)
 
 /**
  * Every AST node kind entry in enum, is prefixed by `CN_AST_`.
  * This X macro used to generate a single kind entry in enum.
+ *
+ * SINCE: 0.3.0
  */
 #define CN__AST_ENUM_ENTRY(K, T, m) CN_AST_##K,
 
 /**
- * This macro declares enum that is used to identify each node intoduced.
+ * This macro declares enum that is used to identify each node introduced.
  *
  * But library extensions can introduce their own AST nodes.
  * In order to sustain stable identifications in enums 
@@ -2984,6 +3116,8 @@ CNDEF Cn_Ast_Postfix_Operator_Kind cn_ast_is_postfix_operator(Cn_Lexer *lexer);
  * PARAM NAME: Is uppercase naming of the enum entry. For example `GNU`.
  *
  * PARAM Name: Is type naming of the enum itself. For example `Gnu`.
+ *
+ * SINCE: 0.3.0
  */
 #define CN_AST_DECLARE_KINDS(NAME, Name, ID, LIST)                      \
     typedef enum {                                                      \
@@ -2995,6 +3129,8 @@ CNDEF Cn_Ast_Postfix_Operator_Kind cn_ast_is_postfix_operator(Cn_Lexer *lexer);
 
 /**
  * List for X macro generation of core library AST nodes.
+ *
+ * SINCE: 0.3.0
  */
 #define CN_AST_GEN_LIST(X)\
     /* --- misc ----------------------------------------------------------- */                              \
@@ -3062,9 +3198,7 @@ CNDEF Cn_Ast_Postfix_Operator_Kind cn_ast_is_postfix_operator(Cn_Lexer *lexer);
     X(ATTRIBUTE_SPECIFIER,              Attribute_Specifier,                attribute_specifier)            \
     X(ATTRIBUTE,                        Attribute,                          attribute)                      \
 
-/**
- * Declaration of core types.
- */
+// Declaration of core types, from `CN_AST_GEN_LIST`.
 CN_AST_DECLARE_KINDS(CORE, Core, 0, CN_AST_GEN_LIST)
 
 
@@ -3074,9 +3208,11 @@ CN_AST_DECLARE_KINDS(CORE, Core, 0, CN_AST_GEN_LIST)
  * Values below `0x100` are shared by every node kind.
  * Values starting from `0x100` are specific to a node kind, so they can overlap between kinds,
  * this also lets extensions define flags for their own kinds.
+ *
+ * SINCE: 0.3.0
  */
-typedef enum : uint32_t {
-    CN_AST_SYNTHETIC                    = 0x4,
+typedef enum {
+    CN_AST_SYNTHETIC                    = 0x1,
 
     CN_AST_DECLARATOR_IS_ABSTRACT                 = 0x100,
 
@@ -3096,24 +3232,32 @@ typedef enum : uint32_t {
     CN_AST_LABEL_IS_DEFAULT                       = 0x200,
 } Cn_Ast_Flags;
 
+/**
+ * Forward declaration for `cn_ast_node` struct.
+ *
+ * SINCE: 0.3.0
+ */
 typedef struct cn_ast_node Cn_Ast_Node;
 
 /**
  * Finalized, immutable-length array of node pointers.
  *
- * Backing storage lives in `Cn_Tu_Data.ast_arena`, so it is rolled
- * back together with the nodes it points at on checkpoint load.
+ * Memory stored in `Cn_Tu_Data.ast_arena`, so it is rolled
+ * back together with the nodes it points when rollback occurs.
+ *
+ * SINCE: 0.3.0
  */
 typedef struct {
     Cn_Ast_Node **ptrs;
     int64_t       length;
 } Cn_Ast_Nodes;
 
-
 /**
  * List for X macro generation of core ast slots---grammar points where custom sub-parser can be plugged in.
+ *
+ * SINCE: 0.3.0
  */
-#define CN_AST_SLOT_GEN_LIST(X)\
+#define CN_AST_SLOT_GEN_LIST(X)                                                                             \
     X(EXTERNAL_DECLARATION,             External_Declaration,               external_declaration)           \
     X(EXTERNAL_DECLARATION_PREFIX,      External_Declaration_Prefix,        external_declaration_prefix)    \
     X(STATEMENT,                        Statement,                          statement)                      \
@@ -3129,7 +3273,11 @@ typedef struct {
     X(TAG,                              Tag,                                tag)                            \
     X(ENUMERATOR,                       Enumerator,                         enumerator)                     \
 
-
+/**
+ * Type definition of ids that slots use.
+ *
+ * SINCE: 0.3.0
+ */
 typedef uint32_t Cn_Ast_Slot_Id;
 
 /**
@@ -4161,7 +4309,7 @@ typedef Cn_Hook_Response (Cn_Hook_Analyze_Declarator)(Cn_Ast_Node *declarator, C
  *    remaining hooks are not called. If no hook produces output, core default behavior applies.
  *  - Whether hook produced output is told by its output only, see each hook for what counts as output.
  *  - Returning `CN_HOOK_RESPONSE_ERROR` aborts analysis, hook is expected to report diagnostic itself.
- *  - AST must not be modified. Any type made by the hook must be interned with `cn_type_intern`.
+ *  - AST must not be modified. Any type made by the hook must be interned with `cn_analyze_intern_type`.
  */
 
 /**
@@ -4241,6 +4389,24 @@ CNDEF bool cn__extension_register(Cn_Extension *extensions[], int64_t length);
  * SECTION: Analyze
  * ============================================
  */
+
+/**
+ * TODO: Make sure if exposed to public API, that it properly handles interning of tagged types.
+ *
+ * Interns `type` into the type universe of the current translation unit.
+ *
+ * Structurally equal types are stored only once, so interned types can be compared by pointer.
+ *
+ * RETURNS: Interned type that is structurally equal to `type`, newly stored if it wasn't there yet.
+ *
+ * IMPORTANT: Every type created outside the library, for example by analyze hooks,
+ * must be interned before it is used, so it is deduplicated and properly rolled back.
+ *
+ * NOTE: `type` itself can be a temporary, it is copied when stored.
+ *
+ * SINCE: 0.3.0
+ */
+CNDEF Cn_Type *cn_analyze_intern_type(Cn_Type *type);
 
 /**
  * Flags to specify details on how certain analyze functions should work.
@@ -7928,8 +8094,8 @@ const Cn_Token_Literal CN_KEYWORD_TOKENS[] = {
     { CN_TOKEN_IMAGINARY,       CN_STR_BUFFER("_Imaginary") },
 
     // TEMPORARY: Post C99.
-    { CN_TOKEN_NORETURN,        CN_STR_BUFFER("_Noreturn") },
-    { CN_TOKEN_ATOMIC,          CN_STR_BUFFER("_Atomic") },
+    // { CN_TOKEN_NORETURN,        CN_STR_BUFFER("_Noreturn") },
+    // { CN_TOKEN_ATOMIC,          CN_STR_BUFFER("_Atomic") },
 
     // TEMPORARY: GNU extension keywords.
     { CN_TOKEN_GNU_ASM,         CN_STR_BUFFER("asm") },
@@ -9514,7 +9680,7 @@ CNDEF Cn_String cn__ast_permanent_save_string(Cn_String str) {
     return str;
 }
 
-CNDEF Cn_Type *cn_type_intern(Cn_Type *type) {
+CNDEF Cn_Type *cn_analyze_intern_type(Cn_Type *type) {
     if (!cn_hash_set_contains(&cn__tu_data->type_ptr_set, type)) {
         // Arena allocate memory for type.
         Cn_Type *result = cn_chained_arena_alloc(&cn__tu_data->type_arena, sizeof(Cn_Type));
@@ -9547,7 +9713,6 @@ CNDEF void cn_scope_stack_push() {
                 .binding_idx = cn_array_list_length(&cn__tu_data->binding_list),
                 .label_binding_idx = cn_array_list_length(&cn__tu_data->label_binding_list),
                 .binding_defined_idx = cn_array_list_length(&cn__tu_data->binding_defined_idx_list),
-                .is_checkpoint_locked = false,
                 } ));
 }
 
@@ -9555,11 +9720,6 @@ CNDEF void cn_scope_stack_pop() {
     CN_ASSERT(cn_array_list_length(&cn__tu_data->scope_stack) > 0);
 
     Cn_Scope *scope = cn_scope_stack_peek();
-
-    if (scope->is_checkpoint_locked) {
-        cn_log(CN_ERROR, "Scope with idx: %ld, is checkpoint locked and cannot be popped, make sure to remove checkpoint before popping the stack.", CN_SCOPE_STACK_CURRENT_IDX);
-        exit(1);
-    }
 
     int64_t binding_list_length = cn_array_list_length(&cn__tu_data->binding_list);
 
@@ -9642,7 +9802,7 @@ CNDEF Cn_String cn__scope_save_string(Cn_String str) {
 CNDEF Cn_Type_Flags cn_ast_qualifier_flags_to_type(Cn_Ast_Qualifier_Flags flags) {
     Cn_Type_Flags f = 0;
     f |= (flags & CN_AST_TYPE_QUALIFIER_CONST) ? CN_TYPE_QUALIFIED_CONSTANT : 0;
-    f |= (flags & CN_AST_TYPE_QUALIFIER_ATOMIC) ? CN_TYPE_QUALIFIED_ATOMIC : 0;
+    // f |= (flags & CN_AST_TYPE_QUALIFIER_ATOMIC) ? CN_TYPE_QUALIFIED_ATOMIC : 0;
     f |= (flags & CN_AST_TYPE_QUALIFIER_RESTRICT) ? CN_TYPE_QUALIFIED_RESTRICT : 0;
     f |= (flags & CN_AST_TYPE_QUALIFIER_VOLATILE) ? CN_TYPE_QUALIFIED_VOLATILE : 0;
     return f;
@@ -10854,7 +11014,7 @@ CNDEF Cn_Binding_Idx cn_binding_declare_label(Cn_String name, void * source) {
 CNDEF Cn_Binding_Idx cn_binding_declare_builtin(Cn_String name, void *source) {
     CN_ASSERT(!cn_str_is_empty(name));
 
-    Cn_Type *opaque = cn_type_intern((Cn_Type *)&CN_TYPE_OPAQUE);
+    Cn_Type *opaque = cn_analyze_intern_type((Cn_Type *)&CN_TYPE_OPAQUE);
 
     Cn_Binding binding = { 
         .kind = CN_BINDING_BUILTIN,
@@ -11262,7 +11422,7 @@ CNDEF Cn_Type *cn__analyze_type_from_primitive(Cn_Ast_Node *ts) {
             }
             type.integer.align = type.integer.size;
             type.integer.is_signed = prim->sign != CN_AST_TYPE_SIGN_UNSIGNED;
-            return cn_type_intern((Cn_Type *)&type);
+            return cn_analyze_intern_type((Cn_Type *)&type);
  
         case CN_AST_TYPE_CHAR:
             type.integer.kind = CN_INTEGER;
@@ -11270,31 +11430,31 @@ CNDEF Cn_Type *cn__analyze_type_from_primitive(Cn_Ast_Node *ts) {
             type.integer.size = sizeof(char);
             type.integer.align = type.integer.size;
             type.integer.is_signed = prim->sign != CN_AST_TYPE_SIGN_UNSIGNED;
-            return cn_type_intern((Cn_Type *)&type);
+            return cn_analyze_intern_type((Cn_Type *)&type);
  
         case CN_AST_TYPE_FLOAT:
             type.kind = CN_FLOAT;
             type.flags |= CN_TYPE_COMPLETE;
             type.size = sizeof(float);
             type.align = type.integer.size;
-            return cn_type_intern((Cn_Type *)&type);
+            return cn_analyze_intern_type((Cn_Type *)&type);
  
         case CN_AST_TYPE_DOUBLE:
             type.kind = CN_FLOAT;
             type.flags |= CN_TYPE_COMPLETE;
             type.size = sizeof(double);
             type.align = type.size;
-            return cn_type_intern((Cn_Type *)&type);
+            return cn_analyze_intern_type((Cn_Type *)&type);
  
         case CN_AST_TYPE_BOOL:
             type.kind = CN_BOOL;
             type.flags |= CN_TYPE_COMPLETE;
             type.size = sizeof(_Bool);
             type.align = type.size;
-            return cn_type_intern((Cn_Type *)&type);
+            return cn_analyze_intern_type((Cn_Type *)&type);
  
         case CN_AST_TYPE_VOID:
-            return cn_type_intern((Cn_Type *)&CN_TYPE_VOID);
+            return cn_analyze_intern_type((Cn_Type *)&CN_TYPE_VOID);
  
         default:
             cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, ts, CN_DC_INVALID_TYPE_SPECIFIER, "Unknown primitive type specifier.");
@@ -11572,7 +11732,7 @@ CNDEF Cn_Type *cn__analyze_type_from_enum(Cn_Ast_Node *ts) {
                 goto error;
             }
         } else {
-            enum_base_type = cn_type_intern((Cn_Type *)&CN_TYPE_INT);
+            enum_base_type = cn_analyze_intern_type((Cn_Type *)&CN_TYPE_INT);
         }
         enum_type->member_type = enum_base_type;
 
@@ -11686,11 +11846,11 @@ CNDEF Cn_Type *cn__analyze_type_apply_pointers(Cn_Type *result, Cn_Ast_Pointer *
         Cn_Ast_Pointer *ptr = pointer;
  
         Cn_Type type = cn_type_make_pointer(result);
-        result = cn_type_intern((Cn_Type *)&type);
+        result = cn_analyze_intern_type((Cn_Type *)&type);
  
         if (ptr->qualifiers != 0) {
             type = cn_type_make_qualified(cn_ast_qualifier_flags_to_type(ptr->qualifiers), result);
-            result = cn_type_intern((Cn_Type *)&type);
+            result = cn_analyze_intern_type((Cn_Type *)&type);
         }
  
         pointer = ptr->pointer;
@@ -11714,7 +11874,7 @@ CNDEF Cn_Type *cn__analyze_type_apply_array(Cn_Type *result, Cn_Ast_Node *dd, bo
     // once parsing qualifiers in array declarator is supported.
     if (apply_parameter_adjustment && (arr->direct_declarator == NULL || arr->direct_declarator->id == CN_AST_IDENTIFIER)) {
         Cn_Type ptr_type = cn_type_make_pointer(result);
-        result = cn_type_intern((Cn_Type *)&ptr_type);
+        result = cn_analyze_intern_type((Cn_Type *)&ptr_type);
         return result;
     }
 
@@ -11736,7 +11896,7 @@ CNDEF Cn_Type *cn__analyze_type_apply_array(Cn_Type *result, Cn_Ast_Node *dd, bo
     // therefore we have incomplete array: '[]' case.
     if (arr->expression == NULL) {
         type.array.flags &= ~CN_TYPE_COMPLETE;
-        return cn_type_intern((Cn_Type *)&type);
+        return cn_analyze_intern_type((Cn_Type *)&type);
     }
  
     // Evaluate the constant length expression.
@@ -11747,7 +11907,7 @@ CNDEF Cn_Type *cn__analyze_type_apply_array(Cn_Type *result, Cn_Ast_Node *dd, bo
         // This is the case where expression inside '[...]' cannot be evaluated.
         // Therefore we have VLA.
         type.array.flags |= CN_TYPE_ARRAY_VARIABLE;
-        return cn_type_intern((Cn_Type *)&type);
+        return cn_analyze_intern_type((Cn_Type *)&type);
     }
  
     if (any.type->kind != CN_INTEGER) {
@@ -11765,7 +11925,7 @@ CNDEF Cn_Type *cn__analyze_type_apply_array(Cn_Type *result, Cn_Ast_Node *dd, bo
     type.array.length = length;
     type.array.size = length * result->size;
  
-    return cn_type_intern((Cn_Type *)&type);
+    return cn_analyze_intern_type((Cn_Type *)&type);
  
 error:
     CN__TRACE_ERROR
@@ -11838,12 +11998,12 @@ CNDEF Cn_Type *cn__analyze_type_apply_function(Cn_Type *result, Cn_Ast_Node *dd,
         
     }
 
-    result = cn_type_intern((Cn_Type *)&type);
+    result = cn_analyze_intern_type((Cn_Type *)&type);
     
     // Casting up to pointer type if adjusting parameter.
     if (apply_parameter_adjustment && (fn->direct_declarator == NULL || fn->direct_declarator->id == CN_AST_IDENTIFIER)) {
         Cn_Type ptr_type = cn_type_make_pointer(result);
-        result = cn_type_intern((Cn_Type *)&ptr_type);
+        result = cn_analyze_intern_type((Cn_Type *)&ptr_type);
     }
  
     return result;
@@ -11923,7 +12083,7 @@ CNDEF Cn_Type *cn_analyze_to_type(Cn_Ast_Qualifier_Flags qualifier, void *type_s
     // Qualifiers on the base type itself.
     if (qualifier != 0) {
         Cn_Type type = cn_type_make_qualified(cn_ast_qualifier_flags_to_type(qualifier), result);
-        result = cn_type_intern((Cn_Type *)&type);
+        result = cn_analyze_intern_type((Cn_Type *)&type);
     }
  
     // Declarator layers (* [] ()).
@@ -11940,10 +12100,10 @@ error:
 CNDEF Cn_Type *cn__analyze_integer_promote(Cn_Type *type) {
     // Integer types of rank lower than int (and _Bool) promote to int.
     if (type->kind == CN_BOOL) {
-        return cn_type_intern((Cn_Type *)&CN_TYPE_INT);
+        return cn_analyze_intern_type((Cn_Type *)&CN_TYPE_INT);
     }
     if (type->kind == CN_INTEGER && type->size < (int64_t)sizeof(int)) {
-        return cn_type_intern((Cn_Type *)&CN_TYPE_INT);
+        return cn_analyze_intern_type((Cn_Type *)&CN_TYPE_INT);
     }
     return type;
 }
@@ -12128,11 +12288,11 @@ CNDEF Cn_Type *cn__analyze_typecheck_binary(Cn_Ast_Node *node) {
                     // 'opaque - p' is only valid as a difference of two pointers.
                     if (other_type->kind == CN_OPAQUE) {
                         if (left->kind == CN_POINTER) return other_type;
-                        return cn_type_intern((Cn_Type *)&CN_TYPE_PTRDIFF);
+                        return cn_analyze_intern_type((Cn_Type *)&CN_TYPE_PTRDIFF);
                     }
                     if (other_type->kind != CN_INTEGER) {
                         if (other_type->kind == CN_POINTER) {
-                            return cn_type_intern((Cn_Type *)&CN_TYPE_PTRDIFF);
+                            return cn_analyze_intern_type((Cn_Type *)&CN_TYPE_PTRDIFF);
                         }
                         cn__analyze_error_illegal_binary(node, left, right, "pointer subtraction");
                         goto error;
@@ -12218,7 +12378,7 @@ CNDEF Cn_Type *cn__analyze_typecheck_binary(Cn_Ast_Node *node) {
                     cn__analyze_error_illegal_binary(node, left, right, "relational comparison");
                     goto error;
                 }
-                return cn_type_intern((Cn_Type *)&CN_TYPE_INT);
+                return cn_analyze_intern_type((Cn_Type *)&CN_TYPE_INT);
             }
 
         // Equality: as relational, plus pointer vs integer (null constant). Result int.
@@ -12237,14 +12397,14 @@ CNDEF Cn_Type *cn__analyze_typecheck_binary(Cn_Ast_Node *node) {
                     cn__analyze_error_illegal_binary(node, left, right, "equality comparison");
                     goto error;
                 }
-                return cn_type_intern((Cn_Type *)&CN_TYPE_INT);
+                return cn_analyze_intern_type((Cn_Type *)&CN_TYPE_INT);
             }
 
         // Logical: scalar operands, no arithmetic conversions, result is int.
         case CN_AST_BINARY_OP_AND:
         case CN_AST_BINARY_OP_OR: {
             if (cn_type_is_scalar(left) && cn_type_is_scalar(right)) {
-                return cn_type_intern((Cn_Type *)&CN_TYPE_INT);
+                return cn_analyze_intern_type((Cn_Type *)&CN_TYPE_INT);
             }
             cn__analyze_error_illegal_binary(node, left, right, "logical operation");
             goto error;
@@ -12463,7 +12623,7 @@ CNDEF Cn_Type *cn__analyze_typecheck_unary(Cn_Ast_Node *node) {
                     cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, node, CN_DC_ILLEGAL_TYPE, "Operand of '!' must be of scalar type.");
                     goto error;
                 }
-                return cn_type_intern((Cn_Type *)&CN_TYPE_INT);
+                return cn_analyze_intern_type((Cn_Type *)&CN_TYPE_INT);
             }
 
         // *x : pointer operand; result is the pointed-to type (an lvalue).
@@ -12494,9 +12654,9 @@ CNDEF Cn_Type *cn__analyze_typecheck_unary(Cn_Ast_Node *node) {
                     cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, node, CN_DC_ILLEGAL_TYPE, "Cannot take the address of a non-lvalue.");
                     goto error;
                 }
-                Cn_Type *void_t = cn_type_intern((Cn_Type *)&CN_TYPE_VOID);
+                Cn_Type *void_t = cn_analyze_intern_type((Cn_Type *)&CN_TYPE_VOID);
                 Cn_Type ptr = cn_type_make_pointer(void_t);
-                return cn_type_intern(&ptr);
+                return cn_analyze_intern_type(&ptr);
             }
 
         default: 
@@ -12624,7 +12784,7 @@ CNDEF Cn_Type *cn__analyze_typecheck_sizeof(Cn_Ast_Node *node) {
         goto error;
     }
 
-    return cn_type_intern((Cn_Type *)&CN_TYPE_SIZE);
+    return cn_analyze_intern_type((Cn_Type *)&CN_TYPE_SIZE);
 
 error:
     CN__TRACE_ERROR
@@ -12918,26 +13078,26 @@ CNDEF Cn_Type *cn_analyze_typecheck_expression(void * expression) {
                         }
                     case CN_AST_INTEGER:
                         {   
-                            result = cn_type_intern((Cn_Type *)&CN_TYPE_INT);
+                            result = cn_analyze_intern_type((Cn_Type *)&CN_TYPE_INT);
                             break;
                         }
                     case CN_AST_FLOAT:
                         {   
-                            result = cn_type_intern((Cn_Type *)&CN_TYPE_FLOAT);
+                            result = cn_analyze_intern_type((Cn_Type *)&CN_TYPE_FLOAT);
                             break;
                         }
                     case CN_AST_STRING:
                         {   
-                            result  = cn_type_intern((Cn_Type *)&CN_TYPE_CHAR);
+                            result  = cn_analyze_intern_type((Cn_Type *)&CN_TYPE_CHAR);
                             Cn_Type const_char = cn_type_make_qualified(CN_TYPE_QUALIFIED_CONSTANT, result);
-                            result = cn_type_intern(&const_char);
+                            result = cn_analyze_intern_type(&const_char);
                             Cn_Type const_char_ptr = cn_type_make_pointer(result);
-                            result = cn_type_intern(&const_char_ptr);
+                            result = cn_analyze_intern_type(&const_char_ptr);
                             break;
                         }
                     case CN_AST_CHAR:
                         {   
-                            result = cn_type_intern((Cn_Type *)&CN_TYPE_CHAR);
+                            result = cn_analyze_intern_type((Cn_Type *)&CN_TYPE_CHAR);
                             break;
                         }
                     default:
@@ -14489,12 +14649,12 @@ CNDEF void cn__emit_qualifiers(Cn_Emitter *e, Cn_Ast_Qualifier_Flags qualifiers)
     if (qualifiers & CN_AST_TYPE_QUALIFIER_CONST)    cn__emit_str_lit(e, "const ");
     if (qualifiers & CN_AST_TYPE_QUALIFIER_RESTRICT) cn__emit_str_lit(e, "restrict ");
     if (qualifiers & CN_AST_TYPE_QUALIFIER_VOLATILE) cn__emit_str_lit(e, "volatile ");
-    if (qualifiers & CN_AST_TYPE_QUALIFIER_ATOMIC)   cn__emit_str_lit(e, "_Atomic ");
+    // if (qualifiers & CN_AST_TYPE_QUALIFIER_ATOMIC)   cn__emit_str_lit(e, "_Atomic ");
 }
 
 CNDEF void cn__emit_function_specifiers(Cn_Emitter *e, Cn_Ast_Function_Specifier_Flags func_spec) {
     if (func_spec & CN_AST_FUNCTION_SPECIFIER_INLINE)   cn__emit_str_lit(e, "inline ");
-    if (func_spec & CN_AST_FUNCTION_SPECIFIER_NORETURN) cn__emit_str_lit(e, "_Noreturn ");
+    // if (func_spec & CN_AST_FUNCTION_SPECIFIER_NORETURN) cn__emit_str_lit(e, "_Noreturn ");
 }
 
 CNDEF void cn__emit_type_specifier_primitive(Cn_Emitter *e, Cn_Ast_Type_Specifier_Primitive *node) {
@@ -14819,7 +14979,7 @@ CNDEF Cn_Ast_Translation_Unit *cn_parse_translation_unit(Cn_Lexer *lexer) {
     // Inject compiler builtins that appear in preprocessed .i files but are
     // never declared by any source.
     {
-        Cn_Type *opaque = cn_type_intern((Cn_Type *)&CN_TYPE_OPAQUE);
+        Cn_Type *opaque = cn_analyze_intern_type((Cn_Type *)&CN_TYPE_OPAQUE);
 
         cn_binding_declare_typedef(CN_STR_LIT("__builtin_va_list"),              NULL, opaque);
     }
@@ -16979,15 +17139,15 @@ CNDEF int cn_parse_try_qualifier(Cn_Lexer *lexer, Cn_Ast_Qualifier_Flags *output
                 *output |= CN_AST_TYPE_QUALIFIER_VOLATILE;
                 return 0;
             }
-        case CN_TOKEN_ATOMIC:
-            {
-                // Case where it is atomic specifier is not handled here, if such case appears just skip.
-                if (cn_lexer_peek(lexer, 1).kind == CN_TOKEN_PARAN_OPEN) return 1;
+        // case CN_TOKEN_ATOMIC:
+        //     {
+        //         // Case where it is atomic specifier is not handled here, if such case appears just skip.
+        //         if (cn_lexer_peek(lexer, 1).kind == CN_TOKEN_PARAN_OPEN) return 1;
 
-                cn_lexer_next_token(lexer);
-                *output |= CN_AST_TYPE_QUALIFIER_ATOMIC;
-                return 0;
-            }
+        //         cn_lexer_next_token(lexer);
+        //         *output |= CN_AST_TYPE_QUALIFIER_ATOMIC;
+        //         return 0;
+        //     }
         default: 
             return 1;
     }
@@ -17006,12 +17166,12 @@ CNDEF int cn_parse_try_function_specifier(Cn_Lexer *lexer, Cn_Ast_Function_Speci
                 *output |= CN_AST_FUNCTION_SPECIFIER_INLINE;
                 return 0;
             }
-        case CN_TOKEN_NORETURN:
-            {
-                cn_lexer_next_token(lexer);
-                *output |= CN_AST_FUNCTION_SPECIFIER_NORETURN;
-                return 0;
-            }
+        // case CN_TOKEN_NORETURN:
+        //     {
+        //         cn_lexer_next_token(lexer);
+        //         *output |= CN_AST_FUNCTION_SPECIFIER_NORETURN;
+        //         return 0;
+        //     }
         default: 
             return 1;
     }

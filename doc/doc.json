@@ -1876,7 +1876,7 @@
     "kind": "struct",
     "module": "Lexer",
     "decl": "typedef struct {\n    Cn_Token_Kind kind;\n    Cn_String     literal;\n} Cn_Token_Literal",
-    "summary": "Struct to group token kind and its respective string litetal.",
+    "summary": "Struct to group token kind and its respective string literal.",
     "description": "For example:\n```c\n    { CN_TOKEN_INT, CN_STR_BUFFER(\"int\") }\n```",
     "tags": [
       { "kind": "SINCE", "text": "0.3.0" }
@@ -2606,17 +2606,25 @@
     "flags": []
   },
   {
-    "symbol": "cn_type_intern",
-    "kind": "function",
-    "module": "Type",
-    "decl": "Cn_Type *cn_type_intern(Cn_Type *type)",
-    "summary": "",
-    "description": "Interns `type` into the type universe of the current translation unit.\n\nStructurally equal types are stored only once, so interned types can be compared by pointer.",
+    "symbol": "Cn_Any",
+    "kind": "struct",
+    "module": "Any",
+    "decl": "typedef struct {\n    Cn_Type *type;\n    void *data;\n} Cn_Any",
+    "summary": "Struct that groups `data` and its `type`.",
+    "description": "",
     "tags": [
-      { "kind": "TODO", "text": "Move this into `analyze` section is `type` section ideally should remain stateless.\nAlso make sure if exposed to public API, that it properly handles interning of tagged types." },
-      { "kind": "RETURNS", "text": "Interned type that is structurally equal to `type`, newly stored if it wasn't there yet." },
-      { "kind": "IMPORTANT", "text": "Every type created outside the library, for example by analyze hooks,\nmust be interned before it is used, so it is deduplicated and properly rolled back." },
-      { "kind": "NOTE", "text": "`type` itself can be a temporary, it is copied when stored." },
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "CN_TYPE_SCALAR_MAX_SIZE",
+    "kind": "macro",
+    "module": "Any",
+    "decl": "#define CN_TYPE_SCALAR_MAX_SIZE 16",
+    "summary": "Maximum size in bytes that scalar type can be.",
+    "description": "",
+    "tags": [
       { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
@@ -2629,7 +2637,8 @@
     "summary": "Reads contents of `any`, interpreting them as integer.",
     "description": "",
     "tags": [
-      { "kind": "RETURNS", "text": "Integer value of `any`." }
+      { "kind": "RETURNS", "text": "Integer value of `any`." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -2641,7 +2650,8 @@
     "summary": "Reads contents of `any`, interpreting them as floating point.",
     "description": "",
     "tags": [
-      { "kind": "RETURNS", "text": "Floating point value of `any`." }
+      { "kind": "RETURNS", "text": "Floating point value of `any`." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -2653,7 +2663,8 @@
     "summary": "Writes integer `value` to contents of `any`, using its type to properly size the integer.",
     "description": "",
     "tags": [
-      { "kind": "RETURNS", "text": "Resulting any." }
+      { "kind": "RETURNS", "text": "Resulting any." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -2665,7 +2676,8 @@
     "summary": "Writes floating point `value` to contents of `any`, using its type to properly size the floating point.",
     "description": "",
     "tags": [
-      { "kind": "RETURNS", "text": "Resulting any." }
+      { "kind": "RETURNS", "text": "Resulting any." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -2677,7 +2689,8 @@
     "summary": "Checks whether value of `any` is zero.",
     "description": "",
     "tags": [
-      { "kind": "RETURNS", "text": "`true` if `any` is `0`, `false` otherwise." }
+      { "kind": "RETURNS", "text": "`true` if `any` is `0`, `false` otherwise." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -2690,7 +2703,8 @@
     "description": "",
     "tags": [
       { "kind": "RETURNS", "text": "Resulting `double` value." },
-      { "kind": "NOTE", "text": "If `any` is not of a scalar type, it is still read as a raw integer and converted to `double`." }
+      { "kind": "NOTE", "text": "If `any` is not of a scalar type, it is still read as a raw integer and converted to `double`." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -2703,7 +2717,8 @@
     "description": "Rejects `NaN` and out of range values, whose conversion would be undefined.",
     "tags": [
       { "kind": "RETURNS", "text": "`true` on success, `false` on failure." },
-      { "kind": "OUTPUTS", "text": "Converted value, written to `out`." }
+      { "kind": "OUTPUTS", "text": "Converted value, written to `out`." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -2716,7 +2731,8 @@
     "description": "",
     "tags": [
       { "kind": "RETURNS", "text": "Any of the converted value on success. `NIL` when target or source isn't a\nfoldable scalar, or when a float to int conversion would be out of range." },
-      { "kind": "NOTE", "text": "Converted value is stored in the supplied `buffer`." }
+      { "kind": "NOTE", "text": "Converted value is stored in the supplied `buffer`." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -2728,7 +2744,8 @@
     "summary": "Checks whether `any` is empty, meaning its data and type are both `NULL`.",
     "description": "",
     "tags": [
-      { "kind": "RETURNS", "text": "`true` if `any` is empty, `false` otherwise." }
+      { "kind": "RETURNS", "text": "`true` if `any` is empty, `false` otherwise." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -2736,10 +2753,12 @@
     "symbol": "Cn_Scope",
     "kind": "struct",
     "module": "Scope",
-    "decl": "typedef struct {\n    int64_t saved_strings_length;\n    int64_t binding_idx;\n    int64_t label_binding_idx;\n    int64_t binding_defined_idx;\n\n    /**\n     * If set to `true`, there is a checkpoint set in this scope.\n     *\n     * Therefore it cannot be removed, because doing so would invalidate\n     * state saved by the checkpoint. If locked scope is removed, an error occurs.\n     *\n     * NOTE: This is a workaround to avoid storing massive deep copies of\n     * scoped data structures like bindings hash tables, or scoped string arenas.\n     * It assumes that ast functionality won't require processor to\n     * jump into a completely different scope that no longer exists.\n     * In other words, all jumps can only occur from current to previous active scopes.\n     */\n    bool    is_checkpoint_locked;\n} Cn_Scope",
+    "decl": "typedef struct {\n    int64_t saved_strings_length;\n    int64_t binding_idx;\n    int64_t label_binding_idx;\n    int64_t binding_defined_idx;\n} Cn_Scope",
     "summary": "Information that each scope has.",
     "description": "",
-    "tags": [],
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
     "flags": []
   },
   {
@@ -2749,7 +2768,9 @@
     "decl": "#define CN_SCOPE_STACK_CURRENT_IDX (cn_array_list_length(&cn__tu_data->scope_stack) - 1)",
     "summary": "Index of the currently active scope.",
     "description": "",
-    "tags": [],
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
     "flags": []
   },
   {
@@ -2759,7 +2780,9 @@
     "decl": "#define CN_SCOPE_FILE_IDX 0",
     "summary": "Index of the file scope.",
     "description": "",
-    "tags": [],
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
     "flags": []
   },
   {
@@ -2770,7 +2793,8 @@
     "summary": "Peeks scope at the top of the scope stack.",
     "description": "",
     "tags": [
-      { "kind": "RETURNS", "text": "Scope that sits at the top of the scope stack." }
+      { "kind": "RETURNS", "text": "Scope that sits at the top of the scope stack." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -2781,7 +2805,9 @@
     "decl": "void cn_scope_stack_push()",
     "summary": "Pushes new scope to the top of the scope stack.",
     "description": "",
-    "tags": [],
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
     "flags": []
   },
   {
@@ -2791,7 +2817,9 @@
     "decl": "void cn_scope_stack_pop()",
     "summary": "Pops scope from the top of the scope stack.",
     "description": "",
-    "tags": [],
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
     "flags": []
   },
   {
@@ -2802,7 +2830,8 @@
     "summary": "Gets next fresh counter value, incrementing the counter.",
     "description": "",
     "tags": [
-      { "kind": "RETURNS", "text": "Counter value before increment." }
+      { "kind": "RETURNS", "text": "Counter value before increment." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -2814,7 +2843,8 @@
     "summary": "Compares types that `type1_ptr` and `type2_ptr` point to, wrapping around `cn_type_equals`.",
     "description": "Used in a set that holds pointers to the types,\nso that actual type data stays at the same memory addresses.",
     "tags": [
-      { "kind": "RETURNS", "text": "`true` if types are identical, `false` otherwise." }
+      { "kind": "RETURNS", "text": "`true` if types are identical, `false` otherwise." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -2826,7 +2856,94 @@
     "summary": "Hashes type that `type_ptr` points to, wrapping around `cn_type_hash`.",
     "description": "Used in a set that holds pointers to the types,\nso that actual type data stays at the same memory addresses.",
     "tags": [
-      { "kind": "RETURNS", "text": "Hash of the type." }
+      { "kind": "RETURNS", "text": "Hash of the type." },
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "Cn_Ast_Qualifier_Flags",
+    "kind": "enum",
+    "module": "Ast",
+    "decl": "typedef enum {\n    CN_AST_TYPE_QUALIFIER_CONST    = 0x1,\n    CN_AST_TYPE_QUALIFIER_RESTRICT = 0x2,\n    CN_AST_TYPE_QUALIFIER_VOLATILE = 0x4,\n    // TEMPORARY: CN_AST_TYPE_QUALIFIER_ATOMIC        = 0x8,\n} Cn_Ast_Qualifier_Flags",
+    "summary": "Enum to store type qualifier information.",
+    "description": "When qualifiers are parsed these flags are set on type specifier.",
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "cn_ast_qualifier_flags_to_type",
+    "kind": "function",
+    "module": "Ast",
+    "decl": "Cn_Type_Flags cn_ast_qualifier_flags_to_type(Cn_Ast_Qualifier_Flags flags)",
+    "summary": "Simple helper that maps ast qualifiers to type qualifiers.",
+    "description": "",
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "Cn_Ast_Function_Specifier_Flags",
+    "kind": "enum",
+    "module": "Ast",
+    "decl": "typedef enum {\n    CN_AST_FUNCTION_SPECIFIER_INLINE = 0x1,\n    // TEMPORARY: CN_AST_FUNCTION_SPECIFIER_NORETURN  = 0x2,\n} Cn_Ast_Function_Specifier_Flags",
+    "summary": "Enum to store function specifier information.",
+    "description": "",
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "Cn_Ast_Storage_Specifier_Flags",
+    "kind": "enum",
+    "module": "Ast",
+    "decl": "typedef enum {\n    CN_AST_STORAGE_SPECIFIER_STATIC   = 0x1,\n    CN_AST_STORAGE_SPECIFIER_EXTERN   = 0x2,\n    CN_AST_STORAGE_SPECIFIER_REGISTER = 0x4,\n    CN_AST_STORAGE_SPECIFIER_AUTO     = 0x8,\n    CN_AST_STORAGE_SPECIFIER_TYPEDEF  = 0x10,\n} Cn_Ast_Storage_Specifier_Flags",
+    "summary": "Enum to store storage specifier information.",
+    "description": "",
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "Cn_Ast_Type_Sign",
+    "kind": "enum",
+    "module": "Ast",
+    "decl": "typedef enum {\n    CN_AST_TYPE_SIGN_NONE     = 0,\n    CN_AST_TYPE_SIGN_SIGNED   = 1,\n    CN_AST_TYPE_SIGN_UNSIGNED = 2,\n} Cn_Ast_Type_Sign",
+    "summary": "Enum to store signess on type specifier.",
+    "description": "",
+    "tags": [
+      { "kind": "NOTE", "text": "`CN_AST_TYPE_SIGN_NONE` means that signess was not explicitly specified." },
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "Cn_Ast_Type_Width",
+    "kind": "enum",
+    "module": "Ast",
+    "decl": "typedef enum {\n    CN_AST_TYPE_WIDTH_NONE      = 0,\n    CN_AST_TYPE_WIDTH_SHORT     = 1,\n    CN_AST_TYPE_WIDTH_LONG      = 2,\n    CN_AST_TYPE_WIDTH_LONG_LONG = 3,\n} Cn_Ast_Type_Width",
+    "summary": "Enum that store width on type specifier.",
+    "description": "",
+    "tags": [
+      { "kind": "NOTE", "text": "`CN_AST_TYPE_WIDTH_NONE` means that width was not explicitly specified." },
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "Cn_Ast_Type_Kind",
+    "kind": "enum",
+    "module": "Ast",
+    "decl": "typedef enum {\n    CN_AST_TYPE_NONE    = 0,\n    CN_AST_TYPE_INT     = 1,\n    CN_AST_TYPE_CHAR    = 2,\n    CN_AST_TYPE_FLOAT   = 3,\n    CN_AST_TYPE_DOUBLE  = 4,\n    CN_AST_TYPE_BOOL    = 5,\n    CN_AST_TYPE_VOID    = 6,\n} Cn_Ast_Type_Kind",
+    "summary": "Enum that indicates primitive base type on type specifier.",
+    "description": "",
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -2834,10 +2951,25 @@
     "symbol": "Cn_Ast_Binary_Operator_Kind",
     "kind": "enum",
     "module": "Ast",
-    "decl": "typedef enum : int8_t {\n    CN_AST_BINARY_OP_NONE           = -1,\n    CN_AST_BINARY_OP_ARRAY_SUB      = 0,\n    CN_AST_BINARY_OP_FUNCTION       = 1,\n    CN_AST_BINARY_OP_DOT            = 2,\n    CN_AST_BINARY_OP_ARROW          = 3,\n    CN_AST_BINARY_OP_MULTIPLICATION = 4,\n    CN_AST_BINARY_OP_DIVISION       = 5,\n    CN_AST_BINARY_OP_MODULO         = 6,\n    CN_AST_BINARY_OP_ADDITION       = 7,\n    CN_AST_BINARY_OP_SUBTRACTION    = 8,\n    CN_AST_BINARY_OP_LSHIFT         = 9,\n    CN_AST_BINARY_OP_RSHIFT         = 10,\n    CN_AST_BINARY_OP_LESS           = 11,\n    CN_AST_BINARY_OP_LESS_EQ        = 12,\n    CN_AST_BINARY_OP_GREATER        = 13,\n    CN_AST_BINARY_OP_GREATER_EQ     = 14,\n    CN_AST_BINARY_OP_EQ             = 15,\n    CN_AST_BINARY_OP_NOT_EQ         = 16,\n    CN_AST_BINARY_OP_BIT_AND        = 17,\n    CN_AST_BINARY_OP_BIT_XOR        = 18,\n    CN_AST_BINARY_OP_BIT_OR         = 19,\n    CN_AST_BINARY_OP_AND            = 20,\n    CN_AST_BINARY_OP_OR             = 21,\n    CN_AST_BINARY_OP_COMMA          = 22,\n} Cn_Ast_Binary_Operator_Kind",
-    "summary": "```\n binary_operator\n         : '['\n         | '('\n         | '.'\n         | '->'\n         | '*'\n         | '/'\n         | '%'\n         | '+'\n         | '-'\n         | '<<'\n         | '>>'\n         | '<'\n         | '<='\n         | '>'\n         | '>='\n         | '=='\n         | '!='\n         | '&'\n         | '^'\n         | '|'\n         | '&&'\n         | '||'\n         | ','\n         ;\n```",
+    "decl": "typedef enum {\n    CN_AST_BINARY_OP_NONE           = -1,\n    CN_AST_BINARY_OP_ARRAY_SUB      = 0,\n    CN_AST_BINARY_OP_FUNCTION       = 1,\n    CN_AST_BINARY_OP_DOT            = 2,\n    CN_AST_BINARY_OP_ARROW          = 3,\n    CN_AST_BINARY_OP_MULTIPLICATION = 4,\n    CN_AST_BINARY_OP_DIVISION       = 5,\n    CN_AST_BINARY_OP_MODULO         = 6,\n    CN_AST_BINARY_OP_ADDITION       = 7,\n    CN_AST_BINARY_OP_SUBTRACTION    = 8,\n    CN_AST_BINARY_OP_LSHIFT         = 9,\n    CN_AST_BINARY_OP_RSHIFT         = 10,\n    CN_AST_BINARY_OP_LESS           = 11,\n    CN_AST_BINARY_OP_LESS_EQ        = 12,\n    CN_AST_BINARY_OP_GREATER        = 13,\n    CN_AST_BINARY_OP_GREATER_EQ     = 14,\n    CN_AST_BINARY_OP_EQ             = 15,\n    CN_AST_BINARY_OP_NOT_EQ         = 16,\n    CN_AST_BINARY_OP_BIT_AND        = 17,\n    CN_AST_BINARY_OP_BIT_XOR        = 18,\n    CN_AST_BINARY_OP_BIT_OR         = 19,\n    CN_AST_BINARY_OP_AND            = 20,\n    CN_AST_BINARY_OP_OR             = 21,\n    CN_AST_BINARY_OP_COMMA          = 22,\n} Cn_Ast_Binary_Operator_Kind",
+    "summary": "Enum that stores binary operator kinds.",
+    "description": "```\n binary_operator\n         : '['\n         | '('\n         | '.'\n         | '->'\n         | '*'\n         | '/'\n         | '%'\n         | '+'\n         | '-'\n         | '<<'\n         | '>>'\n         | '<'\n         | '<='\n         | '>'\n         | '>='\n         | '=='\n         | '!='\n         | '&'\n         | '^'\n         | '|'\n         | '&&'\n         | '||'\n         | ','\n         ;\n```",
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "Cn_Ast_Binary_Operator",
+    "kind": "struct",
+    "module": "Ast",
+    "decl": "typedef struct {\n    Cn_Ast_Binary_Operator_Kind kind;\n    Cn_Token_Kind token_identifier;\n    int precedence;\n} Cn_Ast_Binary_Operator",
+    "summary": "Struct that defines single binary operator.",
     "description": "",
-    "tags": [],
+    "tags": [
+      { "kind": "MEMBER", "text": "token_identifier: `Cn_Token_Kind` that is associated with the operator." },
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
     "flags": []
   },
   {
@@ -2845,10 +2977,23 @@
     "kind": "function",
     "module": "Ast",
     "decl": "Cn_Ast_Binary_Operator_Kind cn_ast_is_binary_operator(Cn_Lexer *lexer)",
-    "summary": "Checks table whether current token of `lexer` is a binary operator.",
+    "summary": "Checks table of binary operators, compares whether current token of `lexer` is a binary operator.",
     "description": "",
     "tags": [
-      { "kind": "RETURNS", "text": "Kind of the binary operator, `CN_AST_BINARY_OP_NONE` if token is not one." }
+      { "kind": "RETURNS", "text": "Kind of the binary operator, `CN_AST_BINARY_OP_NONE` if token is not one." },
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "Cn_Ast_Unary_Operator_Kind",
+    "kind": "enum",
+    "module": "Ast",
+    "decl": "typedef enum {\n    CN_AST_UNARY_OP_NONE           = -1,\n    CN_AST_UNARY_OP_INCREMENT      = 0,\n    CN_AST_UNARY_OP_DECREMENT      = 1,\n    CN_AST_UNARY_OP_POSITIVE       = 2,\n    CN_AST_UNARY_OP_NEGATIVE       = 3,\n    CN_AST_UNARY_OP_NOT            = 4,\n    CN_AST_UNARY_OP_BIT_NOT        = 5,\n    CN_AST_UNARY_OP_DEREF          = 6,\n    CN_AST_UNARY_OP_ADDROF         = 7,\n} Cn_Ast_Unary_Operator_Kind",
+    "summary": "Enum that stores unary operator kinds.",
+    "description": "```\n unary_operator\n         : '++'\n         | '--'\n         | '+'\n         | '-'\n         | '!'\n         | '~'\n         | '*'\n         | '&'\n         ;\n```",
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -2857,9 +3002,24 @@
     "kind": "macro",
     "module": "Ast",
     "decl": "#define CN_AST_UNARY_OPERATOR_PRECEDENCE 13",
-    "summary": "```\n unary_operator\n         : '++'\n         | '--'\n         | '+'\n         | '-'\n         | '!'\n         | '~'\n         | '*'\n         | '&'\n         ;\n```",
+    "summary": "Precedence value for all unary operators.",
     "description": "",
-    "tags": [],
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "Cn_Ast_Unary_Operator",
+    "kind": "struct",
+    "module": "Ast",
+    "decl": "typedef struct {\n    Cn_Ast_Unary_Operator_Kind kind;\n    Cn_Token_Kind token_identifier;\n} Cn_Ast_Unary_Operator",
+    "summary": "Struct that defines single unary operator.",
+    "description": "",
+    "tags": [
+      { "kind": "MEMBER", "text": "token_identifier: `Cn_Token_Kind` that is associated with the operator." },
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
     "flags": []
   },
   {
@@ -2867,10 +3027,23 @@
     "kind": "function",
     "module": "Ast",
     "decl": "Cn_Ast_Unary_Operator_Kind cn_ast_is_unary_operator(Cn_Lexer *lexer)",
-    "summary": "Checks table whether current token of `lexer` is a unary operator.",
+    "summary": "Checks table of unary operators, compares whether current token of `lexer` is a unary operator.",
     "description": "",
     "tags": [
-      { "kind": "RETURNS", "text": "Kind of the unary operator, `CN_AST_UNARY_OP_NONE` if token is not one." }
+      { "kind": "RETURNS", "text": "Kind of the unary operator, `CN_AST_UNARY_OP_NONE` if token is not one." },
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "Cn_Ast_Assignment_Operator_Kind",
+    "kind": "enum",
+    "module": "Ast",
+    "decl": "typedef enum {\n    CN_AST_ASSIGNMENT_OP_NONE           = -1,\n    CN_AST_ASSIGNMENT_OP_ASSIGN         = 0,\n    CN_AST_ASSIGNMENT_OP_MULTIPLY       = 1,\n    CN_AST_ASSIGNMENT_OP_DIVIDE         = 2,\n    CN_AST_ASSIGNMENT_OP_MODULO         = 3,\n    CN_AST_ASSIGNMENT_OP_PLUS           = 4,\n    CN_AST_ASSIGNMENT_OP_MINUS          = 5,\n    CN_AST_ASSIGNMENT_OP_LSHIFT         = 6,\n    CN_AST_ASSIGNMENT_OP_RSHIFT         = 7,\n    CN_AST_ASSIGNMENT_OP_BIT_AND        = 8,\n    CN_AST_ASSIGNMENT_OP_BIT_XOR        = 9,\n    CN_AST_ASSIGNMENT_OP_BIT_OR         = 10,\n} Cn_Ast_Assignment_Operator_Kind",
+    "summary": "Enum that stores assignment operator kinds.",
+    "description": "```\n assignment_operator\n         : '='\n         | '*='\n         | '/='\n         | '%='\n         | '+='\n         | '-='\n         | '<<='\n         | '>>='\n         | '&='\n         | '^='\n         | '|='\n         ;\n```",
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -2879,9 +3052,24 @@
     "kind": "macro",
     "module": "Ast",
     "decl": "#define CN_AST_ASSIGNMENT_OPERATOR_PRECEDENCE 1",
-    "summary": "```\n assignment_operator\n         : '='\n         | '*='\n         | '/='\n         | '%='\n         | '+='\n         | '-='\n         | '<<='\n         | '>>='\n         | '&='\n         | '^='\n         | '|='\n         ;\n```",
+    "summary": "Precedence value for all assignment operators.",
     "description": "",
-    "tags": [],
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "Cn_Ast_Assignment_Operator",
+    "kind": "struct",
+    "module": "Ast",
+    "decl": "typedef struct {\n    Cn_Ast_Assignment_Operator_Kind kind;\n    Cn_Token_Kind token_identifier;\n} Cn_Ast_Assignment_Operator",
+    "summary": "Struct that defines single assignment operator.",
+    "description": "",
+    "tags": [
+      { "kind": "MEMBER", "text": "token_identifier: `Cn_Token_Kind` that is associated with the operator." },
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
     "flags": []
   },
   {
@@ -2889,10 +3077,23 @@
     "kind": "function",
     "module": "Ast",
     "decl": "Cn_Ast_Assignment_Operator_Kind cn_ast_is_assignment_operator(Cn_Lexer *lexer)",
-    "summary": "Checks table whether current token of `lexer` is an assignment operator.",
+    "summary": "Checks table of assignment operators, compares whether current token of `lexer` is an assignment operator.",
     "description": "",
     "tags": [
-      { "kind": "RETURNS", "text": "Kind of the assignment operator, `CN_AST_ASSIGNMENT_OP_NONE` if token is not one." }
+      { "kind": "RETURNS", "text": "Kind of the assignment operator, `CN_AST_ASSIGNMENT_OP_NONE` if token is not one." },
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "Cn_Ast_Postfix_Operator_Kind",
+    "kind": "enum",
+    "module": "Ast",
+    "decl": "typedef enum {\n    CN_AST_POSTFIX_OP_NONE              = -1,\n    CN_AST_POSTFIX_OP_INCREMENT         = 0,\n    CN_AST_POSTFIX_OP_DECREMENT         = 1,\n} Cn_Ast_Postfix_Operator_Kind",
+    "summary": "Enum that stores postfix operator kinds.",
+    "description": "```\n postfix_operator\n         : '++'\n         | '--'\n         ;\n```",
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -2901,9 +3102,24 @@
     "kind": "macro",
     "module": "Ast",
     "decl": "#define CN_AST_POSTFIX_OPERATOR_PRECEDENCE 14",
-    "summary": "```\n postfix_operator\n         : '++'\n         | '--'\n         ;\n```",
+    "summary": "Precedence value for all postfix operators.",
     "description": "",
-    "tags": [],
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "Cn_Ast_Postfix_Operator",
+    "kind": "struct",
+    "module": "Ast",
+    "decl": "typedef struct {\n    Cn_Ast_Postfix_Operator_Kind kind;\n    Cn_Token_Kind token_identifier;\n} Cn_Ast_Postfix_Operator",
+    "summary": "Struct that defines single postfix operator.",
+    "description": "",
+    "tags": [
+      { "kind": "MEMBER", "text": "token_identifier: `Cn_Token_Kind` that is associated with the operator." },
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
     "flags": []
   },
   {
@@ -2911,10 +3127,11 @@
     "kind": "function",
     "module": "Ast",
     "decl": "Cn_Ast_Postfix_Operator_Kind cn_ast_is_postfix_operator(Cn_Lexer *lexer)",
-    "summary": "Checks table whether current token of `lexer` is a postfix operator.",
+    "summary": "Checks table of postfix operators, compares whether current token of `lexer` is a postfix operator.",
     "description": "",
     "tags": [
-      { "kind": "RETURNS", "text": "Kind of the postfix operator, `CN_AST_POSTFIX_OP_NONE` if token is not one." }
+      { "kind": "RETURNS", "text": "Kind of the postfix operator, `CN_AST_POSTFIX_OP_NONE` if token is not one." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -2923,9 +3140,11 @@
     "kind": "macro",
     "module": "Ast",
     "decl": "#define CN_AST_KIND_EXTENSION_ID(kind) ((uint8_t)((uint32_t)(kind) >> 24))",
-    "summary": "Extension id of the `kind`, `0` for the core library kinds.",
+    "summary": "Extension id of any 32-bit `kind`, `0` for the core library kinds.",
     "description": "",
-    "tags": [],
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
     "flags": []
   },
   {
@@ -2933,9 +3152,11 @@
     "kind": "macro",
     "module": "Ast",
     "decl": "#define CN_AST_KIND_EXTENSION_BASE(id) ((uint32_t)(id) << 24)",
-    "summary": "First kind value of the extension with id `id`, every custom kind of that extension\nmust be greater than it. See `Cn_Ast_Kind`.",
+    "summary": "First kind value of the extension with 32-bit id `id`, every custom kind of that extension\nmust be greater than it. See `Cn_Ast_Kind`.",
     "description": "",
-    "tags": [],
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
     "flags": []
   },
   {
@@ -2943,12 +3164,13 @@
     "kind": "macro",
     "module": "Ast",
     "decl": "#define CN_AST_DECLARE_KINDS(NAME, Name, ID, LIST)                      \\\n    typedef enum {                                                      \\\n        CN_AST_##NAME##_UNKNOWN = CN_AST_KIND_EXTENSION_BASE(ID),       \\\n        LIST(CN__AST_ENUM_ENTRY)                                        \\\n        CN_AST_##NAME##__END                                            \\\n    } Cn_Ast_##Name##_Kind;                                             \\",
-    "summary": "This macro declares enum that is used to identify each node intoduced.",
+    "summary": "This macro declares enum that is used to identify each node introduced.",
     "description": "But library extensions can introduce their own AST nodes.\nIn order to sustain stable identifications in enums\nacross the extensions the top 8 bits are reserved for \"extension id\".\nFor example let say GNU extension introduces its own AST nodes, with enum of its kinds.\nIf it's extension id is `1`, the enum kinds must start at the value `0x01000000`.",
     "tags": [
       { "kind": "IMPORTANT", "text": "Extension id of `0` is reserved by main library. Each extension gets range of `2^24` values,\nfor its custom AST nodes. That also means there at most `255` extensions with custom AST nodes\npossible to pack with this library without causing overlap in AST nodes." },
       { "kind": "PARAM", "text": "NAME: Is uppercase naming of the enum entry. For example `GNU`." },
-      { "kind": "PARAM", "text": "Name: Is type naming of the enum itself. For example `Gnu`." }
+      { "kind": "PARAM", "text": "Name: Is type naming of the enum itself. For example `Gnu`." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -2959,17 +3181,33 @@
     "decl": "#define CN_AST_GEN_LIST(X)\\\n    /* --- misc ----------------------------------------------------------- */                              \\\n    X(CODE,                             Code,                               code)                           \\\n    X(TRANSLATION_UNIT,                 Translation_Unit,                   translation_unit)               \\\n    X(EXTERNAL_DECLARATION,             External_Declaration,               external_declaration)           \\\n    X(DECLARATION,                      Declaration,                        declaration)                    \\\n    X(FUNCTION,                         Function,                           function)                       \\\n    /* --- statements ----------------------------------------------------- */                              \\\n    X(BLOCK,                            Block,                              block)                          \\\n    X(BLOCK_ITEM,                       Block_Item,                         block_item)                     \\\n    X(IF,                               If,                                 if_statement)                   \\\n    X(SWITCH,                           Switch,                             switch_statement)               \\\n    X(WHILE,                            While,                              while_statement)                \\\n    X(DO_WHILE,                         Do_While,                           do_while)                       \\\n    X(FOR,                              For,                                for_statement)                  \\\n    X(LABEL,                            Label,                              label)                          \\\n    X(GOTO,                             Goto,                               goto_statement)                 \\\n    X(RETURN,                           Return,                             return_statement)               \\\n    X(BREAK,                            Break,                              break_statement)                \\\n    X(CONTINUE,                         Continue,                           continue_statement)             \\\n    X(EXPRESSION_STATEMENT,             Expression_Statement,               expression_statement)           \\\n    /* --- expressions ---------------------------------------------------- */                              \\\n    X(BINARY,                           Binary,                             binary)                         \\\n    X(ACCESS,                           Access,                             access)                         \\\n    X(CALL,                             Call,                               call)                           \\\n    X(UNARY,                            Unary,                              unary)                          \\\n    X(CAST,                             Cast,                               cast)                           \\\n    X(COMPOUND,                         Compound,                           compound)                       \\\n    X(SIZEOF,                           Sizeof,                             sizeof_expression)              \\\n    X(TERNARY,                          Ternary,                            ternary)                        \\\n    X(ASSIGN,                           Assign,                             assign)                         \\\n    X(POSTFIX,                          Postfix,                            postfix)                        \\\n    X(PRIMARY,                          Primary,                            primary)                        \\\n    /* --- literals ------------------------------------------------------- */                              \\\n    X(IDENTIFIER,                       Identifier,                         identifier)                     \\\n    X(INTEGER,                          Integer,                            integer)                        \\\n    X(FLOAT,                            Float,                              flt)                            \\\n    X(CHAR,                             Char,                               character)                      \\\n    X(STRING,                           String,                             string)                         \\\n    /* --- declarator and declaration machinary --------------------------- */                              \\\n    X(INIT_DECLARATOR,                  Init_Declarator,                    init_declarator)                \\\n    X(INITIALIZER,                      Initializer,                        initializer)                    \\\n    X(DESIGNATION,                      Designation,                        designation)                    \\\n    X(DESIGNATOR,                       Designator,                         designator)                     \\\n    X(DECLARATOR,                       Declarator,                         declarator)                     \\\n    X(POINTER,                          Pointer,                            pointer)                        \\\n    X(DIRECT_DECLARATOR_GROUPED,        Direct_Declarator_Grouped,          direct_declarator_grouped)      \\\n    X(DIRECT_DECLARATOR_ARRAY,          Direct_Declarator_Array,            direct_declarator_array)        \\\n    X(DIRECT_DECLARATOR_FUNCTION,       Direct_Declarator_Function,         direct_declarator_function)     \\\n    X(DECLARATION_SPECIFIERS,           Declaration_Specifiers,             declaration_specifiers)         \\\n    X(TYPE_SPECIFIER_PRIMITIVE,         Type_Specifier_Primitive,           type_specifier_primitive)       \\\n    X(TYPE_SPECIFIER_TYPEDEF,           Type_Specifier_Typedef,             type_specifier_typedef)         \\\n    X(TYPE_NAME,                        Type_Name,                          type_name)                      \\\n    X(SPECIFIER_QUALIFIER,              Specifier_Qualifier,                specifier_qualifier)            \\\n    X(PARAMETER_DECLARATION,            Parameter_Declaration,              parameter_declaration)          \\\n    /* --- tag types ------------------------------------------------------ */                              \\\n    X(STRUCT_SPECIFIER,                 Struct_Specifier,                   struct_specifier)               \\\n    X(UNION_SPECIFIER,                  Union_Specifier,                    union_specifier)                \\\n    X(MEMBER_DECLARATION,               Member_Declaration,                 member_declaration)             \\\n    X(MEMBER_DECLARATOR,                Member_Declarator,                  member_declarator)              \\\n    X(ENUM_SPECIFIER,                   Enum_Specifier,                     enum_specifier)                 \\\n    X(ENUMERATOR,                       Enumerator,                         enumerator)                     \\\n    /* --- attributes ----------------------------------------------------- */                              \\\n    X(ATTRIBUTE_SPECIFIER,              Attribute_Specifier,                attribute_specifier)            \\\n    X(ATTRIBUTE,                        Attribute,                          attribute)                      \\",
     "summary": "List for X macro generation of core library AST nodes.",
     "description": "",
-    "tags": [],
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
     "flags": []
   },
   {
     "symbol": "Cn_Ast_Flags",
     "kind": "enum",
     "module": "Ast",
-    "decl": "typedef enum : uint32_t {\n    CN_AST_SYNTHETIC                    = 0x4,\n\n    CN_AST_DECLARATOR_IS_ABSTRACT                 = 0x100,\n\n    CN_AST_ACCESS_IS_POINTER                      = 0x100,\n\n    CN_AST_DIRECT_DECLARATOR_FUNCTION_IS_VARIADIC = 0x100,\n\n    CN_AST_ENUM_HAS_DEFINITION                    = 0x100,\n\n    CN_AST_UNION_HAS_DEFINITION                   = 0x100,\n\n    CN_AST_STRUCT_HAS_DEFINITION                  = 0x100,\n\n    CN_AST_DECLARATION_IS_EMPTY                   = 0x100,\n\n    CN_AST_LABEL_IS_CASE                          = 0x100,\n    CN_AST_LABEL_IS_DEFAULT                       = 0x200,\n} Cn_Ast_Flags",
+    "decl": "typedef enum {\n    CN_AST_SYNTHETIC                    = 0x1,\n\n    CN_AST_DECLARATOR_IS_ABSTRACT                 = 0x100,\n\n    CN_AST_ACCESS_IS_POINTER                      = 0x100,\n\n    CN_AST_DIRECT_DECLARATOR_FUNCTION_IS_VARIADIC = 0x100,\n\n    CN_AST_ENUM_HAS_DEFINITION                    = 0x100,\n\n    CN_AST_UNION_HAS_DEFINITION                   = 0x100,\n\n    CN_AST_STRUCT_HAS_DEFINITION                  = 0x100,\n\n    CN_AST_DECLARATION_IS_EMPTY                   = 0x100,\n\n    CN_AST_LABEL_IS_CASE                          = 0x100,\n    CN_AST_LABEL_IS_DEFAULT                       = 0x200,\n} Cn_Ast_Flags",
     "summary": "Flags of the ast node.",
     "description": "Values below `0x100` are shared by every node kind.\nValues starting from `0x100` are specific to a node kind, so they can overlap between kinds,\nthis also lets extensions define flags for their own kinds.",
-    "tags": [],
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "Cn_Ast_Node",
+    "kind": "typedef",
+    "module": "Ast",
+    "decl": "typedef struct cn_ast_node Cn_Ast_Node",
+    "summary": "Forward declaration for `cn_ast_node` struct.",
+    "description": "",
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
     "flags": []
   },
   {
@@ -2978,18 +3216,34 @@
     "module": "Ast",
     "decl": "typedef struct {\n    Cn_Ast_Node **ptrs;\n    int64_t       length;\n} Cn_Ast_Nodes",
     "summary": "Finalized, immutable-length array of node pointers.",
-    "description": "Backing storage lives in `Cn_Tu_Data.ast_arena`, so it is rolled\nback together with the nodes it points at on checkpoint load.",
-    "tags": [],
+    "description": "Memory stored in `Cn_Tu_Data.ast_arena`, so it is rolled\nback together with the nodes it points when rollback occurs.",
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
     "flags": []
   },
   {
     "symbol": "CN_AST_SLOT_GEN_LIST",
     "kind": "macro",
     "module": "Ast",
-    "decl": "#define CN_AST_SLOT_GEN_LIST(X)\\\n    X(EXTERNAL_DECLARATION,             External_Declaration,               external_declaration)           \\\n    X(EXTERNAL_DECLARATION_PREFIX,      External_Declaration_Prefix,        external_declaration_prefix)    \\\n    X(STATEMENT,                        Statement,                          statement)                      \\\n    X(TYPE_SPECIFIER,                   Type_Specifier,                     type_specifier)                 \\\n    X(PRIMARY,                          Primary,                            primary)                        \\\n    X(DECLARATION_PREFIX,               Declaration_Prefix,                 declaration_prefix)             \\\n    X(MEMBER_DECLARATION_PREFIX,        Member_Declaration_Prefix,          member_declaration_prefix)      \\\n    X(EXPRESSION_PREFIX,                Expression_Prefix,                  expression_prefix)              \\\n    X(DECLARATION_SPECIFIERS,           Declaration_Specifiers,             declaration_specifiers)         \\\n    X(POINTER,                          Pointer,                            pointer)                        \\\n    X(AFTER_DECLARATOR,                 After_Declarator,                   after_declarator)               \\\n    X(MEMBER_DECLARATOR,                Member_Declarator,                  member_declarator)              \\\n    X(TAG,                              Tag,                                tag)                            \\\n    X(ENUMERATOR,                       Enumerator,                         enumerator)                     \\",
+    "decl": "#define CN_AST_SLOT_GEN_LIST(X)                                                                             \\\n    X(EXTERNAL_DECLARATION,             External_Declaration,               external_declaration)           \\\n    X(EXTERNAL_DECLARATION_PREFIX,      External_Declaration_Prefix,        external_declaration_prefix)    \\\n    X(STATEMENT,                        Statement,                          statement)                      \\\n    X(TYPE_SPECIFIER,                   Type_Specifier,                     type_specifier)                 \\\n    X(PRIMARY,                          Primary,                            primary)                        \\\n    X(DECLARATION_PREFIX,               Declaration_Prefix,                 declaration_prefix)             \\\n    X(MEMBER_DECLARATION_PREFIX,        Member_Declaration_Prefix,          member_declaration_prefix)      \\\n    X(EXPRESSION_PREFIX,                Expression_Prefix,                  expression_prefix)              \\\n    X(DECLARATION_SPECIFIERS,           Declaration_Specifiers,             declaration_specifiers)         \\\n    X(POINTER,                          Pointer,                            pointer)                        \\\n    X(AFTER_DECLARATOR,                 After_Declarator,                   after_declarator)               \\\n    X(MEMBER_DECLARATOR,                Member_Declarator,                  member_declarator)              \\\n    X(TAG,                              Tag,                                tag)                            \\\n    X(ENUMERATOR,                       Enumerator,                         enumerator)                     \\",
     "summary": "List for X macro generation of core ast slots---grammar points where custom sub-parser can be plugged in.",
     "description": "",
-    "tags": [],
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "Cn_Ast_Slot_Id",
+    "kind": "typedef",
+    "module": "Ast",
+    "decl": "typedef uint32_t Cn_Ast_Slot_Id",
+    "summary": "Type definition of ids that slots use.",
+    "description": "",
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
     "flags": []
   },
   {
@@ -3587,6 +3841,22 @@
     "tags": [
       { "kind": "IMPORTANT", "text": "Must be called only once, all memory allocated inside this function is expected\nto live throughout the program`s life time, no freeing is required." },
       { "kind": "RETURNS", "text": "`true` on success, `false` on error." }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "cn_analyze_intern_type",
+    "kind": "function",
+    "module": "Analyze",
+    "decl": "Cn_Type *cn_analyze_intern_type(Cn_Type *type)",
+    "summary": "",
+    "description": "Interns `type` into the type universe of the current translation unit.\n\nStructurally equal types are stored only once, so interned types can be compared by pointer.",
+    "tags": [
+      { "kind": "TODO", "text": "Make sure if exposed to public API, that it properly handles interning of tagged types." },
+      { "kind": "RETURNS", "text": "Interned type that is structurally equal to `type`, newly stored if it wasn't there yet." },
+      { "kind": "IMPORTANT", "text": "Every type created outside the library, for example by analyze hooks,\nmust be interned before it is used, so it is deduplicated and properly rolled back." },
+      { "kind": "NOTE", "text": "`type` itself can be a temporary, it is copied when stored." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
