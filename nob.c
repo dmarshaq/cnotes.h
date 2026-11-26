@@ -8,6 +8,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <time.h>
 
 // Drop in arena implementation.
 typedef struct arena {
@@ -40,6 +41,19 @@ void *arena_alloc(Arena *arena, uint64_t size) {
     }
 
     return arena->ptr - size;
+}
+
+/**
+ * Copies sv into arena, so it outlives the buffer it points to. Empty view if arena is out of memory.
+ */
+Nob_String_View arena_sv_dup(Arena *arena, Nob_String_View sv) {
+    if (sv.count == 0) return (Nob_String_View) {0};
+
+    char *data = arena_alloc(arena, sv.count);
+    if (data == NULL) return (Nob_String_View) {0};
+
+    memcpy(data, sv.data, sv.count);
+    return nob_sv_from_parts(data, sv.count);
 }
 
 uint64_t arena_size(Arena *arena) {
@@ -1235,9 +1249,15 @@ typedef enum : uint8_t {
 } Test_Kind;
 
 typedef struct {
-    Test_Kind   kind;
-    const char *path;
-    Test_Status status;
+    Test_Kind       kind;
+    const char     *path;
+    Test_Status     status;
+    uint64_t        duration_ms;    // Time it took to build and run the test.
+
+    // From "/** TEST: title ... */" doc comment the test file starts with, empty if there is none.
+    Nob_String_View title;
+    Nob_String_View description;
+    bool            gnu;            // "--gnu" flag, parse test is run by gnu runner.
 } Test_Record;
 
 typedef struct {
@@ -1251,7 +1271,11 @@ bool test_prepare_exec_entry(Nob_Walk_Entry entry);
 void test_execute_parse(Test_Record *r, Nob_Cmd *cmd, const char *runner);
 void test_execute_exec(Test_Record *r, Nob_Cmd *cmd);
 void test_print_results(Test_Records *record);
-bool test_scan_entry(const char *path, Doc_Entry *entry);
+bool test_scan_record(Test_Record *r);
+const char *test_status_to_lit(Test_Status status);
+const char *test_kind_to_lit(Test_Kind kind);
+void test_print_json_records(FILE *f, Test_Records *records, bool *first);
+bool test_write_json(Test_Records *parse_records, Test_Records *exec_records, const char *path);
 
 bool test_prepare_parse_entry(Nob_Walk_Entry entry) {
     Test_Records *records = (Test_Records *)entry.data;
@@ -1434,41 +1458,123 @@ void test_print_results(Test_Records *records) {
     }
 }
 
-bool test_scan_entry(const char *path, Doc_Entry *entry_out) {
-    // Doc reading first comment.
+/**
+ * Reads doc comment the test file starts with into title, description and flags of the record.
+ * Comment must have "TEST:" tag, its text is the title, paragraphs after it are the description:
+ * ```
+ * TEST: Array declarators in parameters adjusted to pointers.
+ *
+ * Longer description of what is tested.
+ * ```
+ * Files without such comment are fine, their title and description stay empty.
+ *
+ * RETURNS: `false` if the file couldn't be read or the comment has invalid flags.
+ */
+bool test_scan_record(Test_Record *r) {
     static Nob_String_Builder sb = {0}; // LEAK.
     sb.count = 0; // nob_read_entire_file appends, previous test content must be dropped.
 
-    if (!nob_read_entire_file(path, &sb)) {
-        nob_log(NOB_ERROR, "test: '%s' couldn't open for doc scan.", path);
+    if (!nob_read_entire_file(r->path, &sb)) {
+        nob_log(NOB_ERROR, "test: '%s' couldn't open for doc scan.", r->path);
         return false;
     }
 
     Nob_String_View content = nob_sb_to_sv(sb);
     Nob_String_View doc     = doc_get_next_comment(&content);
-    if (doc.data != NULL) {
-        Doc_Entry entry;
+    if (doc.data == NULL) return true;
 
-        bool ok = doc_parse_entry(
-                (Nob_String_View) { .count = strlen(path), .data = path },
-                (Nob_String_View) {0},
-                doc,
-                &entry
-                );
+    Doc_Entry entry = {0};
+    bool ok = doc_parse_entry(nob_sv_from_cstr(r->path), (Nob_String_View) {0}, doc, &entry);
 
-        if (!ok) return false;
+    nob_da_foreach(Doc_Tag, t, &entry.tags) {
+        if (t->kind != TEST) continue;
 
-        nob_da_foreach(Doc_Tag, t, &entry.tags) {
-            if (t->kind == TEST) { 
-                *entry_out = entry;
-                break; 
-            }
-        }
-    } else {
-        *entry_out = (Doc_Entry) {0};
-        entry_out->symbol = (Nob_String_View) { .count = strlen(path), .data = path };
+        // Texts of the entry are reused by the next doc_parse_entry call, so they are copied.
+        r->title       = arena_sv_dup(&arena_strings, t->text);
+        r->description = arena_sv_dup(&arena_strings, entry.description);
+        r->gnu         = (entry.flags & DOC_FLAG_GNU) != 0;
+        break;
     }
 
+    nob_da_free(entry.tags);
+    return ok;
+}
+
+const char *test_status_to_lit(Test_Status status) {
+    switch (status) {
+    case PENDING:           return "ignored";
+    case BUILD_FAIL:        return "build_fail";
+    case RUNTIME_FAIL:      return "runtime_fail";
+    case UNEXPECTED_OUTPUT: return "unexpected_output";
+    case TIMEOUT:           return "timeout";
+    case SUCCESS:           return "success";
+    }
+    return "<UNKNOWN>";
+}
+
+const char *test_kind_to_lit(Test_Kind kind) {
+    switch (kind) {
+    case PARSE: return "parse";
+    case EXEC:  return "exec";
+    }
+    return "<UNKNOWN>";
+}
+
+void test_print_json_records(FILE *f, Test_Records *records, bool *first) {
+    nob_da_foreach(Test_Record, r, records) {
+        fputs(*first ? "\n" : ",\n", f);
+        *first = false;
+
+        fputs("    { \"path\": ", f);
+        doc_print_json_string(f, nob_sv_from_cstr(r->path));
+        fprintf(f, ", \"kind\": \"%s\", \"status\": \"%s\", \"duration_ms\": %llu, \"gnu\": %s,\n",
+                test_kind_to_lit(r->kind), test_status_to_lit(r->status),
+                (unsigned long long)r->duration_ms, r->gnu ? "true" : "false");
+        fputs("      \"title\": ", f);
+        doc_print_json_string(f, r->title);
+        fputs(",\n      \"description\": ", f);
+        doc_print_json_string(f, r->description);
+        fputs(" }", f);
+    }
+}
+
+/**
+ * Writes results of the test run as json, frontend shows them on its tests page:
+ * ```
+ * {
+ *   "generated": "2026-11-25T10:00:00Z",
+ *   "commit":    "sha from GITHUB_SHA environment variable, empty when run locally",
+ *   "tests": [
+ *     { "path", "kind": "parse|exec", "status", "duration_ms", "gnu", "title", "description" }
+ *   ]
+ * }
+ * ```
+ */
+bool test_write_json(Test_Records *parse_records, Test_Records *exec_records, const char *path) {
+    FILE *f = fopen(path, "wb");
+    if (f == NULL) {
+        nob_log(NOB_ERROR, "Could not open '%s' for writing: %s", path, strerror(errno));
+        return false;
+    }
+
+    char generated[32] = {0};
+    time_t now = time(NULL);
+    strftime(generated, sizeof(generated), "%Y-%m-%dT%H:%M:%SZ", gmtime(&now));
+
+    const char *commit = getenv("GITHUB_SHA");
+
+    fprintf(f, "{\n  \"generated\": \"%s\",\n  \"commit\": ", generated);
+    doc_print_json_string(f, nob_sv_from_cstr(commit != NULL ? commit : ""));
+    fputs(",\n  \"tests\": [", f);
+
+    bool first = true;
+    test_print_json_records(f, parse_records, &first);
+    test_print_json_records(f, exec_records, &first);
+
+    fputs(first ? "]\n}\n" : "\n  ]\n}\n", f);
+    fclose(f);
+
+    nob_log(NOB_INFO, "test: wrote results to '%s'.", path);
     return true;
 }
 
@@ -1676,7 +1782,7 @@ int test_command(int *argc, char ***argv) {
     if (!nob_mkdir_if_not_exists(BUILD_DIR"/"TESTS_DIR"/"PARSE_DIR))    return 1;
     if (!nob_mkdir_if_not_exists(BUILD_DIR"/"TESTS_DIR"/"EXEC_DIR))     return 1;
 
-    arena_strings = arena_make(4096);
+    arena_strings = arena_make(1024*1024); // Paths, titles and descriptions of the tests.
 
     Test_Records parse_records  = {0};
     Test_Records exec_records   = {0};
@@ -1725,30 +1831,31 @@ int test_command(int *argc, char ***argv) {
         return -1;
     }
 
-    // Executing tests
+    // Executing tests, test with unreadable doc comment is not run and stays ignored.
     int failed = 0;
-    
+
     nob_da_foreach(Test_Record, r, &parse_records) {
-        Doc_Entry entry;
-        if (!test_scan_entry(r->path, &entry)) {
-            failed += 1;
-            continue;
+        uint64_t start = nob_nanos_since_unspecified_epoch();
+
+        if (test_scan_record(r)) {
+            test_execute_parse(r, &cmd, r->gnu ? BUILD_DIR"/"TESTS_DIR"/gnu_runner" : BUILD_DIR"/"TESTS_DIR"/runner");
         }
 
-        if (entry.flags & DOC_FLAG_GNU) {
-            test_execute_parse(r, &cmd, BUILD_DIR"/"TESTS_DIR"/gnu_runner");
-        } else {
-            test_execute_parse(r, &cmd, BUILD_DIR"/"TESTS_DIR"/runner");
-        }
-
+        r->duration_ms = (nob_nanos_since_unspecified_epoch() - start) / (NOB_NANOS_PER_SEC / 1000);
         if (r->status != SUCCESS) failed += 1;
     }
 
     nob_da_foreach(Test_Record, r, &exec_records) {
-        test_execute_exec(r, &cmd);
+        uint64_t start = nob_nanos_since_unspecified_epoch();
+
+        if (test_scan_record(r)) {
+            test_execute_exec(r, &cmd);
+        }
+
+        r->duration_ms = (nob_nanos_since_unspecified_epoch() - start) / (NOB_NANOS_PER_SEC / 1000);
         if (r->status != SUCCESS) failed += 1;
     }
-    
+
     // Showing test results
     fprintf(stderr, "PARSE:\n");
     test_print_results(&parse_records);
@@ -1761,6 +1868,10 @@ int test_command(int *argc, char ***argv) {
     } else {
         nob_log(NOB_INFO, "test: total [%lu/%lu] passed.", total - failed, total);
     }
+
+    // Results for the tests page of the documentation site.
+    if (!nob_mkdir_if_not_exists(DOC_DIR)) return 1;
+    test_write_json(&parse_records, &exec_records, DOC_DIR"/tests.json");
 
 
     NOB_FREE(cmd.items);

@@ -63,3 +63,8 @@ dkms.conf
 *.dwo
 
 *.swp
+
+# Generated from ./nob test ./nob doc published by CI
+doc/tests.json
+doc/doc.json
+doc/library.json

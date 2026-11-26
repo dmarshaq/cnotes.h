@@ -1,12 +1,38 @@
 [
   {
+    "symbol": "Cn_Log_Level",
+    "kind": "enum",
+    "module": "Logging",
+    "decl": "typedef enum {\n    CN_INFO,\n    CN_WARNING,\n    CN_ERROR,\n    CN_NO_LOGS,\n} Cn_Log_Level",
+    "summary": "Log levels that are given to each logged message.",
+    "description": "",
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
     "symbol": "cn_log_min_level",
     "kind": "variable",
     "module": "Logging",
     "decl": "extern Cn_Log_Level cn_log_min_level",
     "summary": "Messages with a level below `cn_log_min_level` are suppressed by `cn_default_log_handler`.",
     "description": "",
-    "tags": [],
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "Cn_Log_Handler",
+    "kind": "typedef",
+    "module": "Logging",
+    "decl": "typedef void (Cn_Log_Handler)(Cn_Log_Level level, const char *format, va_list args)",
+    "summary": "Type definition for log handler, `cn_log_handler` is declared with this type.",
+    "description": "",
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
     "flags": []
   },
   {
@@ -16,7 +42,9 @@
     "decl": "extern Cn_Log_Handler *cn_log_handler",
     "summary": "Current log handler, set to `cn_default_log_handler` by default.",
     "description": "",
-    "tags": [],
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
     "flags": []
   },
   {
@@ -26,7 +54,9 @@
     "decl": "Cn_Log_Handler cn_default_log_handler",
     "summary": "Logs formatted message to `stderr`, prefixed with its log level.",
     "description": "",
-    "tags": [],
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
     "flags": []
   },
   {
@@ -36,7 +66,9 @@
     "decl": "Cn_Log_Handler cn_null_log_handler",
     "summary": "Ignores all incoming logs, doesn't output anything anywhere.",
     "description": "",
-    "tags": [],
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
     "flags": []
   },
   {
@@ -52,13 +84,38 @@
     "flags": []
   },
   {
+    "symbol": "Cn_Hash_Function",
+    "kind": "typedef",
+    "module": "Hashing",
+    "decl": "typedef uint64_t (Cn_Hash_Function)(const void *data)",
+    "summary": "Type definition for hashing functions.",
+    "description": "Should return `uint64_t` hash of the specified `data`.",
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "Cn_Equals_Function",
+    "kind": "typedef",
+    "module": "Hashing",
+    "decl": "typedef bool (Cn_Equals_Function)(const void *a, const void *b)",
+    "summary": "Type definition for equals functions.",
+    "description": "If `a == b` should return `true`, false otherwise.",
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
     "symbol": "cn_hash_u64",
     "kind": "function",
     "module": "Hashing",
     "decl": "uint64_t cn_hash_u64(uint64_t value)",
-    "summary": "Hashes unsigned 64-bit integer using the splitmix64 algorithm.",
+    "summary": "Hashes unsigned 64-bit integer using the `splitmix64` algorithm.",
     "description": "",
     "tags": [
+      { "kind": "RETURNS", "text": "Resulting hash." },
       { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
@@ -72,6 +129,7 @@
     "description": "",
     "tags": [
       { "kind": "NOTE", "text": "Wraps around `cn_hash_u64`." },
+      { "kind": "RETURNS", "text": "Resulting hash." },
       { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
@@ -81,9 +139,12 @@
     "kind": "function",
     "module": "Hashing",
     "decl": "uint64_t cn_hash_bytes(void *data, int64_t length)",
-    "summary": "Hashes sequence of `length` bytes using the FNV-1a algorithm.",
+    "summary": "Hashes sequence of `length` bytes using the `FNV-1a` algorithm.",
     "description": "",
-    "tags": [],
+    "tags": [
+      { "kind": "RETURNS", "text": "Resulting hash." },
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
     "flags": []
   },
   {
@@ -94,7 +155,21 @@
     "summary": "Mixes two hashes `a` and `b` into one.",
     "description": "",
     "tags": [
-      { "kind": "NOTE", "text": "Order matters, bit shifts are used to ensure `cn_hash_mix(a, b) != cn_hash_mix(b, a)`." }
+      { "kind": "NOTE", "text": "Order matters, bit shifts are used to ensure `cn_hash_mix(a, b) != cn_hash_mix(b, a)`." },
+      { "kind": "RETURNS", "text": "Resulting hash." },
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "Cn_String",
+    "kind": "struct",
+    "module": "String",
+    "decl": "typedef struct {\n    int64_t length;\n    char *data;\n} Cn_String",
+    "summary": "Length based string definition.",
+    "description": "Length based strings are exactly the same as string views,\nthey are a simple structure of `length` and `data`,\npaired with an interface to modify and use them in\nvarious ways.",
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -103,9 +178,11 @@
     "kind": "macro",
     "module": "String",
     "decl": "#define CN_STR(length, data)            ((Cn_String) { (int64_t)length, (char *)data } )",
-    "summary": "Constructs string view directly from its `length` and `data`.",
+    "summary": "Constructs `Cn_String` directly from its `length` and `data`.",
     "description": "",
-    "tags": [],
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
     "flags": []
   },
   {
@@ -113,9 +190,11 @@
     "kind": "macro",
     "module": "String",
     "decl": "#define CN_STR_LIT(literal)             CN_STR(sizeof(literal) - 1, literal)",
-    "summary": "Constructs string view directly from string `literal`.",
+    "summary": "Constructs `Cn_String` directly from string `literal`.",
     "description": "",
-    "tags": [],
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
     "flags": []
   },
   {
@@ -123,10 +202,11 @@
     "kind": "macro",
     "module": "String",
     "decl": "#define CN_STR_BUFFER(literal)          CN_STR(sizeof(literal) - 1, (char[]){literal})",
-    "summary": "Constructs string view from a stack buffer filled with `literal`.",
+    "summary": "Constructs `Cn_String` from a stack buffer filled with `literal`.",
     "description": "Characters of `literal` are copied into a char array allocated on the stack,\nso the resulting string can be modified.",
     "tags": [
-      { "kind": "IMPORTANT", "text": "Buffer lives only until the end of the enclosing block." }
+      { "kind": "IMPORTANT", "text": "Buffer lives only until the end of the enclosing block." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -135,10 +215,11 @@
     "kind": "macro",
     "module": "String",
     "decl": "#define CN_STR_BUFFER_EMPTY(size)       CN_STR(size, (char[size]){})",
-    "summary": "Constructs string view from an empty stack buffer of `size` chars.",
-    "description": "Works exactly like `CN_STR_BUFFER`, but doesn't take a literal or fill the buffer with any characters.",
+    "summary": "Constructs `Cn_String` from an empty stack buffer of `size` chars.",
+    "description": "Works exactly like `CN_STR_BUFFER`, but doesn't take a literal and fill the\nbuffer with any characters.",
     "tags": [
-      { "kind": "IMPORTANT", "text": "Buffer lives only until the end of the enclosing block." }
+      { "kind": "IMPORTANT", "text": "Buffer lives only until the end of the enclosing block." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -147,10 +228,11 @@
     "kind": "macro",
     "module": "String",
     "decl": "#define CN_STR_UNPACK(str)                  (int)((str).length), (str).data",
-    "summary": "Unpacks string into its length and data components, for use with `%.*s` in formatting.",
+    "summary": "Unpacks `Cn_String` into its length and data components, for use with `%.*s` in formatting.",
     "description": "For example given string `str`:\n\n```c\nprintf(\"value of str: %.*s\", CN_STR_UNPACK(str));\n```",
     "tags": [
-      { "kind": "NOTE", "text": "Cast to `int` is required, because `%.*s` expects length of at most `INT_MAX`,\nso string is truncated if its length exceeds `INT_MAX`." }
+      { "kind": "NOTE", "text": "Cast to `int` is required, because `%.*s` expects length of at most `INT_MAX`,\nso string is truncated if its length exceeds `INT_MAX`." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -163,8 +245,9 @@
     "description": "",
     "tags": [
       { "kind": "RETURNS", "text": "`Cn_String` that points to the memory of `str` at index `start`, with length up until index `end`." },
-      { "kind": "IMPORTANT", "text": "Doesn't copy memory. If `str` memory is freed later, returned string will no longer point to valid memory." },
-      { "kind": "NOTE", "text": "Character at index `end` is not included, domain of the resulting substring is always `[start, end)`." }
+      { "kind": "IMPORTANT", "text": "Doesn't copy memory. If `str` memory is freed later,\nreturned string will no longer point to valid memory." },
+      { "kind": "NOTE", "text": "Character at index `end` is not included, domain of the resulting substring is always `[start, end)`." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -176,7 +259,8 @@
     "summary": "Linearly searches for the first occurrence of `search` in `str` from the left.",
     "description": "Strings are compared through `cn_str_equals`.",
     "tags": [
-      { "kind": "RETURNS", "text": "Index of the first character of the occurrence, otherwise `-1`." }
+      { "kind": "RETURNS", "text": "Index of the first character of the occurrence, otherwise `-1`." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -188,7 +272,8 @@
     "summary": "Linearly searches for the first occurrence of `search` in `str` from the right.",
     "description": "Strings are compared through `cn_str_equals`.",
     "tags": [
-      { "kind": "RETURNS", "text": "Index of the first character of the occurrence, otherwise `-1`." }
+      { "kind": "RETURNS", "text": "Index of the first character of the occurrence, otherwise `-1`." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -200,7 +285,8 @@
     "summary": "Checks whether `str` ends with `end`.",
     "description": "",
     "tags": [
-      { "kind": "RETURNS", "text": "`true` if `str` ends with `end`, `false` otherwise." }
+      { "kind": "RETURNS", "text": "`true` if `str` ends with `end`, `false` otherwise." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -212,7 +298,8 @@
     "summary": "Checks whether `str` starts with `start`.",
     "description": "",
     "tags": [
-      { "kind": "RETURNS", "text": "`true` if `str` starts with `start`, `false` otherwise." }
+      { "kind": "RETURNS", "text": "`true` if `str` starts with `start`, `false` otherwise." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -224,7 +311,8 @@
     "summary": "Linearly searches for the first occurrence of char `symbol` in `str` from the left.",
     "description": "",
     "tags": [
-      { "kind": "RETURNS", "text": "Index of the occurrence, otherwise `-1`." }
+      { "kind": "RETURNS", "text": "Index of the occurrence, otherwise `-1`." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -236,7 +324,8 @@
     "summary": "Linearly searches for the first occurrence of char `symbol` in `str` from the right.",
     "description": "",
     "tags": [
-      { "kind": "RETURNS", "text": "Index of the occurrence, otherwise `-1`." }
+      { "kind": "RETURNS", "text": "Index of the occurrence, otherwise `-1`." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -248,7 +337,8 @@
     "summary": "Finds the first non-whitespace char in `str` from the left.",
     "description": "",
     "tags": [
-      { "kind": "RETURNS", "text": "Index of the first non-whitespace char, otherwise `-1`." }
+      { "kind": "RETURNS", "text": "Index of the first non-whitespace char, otherwise `-1`." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -260,7 +350,8 @@
     "summary": "Finds the first non-whitespace char in `str` from the right.",
     "description": "",
     "tags": [
-      { "kind": "RETURNS", "text": "Index of the first non-whitespace char, otherwise `-1`." }
+      { "kind": "RETURNS", "text": "Index of the first non-whitespace char, otherwise `-1`." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -272,7 +363,8 @@
     "summary": "Finds the first whitespace char in `str` from the left.",
     "description": "",
     "tags": [
-      { "kind": "RETURNS", "text": "Index of the first whitespace char, otherwise `-1`." }
+      { "kind": "RETURNS", "text": "Index of the first whitespace char, otherwise `-1`." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -284,7 +376,8 @@
     "summary": "Finds the first whitespace char in `str` from the right.",
     "description": "",
     "tags": [
-      { "kind": "RETURNS", "text": "Index of the first whitespace char, otherwise `-1`." }
+      { "kind": "RETURNS", "text": "Index of the first whitespace char, otherwise `-1`." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -296,7 +389,8 @@
     "summary": "Shortens `str` by excluding `count` chars from the left.",
     "description": "",
     "tags": [
-      { "kind": "RETURNS", "text": "Resulting string, pointing to the memory of `str`." }
+      { "kind": "RETURNS", "text": "Resulting string, pointing to the memory of `str`." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -308,7 +402,8 @@
     "summary": "Shortens `str` by excluding all whitespace chars from the left.",
     "description": "",
     "tags": [
-      { "kind": "RETURNS", "text": "Resulting string, pointing to the memory of `str`." }
+      { "kind": "RETURNS", "text": "Resulting string, pointing to the memory of `str`." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -320,7 +415,8 @@
     "summary": "Shortens `str` by excluding chars from the left until it hits a whitespace.",
     "description": "The whitespace itself is not excluded.",
     "tags": [
-      { "kind": "RETURNS", "text": "Resulting string, pointing to the memory of `str`." }
+      { "kind": "RETURNS", "text": "Resulting string, pointing to the memory of `str`." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -332,7 +428,8 @@
     "summary": "Gets first `count` chars of `str`.",
     "description": "",
     "tags": [
-      { "kind": "RETURNS", "text": "String that contains `count` chars from the left, pointing to the memory of `str`." }
+      { "kind": "RETURNS", "text": "String that contains `count` chars from the left, pointing to the memory of `str`." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -344,7 +441,8 @@
     "summary": "Gets everything in `str` until the first whitespace.",
     "description": "",
     "tags": [
-      { "kind": "RETURNS", "text": "String that contains everything until a whitespace, not including the whitespace itself." }
+      { "kind": "RETURNS", "text": "String that contains everything until a whitespace, not including the whitespace itself." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -356,7 +454,8 @@
     "summary": "Checks whether `str` is a valid symbol: a letter or `_`, followed by letters, digits or `_`.",
     "description": "",
     "tags": [
-      { "kind": "RETURNS", "text": "`true` if `str` contains only symbol chars, `false` otherwise." }
+      { "kind": "RETURNS", "text": "`true` if `str` contains only symbol chars, `false` otherwise." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -368,7 +467,8 @@
     "summary": "Checks whether `str` is an integer.",
     "description": "",
     "tags": [
-      { "kind": "RETURNS", "text": "`true` if `str` is an integer, `false` otherwise." }
+      { "kind": "RETURNS", "text": "`true` if `str` is an integer, `false` otherwise." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -380,7 +480,8 @@
     "summary": "Checks whether `str` is a float.",
     "description": "",
     "tags": [
-      { "kind": "RETURNS", "text": "`true` if `str` is a float, `false` otherwise." }
+      { "kind": "RETURNS", "text": "`true` if `str` is a float, `false` otherwise." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -392,7 +493,8 @@
     "summary": "Parses integer from `str`.",
     "description": "",
     "tags": [
-      { "kind": "RETURNS", "text": "Integer parsed from the string." }
+      { "kind": "RETURNS", "text": "Integer parsed from the string." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -404,7 +506,8 @@
     "summary": "Parses float from `str`.",
     "description": "",
     "tags": [
-      { "kind": "RETURNS", "text": "Float parsed from the string." }
+      { "kind": "RETURNS", "text": "Float parsed from the string." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -416,7 +519,8 @@
     "summary": "Counts occurrences of char `c` in `str`.",
     "description": "",
     "tags": [
-      { "kind": "RETURNS", "text": "Number of occurrences of `c` in the string." }
+      { "kind": "RETURNS", "text": "Number of occurrences of `c` in the string." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -429,7 +533,8 @@
     "description": "",
     "tags": [
       { "kind": "RETURNS", "text": "Pointer to `buffer`." },
-      { "kind": "IMPORTANT", "text": "`buffer` must have enough space to hold `str` data." }
+      { "kind": "IMPORTANT", "text": "`buffer` must have enough space to hold `str` data." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -442,7 +547,8 @@
     "description": "",
     "tags": [
       { "kind": "RETURNS", "text": "String that corresponds to the formatted string, with `NULL` data if formatting failed." },
-      { "kind": "IMPORTANT", "text": "`buffer` must be big enough to hold the formatted string." }
+      { "kind": "IMPORTANT", "text": "`buffer` must be big enough to hold the formatted string." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -454,7 +560,8 @@
     "summary": "Checks whether `str` is empty, by checking whether its length is `0`.",
     "description": "",
     "tags": [
-      { "kind": "RETURNS", "text": "`true` if string is empty, `false` otherwise." }
+      { "kind": "RETURNS", "text": "`true` if string is empty, `false` otherwise." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -466,7 +573,8 @@
     "summary": "Compares `str1` and `str2`, checking for length equality first and then comparing char by char.",
     "description": "",
     "tags": [
-      { "kind": "RETURNS", "text": "`true` if strings are identical, `false` otherwise." }
+      { "kind": "RETURNS", "text": "`true` if strings are identical, `false` otherwise." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -479,7 +587,8 @@
     "description": "",
     "tags": [
       { "kind": "RETURNS", "text": "`true` if strings are identical, `false` otherwise." },
-      { "kind": "NOTE", "text": "Takes pointers to strings to be compatible with `Cn_Equals_Function`,\nwhich allows it to be used in hash table and hash set." }
+      { "kind": "NOTE", "text": "Takes pointers to strings to be compatible with `Cn_Equals_Function`,\nwhich allows it to be used in hash table and hash set." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -492,7 +601,33 @@
     "description": "",
     "tags": [
       { "kind": "RETURNS", "text": "Hash of the string." },
-      { "kind": "NOTE", "text": "Takes pointer to string to be compatible with `Cn_Hash_Function`,\nwhich allows it to be used in hash table and hash set." }
+      { "kind": "NOTE", "text": "Takes pointer to string to be compatible with `Cn_Hash_Function`,\nwhich allows it to be used in hash table and hash set." },
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "Cn_String_Builder",
+    "kind": "struct",
+    "module": "String Builder",
+    "decl": "typedef struct {\n    int64_t capacity;\n    int64_t length;\n    char *data;\n} Cn_String_Builder",
+    "summary": "Dynamic array based string builder definition.",
+    "description": "This is a simple string builder to provide tools for\nquick and dirty string formatting, concatenation and other\nimportant operations.",
+    "tags": [
+      { "kind": "IMPORTANT", "text": "For the certain capacities this string builder allocated on the stack.\nSee `CN_SB_STACK_STORAGE_CAP` and `cn_sb_make` for more info." },
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "CN_SB_STACK_STORAGE_CAP",
+    "kind": "macro",
+    "module": "String Builder",
+    "decl": "#define CN_SB_STACK_STORAGE_CAP 32",
+    "summary": "Maximum capacity under which string builder will be allocated on the stack.",
+    "description": "",
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -504,7 +639,8 @@
     "summary": "Makes new `Cn_String_Builder` on the stack if `cap` is small enough, otherwise on the heap.",
     "description": "Stack storage is used when `cap` is not bigger than `CN_SB_STACK_STORAGE_CAP`.",
     "tags": [
-      { "kind": "IMPORTANT", "text": "Lifetime of stack allocated string builder ends with the enclosing block.\nIf longer lifetime is needed, make sure to heap allocate the string builder,\nor make sure it is resized to be heap allocated." }
+      { "kind": "IMPORTANT", "text": "Lifetime of stack allocated string builder ends with the enclosing block.\nIf longer lifetime is needed, make sure to heap allocate the string builder,\nor make sure it is resized to be heap allocated." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -515,7 +651,9 @@
     "decl": "void cn_sb_free(Cn_String_Builder *sb)",
     "summary": "Frees heap memory occupied by `sb`.",
     "description": "Memory is freed only if capacity is bigger than `CN_SB_STACK_STORAGE_CAP`.",
-    "tags": [],
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
     "flags": []
   },
   {
@@ -525,7 +663,9 @@
     "decl": "void cn_sb_clear(Cn_String_Builder *sb)",
     "summary": "Clears all contents of `sb`, by setting its length to `0`.",
     "description": "Doesn't allocate or free any memory.",
-    "tags": [],
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
     "flags": []
   },
   {
@@ -535,7 +675,9 @@
     "decl": "void cn_sb_append_char(Cn_String_Builder *sb, char c)",
     "summary": "Appends char `c` to `sb`.",
     "description": "",
-    "tags": [],
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
     "flags": []
   },
   {
@@ -545,7 +687,9 @@
     "decl": "void cn_sb_append_str(Cn_String_Builder *sb, Cn_String str)",
     "summary": "Appends `str` to `sb`.",
     "description": "",
-    "tags": [],
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
     "flags": []
   },
   {
@@ -555,7 +699,9 @@
     "decl": "void cn_sb_prepend_str(Cn_String_Builder *sb, Cn_String str)",
     "summary": "Inserts `str` at the front of `sb`, shifting existing contents to the right.",
     "description": "",
-    "tags": [],
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
     "flags": []
   },
   {
@@ -565,7 +711,9 @@
     "decl": "void cn_sb_append_format(Cn_String_Builder *sb, char *format, ...)",
     "summary": "Formats string and appends the output to `sb`.",
     "description": "",
-    "tags": [],
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
     "flags": []
   },
   {
@@ -575,7 +723,9 @@
     "decl": "void cn_sb_reverse(Cn_String_Builder *sb)",
     "summary": "Reverses contents of `sb`.",
     "description": "",
-    "tags": [],
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
     "flags": []
   },
   {
@@ -587,8 +737,117 @@
     "description": "",
     "tags": [
       { "kind": "RETURNS", "text": "String pointing to the contents of `sb`." },
-      { "kind": "IMPORTANT", "text": "If `sb` is freed or grows, memory pointed to by the string might be invalid." },
-      { "kind": "NOTE", "text": "Contents of the returned string can be copied elsewhere to prevent such invalidation." }
+      { "kind": "IMPORTANT", "text": "If `sb` is freed or grows, memory pointed to by the string might be invalid.\nContents of the returned string can be copied elsewhere to prevent such invalidation." },
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "Cn_Allocator",
+    "kind": "typedef",
+    "module": "Allocator",
+    "decl": "typedef struct cn_allocator Cn_Allocator",
+    "summary": "Forward declaration of `cn_allocator`.",
+    "description": "",
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "Cn_Alloc",
+    "kind": "typedef",
+    "module": "Allocator",
+    "decl": "typedef CNDEF void *(Cn_Alloc)(Cn_Allocator *allocator, size_t size)",
+    "summary": "Type defintion of allocator alloc.",
+    "description": "",
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "Cn_Realloc",
+    "kind": "typedef",
+    "module": "Allocator",
+    "decl": "typedef CNDEF void *(Cn_Realloc)(Cn_Allocator *allocator, void *mem, size_t new_size)",
+    "summary": "Type defintion of allocator realloc.",
+    "description": "",
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "Cn_Free",
+    "kind": "typedef",
+    "module": "Allocator",
+    "decl": "typedef CNDEF void (Cn_Free)(Cn_Allocator *allocator, void *mem)",
+    "summary": "Type defintion of allocator free.",
+    "description": "",
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "Cn_Free_All",
+    "kind": "typedef",
+    "module": "Allocator",
+    "decl": "typedef CNDEF void (Cn_Free_All)(Cn_Allocator *allocator)",
+    "summary": "Type defintion of allocator free all.",
+    "description": "",
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "CN_ALLOCATOR_BASE_MEMBERS",
+    "kind": "macro",
+    "module": "Allocator",
+    "decl": "#define CN_ALLOCATOR_BASE_MEMBERS   \\\n    Cn_Alloc        *alloc;         \\\n    Cn_Realloc      *realloc;       \\\n    Cn_Free         *free;          \\\n    Cn_Free_All     *free_all;      \\",
+    "summary": "Base members definition for allocators.",
+    "description": "This library uses a variety of allocators: arenas, pools, block allocators, etc.\nBut it also doesn't want to introduce extra complexity regarding usage of such allocators,\nso in order to provide a middle ground between simplicity and functionality, all\nallocators must implement the same foundational interface and can be replaced with one another\nat any point in time. This allows users to customize and control memory, while the library has\nstable and well understood internals.\n\nEach allocator must implement its own version of the following functions:\n\n```c\nCNDEF void *cn_alloc(Cn_Allocator *allocator, size_t size);\nCNDEF void *cn_realloc(Cn_Allocator *allocator, void *mem, size_t new_size);\nCNDEF void cn_free(Cn_Allocator *allocator, void *mem);\nCNDEF void cn_free_all(Cn_Allocator *allocator);\n```\n\nSwitching the global allocator then becomes as simple as setting the global allocator variable,\nand separate allocators for different parts of the library can be replaced too.",
+    "tags": [
+      { "kind": "NOTE", "text": "If an allocator cannot perform a certain function, like an arena that cannot free memory by pointer,\nit is allowed to stub out the function and log a warning on attempt to use it." },
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "cn_allocator",
+    "kind": "struct",
+    "module": "Allocator",
+    "decl": "struct cn_allocator {\n    CN_ALLOCATOR_BASE_MEMBERS\n}",
+    "summary": "Allocator definition.",
+    "description": "",
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "CN_ALLOCATOR_BASE",
+    "kind": "macro",
+    "module": "Allocator",
+    "decl": "#define CN_ALLOCATOR_BASE                       \\\n    union {                                     \\\n        Cn_Allocator base;                      \\\n        struct { CN_ALLOCATOR_BASE_MEMBERS };   \\\n    }",
+    "summary": "Allocator base that is added to each allocator struct definition.",
+    "description": "",
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "Cn_Arena",
+    "kind": "struct",
+    "module": "Allocator",
+    "decl": "typedef struct { CN_ALLOCATOR_BASE;\n    size_t capacity;\n    void *allocation;\n    void *ptr;\n} Cn_Arena",
+    "summary": "Arena, linearly gives memory from the pre-allocated block.",
+    "description": "All memory is freed at once, and error will be issued if overflow occurs.",
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -600,7 +859,8 @@
     "summary": "Constructs arena and allocates `capacity` bytes of memory for it.",
     "description": "",
     "tags": [
-      { "kind": "RETURNS", "text": "New arena, zeroed out if memory couldn't be allocated." }
+      { "kind": "RETURNS", "text": "New arena, zeroed out if memory couldn't be allocated." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -612,7 +872,8 @@
     "summary": "Allocates next chunk of `size` bytes from `arena`.",
     "description": "",
     "tags": [
-      { "kind": "RETURNS", "text": "Pointer to the allocated memory, `NULL` if allocation exceeds arena's capacity." }
+      { "kind": "RETURNS", "text": "Pointer to the allocated memory, `NULL` if allocation exceeds arena's capacity." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -625,7 +886,8 @@
     "description": "Allocates new chunk of `new_size` bytes through `cn_arena_alloc`.",
     "tags": [
       { "kind": "RETURNS", "text": "Pointer to the new chunk of memory." },
-      { "kind": "IMPORTANT", "text": "Contents of `mem` are not copied into the new chunk." }
+      { "kind": "IMPORTANT", "text": "Contents of `mem` are not copied into the new chunk." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -637,7 +899,8 @@
     "summary": "Stubbed out, since arena cannot free previously allocated memory.",
     "description": "",
     "tags": [
-      { "kind": "NOTE", "text": "Logs a warning when called, use `cn_arena_free_all` or `cn_arena_destroy` instead." }
+      { "kind": "NOTE", "text": "Logs a warning when called, use `cn_arena_free_all` or `cn_arena_destroy` instead." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -648,7 +911,9 @@
     "decl": "void cn_arena_free_all(Cn_Arena *arena)",
     "summary": "Releases all allocations of `arena` at once, by resetting it to the beginning of its memory.",
     "description": "Arena memory itself stays allocated and can be reused.",
-    "tags": [],
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
     "flags": []
   },
   {
@@ -658,7 +923,9 @@
     "decl": "void cn_arena_destroy(Cn_Arena *arena)",
     "summary": "Completely destroys `arena` and frees all memory occupied by it.",
     "description": "",
-    "tags": [],
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
     "flags": []
   },
   {
@@ -668,7 +935,33 @@
     "decl": "typedef struct { CN_ALLOCATOR_BASE;\n    size_t block_capacity;\n    void  *block;\n} Cn_Chained_Arena",
     "summary": "Chained arena is an allocator that linearly hands out memory and allocates next block when needed.",
     "description": "Pointers it returns are guaranteed to point to valid memory at all times, until freed or popped.\nInstead of making a forward linked list of blocks,\nit makes a reverse linked list of blocks and always points to the most recent block.\n\n```\n block_capacity\n <--------->\n\n -----------     -----------     -----------\n | Block 1 | <-- | Block 2 | <-- | Block 3 |\n -----------     -----------     -----------\n                                 ^      ^\n                                 *block *ptr\n <------------- allocated ------------->\n```\n\nThis setup allows quick append allocation and pop deallocation.\n\nEvery block carries its own capacity, which normally is the `block_capacity` set by the user.\nAn allocation that doesn't fit in a regular block gets an oversized block of exactly its size,\nso no allocation is ever refused because of the `block_capacity` chosen.",
-    "tags": [],
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "CN_CHAINED_ARENA_BLOCK_HEADER",
+    "kind": "macro",
+    "module": "Allocator",
+    "decl": "#define CN_CHAINED_ARENA_BLOCK_HEADER(block) ((Cn_Chained_Arena_Block_Header *)((uint8_t *)(block) - sizeof(Cn_Chained_Arena_Block_Header)))",
+    "summary": "Each block allocated by `Cn_Chained_Arena` contains a header.\nThis macro gets this information from the specific block.",
+    "description": "",
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "Cn_Chained_Arena_Block_Header",
+    "kind": "struct",
+    "module": "Allocator",
+    "decl": "typedef struct {\n    void  *prev;\n    void  *next;\n    size_t capacity;\n    size_t allocated;\n} Cn_Chained_Arena_Block_Header",
+    "summary": "Definition of the block header that is allocated by `Cn_Chained_Arena`\nfor each block.",
+    "description": "",
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
     "flags": []
   },
   {
@@ -678,7 +971,10 @@
     "decl": "Cn_Chained_Arena cn_chained_arena_make(size_t block_capacity)",
     "summary": "Constructs chained arena, allocating its first block of `block_capacity` bytes.",
     "description": "",
-    "tags": [],
+    "tags": [
+      { "kind": "RETURNS", "text": "New chained arena." },
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
     "flags": []
   },
   {
@@ -690,7 +986,8 @@
     "description": "",
     "tags": [
       { "kind": "RETURNS", "text": "Pointer to the allocated memory." },
-      { "kind": "NOTE", "text": "If `size` is bigger than the arena's `block_capacity`, an oversized block of exactly\nthat size is allocated to hold it, and a warning is logged." }
+      { "kind": "NOTE", "text": "If `size` is bigger than the arena's `block_capacity`, an oversized block of exactly\nthat size is allocated to hold it, and a warning is logged." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -703,7 +1000,8 @@
     "description": "Allocates new chunk of `new_size` bytes through `cn_chained_arena_alloc`.",
     "tags": [
       { "kind": "RETURNS", "text": "Pointer to the new chunk of memory." },
-      { "kind": "IMPORTANT", "text": "Contents of `mem` are not copied into the new chunk." }
+      { "kind": "IMPORTANT", "text": "Contents of `mem` are not copied into the new chunk." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -715,7 +1013,8 @@
     "summary": "Stubbed out, since arena cannot free previously allocated memory.",
     "description": "",
     "tags": [
-      { "kind": "NOTE", "text": "Use `cn_chained_arena_dealloc`, `cn_chained_arena_free_all` or `cn_chained_arena_destroy` instead." }
+      { "kind": "NOTE", "text": "Use `cn_chained_arena_dealloc`, `cn_chained_arena_free_all` or `cn_chained_arena_destroy` instead." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -726,7 +1025,9 @@
     "decl": "void cn_chained_arena_free_all(Cn_Chained_Arena *arena)",
     "summary": "Releases all allocations of `arena` at once, by resetting every block and returning to the first one.",
     "description": "Blocks themselves stay allocated and are reused by later allocations.",
-    "tags": [],
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
     "flags": []
   },
   {
@@ -736,7 +1037,9 @@
     "decl": "void cn_chained_arena_dealloc(Cn_Chained_Arena *arena, size_t size)",
     "summary": "Deallocates last `size` bytes allocated from `arena`.",
     "description": "If `size` covers a whole block, arena moves back to the previous block.\nEmptied blocks stay allocated and are reused by later allocations.",
-    "tags": [],
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
     "flags": []
   },
   {
@@ -749,7 +1052,8 @@
     "tags": [
       { "kind": "RETURNS", "text": "Index of the block, `-1` if `allocation_ptr` doesn't point to the allocated memory." },
       { "kind": "OUTPUTS", "text": "Byte offset to the allocated memory from the beginning of the block, written to `offset`." },
-      { "kind": "NOTE", "text": "Returns properly whenever `allocation_ptr` points to memory held by the arena,\neven if it isn't the exact address returned by an allocation." }
+      { "kind": "NOTE", "text": "Returns properly whenever `allocation_ptr` points to memory held by the arena,\neven if it isn't the exact address returned by an allocation." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -761,7 +1065,20 @@
     "summary": "Computes total size allocated by `arena`.",
     "description": "",
     "tags": [
-      { "kind": "RETURNS", "text": "Total allocated size in bytes." }
+      { "kind": "RETURNS", "text": "Total allocated size in bytes." },
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "cn_chained_arena_foreach_in_block",
+    "kind": "macro",
+    "module": "Allocator",
+    "decl": "#define cn_chained_arena_foreach_in_block(type, it, block) for (type *it = (type *)(block); (uint8_t *)it <= (uint8_t *)(block) + CN_CHAINED_ARENA_BLOCK_HEADER(block)->allocated - sizeof(type); it++)",
+    "summary": "For each loop macro to linearly iterate items in the block.",
+    "description": "",
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -772,7 +1089,9 @@
     "decl": "void cn_chained_arena_destroy(Cn_Chained_Arena *arena)",
     "summary": "Completely destroys `arena` and frees all memory occupied by it.",
     "description": "",
-    "tags": [],
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
     "flags": []
   },
   {
@@ -780,11 +1099,63 @@
     "kind": "macro",
     "module": "Allocator",
     "decl": "#define CN_POOL_BLOCK_MAX_CAPACITY 4096",
+    "summary": "Maximum capacity of a single pool block.",
+    "description": "",
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "CN_POOL_BLOCK_MIN_CAPACITY",
+    "kind": "macro",
+    "module": "Allocator",
+    "decl": "#define CN_POOL_BLOCK_MIN_CAPACITY 8",
+    "summary": "Minimum capacity of a single pool block.",
+    "description": "",
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "Cn_Pool_Block",
+    "kind": "typedef",
+    "module": "Allocator",
+    "decl": "typedef struct cn_pool_block Cn_Pool_Block",
+    "summary": "Forward declaration of `cn_pool_block`.",
+    "description": "",
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "cn_pool_block",
+    "kind": "struct",
+    "module": "Allocator",
+    "decl": "struct cn_pool_block {\n    Cn_Pool_Block *next;\n    size_t capacity;\n    uint8_t flags[CN_POOL_BLOCK_MAX_CAPACITY / CN_POOL_BLOCK_MIN_CAPACITY / 8];\n    uint8_t mem[CN_POOL_BLOCK_MAX_CAPACITY];\n}",
+    "summary": "Struct definition of single pool allocator block.",
+    "description": "",
+    "tags": [
+      { "kind": "MEMBER", "text": "capacity: Capacity per allocation, `size_t` keeps mem aligned as malloc returned it." },
+      { "kind": "MEMBER", "text": "flags: Bit flags, if bit set to, specific allocation is occupied." },
+      { "kind": "MEMBER", "text": "mem: Whole allocation." },
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "Cn_Pool",
+    "kind": "struct",
+    "module": "Allocator",
+    "decl": "typedef struct { CN_ALLOCATOR_BASE;\n    Cn_Pool_Block **blocks;\n    size_t blocks_length;\n} Cn_Pool",
     "summary": "Pool is an allocator that hands out fixed size slots cut from pre-divided blocks.",
     "description": "It is constructed from a list of capacities, where every capacity defines a size class.\nEach size class owns a chain of blocks, and each block is a bit field of occupied\nslots followed by the memory those slots are cut from.\n\n```\n cn_pool_make(8, 64)\n\n             -------------------------     -------------------------\n blocks[0] = | 8  | flags | mem     | --> | 8  | flags | mem     |\n             -------------------------     -------------------------\n             -------------------------\n blocks[1] = | 64 | flags | mem     | --> NULL\n             -------------------------\n\n blocks_length = 2\n```\n\nBlocks are always `CN_POOL_BLOCK_MAX_CAPACITY` bytes big, so a size class of capacity `8`\ncuts its block into `512` slots, while a size class of capacity `4096` cuts it into `1`.\nWhen every block of a size class is full, one more block is chained to its end.\n\nPool doesn't store any header next to the returned memory, so the block a pointer\nbelongs to is found by searching the blocks for the one whose memory contains it.\n\nPool struct itself only holds the array of size class chains and its length, and that\narray is the array of capacities supplied to `cn_pool_make`, overwritten in place with\nblock pointers.",
     "tags": [
       { "kind": "IMPORTANT", "text": "Capacities must be listed in strictly ascending order, so that the first size class\nbig enough for an allocation is also the tightest fit for it." },
-      { "kind": "IMPORTANT", "text": "Pool must not outlive the supplied array. `cn_pool_make` used with a compound literal\ninside a function is only valid until the end of the enclosing block." }
+      { "kind": "IMPORTANT", "text": "Pool must not outlive the supplied array. `cn_pool_make` used with a compound literal\ninside a function is only valid until the end of the enclosing block." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -795,7 +1166,9 @@
     "decl": "#define CN_POOL_BLOCK_SLOTS(block) (CN_POOL_BLOCK_MAX_CAPACITY / (block)->capacity)",
     "summary": "Number of slots a block of given capacity is divided into.",
     "description": "",
-    "tags": [],
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
     "flags": []
   },
   {
@@ -807,7 +1180,8 @@
     "description": "",
     "tags": [
       { "kind": "IMPORTANT", "text": "Capacities must be strictly ascending, multiples of `CN_POOL_BLOCK_MIN_CAPACITY`,\nand not bigger than `CN_POOL_BLOCK_MAX_CAPACITY`." },
-      { "kind": "IMPORTANT", "text": "Assumes `sizeof(size_t) == sizeof(void *)`, because it reuses the supplied array of capacities." }
+      { "kind": "IMPORTANT", "text": "Assumes `sizeof(size_t) == sizeof(void *)`, because it reuses the supplied array of capacities." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -819,7 +1193,8 @@
     "summary": "Allocates next free slot of memory from `pool`.",
     "description": "Slot is taken from the smallest size class that fits the requested `size`.",
     "tags": [
-      { "kind": "RETURNS", "text": "Pointer to the allocated slot." }
+      { "kind": "RETURNS", "text": "Pointer to the allocated slot." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -831,7 +1206,8 @@
     "summary": "Reallocates slot of memory `mem` from `pool`.",
     "description": "If `new_size` still fits the slot, same memory is returned.\nIf `mem` is `NULL`, works like `cn_pool_alloc`.",
     "tags": [
-      { "kind": "RETURNS", "text": "Pointer to the reallocated memory, `NULL` if `mem` wasn't allocated by `pool`." }
+      { "kind": "RETURNS", "text": "Pointer to the reallocated memory, `NULL` if `mem` wasn't allocated by `pool`." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -843,7 +1219,8 @@
     "summary": "Frees slot of memory `mem` from `pool`.",
     "description": "",
     "tags": [
-      { "kind": "NOTE", "text": "Does nothing if `mem` is `NULL`, logs a warning if `mem` wasn't allocated by `pool`." }
+      { "kind": "NOTE", "text": "Does nothing if `mem` is `NULL`, logs a warning if `mem` wasn't allocated by `pool`." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -854,7 +1231,9 @@
     "decl": "void cn_pool_free_all(Cn_Pool *pool)",
     "summary": "Marks every slot of every block as free, keeping the blocks themselves allocated.",
     "description": "",
-    "tags": [],
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
     "flags": []
   },
   {
@@ -867,7 +1246,8 @@
     "tags": [
       { "kind": "RETURNS", "text": "Block containing the pointer, `NULL` if `allocation_ptr` doesn't point to the\nbeginning of an occupied slot, which is also the case for already freed memory." },
       { "kind": "OUTPUTS", "text": "Index of the occupied slot in the found block, written to `slot`." },
-      { "kind": "NOTE", "text": "Returns properly whenever `allocation_ptr` points to the beginning of an occupied slot,\neven if it isn't the exact address returned by an allocation." }
+      { "kind": "NOTE", "text": "Returns properly whenever `allocation_ptr` points to the beginning of an occupied slot,\neven if it isn't the exact address returned by an allocation." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -879,7 +1259,20 @@
     "summary": "Completely destroys `pool` and frees all memory occupied by it.",
     "description": "",
     "tags": [
-      { "kind": "NOTE", "text": "Supplied array of capacities is not freed, since pool doesn't own it." }
+      { "kind": "NOTE", "text": "Supplied array of capacities is not freed, since pool doesn't own it." },
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "cn_allocator",
+    "kind": "variable",
+    "module": "Allocator",
+    "decl": "extern Cn_Allocator *cn_allocator",
+    "summary": "Default allocator that this library uses for most of the allocations.\nSee `CN_REALLOC` and `CN_FREE`.",
+    "description": "",
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -891,7 +1284,8 @@
     "summary": "Calls `alloc` of `allocator`, passing the allocator itself as a parameter.",
     "description": "",
     "tags": [
-      { "kind": "RETURNS", "text": "Pointer to the allocated memory." }
+      { "kind": "RETURNS", "text": "Pointer to the allocated memory." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -903,7 +1297,8 @@
     "summary": "Calls `realloc` of `allocator`, passing the allocator itself as a parameter.",
     "description": "",
     "tags": [
-      { "kind": "RETURNS", "text": "Pointer to the reallocated memory." }
+      { "kind": "RETURNS", "text": "Pointer to the reallocated memory." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -914,7 +1309,9 @@
     "decl": "void cn_free(Cn_Allocator *allocator, void *mem)",
     "summary": "Calls `free` of `allocator`, passing the allocator itself as a parameter.",
     "description": "",
-    "tags": [],
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
     "flags": []
   },
   {
@@ -924,7 +1321,45 @@
     "decl": "void cn_free_all(Cn_Allocator *allocator)",
     "summary": "Calls `free_all` of `allocator`, passing the allocator itself as a parameter.",
     "description": "",
-    "tags": [],
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "CN_REALLOC",
+    "kind": "macro",
+    "module": "Allocator",
+    "decl": "#define CN_REALLOC(mem, size)   cn_realloc(cn_allocator, (mem), (size))",
+    "summary": "Realloc wrapper that uses `cn_allocator` underneath.",
+    "description": "",
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "CN_FREE",
+    "kind": "macro",
+    "module": "Allocator",
+    "decl": "#define CN_FREE(mem)            cn_free(cn_allocator, (mem))",
+    "summary": "Free wrapper that uses `cn_allocator` underneath.",
+    "description": "",
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "Cn_Array_List_Header",
+    "kind": "struct",
+    "module": "Array List",
+    "decl": "typedef struct {\n    int64_t capacity;\n    int64_t length;\n    int64_t item_size;\n} Cn_Array_List_Header",
+    "summary": "Array list header that is allocated before allocation block to store\nall of the important array list information.",
+    "description": "",
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
     "flags": []
   },
   {
@@ -935,7 +1370,8 @@
     "summary": "Makes new array list allocated dynamically with a `Cn_Array_List_Header` included.",
     "description": "",
     "tags": [
-      { "kind": "RETURNS", "text": "Pointer of specified `type` that can passed to `cn_array_*` functionality." }
+      { "kind": "RETURNS", "text": "Pointer of specified `type` that can passed to `cn_array_list_*` functionality." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -947,7 +1383,8 @@
     "summary": "",
     "description": "",
     "tags": [
-      { "kind": "RETURNS", "text": "`int64_t` length of an array." }
+      { "kind": "RETURNS", "text": "`int64_t` length of an array list." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -959,7 +1396,8 @@
     "summary": "",
     "description": "",
     "tags": [
-      { "kind": "RETURNS", "text": "`int64_t` capacity of an array." }
+      { "kind": "RETURNS", "text": "`int64_t` capacity of an array list." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -971,7 +1409,8 @@
     "summary": "",
     "description": "",
     "tags": [
-      { "kind": "RETURNS", "text": "`int64_t` item size of an array." }
+      { "kind": "RETURNS", "text": "`int64_t` item size of an array list." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -982,7 +1421,9 @@
     "decl": "#define cn_array_list_append(ptr_list, item)\\\n    do {\\\n        cn__array_list_resize_to_fit((void **)(ptr_list), cn_array_list_length(ptr_list) + 1);\\\n        Cn_Array_List_Header *cn__h_ = (Cn_Array_List_Header *)((uint8_t *)(*ptr_list) - sizeof(Cn_Array_List_Header));\\\n        (*ptr_list)[cn__h_->length++] = item;\\\n    } while(0)",
     "summary": "Appends `item` to the specified array list.",
     "description": "",
-    "tags": [],
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
     "flags": []
   },
   {
@@ -992,7 +1433,9 @@
     "decl": "#define cn_array_list_append_multiple(ptr_list, item_arr, count)\\\n    cn__array_list_append_multiple((void **)ptr_list, (void *)item_arr, count)",
     "summary": "Appends array of items, `item_arr`, to the specified array list.",
     "description": "",
-    "tags": [],
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
     "flags": []
   },
   {
@@ -1002,7 +1445,9 @@
     "decl": "#define cn_array_list_add(ptr_list, index, item)\\\n    do {\\\n        cn__array_list_shift_to_fit((void **)(ptr_list), index, 1);\\\n        (*ptr_list)[index] = item;\\\n    } while(0)",
     "summary": "Adds `item` to the specified `index` in array list, shifting all other items one place to the right.",
     "description": "",
-    "tags": [],
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
     "flags": []
   },
   {
@@ -1012,7 +1457,9 @@
     "decl": "#define cn_array_list_pop(ptr_list)\\\n    cn__array_list_pop((void *)*ptr_list, 1)",
     "summary": "Removes last item from specified array list.",
     "description": "",
-    "tags": [],
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
     "flags": []
   },
   {
@@ -1022,7 +1469,9 @@
     "decl": "#define cn_array_list_pop_multiple(ptr_list, count)\\\n    cn__array_list_pop((void *)*ptr_list, count)",
     "summary": "Removes `count` of items from the end of specified array list.",
     "description": "",
-    "tags": [],
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
     "flags": []
   },
   {
@@ -1032,7 +1481,9 @@
     "decl": "#define cn_array_list_clear(ptr_list)\\\n    cn__array_list_clear((void *)*ptr_list)",
     "summary": "Sets array list length to `0`, clearing all its items.",
     "description": "",
-    "tags": [],
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
     "flags": []
   },
   {
@@ -1042,7 +1493,9 @@
     "decl": "#define cn_array_list_unordered_remove(ptr_list, index)\\\n    cn__array_list_unordered_remove((void *)*ptr_list, index)",
     "summary": "Removes item at `index` from the specified array list in constant time,\nby swapping item with the last item, and decreasing length by -1.",
     "description": "",
-    "tags": [],
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
     "flags": []
   },
   {
@@ -1050,9 +1503,308 @@
     "kind": "macro",
     "module": "Array List",
     "decl": "#define cn_array_list_free(ptr_list)\\\n    cn__array_list_free((void **)ptr_list)",
-    "summary": "Frees all memory occupied the array list.",
+    "summary": "Frees all memory occupied by the array list.",
     "description": "",
-    "tags": [],
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "Cn_Hash_Table_Header",
+    "kind": "struct",
+    "module": "Hash Table",
+    "decl": "typedef struct {\n    int64_t capacity;\n    int64_t count;\n    int64_t item_size;\n    int64_t key_size;\n    Cn_Hash_Function *hash_func;\n    Cn_Equals_Function *equals_func;\n    float load_factor;\n} Cn_Hash_Table_Header",
+    "summary": "Hash table header that is allocated before allocation block to store\nall of the important hast table information.",
+    "description": "",
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "Cn_Hash_Table_Slot_State",
+    "kind": "enum",
+    "module": "Hash Table",
+    "decl": "typedef enum {\n    CN_HASH_TABLE_SLOT_EMPTY,\n    CN_HASH_TABLE_SLOT_OCCUPIED,\n    CN_HASH_TABLE_SLOT_DELETED,\n} Cn_Hash_Table_Slot_State",
+    "summary": "Possible states that slots in hash table can contain.",
+    "description": "",
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "Cn_Hash_Table_Slot",
+    "kind": "struct",
+    "module": "Hash Table",
+    "decl": "typedef struct {\n    Cn_Hash_Table_Slot_State state;\n    uint64_t hash;\n} Cn_Hash_Table_Slot",
+    "summary": "Definition of a hash table slot.",
+    "description": "",
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "cn_hash_table_make",
+    "kind": "macro",
+    "module": "Hash Table",
+    "decl": "#define cn_hash_table_make(key_type, value_type, capacity, hash_func, equals_func)\\\n    (value_type *)cn__hash_table_make(sizeof(key_type), sizeof(value_type), capacity, hash_func, equals_func)",
+    "summary": "Makes new hash table allocated dynamically with a `Cn_Hash_Table_Header` included.",
+    "description": "",
+    "tags": [
+      { "kind": "RETURNS", "text": "Pointer of specified `type` that can passed to `cn_hash_table_*` functionality." },
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "cn_hash_table_header",
+    "kind": "macro",
+    "module": "Hash Table",
+    "decl": "#define cn_hash_table_header(table_ptr)\\\n    ((Cn_Hash_Table_Header *)((uint8_t *)*table_ptr - sizeof(Cn_Hash_Table_Header)))",
+    "summary": "Given the pointer to the hash table, gets its header.",
+    "description": "",
+    "tags": [
+      { "kind": "RETURNS", "text": "`Cn_Hash_Table_Header *` pointer to the table's header." },
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "cn_hash_table_count",
+    "kind": "macro",
+    "module": "Hash Table",
+    "decl": "#define cn_hash_table_count(ptr_table)\\\n    cn__hash_table_count((void *)*ptr_table)",
+    "summary": "",
+    "description": "",
+    "tags": [
+      { "kind": "RETURNS", "text": "`int64_t` count of a hash table." },
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "cn_hash_table_capacity",
+    "kind": "macro",
+    "module": "Hash Table",
+    "decl": "#define cn_hash_table_capacity(ptr_table)\\\n    cn__hash_table_capacity((void *)*ptr_table)",
+    "summary": "",
+    "description": "",
+    "tags": [
+      { "kind": "RETURNS", "text": "`int64_t` capacity of a hash table." },
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "cn_hash_table_item_size",
+    "kind": "macro",
+    "module": "Hash Table",
+    "decl": "#define cn_hash_table_item_size(ptr_table)\\\n    cn__hash_table_item_size((void *)*ptr_table)",
+    "summary": "",
+    "description": "",
+    "tags": [
+      { "kind": "RETURNS", "text": "`int64_t` item size of a hash table." },
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "cn_hash_table_put",
+    "kind": "macro",
+    "module": "Hash Table",
+    "decl": "#define cn_hash_table_put(ptr_table, item, ptr_key)\\\n    do {\\\n        cn__hash_table_resize_to_fit((void **)(ptr_table), cn_hash_table_count(ptr_table) + 1);\\\n        (*ptr_table)[cn__hash_table_push_key((void **)(ptr_table), ptr_key)] = item;\\\n    } while(0)",
+    "summary": "Puts `item` into the hash table, using hash of the speicified key.",
+    "description": "",
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "cn_hash_table_get",
+    "kind": "macro",
+    "module": "Hash Table",
+    "decl": "#define cn_hash_table_get(ptr_table, ptr_key)\\\n    cn__hash_table_get((void **)(ptr_table), ptr_key)",
+    "summary": "Gets `item` from the hash table, by the hash of its key.",
+    "description": "",
+    "tags": [
+      { "kind": "RETURNS", "text": "Pointer to the `item` if found, `NULL` if `item` was not found." },
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "cn_hash_table_remove",
+    "kind": "macro",
+    "module": "Hash Table",
+    "decl": "#define cn_hash_table_remove(ptr_table, ptr_key)\\\n    cn__hash_table_remove((void **)(ptr_table), ptr_key)",
+    "summary": "Removes `item` from the hash table, by the hash of its key.",
+    "description": "",
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "cn_hash_table_free",
+    "kind": "macro",
+    "module": "Hash Table",
+    "decl": "#define cn_hash_table_free(ptr_table)\\\n    cn__hash_table_free((void **)(ptr_table))",
+    "summary": "Frees all memory occupied by the hash table.",
+    "description": "",
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "cn_hash_table_print",
+    "kind": "function",
+    "module": "Hash Table",
+    "decl": "void cn_hash_table_print(FILE *out, void **table)",
+    "summary": "Prints contents of the hash table to `out`.",
+    "description": "",
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "Cn_Hash_Set_Header",
+    "kind": "struct",
+    "module": "Hash Set",
+    "decl": "typedef struct {\n    int64_t capacity;\n    int64_t count;\n    int64_t item_size;\n    Cn_Hash_Function *hash_func;\n    Cn_Equals_Function *equals_func;\n    float load_factor;\n} Cn_Hash_Set_Header",
+    "summary": "Hash set header that is allocated before allocation block to store\nall of the important hast set information.",
+    "description": "",
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "Cn_Hash_Set_Slot_State",
+    "kind": "enum",
+    "module": "Hash Set",
+    "decl": "typedef enum {\n    CN_HASH_SET_SLOT_EMPTY,\n    CN_HASH_SET_SLOT_OCCUPIED,\n    CN_HASH_SET_SLOT_DELETED,\n} Cn_Hash_Set_Slot_State",
+    "summary": "Possible states that slots in hash set can contain. Same as `Cn_Hash_Table_Slot_State`.",
+    "description": "",
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "Cn_Hash_Set_Slot",
+    "kind": "struct",
+    "module": "Hash Set",
+    "decl": "typedef struct {\n    Cn_Hash_Set_Slot_State state;\n    uint64_t hash;\n} Cn_Hash_Set_Slot",
+    "summary": "Definition of a hash set slot. Same as `Cn_Hash_Table_Slot`.",
+    "description": "",
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "cn_hash_set_make",
+    "kind": "macro",
+    "module": "Hash Set",
+    "decl": "#define cn_hash_set_make(type, capacity, hash_func, equals_func)\\\n    (type *)cn__hash_set_make(sizeof(type), capacity, hash_func, equals_func)",
+    "summary": "Makes new hash set allocated dynamically with a `Cn_Hash_Set_Header` included.",
+    "description": "",
+    "tags": [
+      { "kind": "RETURNS", "text": "Pointer of specified `type` that can passed to `cn_hash_set_*` functionality." },
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "cn_hash_set_header",
+    "kind": "macro",
+    "module": "Hash Set",
+    "decl": "#define cn_hash_set_header(ptr_set)\\\n    ((Cn_Hash_Set_Header *)((uint8_t *)((*ptr_set) - 1) - sizeof(Cn_Hash_Set_Header)))",
+    "summary": "Given the pointer to the hash set, gets its header.",
+    "description": "",
+    "tags": [
+      { "kind": "RETURNS", "text": "`Cn_Hash_Set_Header *` pointer to the set's header." },
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "cn_hash_set_put",
+    "kind": "macro",
+    "module": "Hash Set",
+    "decl": "#define cn_hash_set_put(ptr_set, item)\\\n    (*((*ptr_set) - 1) = item, cn__hash_set_put(cn_hash_set_header(ptr_set), (void **)ptr_set), *((*ptr_set) - 1))",
+    "summary": "Puts `item` into the hash set, using its hash.",
+    "description": "",
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "cn_hash_set_contains",
+    "kind": "macro",
+    "module": "Hash Set",
+    "decl": "#define cn_hash_set_contains(ptr_set, item)\\\n    (*((*ptr_set) - 1) = item, cn__hash_set_contains(cn_hash_set_header(ptr_set)))",
+    "summary": "Checks if `item` is inside the hash set.",
+    "description": "",
+    "tags": [
+      { "kind": "RETURNS", "text": "`true` if item is found, `false` otherwise." },
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "cn_hash_set_remove",
+    "kind": "macro",
+    "module": "Hash Set",
+    "decl": "#define cn_hash_set_remove(ptr_set, item)\\\n    (*((*ptr_set) - 1) = item, cn__hash_set_remove(cn_hash_set_header(ptr_set)))",
+    "summary": "Removes `item` from the hash set.",
+    "description": "",
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "cn_hash_set_free",
+    "kind": "macro",
+    "module": "Hash Set",
+    "decl": "#define cn_hash_set_free(ptr_set)\\\n    cn__hash_set_free(cn_hash_set_header(ptr_set))",
+    "summary": "Frees all memory occupied by the hash set.",
+    "description": "",
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "Cn_Source",
+    "kind": "struct",
+    "module": "Source & Location",
+    "decl": "typedef struct {\n    Cn_String source;\n    int64_t offset;\n    int64_t length;\n} Cn_Source",
+    "summary": "Struct definition that reprsents source location,\nstoring full information about source and offsets.",
+    "description": "Used to track source strings and print snippets.",
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "Cn_Location",
+    "kind": "struct",
+    "module": "Source & Location",
+    "decl": "typedef struct {\n    Cn_String file;\n    int64_t line;\n    int64_t column;\n} Cn_Location",
+    "summary": "Struct definition that represents file location,\nstoring `file:line:col:` values.",
+    "description": "Used to track file location for the diagnostics.",
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
     "flags": []
   },
   {
@@ -1064,7 +1816,8 @@
     "description": "",
     "tags": [
       { "kind": "RETURNS", "text": "String based on the supplied source." },
-      { "kind": "NOTE", "text": "If length of `src` is `0`, empty string is returned,\nbut its data still points to the valid memory specified by the source." }
+      { "kind": "NOTE", "text": "If length of `src` is `0`, empty string is returned,\nbut its data still points to the valid memory specified by the source." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -1074,9 +1827,10 @@
     "module": "Source & Location",
     "decl": "int64_t cn_source_dist(Cn_Source *a, Cn_Source *b)",
     "summary": "Computes signed distance between offsets of sources `a` and `b`.",
-    "description": "",
+    "description": "Used to manually improve region highlighted by diagnostics.",
     "tags": [
-      { "kind": "RETURNS", "text": "Signed distance from source `a` to source `b`." }
+      { "kind": "RETURNS", "text": "Signed distance from source `a` to source `b`." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -1088,7 +1842,44 @@
     "summary": "Checks whether `src` is empty, meaning its length is `0`.",
     "description": "",
     "tags": [
-      { "kind": "RETURNS", "text": "Non-zero if source is empty, `0` otherwise." }
+      { "kind": "RETURNS", "text": "Non-zero if source is empty, `0` otherwise." },
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "Cn_Token_Kind",
+    "kind": "enum",
+    "module": "Lexer",
+    "decl": "typedef enum {\n    // General tokens.\n    CN_TOKEN_EOF,\n    CN_TOKEN_UNKNOWN,\n    CN_TOKEN_STRING,\n    CN_TOKEN_COMMENT,\n    CN_TOKEN_LINE_MARKER,\n    CN_TOKEN_INTEGER_VALUE,\n    CN_TOKEN_FLOAT_VALUE,\n    CN_TOKEN_CHAR_VALUE,\n    CN_TOKEN_IDENTIFIER,\n    // Literal tokens, non-identifer.\n    CN_TOKEN_COLON,\n    CN_TOKEN_SEMICOLON,\n    CN_TOKEN_PARAN_OPEN,\n    CN_TOKEN_PARAN_CLOSE,\n    CN_TOKEN_CURLY_OPEN,\n    CN_TOKEN_CURLY_CLOSE,\n    CN_TOKEN_SQR_BRACES_OPEN,\n    CN_TOKEN_SQR_BRACES_CLOSE,\n    CN_TOKEN_COMMA,\n    CN_TOKEN_DOT,\n    CN_TOKEN_ARROW,\n    CN_TOKEN_ASSIGN,\n    CN_TOKEN_ASTERISK,\n    CN_TOKEN_SLASH,\n    CN_TOKEN_PLUS,\n    CN_TOKEN_MINUS,\n    CN_TOKEN_PERCENT,\n    CN_TOKEN_INCREMENT,\n    CN_TOKEN_DECREMENT,\n    CN_TOKEN_LSHIFT,\n    CN_TOKEN_RSHIFT,\n    CN_TOKEN_LESS,\n    CN_TOKEN_GREATER,\n    CN_TOKEN_LESS_EQ,\n    CN_TOKEN_GREATER_EQ,\n    CN_TOKEN_EQ,\n    CN_TOKEN_NOT_EQ,\n    CN_TOKEN_AMPERSAND,\n    CN_TOKEN_HAT,\n    CN_TOKEN_BAR,\n    CN_TOKEN_AND,\n    CN_TOKEN_OR,\n    CN_TOKEN_EXCLAMATION,\n    CN_TOKEN_TILDE,\n    CN_TOKEN_LSHIFT_ASSIGN,\n    CN_TOKEN_RSHIFT_ASSIGN,\n    CN_TOKEN_MULTIPLY_ASSIGN,\n    CN_TOKEN_DIVIDE_ASSIGN,\n    CN_TOKEN_MODULO_ASSIGN,\n    CN_TOKEN_PLUS_ASSIGN,\n    CN_TOKEN_MINUS_ASSIGN,\n    CN_TOKEN_BIT_AND_ASSIGN,\n    CN_TOKEN_BIT_XOR_ASSIGN,\n    CN_TOKEN_BIT_OR_ASSIGN,\n    CN_TOKEN_QUESTION,\n    CN_TOKEN_ELLIPSIS,\n    // Keyword tokens.\n    CN_TOKEN_CONST,\n    CN_TOKEN_RESTRICT,\n    CN_TOKEN_VOLATILE,\n    CN_TOKEN_STATIC,\n    CN_TOKEN_EXTERN,\n    CN_TOKEN_REGISTER,\n    CN_TOKEN_AUTO,\n    CN_TOKEN_TYPEDEF,\n    CN_TOKEN_SIGNED,\n    CN_TOKEN_UNSIGNED,\n    CN_TOKEN_SHORT,\n    CN_TOKEN_LONG,\n    CN_TOKEN_INT,\n    CN_TOKEN_CHAR,\n    CN_TOKEN_FLOAT,\n    CN_TOKEN_DOUBLE,\n    CN_TOKEN_BOOL,\n    CN_TOKEN_VOID,\n    CN_TOKEN_STRUCT,\n    CN_TOKEN_ENUM,\n    CN_TOKEN_UNION,\n    CN_TOKEN_IF,\n    CN_TOKEN_ELSE,\n    CN_TOKEN_SWITCH,\n    CN_TOKEN_WHILE,\n    CN_TOKEN_DO,\n    CN_TOKEN_FOR,\n    CN_TOKEN_GOTO,\n    CN_TOKEN_CONTINUE,\n    CN_TOKEN_BREAK,\n    CN_TOKEN_RETURN,\n    CN_TOKEN_SIZEOF,\n    CN_TOKEN_INLINE,\n    CN_TOKEN_CASE,\n    CN_TOKEN_DEFAULT,\n    CN_TOKEN_COMPLEX,\n    CN_TOKEN_IMAGINARY,\n\n    // TEMPORARY: Post C99.\n    CN_TOKEN_ATOMIC,\n    CN_TOKEN_NORETURN,\n\n    // TEMPORARY: GNU keywords.\n    CN_TOKEN_GNU_ASM,\n    CN_TOKEN_GNU_EXTENSION,\n    CN_TOKEN_GNU_ATTRIBUTE,\n    CN_TOKEN_GNU_TYPEOF,\n} Cn_Token_Kind",
+    "summary": "Enum collection of all core token kinds.",
+    "description": "",
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "Cn_Token",
+    "kind": "struct",
+    "module": "Lexer",
+    "decl": "typedef struct {\n    Cn_Token_Kind   kind;\n    Cn_Location     loc;\n    Cn_Source       src;\n} Cn_Token",
+    "summary": "Definition of token struct, each token is identified by `kind` and\nkeeps track of it's source and location.",
+    "description": "",
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "Cn_Token_Literal",
+    "kind": "struct",
+    "module": "Lexer",
+    "decl": "typedef struct {\n    Cn_Token_Kind kind;\n    Cn_String     literal;\n} Cn_Token_Literal",
+    "summary": "Struct to group token kind and its respective string litetal.",
+    "description": "For example:\n```c\n    { CN_TOKEN_INT, CN_STR_BUFFER(\"int\") }\n```",
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -1099,7 +1890,9 @@
     "decl": "#define CN_LEXER_LOOKUP_COUNT       8",
     "summary": "Count of tokens ahead of the current one, that lexer can look up.",
     "description": "",
-    "tags": [],
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
     "flags": []
   },
   {
@@ -1109,7 +1902,55 @@
     "decl": "#define CN_LEXER_LOOKDOWN_COUNT     8",
     "summary": "Count of tokens behind the current one, that lexer can look down to.",
     "description": "",
-    "tags": [],
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "CN_LEXER_QUEUE_COUNT",
+    "kind": "macro",
+    "module": "Lexer",
+    "decl": "#define CN_LEXER_QUEUE_COUNT        (CN_LEXER_LOOKDOWN_COUNT + 1 + CN_LEXER_LOOKUP_COUNT)",
+    "summary": "Total count of tokens that lexer has in the queue.",
+    "description": "",
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "Cn_Lexer_Blacklist",
+    "kind": "struct",
+    "module": "Lexer",
+    "decl": "typedef struct {\n    Cn_Token_Kind *ttypes;\n    int64_t length;\n} Cn_Lexer_Blacklist",
+    "summary": "Struct to store array of blacklisted token kinds.",
+    "description": "",
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "Cn_Lexer",
+    "kind": "struct",
+    "module": "Lexer",
+    "decl": "typedef struct {\n    int64_t cursor;\n    int64_t bol;\n    int64_t line;\n    Cn_String file;\n    Cn_String content;\n    int64_t head_idx;\n    int64_t tail_idx;\n    int64_t current_idx;\n    Cn_Token queue[CN_LEXER_QUEUE_COUNT];\n    Cn_Lexer_Blacklist blacklist;\n} Cn_Lexer",
+    "summary": "Definition of the lexer struct.",
+    "description": "This lexer goes through source linearly producing tokens. Tokens are stored in the `queue`,\nwhich is done so that user can easily `peek` previous or upcoming tokens, while the current token\nis always stored at `current_idx` in the `queue`.",
+    "tags": [
+      { "kind": "MEMBER", "text": "cursor: Index in `content` at which lexer is currently sitting." },
+      { "kind": "MEMBER", "text": "bol: Index in `content` that marks beginning of currently lexed line." },
+      { "kind": "MEMBER", "text": "line: Line number the lexer is on." },
+      { "kind": "MEMBER", "text": "file: File name of the lexed text." },
+      { "kind": "MEMBER", "text": "content: Source of the lexed text." },
+      { "kind": "MEMBER", "text": "head_idx: Queue index of the most recently lexed upcoming token." },
+      { "kind": "MEMBER", "text": "current_idx: Queue index of the token that is currently viewed." },
+      { "kind": "MEMBER", "text": "tail_idx: Queue index of the most previous lexed token." },
+      { "kind": "MEMBER", "text": "queue: Queue buffer that can store maximum of `CN_LEXER_QUEUE_COUNT` tokens at once." },
+      { "kind": "MEMBER", "text": "blacklist: Tokens specified in here will be skipped by the lexer completely." },
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
     "flags": []
   },
   {
@@ -1118,8 +1959,34 @@
     "module": "Lexer",
     "decl": "#define cn_lexer_token(lexer)   (lexer)->queue[(lexer)->current_idx]",
     "summary": "Unwraps to the current token of `lexer`.",
-    "description": "Changes whenever `cn_lexer_next_token` is called.",
-    "tags": [],
+    "description": "Can change whenever `cn_lexer_next_token` is called.",
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "cn_lexer_head",
+    "kind": "macro",
+    "module": "Lexer",
+    "decl": "#define cn_lexer_head(lexer)    (lexer)->queue[(lexer)->head_idx]",
+    "summary": "Unwraps to the most recently lexed upcoming token of the `lexer`.",
+    "description": "Can change whenever `cn_lexer_next_token` is called.",
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "cn_lexer_tail",
+    "kind": "macro",
+    "module": "Lexer",
+    "decl": "#define cn_lexer_tail(lexer)    (lexer)->queue[(lexer)->tail_idx]",
+    "summary": "Unwraps to the most previous token of the `lexer`.",
+    "description": "Can change whenever `cn_lexer_next_token` is called.",
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
     "flags": []
   },
   {
@@ -1128,8 +1995,11 @@
     "module": "Lexer",
     "decl": "void cn_lexer_init(Cn_Lexer *lexer, Cn_String content, Cn_Lexer_Blacklist blacklist)",
     "summary": "Initializes `lexer` with specific `content`, setting up queue and getting ready to output tokens.",
-    "description": "Setting `blacklist` is optional, but if set, tokens from that list won't appear in the lexed output.",
-    "tags": [],
+    "description": "",
+    "tags": [
+      { "kind": "PARAM", "text": "blacklist: Optional, but if set, tokens from that list won't appear in the lexed output." },
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
     "flags": []
   },
   {
@@ -1138,8 +2008,10 @@
     "module": "Lexer",
     "decl": "void cn_lexer_load_content(Cn_Lexer *lexer, Cn_String content)",
     "summary": "Loads new `content` into `lexer`, resetting queue cursor and everything else.",
-    "description": "Compared to `cn_lexer_init`, only initializes content. It overwrites previous content\nand tokens that were enqueued in lexer, without touching `file`, `line` or `blacklist` values.",
-    "tags": [],
+    "description": "Compared to `cn_lexer_init`, only initializes content. It overwrites previous content\nand tokens that were enqueued in lexer, without touching `file`, `line` or `blacklist` values.\n\nCan be used to inject any content into the lexer without changing location\nfrom which the lexer is starting.",
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
     "flags": []
   },
   {
@@ -1149,18 +2021,21 @@
     "decl": "void cn_lexer_next_token(Cn_Lexer *lexer)",
     "summary": "Advances `lexer` to the next token.",
     "description": "",
-    "tags": [],
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
     "flags": []
   },
   {
     "symbol": "cn_lexer_expect",
     "kind": "function",
     "module": "Lexer",
-    "decl": "bool cn_lexer_expect(Cn_Lexer *lexer, Cn_Token_Type type)",
+    "decl": "bool cn_lexer_expect(Cn_Lexer *lexer, Cn_Token_Kind kind)",
     "summary": "Checks whether current token of `lexer` matches expected `type`.",
     "description": "",
     "tags": [
-      { "kind": "RETURNS", "text": "`true` if it matches, `false` otherwise." }
+      { "kind": "RETURNS", "text": "`true` if it matches, `false` otherwise." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -1173,7 +2048,8 @@
     "description": "`offset == 0` peeks current token, `offset < 0` peeks past tokens.",
     "tags": [
       { "kind": "RETURNS", "text": "Token at the requested offset. `CN_TOKEN_UNKNOWN` if requested token is out of queue bounds,\n`CN_TOKEN_EOF` if requested token comes after already found `CN_TOKEN_EOF`." },
-      { "kind": "IMPORTANT", "text": "Expects `-CN_LEXER_LOOKDOWN_COUNT < offset < CN_LEXER_LOOKUP_COUNT`." }
+      { "kind": "IMPORTANT", "text": "Expects `-CN_LEXER_LOOKDOWN_COUNT < offset < CN_LEXER_LOOKUP_COUNT`." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -1184,7 +2060,9 @@
     "decl": "void cn_lexer_log_tokens(Cn_Lexer *lexer, int64_t n)",
     "summary": "Logs next `n` tokens from `lexer`, if `n == -1` logs all available tokens.",
     "description": "",
-    "tags": [],
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
     "flags": []
   },
   {
@@ -1194,18 +2072,21 @@
     "decl": "bool cn_lexer_changed(Cn_Lexer *lexer, Cn_Lexer *saved)",
     "summary": "Checks if `lexer` state was changed from the given `saved` state.",
     "description": "",
-    "tags": [],
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
     "flags": []
   },
   {
     "symbol": "cn_token_kind_name",
     "kind": "function",
     "module": "Lexer",
-    "decl": "const char *cn_token_kind_name(Cn_Token_Type type)",
+    "decl": "const char *cn_token_kind_name(Cn_Token_Kind kind)",
     "summary": "Gets name of the token `type`, used in messages.",
     "description": "",
     "tags": [
-      { "kind": "RETURNS", "text": "Static string of the token type." }
+      { "kind": "RETURNS", "text": "Static string of the token type." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -1217,7 +2098,325 @@
     "summary": "",
     "description": "",
     "tags": [
-      { "kind": "RETURNS", "text": "`true` if tokens `a == b`." }
+      { "kind": "RETURNS", "text": "`true` if tokens `a == b`." },
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "Cn_Type_Flags",
+    "kind": "enum",
+    "module": "Type",
+    "decl": "typedef enum {\n    CN_TYPE_COMPLETE = 0x1,\n\n    CN_TYPE_QUALIFIED_CONSTANT = 0x2,\n    CN_TYPE_QUALIFIED_RESTRICT = 0x4,\n    CN_TYPE_QUALIFIED_VOLATILE = 0x8,\n    CN_TYPE_QUALIFIED_ATOMIC   = 0x10,\n\n    CN_TYPE_ARRAY_VARIABLE     = 0x20,\n    CN_TYPE_ARRAY_UNSPECIFIED  = 0x40,\n} Cn_Type_Flags",
+    "summary": "Type flags, most of which are specific to different `Cn_Type_Kind`.",
+    "description": "",
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "Cn_Type_Kind",
+    "kind": "enum",
+    "module": "Type",
+    "decl": "typedef enum {\n    CN_INTEGER,\n    CN_FLOAT,\n    CN_BOOL,\n    CN_POINTER,\n    CN_FUNCTION,\n    CN_ARRAY,\n    CN_VOID,\n    CN_STRUCT,\n    CN_UNION,\n    CN_ENUM,\n    CN_QUALIFIED,\n    CN_OPAQUE,\n    CN_UNKNOWN,\n} Cn_Type_Kind",
+    "summary": "Type kinds, list of all interned type kinds that are constructed from\nabstract syntax tree during analysis.",
+    "description": "",
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "CN_TYPE_BASE_MEMBERS",
+    "kind": "macro",
+    "module": "Type",
+    "decl": "#define CN_TYPE_BASE_MEMBERS    \\\n    Cn_Type_Kind kind;          \\\n    Cn_Type_Flags flags;        \\\n    int64_t size;               \\\n    int64_t align;              \\",
+    "summary": "Definition of the base members of any type.",
+    "description": "",
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "CN_TYPE_BASE",
+    "kind": "macro",
+    "module": "Type",
+    "decl": "#define CN_TYPE_BASE                    \\\n    struct { CN_TYPE_BASE_MEMBERS };    \\",
+    "summary": "Definition of the base type struct. Used by every other type struct definition.",
+    "description": "",
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "Cn_Type",
+    "kind": "typedef",
+    "module": "Type",
+    "decl": "typedef union cn_type Cn_Type",
+    "summary": "Forward declaration for `cn_type` union.",
+    "description": "",
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "Cn_Type_Integer",
+    "kind": "struct",
+    "module": "Type",
+    "decl": "typedef struct { CN_TYPE_BASE;\n    bool is_signed;\n} Cn_Type_Integer",
+    "summary": "Definition of integer type.",
+    "description": "",
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "Cn_Type_Pointer",
+    "kind": "struct",
+    "module": "Type",
+    "decl": "typedef struct { CN_TYPE_BASE;\n    Cn_Type *ptr_to;\n} Cn_Type_Pointer",
+    "summary": "Definition of pointer type.",
+    "description": "",
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "Cn_Type_Function_Param",
+    "kind": "struct",
+    "module": "Type",
+    "decl": "typedef struct {\n    Cn_Type *type;\n} Cn_Type_Function_Param",
+    "summary": "Definition of function parameter",
+    "description": "",
+    "tags": [
+      { "kind": "NOTE", "text": "It's not really a type but more a like a wrapper for `Cn_Type_Function` to use\nfor its parameters." },
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "Cn_Type_Function",
+    "kind": "struct",
+    "module": "Type",
+    "decl": "typedef struct { CN_TYPE_BASE;\n    Cn_Type *return_type;\n\n    int64_t params_length;\n    Cn_Type_Function_Param *params;\n\n    bool is_variadic;\n} Cn_Type_Function",
+    "summary": "Definition of function type.",
+    "description": "",
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "Cn_Type_Struct_Member",
+    "kind": "struct",
+    "module": "Type",
+    "decl": "typedef struct {\n    Cn_Type *type;\n    Cn_String name;\n    int64_t offset;\n} Cn_Type_Struct_Member",
+    "summary": "Definition of struct member.",
+    "description": "",
+    "tags": [
+      { "kind": "NOTE", "text": "It's not a type, used similarly to `Cn_Type_Function_Param`." },
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "Cn_Type_Struct",
+    "kind": "struct",
+    "module": "Type",
+    "decl": "typedef struct { CN_TYPE_BASE;\n    Cn_String tag;\n\n    int64_t members_length;\n    Cn_Type_Struct_Member *members;\n} Cn_Type_Struct",
+    "summary": "Definition of struct type.",
+    "description": "",
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "Cn_Type_Union_Member",
+    "kind": "struct",
+    "module": "Type",
+    "decl": "typedef struct {\n    Cn_Type *type;\n    Cn_String name;\n} Cn_Type_Union_Member",
+    "summary": "Definition of union member.",
+    "description": "",
+    "tags": [
+      { "kind": "NOTE", "text": "It's not a type, used similarly to `Cn_Type_Function_Param`." },
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "Cn_Type_Union",
+    "kind": "struct",
+    "module": "Type",
+    "decl": "typedef struct { CN_TYPE_BASE;\n    Cn_String tag;\n\n    int64_t members_length;\n    Cn_Type_Union_Member *members;\n} Cn_Type_Union",
+    "summary": "Definition of union type.",
+    "description": "",
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "Cn_Type_Array",
+    "kind": "struct",
+    "module": "Type",
+    "decl": "typedef struct { CN_TYPE_BASE;\n    Cn_Type *element_type;\n    int64_t length;\n} Cn_Type_Array",
+    "summary": "Definition of array type.",
+    "description": "",
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "Cn_Type_Enum_Member",
+    "kind": "struct",
+    "module": "Type",
+    "decl": "typedef struct {\n    Cn_String name;\n    int64_t value;\n} Cn_Type_Enum_Member",
+    "summary": "Definition of enum member.",
+    "description": "",
+    "tags": [
+      { "kind": "NOTE", "text": "It's not a type, used similarly to `Cn_Type_Function_Param`." },
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "Cn_Type_Enum",
+    "kind": "struct",
+    "module": "Type",
+    "decl": "typedef struct { CN_TYPE_BASE;\n    Cn_String tag;\n\n    Cn_Type *member_type;\n\n    int64_t members_length;\n    Cn_Type_Enum_Member *members;\n} Cn_Type_Enum",
+    "summary": "Definition of enum type.",
+    "description": "",
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "Cn_Type_Qualified",
+    "kind": "struct",
+    "module": "Type",
+    "decl": "typedef struct { CN_TYPE_BASE;\n    Cn_Type *base_type;\n} Cn_Type_Qualified",
+    "summary": "Definition of qualified type.",
+    "description": "In this type universe, qualifiers `const`, `_Atomic`, etc...\nare stored as type wrappers around base type. The reason this is done is\ndue to how C type completion for tagged types is set up.",
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "cn_type",
+    "kind": "union",
+    "module": "Type",
+    "decl": "union cn_type {\n    CN_TYPE_BASE;\n    Cn_Type_Integer   integer;\n    Cn_Type_Pointer   pointer;\n    Cn_Type_Function  function;\n    Cn_Type_Struct    struct_t;\n    Cn_Type_Union     union_t;\n    Cn_Type_Array     array;\n    Cn_Type_Enum      enum_t;\n    Cn_Type_Qualified qualified;\n}",
+    "summary": "Definition of all types union.",
+    "description": "",
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "CN_TYPE_INT",
+    "kind": "variable",
+    "module": "Type",
+    "decl": "extern const Cn_Type CN_TYPE_INT",
+    "summary": "Constant struct of 32 bit signed integer `int` type.",
+    "description": "",
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "CN_TYPE_FLOAT",
+    "kind": "variable",
+    "module": "Type",
+    "decl": "extern const Cn_Type CN_TYPE_FLOAT",
+    "summary": "Constant struct of 32 bit float `float` type.",
+    "description": "",
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "CN_TYPE_DOUBLE",
+    "kind": "variable",
+    "module": "Type",
+    "decl": "extern const Cn_Type CN_TYPE_DOUBLE",
+    "summary": "Constant struct of 64 bit float `double` type.",
+    "description": "",
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "CN_TYPE_CHAR",
+    "kind": "variable",
+    "module": "Type",
+    "decl": "extern const Cn_Type CN_TYPE_CHAR",
+    "summary": "Constant struct of signed character `char` type.",
+    "description": "",
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "CN_TYPE_VOID",
+    "kind": "variable",
+    "module": "Type",
+    "decl": "extern const Cn_Type CN_TYPE_VOID",
+    "summary": "Constant struct of `void` type.",
+    "description": "",
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "CN_TYPE_PTRDIFF",
+    "kind": "variable",
+    "module": "Type",
+    "decl": "extern const Cn_Type CN_TYPE_PTRDIFF",
+    "summary": "Constant struct of `ptrdiff_t` type.",
+    "description": "",
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "CN_TYPE_SIZE",
+    "kind": "variable",
+    "module": "Type",
+    "decl": "extern const Cn_Type CN_TYPE_SIZE",
+    "summary": "Constant struct of `size_t` type.",
+    "description": "",
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "CN_TYPE_OPAQUE",
+    "kind": "variable",
+    "module": "Type",
+    "decl": "extern const Cn_Type CN_TYPE_OPAQUE",
+    "summary": "Constant struct of opaque type.",
+    "description": "",
+    "tags": [
+      { "kind": "IMPORTANT", "text": "Opaque types are kinda of hack for this library.\nAny opaque type encountered by the analyzer is \"trusted\". Meaning\nit would satisfy type checker no matter what happens." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -1229,7 +2428,8 @@
     "summary": "Makes pointer type that points to `type`.",
     "description": "",
     "tags": [
-      { "kind": "RETURNS", "text": "Pointer type struct with `type` as its base type." }
+      { "kind": "RETURNS", "text": "Pointer type struct with `type` as its base type." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -1241,7 +2441,8 @@
     "summary": "Makes qualified version of `type` with qualifier `flags`.",
     "description": "",
     "tags": [
-      { "kind": "RETURNS", "text": "Qualified type struct with `type` as its base type." }
+      { "kind": "RETURNS", "text": "Qualified type struct with `type` as its base type." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -1253,7 +2454,8 @@
     "summary": "Checks whether `type1` equals `type2`.",
     "description": "",
     "tags": [
-      { "kind": "RETURNS", "text": "`true` if types are identical, `false` otherwise." }
+      { "kind": "RETURNS", "text": "`true` if types are identical, `false` otherwise." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -1265,7 +2467,8 @@
     "summary": "Hashes `type`.",
     "description": "",
     "tags": [
-      { "kind": "RETURNS", "text": "Hash of the type." }
+      { "kind": "RETURNS", "text": "Hash of the type." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -1279,7 +2482,8 @@
     "tags": [
       { "kind": "PARAM", "text": "identifier: If not empty, inserted as a declarator name into the type, e.g. `int (*f)(void)`." },
       { "kind": "RETURNS", "text": "Resulting string, with `NULL` data if `buffer` is too small to hold it." },
-      { "kind": "IMPORTANT", "text": "`buffer` must be big enough to hold the string, otherwise an error is logged." }
+      { "kind": "IMPORTANT", "text": "`buffer` must be big enough to hold the string, otherwise an error is logged." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -1290,7 +2494,9 @@
     "decl": "void cn_type_print(const Cn_Type *type)",
     "summary": "Prints `type` to `stderr`, using `cn_type_stringify`.",
     "description": "",
-    "tags": [],
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
     "flags": []
   },
   {
@@ -1301,7 +2507,8 @@
     "summary": "Checks whether `type` is constant.",
     "description": "",
     "tags": [
-      { "kind": "RETURNS", "text": "`true` if type is constant, `false` otherwise." }
+      { "kind": "RETURNS", "text": "`true` if type is constant, `false` otherwise." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -1313,7 +2520,8 @@
     "summary": "Gets unqualified version of `type`.",
     "description": "",
     "tags": [
-      { "kind": "RETURNS", "text": "Unqualified version of the type." }
+      { "kind": "RETURNS", "text": "Unqualified version of the type." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -1325,7 +2533,8 @@
     "summary": "Checks whether `type` is arithmetic: integer or float, including complex.",
     "description": "",
     "tags": [
-      { "kind": "RETURNS", "text": "`true` if type is arithmetic, `false` otherwise." }
+      { "kind": "RETURNS", "text": "`true` if type is arithmetic, `false` otherwise." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -1337,7 +2546,8 @@
     "summary": "Checks whether value of type `from` can be assigned to value of type `to`.",
     "description": "",
     "tags": [
-      { "kind": "RETURNS", "text": "`true` if assignment is allowed, `false` otherwise." }
+      { "kind": "RETURNS", "text": "`true` if assignment is allowed, `false` otherwise." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -1349,7 +2559,8 @@
     "summary": "Checks whether types `a` and `b` are structurally compatible.",
     "description": "",
     "tags": [
-      { "kind": "RETURNS", "text": "`true` if types are compatible, `false` otherwise." }
+      { "kind": "RETURNS", "text": "`true` if types are compatible, `false` otherwise." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -1361,7 +2572,8 @@
     "summary": "Checks whether types `a` and `b` are structurally compatible, ignoring qualifiers.",
     "description": "",
     "tags": [
-      { "kind": "RETURNS", "text": "`true` if types are compatible, `false` otherwise." }
+      { "kind": "RETURNS", "text": "`true` if types are compatible, `false` otherwise." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -1375,7 +2587,8 @@
     "tags": [
       { "kind": "RETURNS", "text": "Type that has the greater arithmetic rank." },
       { "kind": "IMPORTANT", "text": "Expects `a` and `b` to be arithmetic types." },
-      { "kind": "NOTE", "text": "If either type is `CN_OPAQUE`, opaque type is returned, since its rank is unknown." }
+      { "kind": "NOTE", "text": "If either type is `CN_OPAQUE`, opaque type is returned, since its rank is unknown." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -1387,7 +2600,8 @@
     "summary": "Checks whether `type` is scalar: arithmetic, pointer or `bool`.",
     "description": "",
     "tags": [
-      { "kind": "RETURNS", "text": "`true` if type is scalar, `false` otherwise." }
+      { "kind": "RETURNS", "text": "`true` if type is scalar, `false` otherwise." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -1396,12 +2610,14 @@
     "kind": "function",
     "module": "Type",
     "decl": "Cn_Type *cn_type_intern(Cn_Type *type)",
-    "summary": "Interns `type` into the type universe of the current translation unit.",
-    "description": "Structurally equal types are stored only once, so interned types can be compared by pointer.",
+    "summary": "",
+    "description": "Interns `type` into the type universe of the current translation unit.\n\nStructurally equal types are stored only once, so interned types can be compared by pointer.",
     "tags": [
+      { "kind": "TODO", "text": "Move this into `analyze` section is `type` section ideally should remain stateless.\nAlso make sure if exposed to public API, that it properly handles interning of tagged types." },
       { "kind": "RETURNS", "text": "Interned type that is structurally equal to `type`, newly stored if it wasn't there yet." },
       { "kind": "IMPORTANT", "text": "Every type created outside the library, for example by analyze hooks,\nmust be interned before it is used, so it is deduplicated and properly rolled back." },
-      { "kind": "NOTE", "text": "`type` itself can be a temporary, it is copied when stored." }
+      { "kind": "NOTE", "text": "`type` itself can be a temporary, it is copied when stored." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -2532,7 +3748,7 @@
     "symbol": "cn_parse_expect",
     "kind": "function",
     "module": "Parse",
-    "decl": "bool cn_parse_expect(Cn_Lexer *lexer, Cn_Token_Type type)",
+    "decl": "bool cn_parse_expect(Cn_Lexer *lexer, Cn_Token_Kind kind)",
     "summary": "Parses single token of expected `type`, reporting error diagnostic if token doesn't match.",
     "description": "",
     "tags": [
@@ -2544,7 +3760,7 @@
     "symbol": "cn_parse_optional",
     "kind": "function",
     "module": "Parse",
-    "decl": "bool cn_parse_optional(Cn_Lexer *lexer, Cn_Token_Type type)",
+    "decl": "bool cn_parse_optional(Cn_Lexer *lexer, Cn_Token_Kind kind)",
     "summary": "Parses single token of `type` if it is present, without reporting any error otherwise.",
     "description": "",
     "tags": [

@@ -63,7 +63,6 @@
         `get_`                          Getter interface, doesn't modify anything only provides ast introspection ability.
         `diagnostic_`                   Interface to produce variety of source based diagnostics.
         `binding_`                      Binding interface, it is resposible for all names that are glued to some type, handles binding operations.
-        `message_`                      TEMPORARY: Interface to set up user hooks and send or receive messages between user and parser.
         `hook_`                         Interface to set up user hooks and send or receive messages between user and parser.
         `analyze_`                      Interface to perfom complex analysis on ast, typechecking, expression evaluation, etc.
         `emit_`                         Interface for C code emittion from Abstract Syntax Tree.
@@ -171,6 +170,11 @@
  * ============================================
  */
 
+/**
+ * Log levels that are given to each logged message.
+ *
+ * SINCE: 0.3.0 
+ */
 typedef enum {
     CN_INFO,
     CN_WARNING,
@@ -180,23 +184,36 @@ typedef enum {
 
 /**
  * Messages with a level below `cn_log_min_level` are suppressed by `cn_default_log_handler`.
+ *
+ * SINCE: 0.3.0
  */
 extern Cn_Log_Level cn_log_min_level;
 
+/**
+ * Type definition for log handler, `cn_log_handler` is declared with this type.
+ *
+ * SINCE: 0.3.0
+ */
 typedef void (Cn_Log_Handler)(Cn_Log_Level level, const char *format, va_list args);
 
 /**
  * Current log handler, set to `cn_default_log_handler` by default.
+ *
+ * SINCE: 0.3.0
  */
 extern Cn_Log_Handler *cn_log_handler;
 
 /**
  * Logs formatted message to `stderr`, prefixed with its log level.
+ *
+ * SINCE: 0.3.0
  */
 CNDEF Cn_Log_Handler cn_default_log_handler;
 
 /**
  * Ignores all incoming logs, doesn't output anything anywhere.
+ *
+ * SINCE: 0.3.0
  */
 CNDEF Cn_Log_Handler cn_null_log_handler;
 
@@ -214,12 +231,29 @@ CNDEF void cn_log(Cn_Log_Level level, const char *format, ...);
  * SECTION: Hashing
  * ============================================
  */
+
+/**
+ * Type definition for hashing functions.
+ *
+ * Should return `uint64_t` hash of the specified `data`.
+ *
+ * SINCE: 0.3.0
+ */
 typedef uint64_t (Cn_Hash_Function)(const void *data);
 
+/**
+ * Type definition for equals functions.
+ * 
+ * If `a == b` should return `true`, false otherwise.
+ *
+ * SINCE: 0.3.0
+ */
 typedef bool (Cn_Equals_Function)(const void *a, const void *b);
 
 /**
- * Hashes unsigned 64-bit integer using the splitmix64 algorithm.
+ * Hashes unsigned 64-bit integer using the `splitmix64` algorithm.
+ *
+ * RETURNS: Resulting hash.
  *
  * SINCE: 0.3.0
  */
@@ -230,12 +264,18 @@ CNDEF uint64_t cn_hash_u64(uint64_t value);
  *
  * NOTE: Wraps around `cn_hash_u64`.
  *
+ * RETURNS: Resulting hash.
+ *
  * SINCE: 0.3.0
  */
 CNDEF uint64_t cn_hash_ptr(void *ptr);
 
 /**
- * Hashes sequence of `length` bytes using the FNV-1a algorithm.
+ * Hashes sequence of `length` bytes using the `FNV-1a` algorithm.
+ *
+ * RETURNS: Resulting hash.
+ *
+ * SINCE: 0.3.0
  */
 CNDEF uint64_t cn_hash_bytes(void *data, int64_t length);
 
@@ -243,6 +283,10 @@ CNDEF uint64_t cn_hash_bytes(void *data, int64_t length);
  * Mixes two hashes `a` and `b` into one.
  *
  * NOTE: Order matters, bit shifts are used to ensure `cn_hash_mix(a, b) != cn_hash_mix(b, a)`.
+ *
+ * RETURNS: Resulting hash.
+ *
+ * SINCE: 0.3.0
  */
 CNDEF uint64_t cn_hash_mix(uint64_t a, uint64_t b);
 
@@ -250,10 +294,17 @@ CNDEF uint64_t cn_hash_mix(uint64_t a, uint64_t b);
  * ============================================
  * SECTION: String
  * ============================================
+ */
+
+/**
+ * Length based string definition.
  *
- * Length based strings behave like string views,
- * they are a simple structure of length and data,
- * with an interface to modify and use them in various ways.
+ * Length based strings are exactly the same as string views,
+ * they are a simple structure of `length` and `data`,
+ * paired with an interface to modify and use them in 
+ * various ways.
+ *
+ * SINCE: 0.3.0
  */
 typedef struct {
     int64_t length;
@@ -261,36 +312,45 @@ typedef struct {
 } Cn_String;
 
 /**
- * Constructs string view directly from its `length` and `data`.
+ * Constructs `Cn_String` directly from its `length` and `data`.
+ *
+ * SINCE: 0.3.0
  */
 #define CN_STR(length, data)            ((Cn_String) { (int64_t)length, (char *)data } )
 
 /**
- * Constructs string view directly from string `literal`.
+ * Constructs `Cn_String` directly from string `literal`.
+ *
+ * SINCE: 0.3.0
  */
 #define CN_STR_LIT(literal)             CN_STR(sizeof(literal) - 1, literal)
 
 /**
- * Constructs string view from a stack buffer filled with `literal`.
+ * Constructs `Cn_String` from a stack buffer filled with `literal`.
  *
  * Characters of `literal` are copied into a char array allocated on the stack,
  * so the resulting string can be modified.
  *
  * IMPORTANT: Buffer lives only until the end of the enclosing block.
+ *
+ * SINCE: 0.3.0
  */
 #define CN_STR_BUFFER(literal)          CN_STR(sizeof(literal) - 1, (char[]){literal})
 
 /**
- * Constructs string view from an empty stack buffer of `size` chars.
+ * Constructs `Cn_String` from an empty stack buffer of `size` chars.
  *
- * Works exactly like `CN_STR_BUFFER`, but doesn't take a literal or fill the buffer with any characters.
+ * Works exactly like `CN_STR_BUFFER`, but doesn't take a literal and fill the 
+ * buffer with any characters.
  *
  * IMPORTANT: Buffer lives only until the end of the enclosing block.
+ *
+ * SINCE: 0.3.0
  */
 #define CN_STR_BUFFER_EMPTY(size)       CN_STR(size, (char[size]){})
 
 /**
- * Unpacks string into its length and data components, for use with `%.*s` in formatting.
+ * Unpacks `Cn_String` into its length and data components, for use with `%.*s` in formatting.
  *
  * For example given string `str`:
  *
@@ -300,6 +360,8 @@ typedef struct {
  *
  * NOTE: Cast to `int` is required, because `%.*s` expects length of at most `INT_MAX`,
  * so string is truncated if its length exceeds `INT_MAX`.
+ *
+ * SINCE: 0.3.0
  */
 #define CN_STR_UNPACK(str)                  (int)((str).length), (str).data
 
@@ -308,9 +370,12 @@ typedef struct {
  *
  * RETURNS: `Cn_String` that points to the memory of `str` at index `start`, with length up until index `end`.
  *
- * IMPORTANT: Doesn't copy memory. If `str` memory is freed later, returned string will no longer point to valid memory.
+ * IMPORTANT: Doesn't copy memory. If `str` memory is freed later, 
+ * returned string will no longer point to valid memory.
  *
  * NOTE: Character at index `end` is not included, domain of the resulting substring is always `[start, end)`.
+ *
+ * SINCE: 0.3.0
  */
 CNDEF Cn_String cn_str_substring(Cn_String str, int64_t start, int64_t end);
 
@@ -320,6 +385,8 @@ CNDEF Cn_String cn_str_substring(Cn_String str, int64_t start, int64_t end);
  * Strings are compared through `cn_str_equals`.
  *
  * RETURNS: Index of the first character of the occurrence, otherwise `-1`.
+ *
+ * SINCE: 0.3.0
  */
 CNDEF int64_t cn_str_find_left(Cn_String str, Cn_String search);
 
@@ -329,6 +396,8 @@ CNDEF int64_t cn_str_find_left(Cn_String str, Cn_String search);
  * Strings are compared through `cn_str_equals`.
  *
  * RETURNS: Index of the first character of the occurrence, otherwise `-1`.
+ *
+ * SINCE: 0.3.0
  */
 CNDEF int64_t cn_str_find_right(Cn_String str, Cn_String search);
 
@@ -336,6 +405,8 @@ CNDEF int64_t cn_str_find_right(Cn_String str, Cn_String search);
  * Checks whether `str` ends with `end`.
  *
  * RETURNS: `true` if `str` ends with `end`, `false` otherwise.
+ *
+ * SINCE: 0.3.0
  */
 CNDEF bool cn_str_ends_with(Cn_String str, Cn_String end);
 
@@ -343,6 +414,8 @@ CNDEF bool cn_str_ends_with(Cn_String str, Cn_String end);
  * Checks whether `str` starts with `start`.
  *
  * RETURNS: `true` if `str` starts with `start`, `false` otherwise.
+ *
+ * SINCE: 0.3.0
  */
 CNDEF bool cn_str_starts_with(Cn_String str, Cn_String start);
 
@@ -350,6 +423,8 @@ CNDEF bool cn_str_starts_with(Cn_String str, Cn_String start);
  * Linearly searches for the first occurrence of char `symbol` in `str` from the left.
  *
  * RETURNS: Index of the occurrence, otherwise `-1`.
+ *
+ * SINCE: 0.3.0
  */
 CNDEF int64_t cn_str_find_char_left(Cn_String str, char symbol);
 
@@ -357,6 +432,8 @@ CNDEF int64_t cn_str_find_char_left(Cn_String str, char symbol);
  * Linearly searches for the first occurrence of char `symbol` in `str` from the right.
  *
  * RETURNS: Index of the occurrence, otherwise `-1`.
+ *
+ * SINCE: 0.3.0
  */
 CNDEF int64_t cn_str_find_char_right(Cn_String str, char symbol);
 
@@ -364,6 +441,8 @@ CNDEF int64_t cn_str_find_char_right(Cn_String str, char symbol);
  * Finds the first non-whitespace char in `str` from the left.
  *
  * RETURNS: Index of the first non-whitespace char, otherwise `-1`.
+ *
+ * SINCE: 0.3.0
  */
 CNDEF int64_t cn_str_find_non_whitespace_left(Cn_String str);
 
@@ -371,6 +450,8 @@ CNDEF int64_t cn_str_find_non_whitespace_left(Cn_String str);
  * Finds the first non-whitespace char in `str` from the right.
  *
  * RETURNS: Index of the first non-whitespace char, otherwise `-1`.
+ *
+ * SINCE: 0.3.0
  */
 CNDEF int64_t cn_str_find_non_whitespace_right(Cn_String str);
 
@@ -378,6 +459,8 @@ CNDEF int64_t cn_str_find_non_whitespace_right(Cn_String str);
  * Finds the first whitespace char in `str` from the left.
  *
  * RETURNS: Index of the first whitespace char, otherwise `-1`.
+ *
+ * SINCE: 0.3.0
  */
 CNDEF int64_t cn_str_find_whitespace_left(Cn_String str);
 
@@ -385,6 +468,8 @@ CNDEF int64_t cn_str_find_whitespace_left(Cn_String str);
  * Finds the first whitespace char in `str` from the right.
  *
  * RETURNS: Index of the first whitespace char, otherwise `-1`.
+ *
+ * SINCE: 0.3.0
  */
 CNDEF int64_t cn_str_find_whitespace_right(Cn_String str);
 
@@ -392,6 +477,8 @@ CNDEF int64_t cn_str_find_whitespace_right(Cn_String str);
  * Shortens `str` by excluding `count` chars from the left.
  *
  * RETURNS: Resulting string, pointing to the memory of `str`.
+ *
+ * SINCE: 0.3.0
  */
 CNDEF Cn_String cn_str_eat_chars(Cn_String str, int64_t count);
 
@@ -399,6 +486,8 @@ CNDEF Cn_String cn_str_eat_chars(Cn_String str, int64_t count);
  * Shortens `str` by excluding all whitespace chars from the left.
  *
  * RETURNS: Resulting string, pointing to the memory of `str`.
+ *
+ * SINCE: 0.3.0
  */
 CNDEF Cn_String cn_str_eat_spaces(Cn_String str);
 
@@ -408,6 +497,8 @@ CNDEF Cn_String cn_str_eat_spaces(Cn_String str);
  * The whitespace itself is not excluded.
  *
  * RETURNS: Resulting string, pointing to the memory of `str`.
+ *
+ * SINCE: 0.3.0
  */
 CNDEF Cn_String cn_str_eat_until_space(Cn_String str);
 
@@ -415,6 +506,8 @@ CNDEF Cn_String cn_str_eat_until_space(Cn_String str);
  * Gets first `count` chars of `str`.
  *
  * RETURNS: String that contains `count` chars from the left, pointing to the memory of `str`.
+ *
+ * SINCE: 0.3.0
  */
 CNDEF Cn_String cn_str_get_chars(Cn_String str, int64_t count);
 
@@ -422,6 +515,8 @@ CNDEF Cn_String cn_str_get_chars(Cn_String str, int64_t count);
  * Gets everything in `str` until the first whitespace.
  *
  * RETURNS: String that contains everything until a whitespace, not including the whitespace itself.
+ *
+ * SINCE: 0.3.0
  */
 CNDEF Cn_String cn_str_get_until_space(Cn_String str);
 
@@ -429,6 +524,8 @@ CNDEF Cn_String cn_str_get_until_space(Cn_String str);
  * Checks whether `str` is a valid symbol: a letter or `_`, followed by letters, digits or `_`.
  *
  * RETURNS: `true` if `str` contains only symbol chars, `false` otherwise.
+ *
+ * SINCE: 0.3.0
  */
 CNDEF bool cn_str_is_symbol(Cn_String str);
 
@@ -436,6 +533,8 @@ CNDEF bool cn_str_is_symbol(Cn_String str);
  * Checks whether `str` is an integer.
  *
  * RETURNS: `true` if `str` is an integer, `false` otherwise.
+ *
+ * SINCE: 0.3.0
  */
 CNDEF bool cn_str_is_int(Cn_String str);
 
@@ -443,6 +542,8 @@ CNDEF bool cn_str_is_int(Cn_String str);
  * Checks whether `str` is a float.
  *
  * RETURNS: `true` if `str` is a float, `false` otherwise.
+ *
+ * SINCE: 0.3.0
  */
 CNDEF bool cn_str_is_float(Cn_String str);
 
@@ -450,6 +551,8 @@ CNDEF bool cn_str_is_float(Cn_String str);
  * Parses integer from `str`.
  *
  * RETURNS: Integer parsed from the string.
+ *
+ * SINCE: 0.3.0
  */
 CNDEF int64_t cn_str_parse_int(Cn_String str);
 
@@ -457,6 +560,8 @@ CNDEF int64_t cn_str_parse_int(Cn_String str);
  * Parses float from `str`.
  *
  * RETURNS: Float parsed from the string.
+ *
+ * SINCE: 0.3.0
  */
 CNDEF float cn_str_parse_float(Cn_String str);
 
@@ -464,6 +569,8 @@ CNDEF float cn_str_parse_float(Cn_String str);
  * Counts occurrences of char `c` in `str`.
  *
  * RETURNS: Number of occurrences of `c` in the string.
+ *
+ * SINCE: 0.3.0
  */
 CNDEF int64_t cn_str_count_chars(Cn_String str, char c);
 
@@ -473,6 +580,8 @@ CNDEF int64_t cn_str_count_chars(Cn_String str, char c);
  * RETURNS: Pointer to `buffer`.
  *
  * IMPORTANT: `buffer` must have enough space to hold `str` data.
+ *
+ * SINCE: 0.3.0
  */
 CNDEF void *cn_str_copy_to(Cn_String str, void *buffer);
 
@@ -482,6 +591,8 @@ CNDEF void *cn_str_copy_to(Cn_String str, void *buffer);
  * RETURNS: String that corresponds to the formatted string, with `NULL` data if formatting failed.
  *
  * IMPORTANT: `buffer` must be big enough to hold the formatted string.
+ *
+ * SINCE: 0.3.0
  */
 CNDEF Cn_String cn_str_format(Cn_String buffer, char *format, ...);
 
@@ -489,6 +600,8 @@ CNDEF Cn_String cn_str_format(Cn_String buffer, char *format, ...);
  * Checks whether `str` is empty, by checking whether its length is `0`.
  *
  * RETURNS: `true` if string is empty, `false` otherwise.
+ *
+ * SINCE: 0.3.0
  */
 CNDEF bool cn_str_is_empty(Cn_String str);
 
@@ -496,6 +609,8 @@ CNDEF bool cn_str_is_empty(Cn_String str);
  * Compares `str1` and `str2`, checking for length equality first and then comparing char by char.
  *
  * RETURNS: `true` if strings are identical, `false` otherwise.
+ *
+ * SINCE: 0.3.0
  */
 CNDEF bool cn_str_is(Cn_String str1, Cn_String str2);
 
@@ -506,6 +621,8 @@ CNDEF bool cn_str_is(Cn_String str1, Cn_String str2);
  *
  * NOTE: Takes pointers to strings to be compatible with `Cn_Equals_Function`,
  * which allows it to be used in hash table and hash set.
+ *
+ * SINCE: 0.3.0
  */
 CNDEF bool cn_str_equals(const Cn_String *str1, const Cn_String *str2);
 
@@ -516,6 +633,8 @@ CNDEF bool cn_str_equals(const Cn_String *str1, const Cn_String *str2);
  *
  * NOTE: Takes pointer to string to be compatible with `Cn_Hash_Function`,
  * which allows it to be used in hash table and hash set.
+ *
+ * SINCE: 0.3.0
  */
 CNDEF uint64_t cn_str_hash(const Cn_String *str);
 
@@ -524,12 +643,30 @@ CNDEF uint64_t cn_str_hash(const Cn_String *str);
  * SECTION: String Builder
  * ============================================
  */
+
+/**
+ * Dynamic array based string builder definition.
+ *
+ * This is a simple string builder to provide tools for
+ * quick and dirty string formatting, concatenation and other
+ * important operations.
+ *
+ * IMPORTANT: For the certain capacities this string builder allocated on the stack.
+ * See `CN_SB_STACK_STORAGE_CAP` and `cn_sb_make` for more info.
+ *
+ * SINCE: 0.3.0
+ */
 typedef struct {
     int64_t capacity;
     int64_t length;
     char *data;
 } Cn_String_Builder;
 
+/**
+ * Maximum capacity under which string builder will be allocated on the stack.
+ *
+ * SINCE: 0.3.0
+ */
 #define CN_SB_STACK_STORAGE_CAP 32
 
 /**
@@ -540,27 +677,19 @@ typedef struct {
  * IMPORTANT: Lifetime of stack allocated string builder ends with the enclosing block.
  * If longer lifetime is needed, make sure to heap allocate the string builder,
  * or make sure it is resized to be heap allocated.
+ *
+ * SINCE: 0.3.0
  */
 #define cn_sb_make(cap) ((cap) <= CN_SB_STACK_STORAGE_CAP ? ((Cn_String_Builder) { CN_SB_STACK_STORAGE_CAP, 0, (char *)(char[CN_SB_STACK_STORAGE_CAP]){}}) : cn__sb_make(cap))
 
-/**
- * Constructs new heap allocated string builder with specified initial capacity.
- *
- * IMPORTANT: Expects `initial_capacity > CN_SB_STACK_STORAGE_CAP`.
- */
 CNDEF Cn_String_Builder cn__sb_make(int64_t initial_capacity);
-
-/**
- * Grows capacity of `sb`, so it can hold at least `required_length` bytes.
- *
- * Does nothing if it already fits.
- */
-CNDEF void cn__sb_resize_to_fit(Cn_String_Builder *sb, int64_t required_length);
 
 /**
  * Frees heap memory occupied by `sb`.
  *
  * Memory is freed only if capacity is bigger than `CN_SB_STACK_STORAGE_CAP`.
+ *
+ * SINCE: 0.3.0
  */
 CNDEF void cn_sb_free(Cn_String_Builder *sb);
 
@@ -568,31 +697,43 @@ CNDEF void cn_sb_free(Cn_String_Builder *sb);
  * Clears all contents of `sb`, by setting its length to `0`.
  *
  * Doesn't allocate or free any memory.
+ *
+ * SINCE: 0.3.0
  */
 CNDEF void cn_sb_clear(Cn_String_Builder *sb);
 
 /**
  * Appends char `c` to `sb`.
+ *
+ * SINCE: 0.3.0
  */
 CNDEF void cn_sb_append_char(Cn_String_Builder *sb, char c);
 
 /**
  * Appends `str` to `sb`.
+ *
+ * SINCE: 0.3.0
  */
 CNDEF void cn_sb_append_str(Cn_String_Builder *sb, Cn_String str);
 
 /**
  * Inserts `str` at the front of `sb`, shifting existing contents to the right.
+ *
+ * SINCE: 0.3.0
  */
 CNDEF void cn_sb_prepend_str(Cn_String_Builder *sb, Cn_String str);
 
 /**
  * Formats string and appends the output to `sb`.
+ *
+ * SINCE: 0.3.0
  */
 CNDEF void cn_sb_append_format(Cn_String_Builder *sb, char *format, ...);
 
 /**
  * Reverses contents of `sb`.
+ *
+ * SINCE: 0.3.0
  */
 CNDEF void cn_sb_reverse(Cn_String_Builder *sb);
 
@@ -601,9 +742,10 @@ CNDEF void cn_sb_reverse(Cn_String_Builder *sb);
  *
  * RETURNS: String pointing to the contents of `sb`.
  *
- * IMPORTANT: If `sb` is freed or grows, memory pointed to by the string might be invalid.
+ * IMPORTANT: If `sb` is freed or grows, memory pointed to by the string might be invalid. 
+ * Contents of the returned string can be copied elsewhere to prevent such invalidation.
  *
- * NOTE: Contents of the returned string can be copied elsewhere to prevent such invalidation.
+ * SINCE: 0.3.0
  */
 CNDEF Cn_String cn_sb_to_str(Cn_String_Builder *sb);
 
@@ -611,6 +753,47 @@ CNDEF Cn_String cn_sb_to_str(Cn_String_Builder *sb);
  * ============================================
  * SECTION: Allocator
  * ============================================
+ */
+
+#include <stdlib.h>
+
+/**
+ * Forward declaration of `cn_allocator`.
+ *
+ * SINCE: 0.3.0
+ */
+typedef struct cn_allocator Cn_Allocator;
+
+/**
+ * Type defintion of allocator alloc.
+ *
+ * SINCE: 0.3.0
+ */
+typedef CNDEF void *(Cn_Alloc)(Cn_Allocator *allocator, size_t size);
+
+/**
+ * Type defintion of allocator realloc.
+ *
+ * SINCE: 0.3.0
+ */
+typedef CNDEF void *(Cn_Realloc)(Cn_Allocator *allocator, void *mem, size_t new_size);
+
+/**
+ * Type defintion of allocator free.
+ *
+ * SINCE: 0.3.0
+ */
+typedef CNDEF void (Cn_Free)(Cn_Allocator *allocator, void *mem);
+
+/**
+ * Type defintion of allocator free all.
+ *
+ * SINCE: 0.3.0
+ */
+typedef CNDEF void (Cn_Free_All)(Cn_Allocator *allocator);
+
+/**
+ * Base members definition for allocators.
  *
  * This library uses a variety of allocators: arenas, pools, block allocators, etc.
  * But it also doesn't want to introduce extra complexity regarding usage of such allocators,
@@ -633,34 +816,42 @@ CNDEF Cn_String cn_sb_to_str(Cn_String_Builder *sb);
  *
  * Switching the global allocator then becomes as simple as setting the global allocator variable,
  * and separate allocators for different parts of the library can be replaced too.
+ *
+ * SINCE: 0.3.0
  */
-
-#include <stdlib.h>
-
-typedef union cn_allocator Cn_Allocator;
-
-typedef CNDEF void *(Cn_Alloc)(Cn_Allocator *allocator, size_t size);
-typedef CNDEF void *(Cn_Realloc)(Cn_Allocator *allocator, void *mem, size_t new_size);
-typedef CNDEF void (Cn_Free)(Cn_Allocator *allocator, void *mem);
-typedef CNDEF void (Cn_Free_All)(Cn_Allocator *allocator);
-
 #define CN_ALLOCATOR_BASE_MEMBERS   \
     Cn_Alloc        *alloc;         \
     Cn_Realloc      *realloc;       \
     Cn_Free         *free;          \
     Cn_Free_All     *free_all;      \
 
-typedef struct {
+/**
+ * Allocator definition.
+ *
+ * SINCE: 0.3.0
+ */
+struct cn_allocator {
     CN_ALLOCATOR_BASE_MEMBERS
-} Cn_Allocator_Base;
+};
 
+/**
+ * Allocator base that is added to each allocator struct definition.
+ *
+ * SINCE: 0.3.0
+ */
 #define CN_ALLOCATOR_BASE                       \
     union {                                     \
-        Cn_Allocator_Base base;                 \
+        Cn_Allocator base;                      \
         struct { CN_ALLOCATOR_BASE_MEMBERS };   \
     }
 
-
+/**
+ * Arena, linearly gives memory from the pre-allocated block.
+ *
+ * All memory is freed at once, and error will be issued if overflow occurs.
+ *
+ * SINCE: 0.3.0
+ */
 typedef struct { CN_ALLOCATOR_BASE;
     size_t capacity;
     void *allocation;
@@ -671,6 +862,8 @@ typedef struct { CN_ALLOCATOR_BASE;
  * Constructs arena and allocates `capacity` bytes of memory for it.
  *
  * RETURNS: New arena, zeroed out if memory couldn't be allocated.
+ *
+ * SINCE: 0.3.0
  */
 CNDEF Cn_Arena cn_arena_make(size_t capacity);
 
@@ -678,6 +871,8 @@ CNDEF Cn_Arena cn_arena_make(size_t capacity);
  * Allocates next chunk of `size` bytes from `arena`.
  *
  * RETURNS: Pointer to the allocated memory, `NULL` if allocation exceeds arena's capacity.
+ *
+ * SINCE: 0.3.0
  */
 CNDEF void *cn_arena_alloc(Cn_Arena *arena, size_t size);
 
@@ -689,6 +884,8 @@ CNDEF void *cn_arena_alloc(Cn_Arena *arena, size_t size);
  * RETURNS: Pointer to the new chunk of memory.
  *
  * IMPORTANT: Contents of `mem` are not copied into the new chunk.
+ *
+ * SINCE: 0.3.0
  */
 CNDEF void *cn_arena_realloc(Cn_Arena *arena, void *mem, size_t new_size);
 
@@ -696,6 +893,8 @@ CNDEF void *cn_arena_realloc(Cn_Arena *arena, void *mem, size_t new_size);
  * Stubbed out, since arena cannot free previously allocated memory.
  *
  * NOTE: Logs a warning when called, use `cn_arena_free_all` or `cn_arena_destroy` instead.
+ *
+ * SINCE: 0.3.0
  */
 CNDEF void cn_arena_free(Cn_Arena *arena, void *mem);
 
@@ -703,14 +902,17 @@ CNDEF void cn_arena_free(Cn_Arena *arena, void *mem);
  * Releases all allocations of `arena` at once, by resetting it to the beginning of its memory.
  *
  * Arena memory itself stays allocated and can be reused.
+ *
+ * SINCE: 0.3.0
  */
 CNDEF void cn_arena_free_all(Cn_Arena *arena);
 
 /**
  * Completely destroys `arena` and frees all memory occupied by it.
+ *
+ * SINCE: 0.3.0
  */
 CNDEF void cn_arena_destroy(Cn_Arena *arena);
-
 
 /**
  * Chained arena is an allocator that linearly hands out memory and allocates next block when needed.
@@ -736,14 +938,28 @@ CNDEF void cn_arena_destroy(Cn_Arena *arena);
  * Every block carries its own capacity, which normally is the `block_capacity` set by the user.
  * An allocation that doesn't fit in a regular block gets an oversized block of exactly its size,
  * so no allocation is ever refused because of the `block_capacity` chosen.
+ *
+ * SINCE: 0.3.0
  */
 typedef struct { CN_ALLOCATOR_BASE;
     size_t block_capacity;
     void  *block;
 } Cn_Chained_Arena;
 
+/**
+ * Each block allocated by `Cn_Chained_Arena` contains a header.
+ * This macro gets this information from the specific block.
+ *
+ * SINCE: 0.3.0
+ */
 #define CN_CHAINED_ARENA_BLOCK_HEADER(block) ((Cn_Chained_Arena_Block_Header *)((uint8_t *)(block) - sizeof(Cn_Chained_Arena_Block_Header)))
 
+/**
+ * Definition of the block header that is allocated by `Cn_Chained_Arena` 
+ * for each block.
+ *
+ * SINCE: 0.3.0
+ */
 typedef struct {
     void  *prev;
     void  *next;
@@ -753,6 +969,10 @@ typedef struct {
 
 /**
  * Constructs chained arena, allocating its first block of `block_capacity` bytes.
+ *
+ * RETURNS: New chained arena.
+ *
+ * SINCE: 0.3.0
  */
 CNDEF Cn_Chained_Arena cn_chained_arena_make(size_t block_capacity);
 
@@ -763,6 +983,8 @@ CNDEF Cn_Chained_Arena cn_chained_arena_make(size_t block_capacity);
  *
  * NOTE: If `size` is bigger than the arena's `block_capacity`, an oversized block of exactly
  * that size is allocated to hold it, and a warning is logged.
+ *
+ * SINCE: 0.3.0
  */
 CNDEF void *cn_chained_arena_alloc(Cn_Chained_Arena *arena, size_t size);
 
@@ -774,6 +996,8 @@ CNDEF void *cn_chained_arena_alloc(Cn_Chained_Arena *arena, size_t size);
  * RETURNS: Pointer to the new chunk of memory.
  *
  * IMPORTANT: Contents of `mem` are not copied into the new chunk.
+ *
+ * SINCE: 0.3.0
  */
 CNDEF void *cn_chained_arena_realloc(Cn_Chained_Arena *arena, void *mem, size_t new_size);
 
@@ -781,6 +1005,8 @@ CNDEF void *cn_chained_arena_realloc(Cn_Chained_Arena *arena, void *mem, size_t 
  * Stubbed out, since arena cannot free previously allocated memory.
  *
  * NOTE: Use `cn_chained_arena_dealloc`, `cn_chained_arena_free_all` or `cn_chained_arena_destroy` instead.
+ *
+ * SINCE: 0.3.0
  */
 CNDEF void cn_chained_arena_free(Cn_Chained_Arena *arena, void *mem);
 
@@ -788,6 +1014,8 @@ CNDEF void cn_chained_arena_free(Cn_Chained_Arena *arena, void *mem);
  * Releases all allocations of `arena` at once, by resetting every block and returning to the first one.
  *
  * Blocks themselves stay allocated and are reused by later allocations.
+ *
+ * SINCE: 0.3.0
  */
 CNDEF void cn_chained_arena_free_all(Cn_Chained_Arena *arena);
 
@@ -796,6 +1024,8 @@ CNDEF void cn_chained_arena_free_all(Cn_Chained_Arena *arena);
  *
  * If `size` covers a whole block, arena moves back to the previous block.
  * Emptied blocks stay allocated and are reused by later allocations.
+ *
+ * SINCE: 0.3.0
  */
 CNDEF void cn_chained_arena_dealloc(Cn_Chained_Arena *arena, size_t size);
 
@@ -811,6 +1041,8 @@ CNDEF void cn_chained_arena_dealloc(Cn_Chained_Arena *arena, size_t size);
  *
  * NOTE: Returns properly whenever `allocation_ptr` points to memory held by the arena,
  * even if it isn't the exact address returned by an allocation.
+ *
+ * SINCE: 0.3.0
  */
 CNDEF int64_t cn_chained_arena_allocation_info(Cn_Chained_Arena *arena, void *allocation_ptr, size_t *offset);
 
@@ -818,16 +1050,63 @@ CNDEF int64_t cn_chained_arena_allocation_info(Cn_Chained_Arena *arena, void *al
  * Computes total size allocated by `arena`.
  *
  * RETURNS: Total allocated size in bytes.
+ *
+ * SINCE: 0.3.0
  */
 CNDEF size_t cn_chained_arena_allocated(Cn_Chained_Arena *arena);
 
+/**
+ * For each loop macro to linearly iterate items in the block.
+ *
+ * SINCE: 0.3.0
+ */
 #define cn_chained_arena_foreach_in_block(type, it, block) for (type *it = (type *)(block); (uint8_t *)it <= (uint8_t *)(block) + CN_CHAINED_ARENA_BLOCK_HEADER(block)->allocated - sizeof(type); it++)
 
 /**
  * Completely destroys `arena` and frees all memory occupied by it.
+ *
+ * SINCE: 0.3.0
  */
 CNDEF void cn_chained_arena_destroy(Cn_Chained_Arena *arena);
 
+/**
+ * Maximum capacity of a single pool block.
+ *
+ * SINCE: 0.3.0
+ */
+#define CN_POOL_BLOCK_MAX_CAPACITY 4096
+
+/**
+ * Minimum capacity of a single pool block.
+ *
+ * SINCE: 0.3.0
+ */
+#define CN_POOL_BLOCK_MIN_CAPACITY 8
+
+/**
+ * Forward declaration of `cn_pool_block`.
+ *
+ * SINCE: 0.3.0
+ */
+typedef struct cn_pool_block Cn_Pool_Block;
+
+/**
+ * Struct definition of single pool allocator block.
+ *
+ * MEMBER capacity: Capacity per allocation, `size_t` keeps mem aligned as malloc returned it.
+ *
+ * MEMBER flags: Bit flags, if bit set to, specific allocation is occupied.
+ *
+ * MEMBER mem: Whole allocation.
+ *
+ * SINCE: 0.3.0
+ */
+struct cn_pool_block {
+    Cn_Pool_Block *next;
+    size_t capacity;
+    uint8_t flags[CN_POOL_BLOCK_MAX_CAPACITY / CN_POOL_BLOCK_MIN_CAPACITY / 8];
+    uint8_t mem[CN_POOL_BLOCK_MAX_CAPACITY];
+};
 
 /**
  * Pool is an allocator that hands out fixed size slots cut from pre-divided blocks.
@@ -865,19 +1144,9 @@ CNDEF void cn_chained_arena_destroy(Cn_Chained_Arena *arena);
  *
  * IMPORTANT: Pool must not outlive the supplied array. `cn_pool_make` used with a compound literal
  * inside a function is only valid until the end of the enclosing block.
+ *
+ * SINCE: 0.3.0
  */
-#define CN_POOL_BLOCK_MAX_CAPACITY 4096
-#define CN_POOL_BLOCK_MIN_CAPACITY 8
-
-typedef struct cn_pool_block Cn_Pool_Block;
-
-struct cn_pool_block {
-    Cn_Pool_Block *next;
-    size_t capacity; // Capacity per allocation, size_t keeps mem aligned as malloc returned it.
-    uint8_t flags[CN_POOL_BLOCK_MAX_CAPACITY / CN_POOL_BLOCK_MIN_CAPACITY / 8]; // Bit flags, if bit set to, specific allocation is occupied.
-    uint8_t mem[CN_POOL_BLOCK_MAX_CAPACITY]; // Total allocation.
-};
-
 typedef struct { CN_ALLOCATOR_BASE;
     Cn_Pool_Block **blocks;
     size_t blocks_length;
@@ -885,6 +1154,8 @@ typedef struct { CN_ALLOCATOR_BASE;
 
 /**
  * Number of slots a block of given capacity is divided into.
+ *
+ * SINCE: 0.3.0
  */
 #define CN_POOL_BLOCK_SLOTS(block) (CN_POOL_BLOCK_MAX_CAPACITY / (block)->capacity)
 
@@ -895,6 +1166,8 @@ typedef struct { CN_ALLOCATOR_BASE;
  * and not bigger than `CN_POOL_BLOCK_MAX_CAPACITY`.
  *
  * IMPORTANT: Assumes `sizeof(size_t) == sizeof(void *)`, because it reuses the supplied array of capacities.
+ *
+ * SINCE: 0.3.0
  */
 #define cn_pool_make(...) cn__pool_make((size_t []) { __VA_ARGS__ }, (sizeof((size_t []) { __VA_ARGS__ }) / sizeof(size_t)))
 
@@ -906,6 +1179,8 @@ CNDEF Cn_Pool cn__pool_make(size_t capacities[], size_t capacities_length);
  * Slot is taken from the smallest size class that fits the requested `size`.
  *
  * RETURNS: Pointer to the allocated slot.
+ *
+ * SINCE: 0.3.0
  */
 CNDEF void *cn_pool_alloc(Cn_Pool *pool, size_t size);
 
@@ -916,6 +1191,8 @@ CNDEF void *cn_pool_alloc(Cn_Pool *pool, size_t size);
  * If `mem` is `NULL`, works like `cn_pool_alloc`.
  *
  * RETURNS: Pointer to the reallocated memory, `NULL` if `mem` wasn't allocated by `pool`.
+ *
+ * SINCE: 0.3.0
  */
 CNDEF void *cn_pool_realloc(Cn_Pool *pool, void *mem, size_t new_size);
 
@@ -923,11 +1200,15 @@ CNDEF void *cn_pool_realloc(Cn_Pool *pool, void *mem, size_t new_size);
  * Frees slot of memory `mem` from `pool`.
  *
  * NOTE: Does nothing if `mem` is `NULL`, logs a warning if `mem` wasn't allocated by `pool`.
+ *
+ * SINCE: 0.3.0
  */
 CNDEF void cn_pool_free(Cn_Pool *pool, void *mem);
 
 /**
  * Marks every slot of every block as free, keeping the blocks themselves allocated.
+ *
+ * SINCE: 0.3.0
  */
 CNDEF void cn_pool_free_all(Cn_Pool *pool);
 
@@ -944,6 +1225,8 @@ CNDEF void cn_pool_free_all(Cn_Pool *pool);
  *
  * NOTE: Returns properly whenever `allocation_ptr` points to the beginning of an occupied slot,
  * even if it isn't the exact address returned by an allocation.
+ *
+ * SINCE: 0.3.0
  */
 CNDEF Cn_Pool_Block *cn_pool_allocation_info(Cn_Pool *pool, void *allocation_ptr, size_t *slot);
 
@@ -951,25 +1234,25 @@ CNDEF Cn_Pool_Block *cn_pool_allocation_info(Cn_Pool *pool, void *allocation_ptr
  * Completely destroys `pool` and frees all memory occupied by it.
  *
  * NOTE: Supplied array of capacities is not freed, since pool doesn't own it.
+ *
+ * SINCE: 0.3.0
  */
 CNDEF void cn_pool_destroy(Cn_Pool *pool);
 
-
-union cn_allocator {
-    CN_ALLOCATOR_BASE;
-    Cn_Arena arena;
-    Cn_Chained_Arena chained_arena;
-    Cn_Pool pool;
-};
-
-extern Cn_Allocator cn_std_allocator;
-
-extern Cn_Allocator *cn_default_allocator;
+/**
+ * Default allocator that this library uses for most of the allocations.
+ * See `CN_REALLOC` and `CN_FREE`.
+ *
+ * SINCE: 0.3.0
+ */
+extern Cn_Allocator *cn_allocator;
 
 /**
  * Calls `alloc` of `allocator`, passing the allocator itself as a parameter.
  *
  * RETURNS: Pointer to the allocated memory.
+ *
+ * SINCE: 0.3.0
  */
 CNDEF void *cn_alloc(Cn_Allocator *allocator, size_t size);
 
@@ -977,26 +1260,50 @@ CNDEF void *cn_alloc(Cn_Allocator *allocator, size_t size);
  * Calls `realloc` of `allocator`, passing the allocator itself as a parameter.
  *
  * RETURNS: Pointer to the reallocated memory.
+ *
+ * SINCE: 0.3.0
  */
 CNDEF void *cn_realloc(Cn_Allocator *allocator, void *mem, size_t size);
 
 /**
  * Calls `free` of `allocator`, passing the allocator itself as a parameter.
+ *
+ * SINCE: 0.3.0
  */
 CNDEF void cn_free(Cn_Allocator *allocator, void *mem);
 
 /**
  * Calls `free_all` of `allocator`, passing the allocator itself as a parameter.
+ *
+ * SINCE: 0.3.0
  */
 CNDEF void cn_free_all(Cn_Allocator *allocator);
 
-#define CN_REALLOC(mem, size) cn_realloc(cn_default_allocator, (mem), (size))
-#define CN_FREE(mem) cn_free(cn_default_allocator, (mem))
+/**
+ * Realloc wrapper that uses `cn_allocator` underneath.
+ *
+ * SINCE: 0.3.0
+ */
+#define CN_REALLOC(mem, size)   cn_realloc(cn_allocator, (mem), (size))
+
+/**
+ * Free wrapper that uses `cn_allocator` underneath.
+ *
+ * SINCE: 0.3.0
+ */
+#define CN_FREE(mem)            cn_free(cn_allocator, (mem))
 
 /**
  * ============================================
  * SECTION: Array List
  * ============================================
+ */
+
+/**
+ * Array list header that is allocated before allocation block to store 
+ * all of the important array list information.
+ *
+ * SINCE: 0.3.0
  */
 typedef struct {
     int64_t capacity;
@@ -1007,31 +1314,41 @@ typedef struct {
 /**
  * Makes new array list allocated dynamically with a `Cn_Array_List_Header` included.
  * 
- * RETURNS: Pointer of specified `type` that can passed to `cn_array_*` functionality.
+ * RETURNS: Pointer of specified `type` that can passed to `cn_array_list_*` functionality.
+ *
+ * SINCE: 0.3.0
  */
 #define cn_array_list_make(type, capacity)\
     (type *)cn__array_list_make(sizeof(type), capacity)
 
 /**
- * RETURNS: `int64_t` length of an array.
+ * RETURNS: `int64_t` length of an array list.
+ *
+ * SINCE: 0.3.0
  */
 #define cn_array_list_length(ptr_list)\
     cn__array_list_length((void *)*ptr_list)
 
 /**
- * RETURNS: `int64_t` capacity of an array.
+ * RETURNS: `int64_t` capacity of an array list.
+ *
+ * SINCE: 0.3.0
  */
 #define cn_array_list_capacity(ptr_list)\
     cn__array_list_capacity((void *)*ptr_list)
 
 /**
- * RETURNS: `int64_t` item size of an array.
+ * RETURNS: `int64_t` item size of an array list.
+ *
+ * SINCE: 0.3.0
  */
 #define cn_array_list_item_size(ptr_list)\
     cn__array_list_item_size((void *)*ptr_list)
 
 /**
  * Appends `item` to the specified array list.
+ *
+ * SINCE: 0.3.0
  */
 #define cn_array_list_append(ptr_list, item)\
     do {\
@@ -1042,12 +1359,16 @@ typedef struct {
 
 /**
  * Appends array of items, `item_arr`, to the specified array list.
+ *
+ * SINCE: 0.3.0
  */
 #define cn_array_list_append_multiple(ptr_list, item_arr, count)\
     cn__array_list_append_multiple((void **)ptr_list, (void *)item_arr, count)
 
 /**
  * Adds `item` to the specified `index` in array list, shifting all other items one place to the right.
+ *
+ * SINCE: 0.3.0
  */
 #define cn_array_list_add(ptr_list, index, item)\
     do {\
@@ -1057,18 +1378,24 @@ typedef struct {
 
 /**
  * Removes last item from specified array list.
+ *
+ * SINCE: 0.3.0
  */
 #define cn_array_list_pop(ptr_list)\
     cn__array_list_pop((void *)*ptr_list, 1)
 
 /**
  * Removes `count` of items from the end of specified array list.
+ *
+ * SINCE: 0.3.0
  */
 #define cn_array_list_pop_multiple(ptr_list, count)\
     cn__array_list_pop((void *)*ptr_list, count)
 
 /**
  * Sets array list length to `0`, clearing all its items.
+ *
+ * SINCE: 0.3.0
  */
 #define cn_array_list_clear(ptr_list)\
     cn__array_list_clear((void *)*ptr_list)
@@ -1076,12 +1403,16 @@ typedef struct {
 /**
  * Removes item at `index` from the specified array list in constant time,
  * by swapping item with the last item, and decreasing length by -1.
+ *
+ * SINCE: 0.3.0
  */
 #define cn_array_list_unordered_remove(ptr_list, index)\
     cn__array_list_unordered_remove((void *)*ptr_list, index)
 
 /**
- * Frees all memory occupied the array list.
+ * Frees all memory occupied by the array list.
+ *
+ * SINCE: 0.3.0
  */
 #define cn_array_list_free(ptr_list)\
     cn__array_list_free((void **)ptr_list)
@@ -1113,6 +1444,13 @@ CNDEF void cn__array_list_free(void **list);
  * SECTION: Hash Table 
  * ============================================
  */
+
+/**
+ * Hash table header that is allocated before allocation block to store 
+ * all of the important hast table information.
+ *
+ * SINCE: 0.3.0
+ */
 typedef struct {
     int64_t capacity;
     int64_t count;
@@ -1123,48 +1461,114 @@ typedef struct {
     float load_factor;
 } Cn_Hash_Table_Header;
 
+/**
+ * Possible states that slots in hash table can contain.
+ *
+ * SINCE: 0.3.0
+ */
 typedef enum {
     CN_HASH_TABLE_SLOT_EMPTY,
     CN_HASH_TABLE_SLOT_OCCUPIED,
     CN_HASH_TABLE_SLOT_DELETED,
 } Cn_Hash_Table_Slot_State;
 
+/**
+ * Definition of a hash table slot.
+ *
+ * SINCE: 0.3.0
+ */
 typedef struct {
     Cn_Hash_Table_Slot_State state;
     uint64_t hash;
 } Cn_Hash_Table_Slot;
 
+/**
+ * Makes new hash table allocated dynamically with a `Cn_Hash_Table_Header` included.
+ *
+ * RETURNS: Pointer of specified `type` that can passed to `cn_hash_table_*` functionality.
+ *
+ * SINCE: 0.3.0
+ */
 #define cn_hash_table_make(key_type, value_type, capacity, hash_func, equals_func)\
     (value_type *)cn__hash_table_make(sizeof(key_type), sizeof(value_type), capacity, hash_func, equals_func) 
 
+/**
+ * Given the pointer to the hash table, gets its header.
+ *
+ * RETURNS: `Cn_Hash_Table_Header *` pointer to the table's header.
+ *
+ * SINCE: 0.3.0
+ */
+#define cn_hash_table_header(table_ptr)\
+    ((Cn_Hash_Table_Header *)((uint8_t *)*table_ptr - sizeof(Cn_Hash_Table_Header)))
+
+/**
+ * RETURNS: `int64_t` count of a hash table.
+ *
+ * SINCE: 0.3.0
+ */
 #define cn_hash_table_count(ptr_table)\
     cn__hash_table_count((void *)*ptr_table)
 
+/**
+ * RETURNS: `int64_t` capacity of a hash table.
+ *
+ * SINCE: 0.3.0
+ */
 #define cn_hash_table_capacity(ptr_table)\
     cn__hash_table_capacity((void *)*ptr_table)
 
+/**
+ * RETURNS: `int64_t` item size of a hash table.
+ *
+ * SINCE: 0.3.0
+ */
 #define cn_hash_table_item_size(ptr_table)\
     cn__hash_table_item_size((void *)*ptr_table)
 
+/**
+ * Puts `item` into the hash table, using hash of the speicified key.
+ *
+ * SINCE: 0.3.0
+ */
 #define cn_hash_table_put(ptr_table, item, ptr_key)\
     do {\
         cn__hash_table_resize_to_fit((void **)(ptr_table), cn_hash_table_count(ptr_table) + 1);\
         (*ptr_table)[cn__hash_table_push_key((void **)(ptr_table), ptr_key)] = item;\
     } while(0)
 
+/**
+ * Gets `item` from the hash table, by the hash of its key.
+ * 
+ * RETURNS: Pointer to the `item` if found, `NULL` if `item` was not found.
+ *
+ * SINCE: 0.3.0
+ */
 #define cn_hash_table_get(ptr_table, ptr_key)\
     cn__hash_table_get((void **)(ptr_table), ptr_key)
 
+/**
+ * Removes `item` from the hash table, by the hash of its key.
+ *
+ * SINCE: 0.3.0
+ */
 #define cn_hash_table_remove(ptr_table, ptr_key)\
     cn__hash_table_remove((void **)(ptr_table), ptr_key) 
 
+/**
+ * Frees all memory occupied by the hash table.
+ *
+ * SINCE: 0.3.0
+ */
 #define cn_hash_table_free(ptr_table)\
     cn__hash_table_free((void **)(ptr_table))
 
-#define cn_hash_table_header(table_ptr)\
-    ((Cn_Hash_Table_Header *)((uint8_t *)*table_ptr - sizeof(Cn_Hash_Table_Header)))
-
-CNDEF void cn_hash_table_print(FILE *f, void **table);
+/**
+ * Prints contents of the hash table to `out`.
+ *
+ * SINCE: 0.3.0
+ */
+CNDEF void cn_hash_table_print(FILE *out, void **table);
 
 CNDEF void *cn__hash_table_make(int64_t key_size, int64_t item_size, int64_t capacity, Cn_Hash_Function *hash_func, Cn_Equals_Function *equals_func);
 
@@ -1189,6 +1593,13 @@ CNDEF void cn__hash_table_free(void **table);
  * SECTION: Hash Set
  * ============================================
  */
+
+/**
+ * Hash set header that is allocated before allocation block to store 
+ * all of the important hast set information.
+ *
+ * SINCE: 0.3.0
+ */
 typedef struct {
     int64_t capacity;
     int64_t count;
@@ -1198,32 +1609,78 @@ typedef struct {
     float load_factor;
 } Cn_Hash_Set_Header;
 
+/**
+ * Possible states that slots in hash set can contain. Same as `Cn_Hash_Table_Slot_State`.
+ *
+ * SINCE: 0.3.0
+ */
 typedef enum {
     CN_HASH_SET_SLOT_EMPTY,
     CN_HASH_SET_SLOT_OCCUPIED,
     CN_HASH_SET_SLOT_DELETED,
 } Cn_Hash_Set_Slot_State;
 
+/**
+ * Definition of a hash set slot. Same as `Cn_Hash_Table_Slot`.
+ *
+ * SINCE: 0.3.0
+ */
 typedef struct {
     Cn_Hash_Set_Slot_State state;
     uint64_t hash;
 } Cn_Hash_Set_Slot;
 
+/**
+ * Makes new hash set allocated dynamically with a `Cn_Hash_Set_Header` included.
+ *
+ * RETURNS: Pointer of specified `type` that can passed to `cn_hash_set_*` functionality.
+ *
+ * SINCE: 0.3.0
+ */
 #define cn_hash_set_make(type, capacity, hash_func, equals_func)\
     (type *)cn__hash_set_make(sizeof(type), capacity, hash_func, equals_func) 
 
+/**
+ * Given the pointer to the hash set, gets its header.
+ *
+ * RETURNS: `Cn_Hash_Set_Header *` pointer to the set's header.
+ *
+ * SINCE: 0.3.0
+ */
 #define cn_hash_set_header(ptr_set)\
     ((Cn_Hash_Set_Header *)((uint8_t *)((*ptr_set) - 1) - sizeof(Cn_Hash_Set_Header)))
 
+/**
+ * Puts `item` into the hash set, using its hash.
+ *
+ * SINCE: 0.3.0
+ */
 #define cn_hash_set_put(ptr_set, item)\
     (*((*ptr_set) - 1) = item, cn__hash_set_put(cn_hash_set_header(ptr_set), (void **)ptr_set), *((*ptr_set) - 1))
 
+/**
+ * Checks if `item` is inside the hash set.
+ *
+ * RETURNS: `true` if item is found, `false` otherwise.
+ *
+ * SINCE: 0.3.0
+ */
 #define cn_hash_set_contains(ptr_set, item)\
     (*((*ptr_set) - 1) = item, cn__hash_set_contains(cn_hash_set_header(ptr_set)))
 
+/**
+ * Removes `item` from the hash set.
+ *
+ * SINCE: 0.3.0
+ */
 #define cn_hash_set_remove(ptr_set, item)\
     (*((*ptr_set) - 1) = item, cn__hash_set_remove(cn_hash_set_header(ptr_set)))
 
+/**
+ * Frees all memory occupied by the hash set.
+ *
+ * SINCE: 0.3.0
+ */
 #define cn_hash_set_free(ptr_set)\
     cn__hash_set_free(cn_hash_set_header(ptr_set))
 
@@ -1242,17 +1699,34 @@ CNDEF void cn__hash_set_free(Cn_Hash_Set_Header *header);
  * SECTION: Source & Location
  * ============================================
  */
-typedef struct {
-    Cn_String file;
-    int64_t line;
-    int64_t column;
-} Cn_Location;
 
+/**
+ * Struct definition that reprsents source location, 
+ * storing full information about source and offsets.
+ *
+ * Used to track source strings and print snippets.
+ *
+ * SINCE: 0.3.0
+ */
 typedef struct {
     Cn_String source;
     int64_t offset;
     int64_t length;
 } Cn_Source;
+
+/**
+ * Struct definition that represents file location, 
+ * storing `file:line:col:` values.
+ *
+ * Used to track file location for the diagnostics.
+ *
+ * SINCE: 0.3.0
+ */
+typedef struct {
+    Cn_String file;
+    int64_t line;
+    int64_t column;
+} Cn_Location;
 
 /**
  * Gets string of the source code that `src` points to.
@@ -1261,13 +1735,19 @@ typedef struct {
  *
  * NOTE: If length of `src` is `0`, empty string is returned,
  * but its data still points to the valid memory specified by the source.
+ *
+ * SINCE: 0.3.0
  */
 CNDEF Cn_String cn_source_to_str(Cn_Source *src);
 
 /**
  * Computes signed distance between offsets of sources `a` and `b`.
+ * 
+ * Used to manually improve region highlighted by diagnostics.
  *
  * RETURNS: Signed distance from source `a` to source `b`.
+ *
+ * SINCE: 0.3.0
  */
 CNDEF int64_t cn_source_dist(Cn_Source *a, Cn_Source *b);
 
@@ -1275,6 +1755,8 @@ CNDEF int64_t cn_source_dist(Cn_Source *a, Cn_Source *b);
  * Checks whether `src` is empty, meaning its length is `0`.
  *
  * RETURNS: Non-zero if source is empty, `0` otherwise.
+ *
+ * SINCE: 0.3.0
  */
 CNDEF int64_t cn_source_is_empty(Cn_Source *src);
 
@@ -1282,6 +1764,12 @@ CNDEF int64_t cn_source_is_empty(Cn_Source *src);
  * ============================================
  * SECTION: Lexer
  * ============================================
+ */
+
+/**
+ * Enum collection of all core token kinds.
+ *
+ * SINCE: 0.3.0
  */
 typedef enum {
     // General tokens.
@@ -1389,64 +1877,141 @@ typedef enum {
     CN_TOKEN_GNU_EXTENSION,
     CN_TOKEN_GNU_ATTRIBUTE,
     CN_TOKEN_GNU_TYPEOF,
-} Cn_Token_Type;
+} Cn_Token_Kind;
 
+/**
+ * Definition of token struct, each token is identified by `kind` and
+ * keeps track of it's source and location.
+ *
+ * SINCE: 0.3.0
+ */
 typedef struct {
-    Cn_Token_Type   type; // TODO: Rename to kind.
+    Cn_Token_Kind   kind;
     Cn_Location     loc;
     Cn_Source       src;
 } Cn_Token;
 
+/**
+ * Struct to group token kind and its respective string litetal.
+ *
+ * For example:
+ * ```c
+ *     { CN_TOKEN_INT, CN_STR_BUFFER("int") }
+ * ```
+ *
+ * SINCE: 0.3.0
+ */
 typedef struct {
-    Cn_Token_Type type;
+    Cn_Token_Kind kind;
     Cn_String     literal;
 } Cn_Token_Literal;
 
 /**
  * Count of tokens ahead of the current one, that lexer can look up.
+ *
+ * SINCE: 0.3.0
  */
 #define CN_LEXER_LOOKUP_COUNT       8
 
 /**
  * Count of tokens behind the current one, that lexer can look down to.
+ *
+ * SINCE: 0.3.0
  */
 #define CN_LEXER_LOOKDOWN_COUNT     8
 
+/**
+ * Total count of tokens that lexer has in the queue.
+ *
+ * SINCE: 0.3.0
+ */
 #define CN_LEXER_QUEUE_COUNT        (CN_LEXER_LOOKDOWN_COUNT + 1 + CN_LEXER_LOOKUP_COUNT)
 
+/**
+ * Struct to store array of blacklisted token kinds.
+ *
+ * SINCE: 0.3.0
+ */
 typedef struct {
-    Cn_Token_Type *ttypes;
+    Cn_Token_Kind *ttypes;
     int64_t length;
 } Cn_Lexer_Blacklist;
 
+/**
+ * Definition of the lexer struct.
+ *
+ * This lexer goes through source linearly producing tokens. Tokens are stored in the `queue`,
+ * which is done so that user can easily `peek` previous or upcoming tokens, while the current token
+ * is always stored at `current_idx` in the `queue`.
+ *
+ * MEMBER cursor: Index in `content` at which lexer is currently sitting.
+ *
+ * MEMBER bol: Index in `content` that marks beginning of currently lexed line.
+ *
+ * MEMBER line: Line number the lexer is on.
+ *
+ * MEMBER file: File name of the lexed text.
+ *
+ * MEMBER content: Source of the lexed text.
+ * 
+ * MEMBER head_idx: Queue index of the most recently lexed upcoming token.
+ *
+ * MEMBER current_idx: Queue index of the token that is currently viewed.
+ *
+ * MEMBER tail_idx: Queue index of the most previous lexed token.
+ *
+ * MEMBER queue: Queue buffer that can store maximum of `CN_LEXER_QUEUE_COUNT` tokens at once.
+ *
+ * MEMBER blacklist: Tokens specified in here will be skipped by the lexer completely.
+ *
+ * SINCE: 0.3.0
+ */
 typedef struct {
     int64_t cursor;
-    int64_t bol;            // BOL -> Beginning Of Line
+    int64_t bol;
     int64_t line;
     Cn_String file;
     Cn_String content;
     int64_t head_idx;
     int64_t tail_idx;
     int64_t current_idx;
-    Cn_Token queue[CN_LEXER_LOOKDOWN_COUNT + 1 + CN_LEXER_LOOKUP_COUNT];
+    Cn_Token queue[CN_LEXER_QUEUE_COUNT];
     Cn_Lexer_Blacklist blacklist;
 } Cn_Lexer;
 
 /**
  * Unwraps to the current token of `lexer`.
  *
- * Changes whenever `cn_lexer_next_token` is called.
+ * Can change whenever `cn_lexer_next_token` is called.
+ *
+ * SINCE: 0.3.0
  */
 #define cn_lexer_token(lexer)   (lexer)->queue[(lexer)->current_idx]
 
+/**
+ * Unwraps to the most recently lexed upcoming token of the `lexer`.
+ *
+ * Can change whenever `cn_lexer_next_token` is called.
+ *
+ * SINCE: 0.3.0
+ */
 #define cn_lexer_head(lexer)    (lexer)->queue[(lexer)->head_idx]
 
+/**
+ * Unwraps to the most previous token of the `lexer`.
+ *
+ * Can change whenever `cn_lexer_next_token` is called.
+ *
+ * SINCE: 0.3.0
+ */
 #define cn_lexer_tail(lexer)    (lexer)->queue[(lexer)->tail_idx]
 
 /**
  * Initializes `lexer` with specific `content`, setting up queue and getting ready to output tokens.
  *
- * Setting `blacklist` is optional, but if set, tokens from that list won't appear in the lexed output.
+ * PARAM blacklist: Optional, but if set, tokens from that list won't appear in the lexed output.
+ *
+ * SINCE: 0.3.0
  */
 CNDEF void cn_lexer_init(Cn_Lexer *lexer, Cn_String content, Cn_Lexer_Blacklist blacklist);
 
@@ -1455,11 +2020,18 @@ CNDEF void cn_lexer_init(Cn_Lexer *lexer, Cn_String content, Cn_Lexer_Blacklist 
  *
  * Compared to `cn_lexer_init`, only initializes content. It overwrites previous content
  * and tokens that were enqueued in lexer, without touching `file`, `line` or `blacklist` values.
+ *
+ * Can be used to inject any content into the lexer without changing location 
+ * from which the lexer is starting.
+ *
+ * SINCE: 0.3.0
  */
 CNDEF void cn_lexer_load_content(Cn_Lexer *lexer, Cn_String content);
 
 /**
  * Advances `lexer` to the next token.
+ *
+ * SINCE: 0.3.0
  */
 CNDEF void cn_lexer_next_token(Cn_Lexer *lexer);
 
@@ -1467,8 +2039,10 @@ CNDEF void cn_lexer_next_token(Cn_Lexer *lexer);
  * Checks whether current token of `lexer` matches expected `type`.
  *
  * RETURNS: `true` if it matches, `false` otherwise.
+ *
+ * SINCE: 0.3.0
  */
-CNDEF bool cn_lexer_expect(Cn_Lexer *lexer, Cn_Token_Type type);
+CNDEF bool cn_lexer_expect(Cn_Lexer *lexer, Cn_Token_Kind kind);
 
 /**
  * Peeks token based on its `offset` from the current token.
@@ -1479,16 +2053,22 @@ CNDEF bool cn_lexer_expect(Cn_Lexer *lexer, Cn_Token_Type type);
  * `CN_TOKEN_EOF` if requested token comes after already found `CN_TOKEN_EOF`.
  *
  * IMPORTANT: Expects `-CN_LEXER_LOOKDOWN_COUNT < offset < CN_LEXER_LOOKUP_COUNT`.
+ *
+ * SINCE: 0.3.0
  */
 CNDEF Cn_Token cn_lexer_peek(Cn_Lexer *lexer, int64_t offset);
 
 /**
  * Logs next `n` tokens from `lexer`, if `n == -1` logs all available tokens.
+ *
+ * SINCE: 0.3.0
  */
 CNDEF void cn_lexer_log_tokens(Cn_Lexer *lexer, int64_t n);
 
 /**
  * Checks if `lexer` state was changed from the given `saved` state.
+ *
+ * SINCE: 0.3.0
  */
 CNDEF bool cn_lexer_changed(Cn_Lexer *lexer, Cn_Lexer *saved);
 
@@ -1496,11 +2076,15 @@ CNDEF bool cn_lexer_changed(Cn_Lexer *lexer, Cn_Lexer *saved);
  * Gets name of the token `type`, used in messages.
  *
  * RETURNS: Static string of the token type.
+ *
+ * SINCE: 0.3.0
  */
-CNDEF const char *cn_token_kind_name(Cn_Token_Type type);
+CNDEF const char *cn_token_kind_name(Cn_Token_Kind kind);
 
 /**
  * RETURNS: `true` if tokens `a == b`.
+ *
+ * SINCE: 0.3.0
  */
 CNDEF bool cn_token_equals(Cn_Token *a, Cn_Token *b);
 
@@ -1509,7 +2093,13 @@ CNDEF bool cn_token_equals(Cn_Token *a, Cn_Token *b);
  * SECTION: Type
  * ============================================
  */
-typedef enum : uint8_t {
+
+/**
+ * Type flags, most of which are specific to different `Cn_Type_Kind`.
+ *
+ * SINCE: 0.3.0
+ */
+typedef enum {
     CN_TYPE_COMPLETE = 0x1,
 
     CN_TYPE_QUALIFIED_CONSTANT = 0x2,
@@ -1521,7 +2111,13 @@ typedef enum : uint8_t {
     CN_TYPE_ARRAY_UNSPECIFIED  = 0x40,
 } Cn_Type_Flags;
 
-typedef enum : uint8_t {
+/**
+ * Type kinds, list of all interned type kinds that are constructed from 
+ * abstract syntax tree during analysis.
+ *
+ * SINCE: 0.3.0
+ */
+typedef enum {
     CN_INTEGER,
     CN_FLOAT,
     CN_BOOL,
@@ -1537,36 +2133,67 @@ typedef enum : uint8_t {
     CN_UNKNOWN,
 } Cn_Type_Kind;
 
-#define CN_TYPE_BASE_MEMBERS     \
-    Cn_Type_Kind kind;      \
-    Cn_Type_Flags flags;    \
-    int64_t size;           \
-    int64_t align;
+/**
+ * Definition of the base members of any type.
+ *
+ * SINCE: 0.3.0
+ */
+#define CN_TYPE_BASE_MEMBERS    \
+    Cn_Type_Kind kind;          \
+    Cn_Type_Flags flags;        \
+    int64_t size;               \
+    int64_t align;              \
 
-typedef struct {
-    CN_TYPE_BASE_MEMBERS
-} Cn_Type_Base;
+/**
+ * Definition of the base type struct. Used by every other type struct definition.
+ *
+ * SINCE: 0.3.0
+ */
+#define CN_TYPE_BASE                    \
+    struct { CN_TYPE_BASE_MEMBERS };    \
 
-#define CN_TYPE_BASE                        \
-    union {                                 \
-        Cn_Type_Base base;                  \
-        struct { CN_TYPE_BASE_MEMBERS };    \
-    }
-
+/**
+ * Forward declaration for `cn_type` union.
+ *
+ * SINCE: 0.3.0
+ */
 typedef union cn_type Cn_Type;
 
+/**
+ * Definition of integer type.
+ *
+ * SINCE: 0.3.0
+ */
 typedef struct { CN_TYPE_BASE;
     bool is_signed;
 } Cn_Type_Integer;
 
+/**
+ * Definition of pointer type.
+ *
+ * SINCE: 0.3.0
+ */
 typedef struct { CN_TYPE_BASE;
     Cn_Type *ptr_to;
 } Cn_Type_Pointer;
 
+/**
+ * Definition of function parameter
+ *
+ * NOTE: It's not really a type but more a like a wrapper for `Cn_Type_Function` to use 
+ * for its parameters.
+ *
+ * SINCE: 0.3.0
+ */
 typedef struct {
     Cn_Type *type;
 } Cn_Type_Function_Param;
 
+/**
+ * Definition of function type.
+ *
+ * SINCE: 0.3.0
+ */
 typedef struct { CN_TYPE_BASE;
     Cn_Type *return_type;
 
@@ -1576,12 +2203,24 @@ typedef struct { CN_TYPE_BASE;
     bool is_variadic;
 } Cn_Type_Function;
 
+/**
+ * Definition of struct member.
+ *
+ * NOTE: It's not a type, used similarly to `Cn_Type_Function_Param`.
+ *
+ * SINCE: 0.3.0
+ */
 typedef struct {
     Cn_Type *type;
     Cn_String name;
     int64_t offset;
 } Cn_Type_Struct_Member;
 
+/**
+ * Definition of struct type.
+ *
+ * SINCE: 0.3.0
+ */
 typedef struct { CN_TYPE_BASE;
     Cn_String tag;
     
@@ -1589,11 +2228,23 @@ typedef struct { CN_TYPE_BASE;
     Cn_Type_Struct_Member *members;
 } Cn_Type_Struct;
 
+/**
+ * Definition of union member.
+ *
+ * NOTE: It's not a type, used similarly to `Cn_Type_Function_Param`.
+ *
+ * SINCE: 0.3.0
+ */
 typedef struct {
     Cn_Type *type;
     Cn_String name;
 } Cn_Type_Union_Member;
 
+/**
+ * Definition of union type.
+ *
+ * SINCE: 0.3.0
+ */
 typedef struct { CN_TYPE_BASE;
     Cn_String tag;
     
@@ -1601,16 +2252,33 @@ typedef struct { CN_TYPE_BASE;
     Cn_Type_Union_Member *members;
 } Cn_Type_Union;
 
+/**
+ * Definition of array type.
+ *
+ * SINCE: 0.3.0
+ */
 typedef struct { CN_TYPE_BASE;
     Cn_Type *element_type;
     int64_t length;
 } Cn_Type_Array;
 
+/**
+ * Definition of enum member.
+ *
+ * NOTE: It's not a type, used similarly to `Cn_Type_Function_Param`.
+ *
+ * SINCE: 0.3.0
+ */
 typedef struct {
     Cn_String name;
     int64_t value;
 } Cn_Type_Enum_Member;
 
+/**
+ * Definition of enum type.
+ *
+ * SINCE: 0.3.0
+ */
 typedef struct { CN_TYPE_BASE;
     Cn_String tag;
 
@@ -1620,10 +2288,24 @@ typedef struct { CN_TYPE_BASE;
     Cn_Type_Enum_Member *members;
 } Cn_Type_Enum;
 
+/**
+ * Definition of qualified type.
+ *
+ * In this type universe, qualifiers `const`, `_Atomic`, etc...
+ * are stored as type wrappers around base type. The reason this is done is 
+ * due to how C type completion for tagged types is set up.
+ *
+ * SINCE: 0.3.0
+ */
 typedef struct { CN_TYPE_BASE;
     Cn_Type *base_type;
 } Cn_Type_Qualified;
 
+/**
+ * Definition of all types union.
+ *
+ * SINCE: 0.3.0
+ */
 union cn_type {
     CN_TYPE_BASE;
     Cn_Type_Integer   integer;
@@ -1636,19 +2318,72 @@ union cn_type {
     Cn_Type_Qualified qualified;
 };
 
+/**
+ * Constant struct of 32 bit signed integer `int` type.
+ *
+ * SINCE: 0.3.0
+ */
 extern const Cn_Type CN_TYPE_INT;
+
+/**
+ * Constant struct of 32 bit float `float` type.
+ *
+ * SINCE: 0.3.0
+ */
 extern const Cn_Type CN_TYPE_FLOAT;
+
+/**
+ * Constant struct of 64 bit float `double` type.
+ *
+ * SINCE: 0.3.0
+ */
 extern const Cn_Type CN_TYPE_DOUBLE;
+
+/**
+ * Constant struct of signed character `char` type.
+ *
+ * SINCE: 0.3.0
+ */
 extern const Cn_Type CN_TYPE_CHAR;
+
+/**
+ * Constant struct of `void` type.
+ *
+ * SINCE: 0.3.0
+ */
 extern const Cn_Type CN_TYPE_VOID;
+
+/**
+ * Constant struct of `ptrdiff_t` type.
+ *
+ * SINCE: 0.3.0
+ */
 extern const Cn_Type CN_TYPE_PTRDIFF;
+
+/**
+ * Constant struct of `size_t` type.
+ *
+ * SINCE: 0.3.0
+ */
 extern const Cn_Type CN_TYPE_SIZE;
+
+/**
+ * Constant struct of opaque type.
+ *
+ * IMPORTANT: Opaque types are kinda of hack for this library.
+ * Any opaque type encountered by the analyzer is "trusted". Meaning
+ * it would satisfy type checker no matter what happens.
+ *
+ * SINCE: 0.3.0
+ */
 extern const Cn_Type CN_TYPE_OPAQUE;
 
 /**
  * Makes pointer type that points to `type`.
  *
  * RETURNS: Pointer type struct with `type` as its base type.
+ *
+ * SINCE: 0.3.0
  */
 CNDEF Cn_Type cn_type_make_pointer(const Cn_Type *type);
 
@@ -1656,6 +2391,8 @@ CNDEF Cn_Type cn_type_make_pointer(const Cn_Type *type);
  * Makes qualified version of `type` with qualifier `flags`.
  *
  * RETURNS: Qualified type struct with `type` as its base type.
+ *
+ * SINCE: 0.3.0
  */
 CNDEF Cn_Type cn_type_make_qualified(Cn_Type_Flags flags, const Cn_Type *type);
 
@@ -1663,6 +2400,8 @@ CNDEF Cn_Type cn_type_make_qualified(Cn_Type_Flags flags, const Cn_Type *type);
  * Checks whether `type1` equals `type2`.
  *
  * RETURNS: `true` if types are identical, `false` otherwise.
+ *
+ * SINCE: 0.3.0
  */
 CNDEF bool cn_type_equals(const Cn_Type *type1, const Cn_Type *type2);
 
@@ -1670,6 +2409,8 @@ CNDEF bool cn_type_equals(const Cn_Type *type1, const Cn_Type *type2);
  * Hashes `type`.
  *
  * RETURNS: Hash of the type.
+ *
+ * SINCE: 0.3.0
  */
 CNDEF uint64_t cn_type_hash(const Cn_Type *type);
 
@@ -1681,11 +2422,15 @@ CNDEF uint64_t cn_type_hash(const Cn_Type *type);
  * RETURNS: Resulting string, with `NULL` data if `buffer` is too small to hold it.
  *
  * IMPORTANT: `buffer` must be big enough to hold the string, otherwise an error is logged.
+ *
+ * SINCE: 0.3.0
  */
 CNDEF Cn_String cn_type_stringify(Cn_String buffer, const Cn_Type *type, Cn_String identifier);
 
 /**
  * Prints `type` to `stderr`, using `cn_type_stringify`.
+ *
+ * SINCE: 0.3.0
  */
 CNDEF void cn_type_print(const Cn_Type *type);
 
@@ -1693,6 +2438,8 @@ CNDEF void cn_type_print(const Cn_Type *type);
  * Checks whether `type` is constant.
  *
  * RETURNS: `true` if type is constant, `false` otherwise.
+ *
+ * SINCE: 0.3.0
  */
 CNDEF bool cn_type_is_constant(const Cn_Type *type);
 
@@ -1700,6 +2447,8 @@ CNDEF bool cn_type_is_constant(const Cn_Type *type);
  * Gets unqualified version of `type`.
  *
  * RETURNS: Unqualified version of the type.
+ *
+ * SINCE: 0.3.0
  */
 CNDEF Cn_Type *cn_type_unqualified(const Cn_Type *type);
 
@@ -1707,6 +2456,8 @@ CNDEF Cn_Type *cn_type_unqualified(const Cn_Type *type);
  * Checks whether `type` is arithmetic: integer or float, including complex.
  *
  * RETURNS: `true` if type is arithmetic, `false` otherwise.
+ *
+ * SINCE: 0.3.0
  */
 CNDEF bool cn_type_is_arithmetic(const Cn_Type *type);
 
@@ -1714,6 +2465,8 @@ CNDEF bool cn_type_is_arithmetic(const Cn_Type *type);
  * Checks whether value of type `from` can be assigned to value of type `to`.
  *
  * RETURNS: `true` if assignment is allowed, `false` otherwise.
+ *
+ * SINCE: 0.3.0
  */
 CNDEF bool cn_type_is_assignable(const Cn_Type *to, const Cn_Type *from);
 
@@ -1721,6 +2474,8 @@ CNDEF bool cn_type_is_assignable(const Cn_Type *to, const Cn_Type *from);
  * Checks whether types `a` and `b` are structurally compatible.
  *
  * RETURNS: `true` if types are compatible, `false` otherwise.
+ *
+ * SINCE: 0.3.0
  */
 CNDEF bool cn_type_is_compatible(const Cn_Type *a, const Cn_Type *b);
 
@@ -1728,6 +2483,8 @@ CNDEF bool cn_type_is_compatible(const Cn_Type *a, const Cn_Type *b);
  * Checks whether types `a` and `b` are structurally compatible, ignoring qualifiers.
  *
  * RETURNS: `true` if types are compatible, `false` otherwise.
+ *
+ * SINCE: 0.3.0
  */
 CNDEF bool cn_type_is_compatible_no_qualifiers(const Cn_Type *a, const Cn_Type *b);
 
@@ -1739,6 +2496,8 @@ CNDEF bool cn_type_is_compatible_no_qualifiers(const Cn_Type *a, const Cn_Type *
  * IMPORTANT: Expects `a` and `b` to be arithmetic types.
  *
  * NOTE: If either type is `CN_OPAQUE`, opaque type is returned, since its rank is unknown.
+ *
+ * SINCE: 0.3.0
  */
 CNDEF Cn_Type *cn_type_greatest_arithmetic_rank(const Cn_Type *a, const Cn_Type *b);
 
@@ -1746,10 +2505,15 @@ CNDEF Cn_Type *cn_type_greatest_arithmetic_rank(const Cn_Type *a, const Cn_Type 
  * Checks whether `type` is scalar: arithmetic, pointer or `bool`.
  *
  * RETURNS: `true` if type is scalar, `false` otherwise.
+ *
+ * SINCE: 0.3.0
  */
 CNDEF bool cn_type_is_scalar(Cn_Type *type);
 
 /**
+ * TODO: Move this into `analyze` section is `type` section ideally should remain stateless.
+ * Also make sure if exposed to public API, that it properly handles interning of tagged types.
+ *
  * Interns `type` into the type universe of the current translation unit.
  *
  * Structurally equal types are stored only once, so interned types can be compared by pointer.
@@ -1760,6 +2524,8 @@ CNDEF bool cn_type_is_scalar(Cn_Type *type);
  * must be interned before it is used, so it is deduplicated and properly rolled back.
  *
  * NOTE: `type` itself can be a temporary, it is copied when stored.
+ *
+ * SINCE: 0.3.0
  */
 CNDEF Cn_Type *cn_type_intern(Cn_Type *type);
 
@@ -1910,8 +2676,8 @@ CNDEF void cn_scope_stack_pop();
  * ============================================
  */
 
-
-// #define CN__TRACE_ERROR
+// TODO: Make this macro be active only when needed through compilation.
+#define CN__TRACE_ERROR
 #ifndef CN__TRACE_ERROR
 #   define CN__TRACE_ERROR   fprintf(stderr, "   error from '%s()'\n", __FUNCTION__);
 #endif // CN__TRACE_ERROR
@@ -1992,7 +2758,7 @@ typedef enum : uint8_t {
     CN_AST_TYPE_VOID    = 6,
 } Cn_Ast_Type_Kind;
 
-static const Cn_Token_Type CN_AST_TYPE_KINDS[] = {
+static const Cn_Token_Kind CN_AST_TYPE_KINDS[] = {
     CN_TOKEN_UNKNOWN,
     CN_TOKEN_INT,
     CN_TOKEN_CHAR,
@@ -2060,7 +2826,7 @@ typedef enum : int8_t {
 
 typedef struct {
     Cn_Ast_Binary_Operator_Kind kind;   // Kind of operator.
-    Cn_Token_Type token_identifier; // Token which identifies binary operator.
+    Cn_Token_Kind token_identifier; // Token which identifies binary operator.
     int precedence;                 // Precedence.
 } Cn_Ast_Binary_Operator;
 
@@ -2101,7 +2867,7 @@ typedef enum : int8_t {
 
 typedef struct {
     Cn_Ast_Unary_Operator_Kind kind;         // Kind of operator.
-    Cn_Token_Type token_identifier;      // Token which identifies unary operator, if such present.
+    Cn_Token_Kind token_identifier;      // Token which identifies unary operator, if such present.
 } Cn_Ast_Unary_Operator;
 
 /**
@@ -2147,7 +2913,7 @@ typedef enum : int8_t {
 
 typedef struct {
     Cn_Ast_Assignment_Operator_Kind kind;    // Kind of operator.
-    Cn_Token_Type token_identifier;      // Token which identifies assignment operator, if such present.
+    Cn_Token_Kind token_identifier;      // Token which identifies assignment operator, if such present.
 } Cn_Ast_Assignment_Operator;
 
 /**
@@ -2175,7 +2941,7 @@ typedef enum : int8_t {
 
 typedef struct {
     Cn_Ast_Postfix_Operator_Kind kind;       // Kind of operator.
-    Cn_Token_Type token_identifier;      // Token which identifies postfix operator, if such present.
+    Cn_Token_Kind token_identifier;      // Token which identifies postfix operator, if such present.
 } Cn_Ast_Postfix_Operator;
 
 /**
@@ -3669,14 +4435,14 @@ CNDEF void cn_emit(Cn_Emitter *e, void *node);
  *
  * RETURNS: `true` if token was parsed, `false` otherwise.
  */
-CNDEF bool cn_parse_expect(Cn_Lexer *lexer, Cn_Token_Type type);
+CNDEF bool cn_parse_expect(Cn_Lexer *lexer, Cn_Token_Kind kind);
 
 /**
  * Parses single token of `type` if it is present, without reporting any error otherwise.
  *
  * RETURNS: `true` if token was parsed, `false` otherwise.
  */
-CNDEF bool cn_parse_optional(Cn_Lexer *lexer, Cn_Token_Type type);
+CNDEF bool cn_parse_optional(Cn_Lexer *lexer, Cn_Token_Kind kind);
 
 /**
  * Parses translation unit from the current token of `lexer`.
@@ -5920,6 +6686,12 @@ CNDEF uint64_t cn_str_hash(const Cn_String *str) {
  * IMPLEMENTATION SECTION: String Builder
  * ============================================
  */
+
+/**
+ * Constructs new heap allocated string builder with specified initial capacity.
+ *
+ * IMPORTANT: Expects `initial_capacity > CN_SB_STACK_STORAGE_CAP`.
+ */
 CNDEF Cn_String_Builder cn__sb_make(int64_t initial_capacity) {
     CN_ASSERT(initial_capacity > CN_SB_STACK_STORAGE_CAP);
     
@@ -5968,6 +6740,11 @@ CNDEF void cn_sb_append_char(Cn_String_Builder *sb, char c) {
     sb->length++;
 }
 
+/**
+ * Grows capacity of `sb`, so it can hold at least `required_length` bytes.
+ *
+ * Does nothing if it already fits.
+ */
 CNDEF void cn__sb_resize_to_fit(Cn_String_Builder *sb, int64_t required_length) {
     if (required_length <= sb->capacity) return;
 
@@ -6487,14 +7264,14 @@ CNDEF void cn_std_free_all(Cn_Allocator *allocator) {
     cn_log(CN_WARNING, "Coudln't free all memory in std allocator, std allocator doesn't implement free all mechanism, use free instead.");
 }
 
-Cn_Allocator cn_std_allocator = {
+Cn_Allocator cn__std_allocator = {
     .alloc      = (Cn_Alloc *)cn_std_alloc, 
     .realloc    = (Cn_Realloc *)cn_std_realloc, 
     .free       = (Cn_Free *)cn_std_free, 
     .free_all   = (Cn_Free_All *)cn_std_free_all
 };
 
-Cn_Allocator *cn_default_allocator = &cn_std_allocator;
+Cn_Allocator *cn_allocator = &cn__std_allocator;
 
 CNDEF void *cn_alloc(Cn_Allocator *allocator, size_t size) {
     CN_ASSERT(allocator != NULL);
@@ -7319,7 +8096,7 @@ CNDEF void cn__lexer_get_float_suffix(Cn_Lexer *l, Cn_Token *token) {
 CNDEF void cn__lexer_backtrack_token(Cn_Lexer *l, Cn_Token *token) {
     l->cursor -= token->src.length;
     token->src.length = 0;
-    token->type = CN_TOKEN_UNKNOWN;
+    token->kind = CN_TOKEN_UNKNOWN;
 }
 
 /**
@@ -7327,7 +8104,7 @@ CNDEF void cn__lexer_backtrack_token(Cn_Lexer *l, Cn_Token *token) {
  */
 CNDEF bool cn__lexer_blacklisted(Cn_Token *token, Cn_Lexer_Blacklist *blacklist) {
     for (int64_t i = 0; i < blacklist->length; i++) {
-        if (token->type == blacklist->ttypes[i]) return true;
+        if (token->kind == blacklist->ttypes[i]) return true;
     }
 
     return false;
@@ -7342,7 +8119,7 @@ CNDEF Cn_Token cn__lexer_lex(Cn_Lexer *l) {
     cn__lexer_consume_spaces(l);
 
     Cn_Token token = (Cn_Token) {
-        .type = CN_TOKEN_UNKNOWN,
+        .kind = CN_TOKEN_UNKNOWN,
         .loc = (Cn_Location) { 
             .file = l->file, 
             .line = l->line, 
@@ -7356,24 +8133,24 @@ CNDEF Cn_Token cn__lexer_lex(Cn_Lexer *l) {
     };
 
     if (cn__lexer_eof(l)) {
-        token.type = CN_TOKEN_EOF;
+        token.kind = CN_TOKEN_EOF;
         return token;
     }
 
     if (cn__valid_number_start(l->content.data[l->cursor])) {
         int digit_count = 0;
-        token.type = CN_TOKEN_INTEGER_VALUE;
+        token.kind = CN_TOKEN_INTEGER_VALUE;
         
         digit_count += cn__lexer_get_digits(l, &token);
         if (cn__lexer_eof(l)) return token;
 
         if (l->content.data[l->cursor] == '.') {
-            token.type = CN_TOKEN_FLOAT_VALUE;
+            token.kind = CN_TOKEN_FLOAT_VALUE;
             token.src.length++;
             l->cursor++;
         }
        
-        if (token.type == CN_TOKEN_FLOAT_VALUE && digit_count == 0) {
+        if (token.kind == CN_TOKEN_FLOAT_VALUE && digit_count == 0) {
             cn__lexer_backtrack_token(l, &token);
             goto number_lexer_fail;
         }
@@ -7382,7 +8159,7 @@ CNDEF Cn_Token cn__lexer_lex(Cn_Lexer *l) {
         if (cn__lexer_eof(l)) return token;
         
         if (l->content.data[l->cursor] == 'e' || l->content.data[l->cursor] == 'E') {
-            token.type = CN_TOKEN_FLOAT_VALUE;
+            token.kind = CN_TOKEN_FLOAT_VALUE;
             token.src.length++;
             l->cursor++;
 
@@ -7397,7 +8174,7 @@ CNDEF Cn_Token cn__lexer_lex(Cn_Lexer *l) {
         digit_count += cn__lexer_get_digits(l, &token);
         if (cn__lexer_eof(l)) return token;
 
-        if (token.type == CN_TOKEN_FLOAT_VALUE) {
+        if (token.kind == CN_TOKEN_FLOAT_VALUE) {
             if (digit_count == 0) {
                 cn__lexer_backtrack_token(l, &token);
                 goto number_lexer_fail;
@@ -7422,7 +8199,7 @@ number_lexer_fail:
 
 
     if (l->content.data[l->cursor] == '#') {
-        token.type = CN_TOKEN_LINE_MARKER;
+        token.kind = CN_TOKEN_LINE_MARKER;
         token.src.length++;
         l->cursor++;
 
@@ -7463,7 +8240,7 @@ number_lexer_fail:
 
 
     if (l->content.data[l->cursor] == '"') {
-        token.type = CN_TOKEN_STRING;
+        token.kind = CN_TOKEN_STRING;
         token.src.length++;
         l->cursor++;
 
@@ -7495,7 +8272,7 @@ number_lexer_fail:
     }
 
     if (l->content.data[l->cursor] == '\'') {
-        token.type = CN_TOKEN_CHAR_VALUE;
+        token.kind = CN_TOKEN_CHAR_VALUE;
         token.src.length++;
         l->cursor++;
 
@@ -7527,7 +8304,7 @@ number_lexer_fail:
         
         // One line comment.
         if (l->cursor < l->content.length && l->content.data[l->cursor] == '/') {
-            token.type = CN_TOKEN_COMMENT;
+            token.kind = CN_TOKEN_COMMENT;
             token.src.length++;
             l->cursor++;
 
@@ -7544,7 +8321,7 @@ number_lexer_fail:
 
         // Multiline comment.
         if (l->cursor < l->content.length && l->content.data[l->cursor] == '*') {
-            token.type = CN_TOKEN_COMMENT;
+            token.kind = CN_TOKEN_COMMENT;
             token.src.length++;
             l->cursor++;
 
@@ -7570,7 +8347,7 @@ number_lexer_fail:
         if (l->content.length - l->cursor >= CN_LITERAL_TOKENS[i].literal.length) {
             comp = CN_STR(CN_LITERAL_TOKENS[i].literal.length, l->content.data + l->cursor);
             if (cn_str_equals((Cn_String *)&CN_LITERAL_TOKENS[i].literal, &comp)) {
-                token.type = CN_LITERAL_TOKENS[i].type;
+                token.kind = CN_LITERAL_TOKENS[i].kind;
                 token.src.length = CN_LITERAL_TOKENS[i].literal.length;
                 l->cursor += token.src.length;
                 return token;
@@ -7580,7 +8357,7 @@ number_lexer_fail:
 
 
     if (cn__valid_symbol_start(l->content.data[l->cursor])) {
-        token.type = CN_TOKEN_IDENTIFIER;
+        token.kind = CN_TOKEN_IDENTIFIER;
         while (l->cursor < l->content.length && cn__valid_symbol(l->content.data[l->cursor])) {
             token.src.length++;
             l->cursor++;
@@ -7589,7 +8366,7 @@ number_lexer_fail:
         Cn_String symbol = cn_source_to_str(&token.src);
         for (int i = 0; i < (int)CN_ARRAY_LENGTH(CN_KEYWORD_TOKENS); i++) {
             if (cn_str_equals(&CN_KEYWORD_TOKENS[i].literal, &symbol)) {
-                token.type = CN_KEYWORD_TOKENS[i].type;
+                token.kind = CN_KEYWORD_TOKENS[i].kind;
                 break;
             }
         }
@@ -7629,7 +8406,7 @@ CNDEF void cn_lexer_load_content(Cn_Lexer *lexer, Cn_String content) {
 
         lexer->queue[i] = token;
 
-        if (lexer->queue[i].type == CN_TOKEN_EOF) {
+        if (lexer->queue[i].kind == CN_TOKEN_EOF) {
             lexer->head_idx = i;
             return;
         }
@@ -7644,7 +8421,7 @@ CNDEF void cn_lexer_load_content(Cn_Lexer *lexer, Cn_String content) {
 
 CNDEF void cn_lexer_next_token(Cn_Lexer *l) {
     // No more tokens left case.
-    if (cn_lexer_head(l).type == CN_TOKEN_EOF) {
+    if (cn_lexer_head(l).kind == CN_TOKEN_EOF) {
         if (l->current_idx == l->head_idx) return;
 
         if (cn__lexer_tail_dist(l) >= CN_LEXER_LOOKDOWN_COUNT) {
@@ -7671,8 +8448,8 @@ CNDEF void cn_lexer_next_token(Cn_Lexer *l) {
     l->current_idx = (l->current_idx + 1) % CN_LEXER_QUEUE_COUNT;
 }
 
-CNDEF bool cn_lexer_expect(Cn_Lexer *lexer, Cn_Token_Type type) {
-    return cn_lexer_token(lexer).type == type;
+CNDEF bool cn_lexer_expect(Cn_Lexer *lexer, Cn_Token_Kind kind) {
+    return cn_lexer_token(lexer).kind == kind;
 }
 
 CNDEF Cn_Token cn_lexer_peek(Cn_Lexer *lexer, int64_t offset) {
@@ -7681,16 +8458,16 @@ CNDEF Cn_Token cn_lexer_peek(Cn_Lexer *lexer, int64_t offset) {
     // Peeking past tokens.
     if (offset < 0) {
         if (-offset > cn__lexer_tail_dist(lexer)) {
-            return (Cn_Token) { .type = CN_TOKEN_UNKNOWN };
+            return (Cn_Token) { .kind = CN_TOKEN_UNKNOWN };
         }
 
         return lexer->queue[(lexer->current_idx + offset) % CN_LEXER_QUEUE_COUNT];
     }
 
     if (offset > cn__lexer_head_dist(lexer)) {
-        if (cn_lexer_head(lexer).type == CN_TOKEN_EOF) return cn_lexer_head(lexer);
+        if (cn_lexer_head(lexer).kind == CN_TOKEN_EOF) return cn_lexer_head(lexer);
 
-        return (Cn_Token) { .type = CN_TOKEN_UNKNOWN };
+        return (Cn_Token) { .kind = CN_TOKEN_UNKNOWN };
     }
     
     return lexer->queue[(lexer->current_idx + offset) % CN_LEXER_QUEUE_COUNT];
@@ -7700,14 +8477,14 @@ CNDEF void cn_lexer_log_tokens(Cn_Lexer *lexer, int64_t n) {
     Cn_Lexer copy = *lexer;
     cn_log(CN_INFO, "Tokenized:" CN_ANSI_CYAN);
     do {
-        fprintf(stderr, "TOKEN:     %s\n", cn_token_kind_name(cn_lexer_token(&copy).type));
+        fprintf(stderr, "TOKEN:     %s\n", cn_token_kind_name(cn_lexer_token(&copy).kind));
         cn_lexer_next_token(&copy);
 
         if (n > 0) {
             n--;
             if (n == 0) break;
         }
-    } while (cn_lexer_token(&copy).type != CN_TOKEN_EOF);
+    } while (cn_lexer_token(&copy).kind != CN_TOKEN_EOF);
 
     fprintf(stderr, CN_ANSI_RESET"\n");
 }
@@ -7727,8 +8504,8 @@ CNDEF bool cn_lexer_changed(Cn_Lexer *lexer, Cn_Lexer *saved) {
     return false;
 }
 
-CNDEF const char *cn_token_kind_name(Cn_Token_Type type) {
-    switch(type) {
+CNDEF const char *cn_token_kind_name(Cn_Token_Kind kind) {
+    switch(kind) {
         case CN_TOKEN_EOF:              return "<eof>";
         case CN_TOKEN_UNKNOWN:          return "<unknown>";
         case CN_TOKEN_STRING:           return "<string literal>";
@@ -7841,7 +8618,7 @@ CNDEF const char *cn_token_kind_name(Cn_Token_Type type) {
 CNDEF bool cn_token_equals(Cn_Token *a, Cn_Token *b) {
     if (a == b) return true;
 
-    return  a->type == b->type                              &&
+    return  a->kind == b->kind                              &&
             a->loc.column == b->loc.column                  &&
             a->loc.line == b->loc.line                      &&
             a->src.length == b->src.length                  &&
@@ -8899,7 +9676,7 @@ const Cn_Ast_Binary_Operator CN_AST_BINARY_OPERATORS[] = {
 
 CNDEF Cn_Ast_Binary_Operator_Kind cn_ast_is_binary_operator(Cn_Lexer *lexer) {
     for (int i = 0; i < (int)CN_ARRAY_LENGTH(CN_AST_BINARY_OPERATORS); i++) {
-        if (cn_lexer_token(lexer).type == CN_AST_BINARY_OPERATORS[i].token_identifier) {
+        if (cn_lexer_token(lexer).kind == CN_AST_BINARY_OPERATORS[i].token_identifier) {
             return i;
         }
     }
@@ -8920,7 +9697,7 @@ const Cn_Ast_Unary_Operator CN_AST_UNARY_OPERATORS[] = {
 
 CNDEF Cn_Ast_Unary_Operator_Kind cn_ast_is_unary_operator(Cn_Lexer *lexer) {
     for (int i = 0; i < (int)CN_ARRAY_LENGTH(CN_AST_UNARY_OPERATORS); i++) {
-        if (cn_lexer_token(lexer).type == CN_AST_UNARY_OPERATORS[i].token_identifier) {
+        if (cn_lexer_token(lexer).kind == CN_AST_UNARY_OPERATORS[i].token_identifier) {
             return i;
         }
     }
@@ -8944,7 +9721,7 @@ const Cn_Ast_Assignment_Operator CN_AST_ASSIGNMENT_OPERATORS[] = {
 
 CNDEF Cn_Ast_Assignment_Operator_Kind cn_ast_is_assignment_operator(Cn_Lexer *lexer) {
     for (int i = 0; i < (int)CN_ARRAY_LENGTH(CN_AST_ASSIGNMENT_OPERATORS); i++) {
-        if (cn_lexer_token(lexer).type == CN_AST_ASSIGNMENT_OPERATORS[i].token_identifier) {
+        if (cn_lexer_token(lexer).kind == CN_AST_ASSIGNMENT_OPERATORS[i].token_identifier) {
             return i;
         }
     }
@@ -8959,7 +9736,7 @@ const Cn_Ast_Postfix_Operator CN_AST_POSTFIX_OPERATORS[] = {
 
 CNDEF Cn_Ast_Postfix_Operator_Kind cn_ast_is_postfix_operator(Cn_Lexer *lexer) {
     for (int i = 0; i < (int)CN_ARRAY_LENGTH(CN_AST_POSTFIX_OPERATORS); i++) {
-        if (cn_lexer_token(lexer).type == CN_AST_POSTFIX_OPERATORS[i].token_identifier) {
+        if (cn_lexer_token(lexer).kind == CN_AST_POSTFIX_OPERATORS[i].token_identifier) {
             return i;
         }
     }
@@ -14013,19 +14790,19 @@ CNDEF void cn_emit(Cn_Emitter *e, void *n) {
  * ============================================
  */
 
-CNDEF bool cn_parse_expect(Cn_Lexer *lexer, Cn_Token_Type type) {
-    if (cn_lexer_expect(lexer, type)) {
+CNDEF bool cn_parse_expect(Cn_Lexer *lexer, Cn_Token_Kind kind) {
+    if (cn_lexer_expect(lexer, kind)) {
         cn_lexer_next_token(lexer);
         return true;
     }
 
     Cn_Token token = cn_lexer_peek(lexer, 0);
-    cn_diagnostic_src(CN_DIAGNOSTIC_ERROR, &token.loc, &token.src, CN_DC_EXPECTED_TOKEN, "Expected '%s' token, but got '%s'.", cn_token_kind_name(type), cn_token_kind_name(cn_lexer_token(lexer).type));
+    cn_diagnostic_src(CN_DIAGNOSTIC_ERROR, &token.loc, &token.src, CN_DC_EXPECTED_TOKEN, "Expected '%s' token, but got '%s'.", cn_token_kind_name(kind), cn_token_kind_name(cn_lexer_token(lexer).kind));
     return false;
 }
 
-CNDEF bool cn_parse_optional(Cn_Lexer *lexer, Cn_Token_Type type) {
-    if (cn_lexer_expect(lexer, type)) {
+CNDEF bool cn_parse_optional(Cn_Lexer *lexer, Cn_Token_Kind kind) {
+    if (cn_lexer_expect(lexer, kind)) {
         cn_lexer_next_token(lexer);
         return true;
     }
@@ -14090,7 +14867,7 @@ CNDEF Cn_Ast_Translation_Unit *cn_parse_translation_unit(Cn_Lexer *lexer) {
     }
     
 
-    while (cn_lexer_token(lexer).type != CN_TOKEN_EOF) {
+    while (cn_lexer_token(lexer).kind != CN_TOKEN_EOF) {
         Cn_Ast_External_Declaration *next_idx = cn_parse_external_declaration(lexer);
 
         if (next_idx == NULL) goto error;
@@ -14157,7 +14934,7 @@ CNDEF Cn_Ast_External_Declaration *cn_parse_external_declaration(Cn_Lexer *lexer
     if (!cn__hook_parse(CN_AST_SLOT_EXTERNAL_DECLARATION_PREFIX, NULL, lexer)) goto error;
 
     // If stray ';' case, it still can be prefixed.
-    if (cn_lexer_token(lexer).type == CN_TOKEN_SEMICOLON) {
+    if (cn_lexer_token(lexer).kind == CN_TOKEN_SEMICOLON) {
         cn_lexer_next_token(lexer);
         node.extensions = cn__ast_ext_stack_finalize(ext_mark);
         return cn_ast_new(node);
@@ -14381,7 +15158,7 @@ CNDEF bool cn_parse_starts_declaration(Cn_Lexer *lexer) {
 }
 
 CNDEF bool cn_parse_starts_type(Cn_Lexer *lexer) {
-    if (cn_lexer_token(lexer).type == CN_TOKEN_IDENTIFIER) {
+    if (cn_lexer_token(lexer).kind == CN_TOKEN_IDENTIFIER) {
         Cn_String str = cn_source_to_str(&cn_lexer_token(lexer).src);
         Cn_Binding_Idx *ref = cn_hash_table_get(&cn__tu_data->symbol_binding_table, &str);
         if (ref != NULL && cn__tu_data->binding_list[*ref].kind == CN_BINDING_TYPEDEF) 
@@ -14439,13 +15216,13 @@ CNDEF Cn_Ast_Node *cn_parse_finish_statement(Cn_Lexer *lexer, Cn_Ast_Nodes attri
     if (!cn__hook_parse(CN_AST_SLOT_STATEMENT, &statement, lexer)) goto error;
 
     if (statement == NULL) {
-        if (cn_lexer_expect(lexer, CN_TOKEN_CASE) || cn_lexer_peek(lexer, 1).type == CN_TOKEN_COLON) {
+        if (cn_lexer_expect(lexer, CN_TOKEN_CASE) || cn_lexer_peek(lexer, 1).kind == CN_TOKEN_COLON) {
             statement = cn_parse_label(lexer);
             if (statement == NULL) goto error;
 
             cn_ast_as(Label, statement)->attribute_specifiers = attribute_specifiers;
         } else {
-            switch (cn_lexer_token(lexer).type) {
+            switch (cn_lexer_token(lexer).kind) {
                 case CN_TOKEN_CURLY_OPEN:
                     statement = cn_ast_node(cn_parse_block(lexer, false));
                     if (statement == NULL) goto error;
@@ -15388,7 +16165,7 @@ CNDEF Cn_Ast_Node *cn_parse_expression_leaf(Cn_Lexer *lexer, Cn_Parse_Expression
     }
 
 
-    switch (cn_lexer_token(lexer).type) {
+    switch (cn_lexer_token(lexer).kind) {
         case CN_TOKEN_IDENTIFIER:
             literal = cn_ast_node(cn_parse_identifier(lexer));
             break;
@@ -15829,7 +16606,7 @@ CNDEF Cn_Ast_Node *cn_parse_direct_declarator(Cn_Lexer *lexer, bool *is_abstract
 
             if (!cn_lexer_expect(lexer, CN_TOKEN_PARAN_CLOSE)) {
                 // If not '(' 'void' ')' case.
-                if (cn_lexer_expect(lexer, CN_TOKEN_VOID) && cn_lexer_peek(lexer, 1).type == CN_TOKEN_PARAN_CLOSE) {
+                if (cn_lexer_expect(lexer, CN_TOKEN_VOID) && cn_lexer_peek(lexer, 1).kind == CN_TOKEN_PARAN_CLOSE) {
                     cn_lexer_next_token(lexer);
                 } else {
                     bool variadic;
@@ -16125,7 +16902,7 @@ error:
 CNDEF int cn_parse_try_storage_specifier(Cn_Lexer *lexer, Cn_Ast_Storage_Specifier_Flags *output) {
     Cn_Lexer original_state = *lexer;
 
-    switch(cn_lexer_token(lexer).type) {
+    switch(cn_lexer_token(lexer).kind) {
         case CN_TOKEN_STATIC:
             {
                 if (*output != 0) goto error_multiple_storage_specifier;
@@ -16183,7 +16960,7 @@ error:
 CNDEF int cn_parse_try_qualifier(Cn_Lexer *lexer, Cn_Ast_Qualifier_Flags *output) {
     Cn_Lexer original_state = *lexer;
 
-    switch(cn_lexer_token(lexer).type) {
+    switch(cn_lexer_token(lexer).kind) {
         case CN_TOKEN_CONST:
             {
                 cn_lexer_next_token(lexer);
@@ -16205,7 +16982,7 @@ CNDEF int cn_parse_try_qualifier(Cn_Lexer *lexer, Cn_Ast_Qualifier_Flags *output
         case CN_TOKEN_ATOMIC:
             {
                 // Case where it is atomic specifier is not handled here, if such case appears just skip.
-                if (cn_lexer_peek(lexer, 1).type == CN_TOKEN_PARAN_OPEN) return 1;
+                if (cn_lexer_peek(lexer, 1).kind == CN_TOKEN_PARAN_OPEN) return 1;
 
                 cn_lexer_next_token(lexer);
                 *output |= CN_AST_TYPE_QUALIFIER_ATOMIC;
@@ -16222,7 +16999,7 @@ CNDEF int cn_parse_try_qualifier(Cn_Lexer *lexer, Cn_Ast_Qualifier_Flags *output
 CNDEF int cn_parse_try_function_specifier(Cn_Lexer *lexer, Cn_Ast_Function_Specifier_Flags *output) {
     Cn_Lexer original_state = *lexer;
 
-    switch(cn_lexer_token(lexer).type) {
+    switch(cn_lexer_token(lexer).kind) {
         case CN_TOKEN_INLINE:
             {
                 cn_lexer_next_token(lexer);
@@ -16551,7 +17328,7 @@ CNDEF Cn_Ast_Node *cn_parse_struct_or_union_specifier(Cn_Lexer *lexer) {
     // only 'kind' tells them apart, so one local serves for both.
     Cn_Ast_Struct_Specifier node = { .loc = cn_lexer_token(lexer).loc, .src = cn_lexer_token(lexer).src };
 
-    switch (cn_lexer_token(lexer).type) {
+    switch (cn_lexer_token(lexer).kind) {
         case CN_TOKEN_STRUCT:
             {
                 node.id = CN_AST_STRUCT_SPECIFIER;
@@ -16874,7 +17651,7 @@ CNDEF Cn_Ast_Nodes cn_parse_attribute_specifiers(Cn_Lexer *lexer, bool *ok) {
     int64_t mark = cn_ast_stack_mark();
 
     while (true) {
-        if (!cn_lexer_expect(lexer, CN_TOKEN_SQR_BRACES_OPEN) || cn_lexer_peek(lexer, 1).type != CN_TOKEN_SQR_BRACES_OPEN) {
+        if (!cn_lexer_expect(lexer, CN_TOKEN_SQR_BRACES_OPEN) || cn_lexer_peek(lexer, 1).kind != CN_TOKEN_SQR_BRACES_OPEN) {
             *ok = true;
             return cn_ast_stack_finalize(mark);
         }
@@ -16950,7 +17727,7 @@ CNDEF Cn_Ast_Attribute *cn_parse_attribute(Cn_Lexer *lexer) {
     Cn_Ast_Attribute node = { .id = CN_AST_ATTRIBUTE, .loc = cn_lexer_token(lexer).loc, .src = cn_lexer_token(lexer).src };
     
     // Extracting vendor identifier.
-    if (cn_lexer_peek(lexer, 1).type == CN_TOKEN_COLON && cn_lexer_peek(lexer, 2).type == CN_TOKEN_COLON) {
+    if (cn_lexer_peek(lexer, 1).kind == CN_TOKEN_COLON && cn_lexer_peek(lexer, 2).kind == CN_TOKEN_COLON) {
         Cn_Ast_Identifier *vendor_identifier = cn_parse_identifier(lexer);
         if (vendor_identifier == NULL) goto error;
         node.vendor_identifier = vendor_identifier;
@@ -17946,7 +18723,7 @@ CNDEF bool cn__tu_init_opt(Cn_Translation_Unit *tu, char *intermidiate_path, Cn_
 // Setting up lexer.
 const Cn_Lexer_Blacklist cn__default_blacklist = {
     .length = 2,
-    .ttypes = ((Cn_Token_Type[]){ CN_TOKEN_COMMENT, CN_TOKEN_LINE_MARKER }),
+    .ttypes = ((Cn_Token_Kind[]){ CN_TOKEN_COMMENT, CN_TOKEN_LINE_MARKER }),
 };
 
 CNDEF int cn_tu_process(Cn_Translation_Unit *tu) {

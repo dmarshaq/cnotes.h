@@ -582,7 +582,7 @@ CNDEF int cn_parse_try_gnu_asm_qualifier(Cn_Lexer *lexer, Cn_Ast_Gnu_Asm_Qualifi
 
     Cn_Ast_Gnu_Asm_Qualifier_Flags qualifier;
 
-    switch(cn_lexer_token(lexer).type) {
+    switch(cn_lexer_token(lexer).kind) {
         case CN_TOKEN_VOLATILE: qualifier = CN_AST_ASM_QUALIFIER_VOLATILE; break;
         case CN_TOKEN_INLINE:   qualifier = CN_AST_ASM_QUALIFIER_INLINE;   break;
         case CN_TOKEN_GOTO:     qualifier = CN_AST_ASM_QUALIFIER_GOTO;     break;
@@ -591,7 +591,7 @@ CNDEF int cn_parse_try_gnu_asm_qualifier(Cn_Lexer *lexer, Cn_Ast_Gnu_Asm_Qualifi
     }
 
     if (*output & qualifier) {
-        cn_diagnostic_src(CN_DIAGNOSTIC_ERROR, &cn_lexer_token(lexer).loc, &cn_lexer_token(lexer).src, CN_DC_UNEXPECTED_TOKEN, "Duplicate '%s' asm qualifier.", cn_token_kind_name(cn_lexer_token(lexer).type));
+        cn_diagnostic_src(CN_DIAGNOSTIC_ERROR, &cn_lexer_token(lexer).loc, &cn_lexer_token(lexer).src, CN_DC_UNEXPECTED_TOKEN, "Duplicate '%s' asm qualifier.", cn_token_kind_name(cn_lexer_token(lexer).kind));
         goto error;
     }
 
