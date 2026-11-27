@@ -106,19 +106,24 @@ const Cn_String src = CN_STR_BUFFER(
     "}\n"
 );
 
-Cn_Message_Response handler(Cn_Message *message) {
-    // Reporting modification on every parsed function definition,
-    // it rolls back to the checkpoint and makes parser take the reparse path.
-    if (message->kind == CN_MESSAGE_AST_PARSED && message->flags & CN_MESSAGE_AST_FUNCTION && message->flags & CN_MESSAGE_AST_UNMODIFIED) {
-        return CN_MESSAGE_RESPONSE_MODIFIED;
+Cn_Hook_Response hook(Cn_Ast_Node **node_ptr, bool *ast_is_modified, bool first) {
+    if ((*node_ptr)->kind == CN_AST_FUNCTION && first) {
+        *ast_is_modified = true;
     }
 
-    return CN_MESSAGE_RESPONSE_NONE;
+    return CN_HOOK_RESPONSE_NONE;
+}
+
+bool my_extension(Cn_Hooks *hooks) {
+    cn_array_list_append(&hooks->ast_parsed_hooks, hook);
+
+    return true;
 }
 
 int main(void) {
     cn_diagnostic_handler = &cn_test_diagnostic_handler;
-    cn_message_handler = &handler;
+
+    cn_extension_register(my_extension);
 
     Cn_Translation_Unit tu = {0};
     cn_tu_init(&tu, "input.i", .source = src, .flags = CN_TU_NO_CODE_OUTPUT);

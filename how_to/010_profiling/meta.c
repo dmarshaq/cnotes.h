@@ -1,10 +1,24 @@
-// The driver is the same one `005_defer` uses, with a second handler added to it.
+// The driver is the same one `005_defer` uses, with a second extension added to it.
 #define CN_IMPLEMENTATION
 #include "cnotes.h"
 
-Cn_Message_Response msg_handler(Cn_Message *message);
+// Forward declaring both extensions, `timer_extension` lives in `timer.c` and `defer_extension` in
+// `defer.c`, which is the same file `005_defer` uses.
+bool timer_extension(Cn_Hooks *hooks);
+bool defer_extension(Cn_Hooks *hooks);
 
 int main(int argc, char **argv) {
+    // This is the structure `005_defer` was building towards, now with something in it:
+    // every extension adds its hooks, and the library calls those hooks in the order they were added.
+    //
+    // For every parsed function, each hook is called repeatedly until it stops reporting modifications,
+    // and only then the next hook gets the reparsed function.
+    //
+    // `timer_extension` goes first because it produces work for `defer_hook`: it generates a
+    // `[[defer]]`, reports the modification, and once that text has been parsed back into
+    // ast nodes, `defer_hook` gets to see it.
+    if (!cn_extension_register(timer_extension, defer_extension)) return 1;
+
     while (true) {
         argc--;
         argv++;
@@ -12,8 +26,6 @@ int main(int argc, char **argv) {
 
         Cn_Translation_Unit tu = {0};
         if (!cn_tu_init(&tu, *argv)) return 1;
-
-        cn_message_handler = msg_handler;
 
         if (cn_tu_process(&tu) != 0) {
             fprintf(stderr, "Processing failed with %ld error(s)\n", tu.data.error_count);
@@ -25,29 +37,4 @@ int main(int argc, char **argv) {
     }
 
     return 0;
-}
-
-// Forward declaring both handlers, `timer_handler` lives in `timer.c` and `defer_handler` in
-// `defer.c`, which is the same file `005_defer` uses.
-Cn_Message_Response timer_handler(Cn_Message *message);
-Cn_Message_Response defer_handler(Cn_Message *message);
-
-// This is the structure `001_basic_usage` and `005_defer` were building towards, now with
-// something in it: every message is offered to each handler in turn, and the first one to report
-// a modification ends the round, because the library is about to reparse and send the message
-// again anyway.
-//
-// `timer_handler` goes first because it produces work for `defer_handler`: it generates a
-// `[[defer]]`, reports the modification, and only on the next round, once that text has been
-// parsed back into ast nodes, does `defer_handler` get to see it.
-Cn_Message_Response msg_handler(Cn_Message *message) {
-    Cn_Message_Response response = CN_MESSAGE_RESPONSE_NONE;
-
-    response = timer_handler(message);
-    if (response != CN_MESSAGE_RESPONSE_NONE) return response;
-
-    response = defer_handler(message);
-    if (response != CN_MESSAGE_RESPONSE_NONE) return response;
-
-    return response;
 }

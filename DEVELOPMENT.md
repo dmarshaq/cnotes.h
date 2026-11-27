@@ -111,7 +111,7 @@ the test file.
 
 | FLAG              | Meaning                                                                   |
 |-------------------|---------------------------------------------------------------------------|
-| `--gnu`           | Test will be ran with cnotes gnu extension attached.                      |
+| `--gnu`           | Test will be ran with cnotes gnu runner (`CN_GNU` defined).               |
 
 
 ### Known tool feature limitation are all stated in README.md.

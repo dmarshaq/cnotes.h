@@ -1851,7 +1851,7 @@
     "symbol": "Cn_Token_Kind",
     "kind": "enum",
     "module": "Lexer",
-    "decl": "typedef enum {\n    // General tokens.\n    CN_TOKEN_EOF,\n    CN_TOKEN_UNKNOWN,\n    CN_TOKEN_STRING,\n    CN_TOKEN_COMMENT,\n    CN_TOKEN_LINE_MARKER,\n    CN_TOKEN_INTEGER_VALUE,\n    CN_TOKEN_FLOAT_VALUE,\n    CN_TOKEN_CHAR_VALUE,\n    CN_TOKEN_IDENTIFIER,\n    // Literal tokens, non-identifer.\n    CN_TOKEN_COLON,\n    CN_TOKEN_SEMICOLON,\n    CN_TOKEN_PARAN_OPEN,\n    CN_TOKEN_PARAN_CLOSE,\n    CN_TOKEN_CURLY_OPEN,\n    CN_TOKEN_CURLY_CLOSE,\n    CN_TOKEN_SQR_BRACES_OPEN,\n    CN_TOKEN_SQR_BRACES_CLOSE,\n    CN_TOKEN_COMMA,\n    CN_TOKEN_DOT,\n    CN_TOKEN_ARROW,\n    CN_TOKEN_ASSIGN,\n    CN_TOKEN_ASTERISK,\n    CN_TOKEN_SLASH,\n    CN_TOKEN_PLUS,\n    CN_TOKEN_MINUS,\n    CN_TOKEN_PERCENT,\n    CN_TOKEN_INCREMENT,\n    CN_TOKEN_DECREMENT,\n    CN_TOKEN_LSHIFT,\n    CN_TOKEN_RSHIFT,\n    CN_TOKEN_LESS,\n    CN_TOKEN_GREATER,\n    CN_TOKEN_LESS_EQ,\n    CN_TOKEN_GREATER_EQ,\n    CN_TOKEN_EQ,\n    CN_TOKEN_NOT_EQ,\n    CN_TOKEN_AMPERSAND,\n    CN_TOKEN_HAT,\n    CN_TOKEN_BAR,\n    CN_TOKEN_AND,\n    CN_TOKEN_OR,\n    CN_TOKEN_EXCLAMATION,\n    CN_TOKEN_TILDE,\n    CN_TOKEN_LSHIFT_ASSIGN,\n    CN_TOKEN_RSHIFT_ASSIGN,\n    CN_TOKEN_MULTIPLY_ASSIGN,\n    CN_TOKEN_DIVIDE_ASSIGN,\n    CN_TOKEN_MODULO_ASSIGN,\n    CN_TOKEN_PLUS_ASSIGN,\n    CN_TOKEN_MINUS_ASSIGN,\n    CN_TOKEN_BIT_AND_ASSIGN,\n    CN_TOKEN_BIT_XOR_ASSIGN,\n    CN_TOKEN_BIT_OR_ASSIGN,\n    CN_TOKEN_QUESTION,\n    CN_TOKEN_ELLIPSIS,\n    // Keyword tokens.\n    CN_TOKEN_CONST,\n    CN_TOKEN_RESTRICT,\n    CN_TOKEN_VOLATILE,\n    CN_TOKEN_STATIC,\n    CN_TOKEN_EXTERN,\n    CN_TOKEN_REGISTER,\n    CN_TOKEN_AUTO,\n    CN_TOKEN_TYPEDEF,\n    CN_TOKEN_SIGNED,\n    CN_TOKEN_UNSIGNED,\n    CN_TOKEN_SHORT,\n    CN_TOKEN_LONG,\n    CN_TOKEN_INT,\n    CN_TOKEN_CHAR,\n    CN_TOKEN_FLOAT,\n    CN_TOKEN_DOUBLE,\n    CN_TOKEN_BOOL,\n    CN_TOKEN_VOID,\n    CN_TOKEN_STRUCT,\n    CN_TOKEN_ENUM,\n    CN_TOKEN_UNION,\n    CN_TOKEN_IF,\n    CN_TOKEN_ELSE,\n    CN_TOKEN_SWITCH,\n    CN_TOKEN_WHILE,\n    CN_TOKEN_DO,\n    CN_TOKEN_FOR,\n    CN_TOKEN_GOTO,\n    CN_TOKEN_CONTINUE,\n    CN_TOKEN_BREAK,\n    CN_TOKEN_RETURN,\n    CN_TOKEN_SIZEOF,\n    CN_TOKEN_INLINE,\n    CN_TOKEN_CASE,\n    CN_TOKEN_DEFAULT,\n    CN_TOKEN_COMPLEX,\n    CN_TOKEN_IMAGINARY,\n\n    // TEMPORARY: Post C99.\n    CN_TOKEN_ATOMIC,\n    CN_TOKEN_NORETURN,\n\n    // TEMPORARY: GNU keywords.\n    CN_TOKEN_GNU_ASM,\n    CN_TOKEN_GNU_EXTENSION,\n    CN_TOKEN_GNU_ATTRIBUTE,\n    CN_TOKEN_GNU_TYPEOF,\n} Cn_Token_Kind",
+    "decl": "typedef enum {\n    // General tokens.\n    CN_TOKEN_EOF,\n    CN_TOKEN_UNKNOWN,\n    CN_TOKEN_STRING,\n    CN_TOKEN_COMMENT,\n    CN_TOKEN_LINE_MARKER,\n    CN_TOKEN_INTEGER_VALUE,\n    CN_TOKEN_FLOAT_VALUE,\n    CN_TOKEN_CHAR_VALUE,\n    CN_TOKEN_IDENTIFIER,\n\n    // Literal tokens, non-identifer.\n    CN_TOKEN_COLON,\n    CN_TOKEN_SEMICOLON,\n    CN_TOKEN_PARAN_OPEN,\n    CN_TOKEN_PARAN_CLOSE,\n    CN_TOKEN_CURLY_OPEN,\n    CN_TOKEN_CURLY_CLOSE,\n    CN_TOKEN_SQR_BRACES_OPEN,\n    CN_TOKEN_SQR_BRACES_CLOSE,\n    CN_TOKEN_COMMA,\n    CN_TOKEN_DOT,\n    CN_TOKEN_ARROW,\n    CN_TOKEN_ASSIGN,\n    CN_TOKEN_ASTERISK,\n    CN_TOKEN_SLASH,\n    CN_TOKEN_PLUS,\n    CN_TOKEN_MINUS,\n    CN_TOKEN_PERCENT,\n    CN_TOKEN_INCREMENT,\n    CN_TOKEN_DECREMENT,\n    CN_TOKEN_LSHIFT,\n    CN_TOKEN_RSHIFT,\n    CN_TOKEN_LESS,\n    CN_TOKEN_GREATER,\n    CN_TOKEN_LESS_EQ,\n    CN_TOKEN_GREATER_EQ,\n    CN_TOKEN_EQ,\n    CN_TOKEN_NOT_EQ,\n    CN_TOKEN_AMPERSAND,\n    CN_TOKEN_HAT,\n    CN_TOKEN_BAR,\n    CN_TOKEN_AND,\n    CN_TOKEN_OR,\n    CN_TOKEN_EXCLAMATION,\n    CN_TOKEN_TILDE,\n    CN_TOKEN_LSHIFT_ASSIGN,\n    CN_TOKEN_RSHIFT_ASSIGN,\n    CN_TOKEN_MULTIPLY_ASSIGN,\n    CN_TOKEN_DIVIDE_ASSIGN,\n    CN_TOKEN_MODULO_ASSIGN,\n    CN_TOKEN_PLUS_ASSIGN,\n    CN_TOKEN_MINUS_ASSIGN,\n    CN_TOKEN_BIT_AND_ASSIGN,\n    CN_TOKEN_BIT_XOR_ASSIGN,\n    CN_TOKEN_BIT_OR_ASSIGN,\n    CN_TOKEN_QUESTION,\n    CN_TOKEN_ELLIPSIS,\n\n    // Keyword tokens.\n    CN_TOKEN_CONST,\n    CN_TOKEN_RESTRICT,\n    CN_TOKEN_VOLATILE,\n    CN_TOKEN_STATIC,\n    CN_TOKEN_EXTERN,\n    CN_TOKEN_REGISTER,\n    CN_TOKEN_AUTO,\n    CN_TOKEN_TYPEDEF,\n    CN_TOKEN_SIGNED,\n    CN_TOKEN_UNSIGNED,\n    CN_TOKEN_SHORT,\n    CN_TOKEN_LONG,\n    CN_TOKEN_INT,\n    CN_TOKEN_CHAR,\n    CN_TOKEN_FLOAT,\n    CN_TOKEN_DOUBLE,\n    CN_TOKEN_BOOL,\n    CN_TOKEN_VOID,\n    CN_TOKEN_STRUCT,\n    CN_TOKEN_ENUM,\n    CN_TOKEN_UNION,\n    CN_TOKEN_IF,\n    CN_TOKEN_ELSE,\n    CN_TOKEN_SWITCH,\n    CN_TOKEN_WHILE,\n    CN_TOKEN_DO,\n    CN_TOKEN_FOR,\n    CN_TOKEN_GOTO,\n    CN_TOKEN_CONTINUE,\n    CN_TOKEN_BREAK,\n    CN_TOKEN_RETURN,\n    CN_TOKEN_SIZEOF,\n    CN_TOKEN_INLINE,\n    CN_TOKEN_CASE,\n    CN_TOKEN_DEFAULT,\n    CN_TOKEN_COMPLEX,\n    CN_TOKEN_IMAGINARY,\n\n    // TEMPORARY: Post C99.\n    CN_TOKEN_ATOMIC,\n    CN_TOKEN_NORETURN,\n\n#ifdef CN_GNU\n    CN_TOKEN_GNU_ASM,\n    CN_TOKEN_GNU_EXTENSION,\n    CN_TOKEN_GNU_ATTRIBUTE,\n    CN_TOKEN_GNU_TYPEOF,\n#endif // CN_GNU\n} Cn_Token_Kind",
     "summary": "Enum collection of all core token kinds.",
     "description": "",
     "tags": [
@@ -2948,6 +2948,18 @@
     "flags": []
   },
   {
+    "symbol": "Cn_Ast_Gnu_Asm_Qualifier_Flags",
+    "kind": "enum",
+    "module": "Ast",
+    "decl": "typedef enum {\n    CN_AST_GNU_ASM_QUALIFIER_VOLATILE   = 0x1,\n    CN_AST_GNU_ASM_QUALIFIER_INLINE     = 0x2,\n    CN_AST_GNU_ASM_QUALIFIER_GOTO       = 0x4,\n} Cn_Ast_Gnu_Asm_Qualifier_Flags",
+    "summary": "Qualifiers of GNU `asm` statement.",
+    "description": "",
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
     "symbol": "Cn_Ast_Binary_Operator_Kind",
     "kind": "enum",
     "module": "Ast",
@@ -3136,50 +3148,11 @@
     "flags": []
   },
   {
-    "symbol": "CN_AST_KIND_EXTENSION_ID",
-    "kind": "macro",
+    "symbol": "Cn_Ast_Kind",
+    "kind": "enum",
     "module": "Ast",
-    "decl": "#define CN_AST_KIND_EXTENSION_ID(kind) ((uint8_t)((uint32_t)(kind) >> 24))",
-    "summary": "Extension id of any 32-bit `kind`, `0` for the core library kinds.",
-    "description": "",
-    "tags": [
-      { "kind": "SINCE", "text": "0.3.0" }
-    ],
-    "flags": []
-  },
-  {
-    "symbol": "CN_AST_KIND_EXTENSION_BASE",
-    "kind": "macro",
-    "module": "Ast",
-    "decl": "#define CN_AST_KIND_EXTENSION_BASE(id) ((uint32_t)(id) << 24)",
-    "summary": "First kind value of the extension with 32-bit id `id`, every custom kind of that extension\nmust be greater than it. See `Cn_Ast_Kind`.",
-    "description": "",
-    "tags": [
-      { "kind": "SINCE", "text": "0.3.0" }
-    ],
-    "flags": []
-  },
-  {
-    "symbol": "CN_AST_DECLARE_KINDS",
-    "kind": "macro",
-    "module": "Ast",
-    "decl": "#define CN_AST_DECLARE_KINDS(NAME, Name, ID, LIST)                      \\\n    typedef enum {                                                      \\\n        CN_AST_##NAME##_UNKNOWN = CN_AST_KIND_EXTENSION_BASE(ID),       \\\n        LIST(CN__AST_ENUM_ENTRY)                                        \\\n        CN_AST_##NAME##__END                                            \\\n    } Cn_Ast_##Name##_Kind;                                             \\",
-    "summary": "This macro declares enum that is used to identify each node introduced.",
-    "description": "But library extensions can introduce their own AST nodes.\nIn order to sustain stable identifications in enums\nacross the extensions the top 8 bits are reserved for \"extension id\".\nFor example let say GNU extension introduces its own AST nodes, with enum of its kinds.\nIf it's extension id is `1`, the enum kinds must start at the value `0x01000000`.",
-    "tags": [
-      { "kind": "IMPORTANT", "text": "Extension id of `0` is reserved by main library. Each extension gets range of `2^24` values,\nfor its custom AST nodes. That also means there at most `255` extensions with custom AST nodes\npossible to pack with this library without causing overlap in AST nodes." },
-      { "kind": "PARAM", "text": "NAME: Is uppercase naming of the enum entry. For example `GNU`." },
-      { "kind": "PARAM", "text": "Name: Is type naming of the enum itself. For example `Gnu`." },
-      { "kind": "SINCE", "text": "0.3.0" }
-    ],
-    "flags": []
-  },
-  {
-    "symbol": "CN_AST_GEN_LIST",
-    "kind": "macro",
-    "module": "Ast",
-    "decl": "#define CN_AST_GEN_LIST(X)\\\n    /* --- misc ----------------------------------------------------------- */                              \\\n    X(CODE,                             Code,                               code)                           \\\n    X(TRANSLATION_UNIT,                 Translation_Unit,                   translation_unit)               \\\n    X(EXTERNAL_DECLARATION,             External_Declaration,               external_declaration)           \\\n    X(DECLARATION,                      Declaration,                        declaration)                    \\\n    X(FUNCTION,                         Function,                           function)                       \\\n    /* --- statements ----------------------------------------------------- */                              \\\n    X(BLOCK,                            Block,                              block)                          \\\n    X(BLOCK_ITEM,                       Block_Item,                         block_item)                     \\\n    X(IF,                               If,                                 if_statement)                   \\\n    X(SWITCH,                           Switch,                             switch_statement)               \\\n    X(WHILE,                            While,                              while_statement)                \\\n    X(DO_WHILE,                         Do_While,                           do_while)                       \\\n    X(FOR,                              For,                                for_statement)                  \\\n    X(LABEL,                            Label,                              label)                          \\\n    X(GOTO,                             Goto,                               goto_statement)                 \\\n    X(RETURN,                           Return,                             return_statement)               \\\n    X(BREAK,                            Break,                              break_statement)                \\\n    X(CONTINUE,                         Continue,                           continue_statement)             \\\n    X(EXPRESSION_STATEMENT,             Expression_Statement,               expression_statement)           \\\n    /* --- expressions ---------------------------------------------------- */                              \\\n    X(BINARY,                           Binary,                             binary)                         \\\n    X(ACCESS,                           Access,                             access)                         \\\n    X(CALL,                             Call,                               call)                           \\\n    X(UNARY,                            Unary,                              unary)                          \\\n    X(CAST,                             Cast,                               cast)                           \\\n    X(COMPOUND,                         Compound,                           compound)                       \\\n    X(SIZEOF,                           Sizeof,                             sizeof_expression)              \\\n    X(TERNARY,                          Ternary,                            ternary)                        \\\n    X(ASSIGN,                           Assign,                             assign)                         \\\n    X(POSTFIX,                          Postfix,                            postfix)                        \\\n    X(PRIMARY,                          Primary,                            primary)                        \\\n    /* --- literals ------------------------------------------------------- */                              \\\n    X(IDENTIFIER,                       Identifier,                         identifier)                     \\\n    X(INTEGER,                          Integer,                            integer)                        \\\n    X(FLOAT,                            Float,                              flt)                            \\\n    X(CHAR,                             Char,                               character)                      \\\n    X(STRING,                           String,                             string)                         \\\n    /* --- declarator and declaration machinary --------------------------- */                              \\\n    X(INIT_DECLARATOR,                  Init_Declarator,                    init_declarator)                \\\n    X(INITIALIZER,                      Initializer,                        initializer)                    \\\n    X(DESIGNATION,                      Designation,                        designation)                    \\\n    X(DESIGNATOR,                       Designator,                         designator)                     \\\n    X(DECLARATOR,                       Declarator,                         declarator)                     \\\n    X(POINTER,                          Pointer,                            pointer)                        \\\n    X(DIRECT_DECLARATOR_GROUPED,        Direct_Declarator_Grouped,          direct_declarator_grouped)      \\\n    X(DIRECT_DECLARATOR_ARRAY,          Direct_Declarator_Array,            direct_declarator_array)        \\\n    X(DIRECT_DECLARATOR_FUNCTION,       Direct_Declarator_Function,         direct_declarator_function)     \\\n    X(DECLARATION_SPECIFIERS,           Declaration_Specifiers,             declaration_specifiers)         \\\n    X(TYPE_SPECIFIER_PRIMITIVE,         Type_Specifier_Primitive,           type_specifier_primitive)       \\\n    X(TYPE_SPECIFIER_TYPEDEF,           Type_Specifier_Typedef,             type_specifier_typedef)         \\\n    X(TYPE_NAME,                        Type_Name,                          type_name)                      \\\n    X(SPECIFIER_QUALIFIER,              Specifier_Qualifier,                specifier_qualifier)            \\\n    X(PARAMETER_DECLARATION,            Parameter_Declaration,              parameter_declaration)          \\\n    /* --- tag types ------------------------------------------------------ */                              \\\n    X(STRUCT_SPECIFIER,                 Struct_Specifier,                   struct_specifier)               \\\n    X(UNION_SPECIFIER,                  Union_Specifier,                    union_specifier)                \\\n    X(MEMBER_DECLARATION,               Member_Declaration,                 member_declaration)             \\\n    X(MEMBER_DECLARATOR,                Member_Declarator,                  member_declarator)              \\\n    X(ENUM_SPECIFIER,                   Enum_Specifier,                     enum_specifier)                 \\\n    X(ENUMERATOR,                       Enumerator,                         enumerator)                     \\\n    /* --- attributes ----------------------------------------------------- */                              \\\n    X(ATTRIBUTE_SPECIFIER,              Attribute_Specifier,                attribute_specifier)            \\\n    X(ATTRIBUTE,                        Attribute,                          attribute)                      \\",
-    "summary": "List for X macro generation of core library AST nodes.",
+    "decl": "typedef enum {\n    CN_AST_UNKNOWN = 0,\n\n    // Misc.\n    CN_AST_CODE,\n    CN_AST_TRANSLATION_UNIT,\n    CN_AST_EXTERNAL_DECLARATION,\n    CN_AST_DECLARATION,\n    CN_AST_FUNCTION,\n\n    // Statements.\n    CN_AST_BLOCK,\n    CN_AST_BLOCK_ITEM,\n    CN_AST_IF,\n    CN_AST_SWITCH,\n    CN_AST_WHILE,\n    CN_AST_DO_WHILE,\n    CN_AST_FOR,\n    CN_AST_LABEL,\n    CN_AST_GOTO,\n    CN_AST_RETURN,\n    CN_AST_BREAK,\n    CN_AST_CONTINUE,\n    CN_AST_EXPRESSION_STATEMENT,\n\n    // Expressions.\n    CN_AST_BINARY,\n    CN_AST_ACCESS,\n    CN_AST_CALL,\n    CN_AST_UNARY,\n    CN_AST_CAST,\n    CN_AST_COMPOUND,\n    CN_AST_SIZEOF,\n    CN_AST_TERNARY,\n    CN_AST_ASSIGN,\n    CN_AST_POSTFIX,\n    CN_AST_PRIMARY,\n\n    // Literals.\n    CN_AST_IDENTIFIER,\n    CN_AST_INTEGER,\n    CN_AST_FLOAT,\n    CN_AST_CHAR,\n    CN_AST_STRING,\n\n    // Declarator and declaration machinary.\n    CN_AST_INIT_DECLARATOR,\n    CN_AST_INITIALIZER,\n    CN_AST_DESIGNATION,\n    CN_AST_DESIGNATOR,\n    CN_AST_DECLARATOR,\n    CN_AST_POINTER,\n    CN_AST_DIRECT_DECLARATOR_GROUPED,\n    CN_AST_DIRECT_DECLARATOR_ARRAY,\n    CN_AST_DIRECT_DECLARATOR_FUNCTION,\n    CN_AST_DECLARATION_SPECIFIERS,\n    CN_AST_TYPE_SPECIFIER_PRIMITIVE,\n    CN_AST_TYPE_SPECIFIER_TYPEDEF,\n    CN_AST_TYPE_NAME,\n    CN_AST_SPECIFIER_QUALIFIER,\n    CN_AST_PARAMETER_DECLARATION,\n\n    // Tag types.\n    CN_AST_STRUCT_SPECIFIER,\n    CN_AST_UNION_SPECIFIER,\n    CN_AST_MEMBER_DECLARATION,\n    CN_AST_MEMBER_DECLARATOR,\n    CN_AST_ENUM_SPECIFIER,\n    CN_AST_ENUMERATOR,\n\n    // Attributes.\n    CN_AST_ATTRIBUTE_SPECIFIER,\n    CN_AST_ATTRIBUTE,\n\n#ifdef CN_GNU\n    CN_AST_GNU_TYPEOF,\n    CN_AST_GNU_ASM_STATEMENT,\n    CN_AST_GNU_ASM_OPERAND,\n    CN_AST_GNU_ASM_LABEL,\n#endif // CN_GNU\n\n    CN_AST__END\n} Cn_Ast_Kind",
+    "summary": "Kinds of AST nodes, each kind has its own `Cn_Ast_...` struct.",
     "description": "",
     "tags": [
       { "kind": "SINCE", "text": "0.3.0" }
@@ -3190,9 +3163,21 @@
     "symbol": "Cn_Ast_Flags",
     "kind": "enum",
     "module": "Ast",
-    "decl": "typedef enum {\n    CN_AST_SYNTHETIC                    = 0x1,\n\n    CN_AST_DECLARATOR_IS_ABSTRACT                 = 0x100,\n\n    CN_AST_ACCESS_IS_POINTER                      = 0x100,\n\n    CN_AST_DIRECT_DECLARATOR_FUNCTION_IS_VARIADIC = 0x100,\n\n    CN_AST_ENUM_HAS_DEFINITION                    = 0x100,\n\n    CN_AST_UNION_HAS_DEFINITION                   = 0x100,\n\n    CN_AST_STRUCT_HAS_DEFINITION                  = 0x100,\n\n    CN_AST_DECLARATION_IS_EMPTY                   = 0x100,\n\n    CN_AST_LABEL_IS_CASE                          = 0x100,\n    CN_AST_LABEL_IS_DEFAULT                       = 0x200,\n} Cn_Ast_Flags",
+    "decl": "typedef enum {\n    CN_AST_SYNTHETIC                    = 0x1,\n#ifdef CN_GNU\n    CN_AST_GNU_EXTENSION                = 0x2,\n#endif // CN_GNU\n\n    CN_AST_DECLARATOR_IS_ABSTRACT                 = 0x100,\n\n    CN_AST_ACCESS_IS_POINTER                      = 0x100,\n\n    CN_AST_DIRECT_DECLARATOR_FUNCTION_IS_VARIADIC = 0x100,\n\n    CN_AST_ENUM_HAS_DEFINITION                    = 0x100,\n\n    CN_AST_UNION_HAS_DEFINITION                   = 0x100,\n\n    CN_AST_STRUCT_HAS_DEFINITION                  = 0x100,\n\n    CN_AST_DECLARATION_IS_EMPTY                   = 0x100,\n\n    CN_AST_LABEL_IS_CASE                          = 0x100,\n    CN_AST_LABEL_IS_DEFAULT                       = 0x200,\n\n#ifdef CN_GNU\n    CN_AST_ATTRIBUTE_SPECIFIER_IS_GNU             = 0x100,\n\n    CN_AST_GNU_ASM_STATEMENT_IS_EXTENDED          = 0x100,\n#endif // CN_GNU\n} Cn_Ast_Flags",
     "summary": "Flags of the ast node.",
-    "description": "Values below `0x100` are shared by every node kind.\nValues starting from `0x100` are specific to a node kind, so they can overlap between kinds,\nthis also lets extensions define flags for their own kinds.",
+    "description": "Values below `0x100` are shared by every node kind.\nValues starting from `0x100` are specific to a node kind, so they can overlap between kinds.",
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "CN_AST_BASE_MEMBERS",
+    "kind": "macro",
+    "module": "Ast",
+    "decl": "#define CN_AST_BASE_MEMBERS         \\\n    Cn_Ast_Kind         kind;       \\\n    Cn_Ast_Flags        flags;      \\\n    Cn_Location         loc;        \\\n    Cn_Source           src;        \\",
+    "summary": "Definition of the base members of any ast node.",
+    "description": "",
     "tags": [
       { "kind": "SINCE", "text": "0.3.0" }
     ],
@@ -3200,10 +3185,10 @@
   },
   {
     "symbol": "Cn_Ast_Node",
-    "kind": "typedef",
+    "kind": "struct",
     "module": "Ast",
-    "decl": "typedef struct cn_ast_node Cn_Ast_Node",
-    "summary": "Forward declaration for `cn_ast_node` struct.",
+    "decl": "typedef struct {\n    CN_AST_BASE_MEMBERS\n} Cn_Ast_Node",
+    "summary": "Generic ast node, every `Cn_Ast_...` struct starts with the same members.",
     "description": "",
     "tags": [
       { "kind": "SINCE", "text": "0.3.0" }
@@ -3223,11 +3208,11 @@
     "flags": []
   },
   {
-    "symbol": "CN_AST_SLOT_GEN_LIST",
+    "symbol": "CN_AST_BASE",
     "kind": "macro",
     "module": "Ast",
-    "decl": "#define CN_AST_SLOT_GEN_LIST(X)                                                                             \\\n    X(EXTERNAL_DECLARATION,             External_Declaration,               external_declaration)           \\\n    X(EXTERNAL_DECLARATION_PREFIX,      External_Declaration_Prefix,        external_declaration_prefix)    \\\n    X(STATEMENT,                        Statement,                          statement)                      \\\n    X(TYPE_SPECIFIER,                   Type_Specifier,                     type_specifier)                 \\\n    X(PRIMARY,                          Primary,                            primary)                        \\\n    X(DECLARATION_PREFIX,               Declaration_Prefix,                 declaration_prefix)             \\\n    X(MEMBER_DECLARATION_PREFIX,        Member_Declaration_Prefix,          member_declaration_prefix)      \\\n    X(EXPRESSION_PREFIX,                Expression_Prefix,                  expression_prefix)              \\\n    X(DECLARATION_SPECIFIERS,           Declaration_Specifiers,             declaration_specifiers)         \\\n    X(POINTER,                          Pointer,                            pointer)                        \\\n    X(AFTER_DECLARATOR,                 After_Declarator,                   after_declarator)               \\\n    X(MEMBER_DECLARATOR,                Member_Declarator,                  member_declarator)              \\\n    X(TAG,                              Tag,                                tag)                            \\\n    X(ENUMERATOR,                       Enumerator,                         enumerator)                     \\",
-    "summary": "List for X macro generation of core ast slots---grammar points where custom sub-parser can be plugged in.",
+    "decl": "#define CN_AST_BASE                         \\\n    union {                                 \\\n        Cn_Ast_Node base;                   \\\n        struct { CN_AST_BASE_MEMBERS };     \\\n    }",
+    "summary": "Ast node base that is added to each ast node struct definition.",
     "description": "",
     "tags": [
       { "kind": "SINCE", "text": "0.3.0" }
@@ -3235,11 +3220,11 @@
     "flags": []
   },
   {
-    "symbol": "Cn_Ast_Slot_Id",
-    "kind": "typedef",
+    "symbol": "Cn_Ast_Member_Info_Kind",
+    "kind": "enum",
     "module": "Ast",
-    "decl": "typedef uint32_t Cn_Ast_Slot_Id",
-    "summary": "Type definition of ids that slots use.",
+    "decl": "typedef enum {\n    CN_AST_MEMBER_INFO_NODE,\n    CN_AST_MEMBER_INFO_NODES,\n    CN_AST_MEMBER_INFO_STRING,\n    CN_AST_MEMBER_INFO_UINT64,\n    CN_AST_MEMBER_INFO_INT32,\n    CN_AST_MEMBER_INFO_DOUBLE,\n    CN_AST_MEMBER_INFO_TYPE,\n} Cn_Ast_Member_Info_Kind",
+    "summary": "Enum that represents kind of member entry of ast node struct.",
     "description": "",
     "tags": [
       { "kind": "SINCE", "text": "0.3.0" }
@@ -3247,35 +3232,15 @@
     "flags": []
   },
   {
-    "symbol": "CN_AST_SLOT_DECLARE_KINDS",
-    "kind": "macro",
+    "symbol": "Cn_Ast_Member_Info",
+    "kind": "struct",
     "module": "Ast",
-    "decl": "#define CN_AST_SLOT_DECLARE_KINDS(NAME, Name, ID, LIST)                     \\\n    typedef enum {                                                          \\\n        CN_AST_SLOT_##NAME##_UNKNOWN = CN_AST_KIND_EXTENSION_BASE(ID),      \\\n        LIST(CN__AST_SLOT_ENUM_ENTRY)                                       \\\n        CN_AST_SLOT_##NAME##__END                                           \\\n    } Cn_Ast_Slot_##Name##_Kind;                                            \\",
-    "summary": "",
+    "decl": "typedef struct {\n    const char              *name;\n    size_t                   offset;\n    Cn_Ast_Member_Info_Kind  kind;\n} Cn_Ast_Member_Info",
+    "summary": "Struct definition that represents member entry of ast node struct.",
     "description": "",
     "tags": [
-      { "kind": "TODO", "text": "Wrote me." }
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
-    "flags": []
-  },
-  {
-    "symbol": "cn_ast_ext_merge",
-    "kind": "function",
-    "module": "Ast",
-    "decl": "Cn_Ast_Extensions cn_ast_ext_merge(Cn_Ast_Extensions a, Cn_Ast_Extensions b)",
-    "summary": "Merges two extensions lists `a` and `b`, by reallocating and combinding them.\nInto a new extensions list, order is `a` elements first then `b` elements.",
-    "description": "",
-    "tags": [],
-    "flags": []
-  },
-  {
-    "symbol": "cn_ast_ext_stack_push",
-    "kind": "macro",
-    "module": "Ast",
-    "decl": "#define cn_ast_ext_stack_push(ext) cn_array_list_append(&cn__tu_data->ext_stack, (ext))",
-    "summary": "Pushes `ext` onto the `ext_stack`.",
-    "description": "",
-    "tags": [],
     "flags": []
   },
   {
@@ -3285,18 +3250,21 @@
     "decl": "typedef struct {\n    const char          *name;\n    size_t               size;\n    Cn_Ast_Member_Info  *members;\n    int64_t              members_count;\n    void                *emit_func;\n} Cn_Ast_Info",
     "summary": "This struct is used to store generically meta information for each ast node type.",
     "description": "",
-    "tags": [],
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
     "flags": []
   },
   {
     "symbol": "cn_ast_info",
     "kind": "function",
     "module": "Ast",
-    "decl": "Cn_Ast_Info *cn_ast_info(Cn_Ast_Id id)",
-    "summary": "Gets info of any ast node type, based on its id, even if\nnode is coming from the library extensions.",
+    "decl": "Cn_Ast_Info *cn_ast_info(Cn_Ast_Kind kind)",
+    "summary": "Gets info of any ast node type, based on its kind.",
     "description": "",
     "tags": [
-      { "kind": "IMPORTANT", "text": "Expects id to be a valid AST id.\nExpects all ast nodes to have their respective infos.\nNever returns `NULL` but asserts expectations set above." }
+      { "kind": "IMPORTANT", "text": "Expects kind to be a valid AST kind.\nExpects all ast nodes to have their respective infos.\nNever returns `NULL` but asserts expectations set above." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -3306,59 +3274,819 @@
     "module": "Ast",
     "decl": "#define cn_ast_as(T, p) ((Cn_Ast_##T *)(p))",
     "summary": "Downcasts generic node pointer `p` to a concrete node type.",
-    "description": "`T` is the type name column of `CN_AST_GEN_LIST`, e.g. `cn_ast_as(Function, node)`.",
-    "tags": [],
+    "description": "`T` is the struct name without `Cn_Ast_` prefix, e.g. `cn_ast_as(Function, node)`.",
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
     "flags": []
   },
   {
-    "symbol": "cn_ast_node",
+    "symbol": "cn_ast_upcast",
     "kind": "macro",
     "module": "Ast",
-    "decl": "#define cn_ast_node(p) ((Cn_Ast_Node *)(p))",
+    "decl": "#define cn_ast_upcast(p) ((Cn_Ast_Node *)(p))",
     "summary": "Upcasts concrete node pointer `p` to the generic `Cn_Ast_Node *`.",
     "description": "Every `Cn_Ast_...` struct starts with `CN_AST_BASE`, so this is always valid.",
-    "tags": [],
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
     "flags": []
   },
   {
-    "symbol": "CN_AST_DECLARE_STRUCTS",
-    "kind": "macro",
+    "symbol": "Cn_Ast_Code",
+    "kind": "struct",
     "module": "Ast",
-    "decl": "#define CN_AST_DECLARE_STRUCTS(LIST)            \\\n    LIST(CN__AST_STRUCT_FORWARD_DECLARATION)    \\",
-    "summary": "Macro for forward declaration of every concrete node type, so that node structs\ncan reference each other, and themselves, by pointer regardless of the\norder they are defined in below.",
-    "description": "",
-    "tags": [],
-    "flags": []
-  },
-  {
-    "symbol": "CN_AST_DEFINE_STRUCTS",
-    "kind": "macro",
-    "module": "Ast",
-    "decl": "#define CN_AST_DEFINE_STRUCTS(LIST)                             \\\n    LIST(CN__AST_STRUCT_DEFINITION)                             \\",
-    "summary": "Macro for definition of every concrete ast node type.",
-    "description": "",
-    "tags": [],
-    "flags": []
-  },
-  {
-    "symbol": "CN_AST_INFO_DEFINE_ARRAY",
-    "kind": "macro",
-    "module": "Ast",
-    "decl": "#define CN_AST_INFO_DEFINE_ARRAY(NAME, ID, LIST)                                        \\\n   const Cn_Ast_Info_Array cn__ast_info_##NAME##_array = {                       \\\n        .infos = (Cn_Ast_Info []) {                                                     \\\n            { .name = \"<unknown>\", .size = 0, .members = NULL, .members_count = 0 },    \\\n            LIST(CN__AST_INFO_DESIGNATION)                                              \\\n        },                                                                              \\\n        .length = (int64_t)CN_AST_##NAME##__END,                                        \\\n   }",
-    "summary": "This macro generates all meta info for the AST types list specified.\nThe meta info generated is stored statically. If you writing your own extension,\nmake sure to declare this array in header using `CN_AST_INFO_DECLARE_ARRAY`.\nand then simply define it using this macro somewhere in your implementation.\nIn this file it is done at the very end of the file, so that all declarations\nand bindings can be referenced from array definiton.",
-    "description": "",
-    "tags": [],
-    "flags": []
-  },
-  {
-    "symbol": "CN_AST_INFO_TABLE_REGISTER",
-    "kind": "macro",
-    "module": "Ast",
-    "decl": "#define CN_AST_INFO_TABLE_REGISTER(table, ID, NAME) table[ID] = cn__ast_info_##NAME##_array",
-    "summary": "Following macro adds ast infos to the table given the extension `ID` and `LIST` of\nAST nodes.",
+    "decl": "typedef struct { CN_AST_BASE;\n    Cn_String text;\n} Cn_Ast_Code",
+    "summary": "Raw code fragment, usually built by meta programs with `cn_build`, it is emitted as is.",
     "description": "",
     "tags": [
-      { "kind": "PARAM", "text": "NAME: Extension uppercase name." }
+      { "kind": "MEMBER", "text": "text: Code text, newlines in it are indented to the current emit level." },
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "Cn_Ast_Translation_Unit",
+    "kind": "struct",
+    "module": "Ast",
+    "decl": "typedef struct { CN_AST_BASE;\n    Cn_Ast_Nodes external_declarations;\n} Cn_Ast_Translation_Unit",
+    "summary": "Root node of the translation unit.",
+    "description": "",
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "Cn_Ast_External_Declaration",
+    "kind": "struct",
+    "module": "Ast",
+    "decl": "typedef struct { CN_AST_BASE;\n    Cn_Ast_Node *child;\n} Cn_Ast_External_Declaration",
+    "summary": "Single file scope declaration, function definition, stray `;` or GNU file scope `asm`.",
+    "description": "",
+    "tags": [
+      { "kind": "MEMBER", "text": "child: `Function`, `Declaration` or `Gnu_Asm_Statement` node, `NULL` for stray `;`." },
+      { "kind": "NOTE", "text": "With `CN_GNU`, node is flagged with `CN_AST_GNU_EXTENSION` if it is preceded by `__extension__`." },
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "Cn_Ast_Identifier",
+    "kind": "struct",
+    "module": "Ast",
+    "decl": "typedef struct { CN_AST_BASE;\n    Cn_String name;\n} Cn_Ast_Identifier",
+    "summary": "Identifier, name of a symbol, tag, member or label.",
+    "description": "",
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "Cn_Ast_Integer",
+    "kind": "struct",
+    "module": "Ast",
+    "decl": "typedef struct { CN_AST_BASE;\n    uint64_t value;\n} Cn_Ast_Integer",
+    "summary": "Integer literal.",
+    "description": "",
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "Cn_Ast_Float",
+    "kind": "struct",
+    "module": "Ast",
+    "decl": "typedef struct { CN_AST_BASE;\n    double value;\n} Cn_Ast_Float",
+    "summary": "Floating point literal.",
+    "description": "",
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "Cn_Ast_Char",
+    "kind": "struct",
+    "module": "Ast",
+    "decl": "typedef struct { CN_AST_BASE;\n    uint64_t value;\n    int      unit_count;\n} Cn_Ast_Char",
+    "summary": "Character literal.",
+    "description": "",
+    "tags": [
+      { "kind": "MEMBER", "text": "unit_count: Number of character units in the literal, more than `1` for multi-character literals." },
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "Cn_Ast_String",
+    "kind": "struct",
+    "module": "Ast",
+    "decl": "typedef struct { CN_AST_BASE;\n    Cn_String str;\n} Cn_Ast_String",
+    "summary": "String literal, adjacent literals are concatenated into one.",
+    "description": "",
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "Cn_Ast_Attribute_Specifier",
+    "kind": "struct",
+    "module": "Ast",
+    "decl": "typedef struct { CN_AST_BASE;\n    Cn_Ast_Nodes attributes;\n} Cn_Ast_Attribute_Specifier",
+    "summary": "Attribute specifier, `[[attributes]]`, or with `CN_GNU` also `__attribute__((attributes))`.",
+    "description": "",
+    "tags": [
+      { "kind": "NOTE", "text": "Flagged with `CN_AST_ATTRIBUTE_SPECIFIER_IS_GNU` if it is written in GNU syntax." },
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "Cn_Ast_Attribute",
+    "kind": "struct",
+    "module": "Ast",
+    "decl": "typedef struct { CN_AST_BASE;\n    Cn_Ast_Identifier *vendor_identifier;\n    Cn_Ast_Identifier *identifier;\n    Cn_Ast_Nodes       arguments;\n} Cn_Ast_Attribute",
+    "summary": "Single attribute, `vendor::identifier(arguments)`.",
+    "description": "",
+    "tags": [
+      { "kind": "MEMBER", "text": "vendor_identifier: Attribute namespace, `NULL` if not specified, always `NULL` in GNU syntax." },
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "Cn_Ast_Gnu_Typeof",
+    "kind": "struct",
+    "module": "Ast",
+    "decl": "typedef struct { CN_AST_BASE;\n    Cn_Ast_Node *target;\n} Cn_Ast_Gnu_Typeof",
+    "summary": "GNU `typeof` type specifier, `typeof(type_name)` or `typeof(expression)`.",
+    "description": "",
+    "tags": [
+      { "kind": "MEMBER", "text": "target: `Type_Name` node or expression." },
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "Cn_Ast_Gnu_Asm_Statement",
+    "kind": "struct",
+    "module": "Ast",
+    "decl": "typedef struct { CN_AST_BASE;\n    Cn_Ast_Gnu_Asm_Qualifier_Flags  qualifiers;\n    Cn_Ast_String                  *template;\n    Cn_Ast_Nodes                    outputs;\n    Cn_Ast_Nodes                    inputs;\n    Cn_Ast_Nodes                    clobbers;\n    Cn_Ast_Nodes                    goto_labels;\n} Cn_Ast_Gnu_Asm_Statement",
+    "summary": "GNU `asm` statement, at block scope or at file scope.",
+    "description": "",
+    "tags": [
+      { "kind": "MEMBER", "text": "template: Assembler template string." },
+      { "kind": "MEMBER", "text": "outputs: Output `Gnu_Asm_Operand` nodes." },
+      { "kind": "MEMBER", "text": "inputs: Input `Gnu_Asm_Operand` nodes." },
+      { "kind": "MEMBER", "text": "clobbers: Clobber `String` nodes." },
+      { "kind": "MEMBER", "text": "goto_labels: `Identifier` nodes of `asm goto` labels." },
+      { "kind": "NOTE", "text": "Flagged with `CN_AST_GNU_ASM_STATEMENT_IS_EXTENDED` if it has any `:` section,\notherwise it is basic asm." },
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "Cn_Ast_Gnu_Asm_Operand",
+    "kind": "struct",
+    "module": "Ast",
+    "decl": "typedef struct { CN_AST_BASE;\n    Cn_Ast_Identifier *identifier;\n    Cn_Ast_String     *string;\n    Cn_Ast_Node       *expression;\n} Cn_Ast_Gnu_Asm_Operand",
+    "summary": "Single operand of GNU `asm` statement, `[identifier] string (expression)`.",
+    "description": "",
+    "tags": [
+      { "kind": "MEMBER", "text": "identifier: Symbolic name, referenced from template as `%[name]`, `NULL` if not specified." },
+      { "kind": "MEMBER", "text": "string: Constraint, e.g. `\"=r\"`." },
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "Cn_Ast_Gnu_Asm_Label",
+    "kind": "struct",
+    "module": "Ast",
+    "decl": "typedef struct { CN_AST_BASE;\n    Cn_Ast_String *string;\n} Cn_Ast_Gnu_Asm_Label",
+    "summary": "GNU `asm(\"name\")` label of a declarator, sets assembler name of the declared symbol.",
+    "description": "",
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "Cn_Ast_Pointer",
+    "kind": "struct",
+    "module": "Ast",
+    "decl": "typedef struct cn_ast_pointer { CN_AST_BASE;\n    Cn_Ast_Qualifier_Flags  qualifiers;\n#ifdef CN_GNU\n    Cn_Ast_Nodes            attribute_specifiers;\n#endif // CN_GNU\n    struct cn_ast_pointer  *pointer;\n} Cn_Ast_Pointer",
+    "summary": "Single `*` of a declarator with its qualifiers, chained to the next `*`.",
+    "description": "",
+    "tags": [
+      { "kind": "MEMBER", "text": "attribute_specifiers: GNU attribute specifiers among the qualifiers." },
+      { "kind": "MEMBER", "text": "pointer: Next `*`, `NULL` if this is the last one." },
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "Cn_Ast_Declarator",
+    "kind": "struct",
+    "module": "Ast",
+    "decl": "typedef struct { CN_AST_BASE;\n    Cn_Ast_Pointer *pointer;\n    Cn_Ast_Node    *direct_declarator;\n} Cn_Ast_Declarator",
+    "summary": "Declarator, optional pointer followed by a direct declarator.",
+    "description": "",
+    "tags": [
+      { "kind": "MEMBER", "text": "pointer: `NULL` if declarator has no pointer." },
+      { "kind": "MEMBER", "text": "direct_declarator: `Identifier`, `Direct_Declarator_Grouped`, `Direct_Declarator_Array` or\n`Direct_Declarator_Function` node, `NULL` for an abstract declarator without one." },
+      { "kind": "NOTE", "text": "Flagged with `CN_AST_DECLARATOR_IS_ABSTRACT` if it declares no name." },
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "Cn_Ast_Direct_Declarator_Grouped",
+    "kind": "struct",
+    "module": "Ast",
+    "decl": "typedef struct { CN_AST_BASE;\n    Cn_Ast_Declarator *declarator;\n} Cn_Ast_Direct_Declarator_Grouped",
+    "summary": "Parenthesized declarator, `(declarator)`.",
+    "description": "",
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "Cn_Ast_Direct_Declarator_Array",
+    "kind": "struct",
+    "module": "Ast",
+    "decl": "typedef struct { CN_AST_BASE;\n    Cn_Ast_Node *direct_declarator;\n    Cn_Ast_Node *expression;\n} Cn_Ast_Direct_Declarator_Array",
+    "summary": "Array declarator, `direct_declarator[expression]`.",
+    "description": "",
+    "tags": [
+      { "kind": "MEMBER", "text": "expression: Array size, `NULL` if size is not specified." },
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "Cn_Ast_Direct_Declarator_Function",
+    "kind": "struct",
+    "module": "Ast",
+    "decl": "typedef struct { CN_AST_BASE;\n    Cn_Ast_Node  *direct_declarator;\n    Cn_Ast_Nodes  parameter_declarations;\n} Cn_Ast_Direct_Declarator_Function",
+    "summary": "Function declarator, `direct_declarator(parameter_declarations)`.",
+    "description": "",
+    "tags": [
+      { "kind": "NOTE", "text": "Flagged with `CN_AST_DIRECT_DECLARATOR_FUNCTION_IS_VARIADIC` if parameters end with `...`." },
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "Cn_Ast_Initializer",
+    "kind": "struct",
+    "module": "Ast",
+    "decl": "typedef struct { CN_AST_BASE;\n    Cn_Ast_Node  *expression;\n    Cn_Ast_Nodes  designations;\n} Cn_Ast_Initializer",
+    "summary": "Initializer, either a single expression or a braced list.",
+    "description": "",
+    "tags": [
+      { "kind": "MEMBER", "text": "expression: Initializing expression, `NULL` for a braced list." },
+      { "kind": "MEMBER", "text": "designations: `Designation` nodes of a braced list." },
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "Cn_Ast_Designation",
+    "kind": "struct",
+    "module": "Ast",
+    "decl": "typedef struct { CN_AST_BASE;\n    Cn_Ast_Nodes        designators;\n    Cn_Ast_Initializer *initializer;\n} Cn_Ast_Designation",
+    "summary": "Single element of a braced initializer list, `designators = initializer`.",
+    "description": "",
+    "tags": [
+      { "kind": "MEMBER", "text": "designators: `Designator` nodes, empty if element has no designation." },
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "Cn_Ast_Designator",
+    "kind": "struct",
+    "module": "Ast",
+    "decl": "typedef struct { CN_AST_BASE;\n    Cn_Ast_Identifier *identifier;\n    Cn_Ast_Node       *expression;\n    Cn_Ast_Node       *expression_range_end;\n} Cn_Ast_Designator",
+    "summary": "Single designator, `.identifier`, `[expression]` or GNU range `[expression ... expression_range_end]`.",
+    "description": "",
+    "tags": [
+      { "kind": "MEMBER", "text": "identifier: Member name, `NULL` for an index designator." },
+      { "kind": "MEMBER", "text": "expression: Index, `NULL` for a member designator." },
+      { "kind": "MEMBER", "text": "expression_range_end: Last index of a range designator, `NULL` otherwise." },
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "Cn_Ast_Init_Declarator",
+    "kind": "struct",
+    "module": "Ast",
+    "decl": "typedef struct { CN_AST_BASE;\n    Cn_Ast_Declarator    *declarator;\n#ifdef CN_GNU\n    Cn_Ast_Gnu_Asm_Label *asm_label;\n    Cn_Ast_Nodes          attribute_specifiers;\n#endif // CN_GNU\n    Cn_Ast_Initializer   *initializer;\n} Cn_Ast_Init_Declarator",
+    "summary": "Single declarator of a declaration, with its optional initializer.",
+    "description": "",
+    "tags": [
+      { "kind": "MEMBER", "text": "initializer: `NULL` if there is no initializer." },
+      { "kind": "MEMBER", "text": "asm_label: GNU `asm(\"name\")` label, `NULL` if there is none." },
+      { "kind": "MEMBER", "text": "attribute_specifiers: GNU attribute specifiers that follow the declarator." },
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "Cn_Ast_Type_Specifier_Primitive",
+    "kind": "struct",
+    "module": "Ast",
+    "decl": "typedef struct { CN_AST_BASE;\n    Cn_Ast_Type_Kind  primitive_kind;\n    Cn_Ast_Type_Width width;\n    Cn_Ast_Type_Sign  sign;\n} Cn_Ast_Type_Specifier_Primitive",
+    "summary": "Primitive type specifier, combination of keywords like `unsigned long int`.",
+    "description": "",
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "Cn_Ast_Type_Specifier_Typedef",
+    "kind": "struct",
+    "module": "Ast",
+    "decl": "typedef struct { CN_AST_BASE;\n    Cn_String typedef_name;\n} Cn_Ast_Type_Specifier_Typedef",
+    "summary": "Type specifier that names a `typedef`.",
+    "description": "",
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "Cn_Ast_Specifier_Qualifier",
+    "kind": "struct",
+    "module": "Ast",
+    "decl": "typedef struct { CN_AST_BASE;\n    Cn_Ast_Qualifier_Flags  qualifiers;\n#ifdef CN_GNU\n    Cn_Ast_Nodes            attribute_specifiers;\n#endif // CN_GNU\n    Cn_Ast_Node            *type_specifier;\n} Cn_Ast_Specifier_Qualifier",
+    "summary": "Specifier qualifier list, qualifiers and a type specifier.",
+    "description": "",
+    "tags": [
+      { "kind": "MEMBER", "text": "attribute_specifiers: GNU attribute specifiers among the qualifiers." },
+      { "kind": "MEMBER", "text": "type_specifier: Any type specifier node." },
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "Cn_Ast_Type_Name",
+    "kind": "struct",
+    "module": "Ast",
+    "decl": "typedef struct { CN_AST_BASE;\n    Cn_Ast_Specifier_Qualifier *specifier_qualifier;\n    Cn_Ast_Declarator          *abstract_declarator;\n} Cn_Ast_Type_Name",
+    "summary": "Type name, used by casts, `sizeof` and compound literals.",
+    "description": "",
+    "tags": [
+      { "kind": "MEMBER", "text": "abstract_declarator: `NULL` if type name has no declarator." },
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "Cn_Ast_Declaration_Specifiers",
+    "kind": "struct",
+    "module": "Ast",
+    "decl": "typedef struct { CN_AST_BASE;\n    Cn_Ast_Storage_Specifier_Flags   storage_specifiers;\n    Cn_Ast_Qualifier_Flags           qualifiers;\n    Cn_Ast_Function_Specifier_Flags  function_specifiers;\n#ifdef CN_GNU\n    Cn_Ast_Nodes                     attribute_specifiers;\n#endif // CN_GNU\n    Cn_Ast_Node                     *type_specifier;\n} Cn_Ast_Declaration_Specifiers",
+    "summary": "Declaration specifiers, storage class, qualifiers, function specifiers and a type specifier.",
+    "description": "",
+    "tags": [
+      { "kind": "MEMBER", "text": "attribute_specifiers: GNU attribute specifiers among the specifiers." },
+      { "kind": "MEMBER", "text": "type_specifier: Any type specifier node." },
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "Cn_Ast_Parameter_Declaration",
+    "kind": "struct",
+    "module": "Ast",
+    "decl": "typedef struct { CN_AST_BASE;\n    Cn_Ast_Declaration_Specifiers *declaration_specifiers;\n    Cn_Ast_Declarator             *declarator;\n} Cn_Ast_Parameter_Declaration",
+    "summary": "Single parameter of a function declarator.",
+    "description": "",
+    "tags": [
+      { "kind": "MEMBER", "text": "declarator: Named or abstract declarator, `NULL` if parameter has none." },
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "Cn_Ast_Struct_Specifier",
+    "kind": "struct",
+    "module": "Ast",
+    "decl": "typedef struct { CN_AST_BASE;\n    Cn_Ast_Nodes       attribute_specifiers;\n    Cn_Ast_Identifier *identifier;\n    Cn_Ast_Nodes       member_declarations;\n} Cn_Ast_Struct_Specifier",
+    "summary": "`struct` specifier, a definition or a reference to a tag.",
+    "description": "",
+    "tags": [
+      { "kind": "MEMBER", "text": "attribute_specifiers: Attribute specifiers right after the `struct` keyword." },
+      { "kind": "MEMBER", "text": "identifier: Tag name, `NULL` for an anonymous struct." },
+      { "kind": "NOTE", "text": "Flagged with `CN_AST_STRUCT_HAS_DEFINITION` if it has a member list." },
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "Cn_Ast_Union_Specifier",
+    "kind": "struct",
+    "module": "Ast",
+    "decl": "typedef struct { CN_AST_BASE;\n    Cn_Ast_Nodes       attribute_specifiers;\n    Cn_Ast_Identifier *identifier;\n    Cn_Ast_Nodes       member_declarations;\n} Cn_Ast_Union_Specifier",
+    "summary": "`union` specifier, a definition or a reference to a tag.",
+    "description": "",
+    "tags": [
+      { "kind": "MEMBER", "text": "attribute_specifiers: Attribute specifiers right after the `union` keyword." },
+      { "kind": "MEMBER", "text": "identifier: Tag name, `NULL` for an anonymous union." },
+      { "kind": "NOTE", "text": "Flagged with `CN_AST_UNION_HAS_DEFINITION` if it has a member list." },
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "Cn_Ast_Member_Declaration",
+    "kind": "struct",
+    "module": "Ast",
+    "decl": "typedef struct { CN_AST_BASE;\n    Cn_Ast_Nodes                attribute_specifiers;\n    Cn_Ast_Specifier_Qualifier *specifier_qualifier;\n    Cn_Ast_Nodes                member_declarators;\n} Cn_Ast_Member_Declaration",
+    "summary": "Member declaration of a struct or union, `int a, b : 3;`.",
+    "description": "",
+    "tags": [
+      { "kind": "NOTE", "text": "With `CN_GNU`, flagged with `CN_AST_GNU_EXTENSION` if it is preceded by `__extension__`." },
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "Cn_Ast_Member_Declarator",
+    "kind": "struct",
+    "module": "Ast",
+    "decl": "typedef struct { CN_AST_BASE;\n    Cn_Ast_Declarator *declarator;\n    Cn_Ast_Node       *bitfield;\n#ifdef CN_GNU\n    Cn_Ast_Nodes       attribute_specifiers;\n#endif // CN_GNU\n} Cn_Ast_Member_Declarator",
+    "summary": "Single declarator of a member declaration.",
+    "description": "",
+    "tags": [
+      { "kind": "MEMBER", "text": "declarator: `NULL` for an unnamed bit-field." },
+      { "kind": "MEMBER", "text": "bitfield: Bit-field width, `NULL` if member is not a bit-field." },
+      { "kind": "MEMBER", "text": "attribute_specifiers: GNU attribute specifiers that follow the declarator." },
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "Cn_Ast_Enum_Specifier",
+    "kind": "struct",
+    "module": "Ast",
+    "decl": "typedef struct { CN_AST_BASE;\n    Cn_Ast_Nodes                attribute_specifiers;\n    Cn_Ast_Identifier          *identifier;\n    Cn_Ast_Specifier_Qualifier *specifier_qualifier;\n    Cn_Ast_Nodes                enumerators;\n} Cn_Ast_Enum_Specifier",
+    "summary": "`enum` specifier, a definition or a reference to a tag.",
+    "description": "",
+    "tags": [
+      { "kind": "MEMBER", "text": "attribute_specifiers: Attribute specifiers right after the `enum` keyword." },
+      { "kind": "MEMBER", "text": "identifier: Tag name, `NULL` for an anonymous enum." },
+      { "kind": "MEMBER", "text": "specifier_qualifier: Fixed underlying type, `NULL` if not specified." },
+      { "kind": "NOTE", "text": "Flagged with `CN_AST_ENUM_HAS_DEFINITION` if it has an enumerator list." },
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "Cn_Ast_Enumerator",
+    "kind": "struct",
+    "module": "Ast",
+    "decl": "typedef struct { CN_AST_BASE;\n    Cn_Ast_Identifier *identifier;\n    Cn_Ast_Nodes       attribute_specifiers;\n    Cn_Ast_Node       *expression;\n} Cn_Ast_Enumerator",
+    "summary": "Single enumerator of an enum, `identifier = expression`.",
+    "description": "",
+    "tags": [
+      { "kind": "MEMBER", "text": "expression: Explicit value, `NULL` if not specified." },
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "Cn_Ast_Binary",
+    "kind": "struct",
+    "module": "Ast",
+    "decl": "typedef struct { CN_AST_BASE;\n    Cn_Type                     *type;\n    Cn_Ast_Node                 *left;\n    Cn_Ast_Binary_Operator_Kind  operator;\n    Cn_Ast_Node                 *right;\n} Cn_Ast_Binary",
+    "summary": "Binary expression, `left operator right`, including the comma operator.",
+    "description": "",
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "Cn_Ast_Access",
+    "kind": "struct",
+    "module": "Ast",
+    "decl": "typedef struct { CN_AST_BASE;\n    Cn_Type           *type;\n    Cn_Ast_Node       *expression;\n    Cn_Ast_Identifier *member;\n} Cn_Ast_Access",
+    "summary": "Member access, `expression.member` or `expression->member`.",
+    "description": "",
+    "tags": [
+      { "kind": "NOTE", "text": "Flagged with `CN_AST_ACCESS_IS_POINTER` for `->`." },
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "Cn_Ast_Call",
+    "kind": "struct",
+    "module": "Ast",
+    "decl": "typedef struct { CN_AST_BASE;\n    Cn_Type      *type;\n    Cn_Ast_Node  *expression;\n    Cn_Ast_Nodes  arguments;\n} Cn_Ast_Call",
+    "summary": "Function call, `expression(arguments)`.",
+    "description": "",
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "Cn_Ast_Unary",
+    "kind": "struct",
+    "module": "Ast",
+    "decl": "typedef struct { CN_AST_BASE;\n    Cn_Type                    *type;\n    Cn_Ast_Unary_Operator_Kind  operator;\n    Cn_Ast_Node                *expression;\n} Cn_Ast_Unary",
+    "summary": "Prefix unary expression, `operator expression`.",
+    "description": "",
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "Cn_Ast_Cast",
+    "kind": "struct",
+    "module": "Ast",
+    "decl": "typedef struct { CN_AST_BASE;\n    Cn_Type          *type;\n    Cn_Ast_Type_Name *type_name;\n    Cn_Ast_Node      *expression;\n} Cn_Ast_Cast",
+    "summary": "Cast expression, `(type_name) expression`.",
+    "description": "",
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "Cn_Ast_Compound",
+    "kind": "struct",
+    "module": "Ast",
+    "decl": "typedef struct { CN_AST_BASE;\n    Cn_Type          *type;\n    Cn_Ast_Type_Name *type_name;\n    Cn_Ast_Nodes      designations;\n} Cn_Ast_Compound",
+    "summary": "Compound literal, `(type_name) { designations }`.",
+    "description": "",
+    "tags": [
+      { "kind": "MEMBER", "text": "designations: `Designation` nodes of the initializer list." },
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "Cn_Ast_Sizeof",
+    "kind": "struct",
+    "module": "Ast",
+    "decl": "typedef struct { CN_AST_BASE;\n    Cn_Type     *type;\n    Cn_Ast_Node *target;\n} Cn_Ast_Sizeof",
+    "summary": "`sizeof` expression.",
+    "description": "",
+    "tags": [
+      { "kind": "MEMBER", "text": "target: `Type_Name` node or expression." },
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "Cn_Ast_Ternary",
+    "kind": "struct",
+    "module": "Ast",
+    "decl": "typedef struct { CN_AST_BASE;\n    Cn_Type     *type;\n    Cn_Ast_Node *condition;\n    Cn_Ast_Node *if_true;\n    Cn_Ast_Node *if_false;\n} Cn_Ast_Ternary",
+    "summary": "Conditional expression, `condition ? if_true : if_false`.",
+    "description": "",
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "Cn_Ast_Assign",
+    "kind": "struct",
+    "module": "Ast",
+    "decl": "typedef struct { CN_AST_BASE;\n    Cn_Type                         *type;\n    Cn_Ast_Node                     *left;\n    Cn_Ast_Assignment_Operator_Kind  operator;\n    Cn_Ast_Node                     *right;\n} Cn_Ast_Assign",
+    "summary": "Assignment expression, `left operator right`, where `operator` is `=` or compound assignment.",
+    "description": "",
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "Cn_Ast_Postfix",
+    "kind": "struct",
+    "module": "Ast",
+    "decl": "typedef struct { CN_AST_BASE;\n    Cn_Type                      *type;\n    Cn_Ast_Node                  *expression;\n    Cn_Ast_Postfix_Operator_Kind  operator;\n} Cn_Ast_Postfix",
+    "summary": "Postfix expression, `expression++` or `expression--`.",
+    "description": "",
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "Cn_Ast_Primary",
+    "kind": "struct",
+    "module": "Ast",
+    "decl": "typedef struct { CN_AST_BASE;\n    Cn_Type     *type;\n    Cn_Ast_Node *literal;\n} Cn_Ast_Primary",
+    "summary": "Primary expression, wraps a single literal so it can be typed.",
+    "description": "",
+    "tags": [
+      { "kind": "MEMBER", "text": "literal: `Identifier`, `Integer`, `Float`, `Char` or `String` node." },
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "Cn_Ast_Block",
+    "kind": "struct",
+    "module": "Ast",
+    "decl": "typedef struct { CN_AST_BASE;\n    Cn_Ast_Nodes attribute_specifiers;\n    Cn_Ast_Nodes block_items;\n} Cn_Ast_Block",
+    "summary": "Compound statement, `{ ... }`, that opens a new scope.",
+    "description": "",
+    "tags": [
+      { "kind": "MEMBER", "text": "block_items: `Block_Item` nodes, in order." },
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "Cn_Ast_Block_Item",
+    "kind": "struct",
+    "module": "Ast",
+    "decl": "typedef struct { CN_AST_BASE;\n    Cn_Ast_Node *declaration_or_statement;\n} Cn_Ast_Block_Item",
+    "summary": "Single item of a block.",
+    "description": "",
+    "tags": [
+      { "kind": "MEMBER", "text": "declaration_or_statement: `Declaration` node or any statement node." },
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "Cn_Ast_If",
+    "kind": "struct",
+    "module": "Ast",
+    "decl": "typedef struct { CN_AST_BASE;\n    Cn_Ast_Nodes  attribute_specifiers;\n    Cn_Ast_Node  *condition;\n    Cn_Ast_Node  *then_statement;\n    Cn_Ast_Node  *else_statement;\n} Cn_Ast_If",
+    "summary": "`if` statement.",
+    "description": "",
+    "tags": [
+      { "kind": "MEMBER", "text": "else_statement: `NULL` if there is no `else` branch." },
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "Cn_Ast_Switch",
+    "kind": "struct",
+    "module": "Ast",
+    "decl": "typedef struct { CN_AST_BASE;\n    Cn_Ast_Nodes  attribute_specifiers;\n    Cn_Ast_Node  *condition;\n    Cn_Ast_Node  *body;\n} Cn_Ast_Switch",
+    "summary": "`switch` statement, its `case` and `default` labels are `Label` nodes inside of `body`.",
+    "description": "",
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "Cn_Ast_While",
+    "kind": "struct",
+    "module": "Ast",
+    "decl": "typedef struct { CN_AST_BASE;\n    Cn_Ast_Nodes  attribute_specifiers;\n    Cn_Ast_Node  *condition;\n    Cn_Ast_Node  *body;\n} Cn_Ast_While",
+    "summary": "`while` statement.",
+    "description": "",
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "Cn_Ast_Do_While",
+    "kind": "struct",
+    "module": "Ast",
+    "decl": "typedef struct { CN_AST_BASE;\n    Cn_Ast_Nodes  attribute_specifiers;\n    Cn_Ast_Node  *condition;\n    Cn_Ast_Node  *body;\n} Cn_Ast_Do_While",
+    "summary": "`do ... while` statement.",
+    "description": "",
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "Cn_Ast_For",
+    "kind": "struct",
+    "module": "Ast",
+    "decl": "typedef struct { CN_AST_BASE;\n    Cn_Ast_Nodes  attribute_specifiers;\n    Cn_Ast_Node  *initialization;\n    Cn_Ast_Node  *condition;\n    Cn_Ast_Node  *update;\n    Cn_Ast_Node  *body;\n} Cn_Ast_For",
+    "summary": "`for` statement, each of its clauses is `NULL` if omitted.",
+    "description": "",
+    "tags": [
+      { "kind": "MEMBER", "text": "initialization: `Declaration` node or expression." },
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "Cn_Ast_Label",
+    "kind": "struct",
+    "module": "Ast",
+    "decl": "typedef struct { CN_AST_BASE;\n    Cn_Ast_Nodes       attribute_specifiers;\n    Cn_Ast_Identifier *identifier;\n    Cn_Ast_Node       *expression;\n    Cn_Ast_Node       *statement;\n} Cn_Ast_Label",
+    "summary": "Labeled statement: named label, `case` or `default`.",
+    "description": "",
+    "tags": [
+      { "kind": "MEMBER", "text": "identifier: Label name, `NULL` for `case` and `default`." },
+      { "kind": "MEMBER", "text": "expression: Constant expression of `case`, `NULL` otherwise." },
+      { "kind": "NOTE", "text": "Flagged with `CN_AST_LABEL_IS_CASE` or `CN_AST_LABEL_IS_DEFAULT`." },
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "Cn_Ast_Goto",
+    "kind": "struct",
+    "module": "Ast",
+    "decl": "typedef struct { CN_AST_BASE;\n    Cn_Ast_Nodes       attribute_specifiers;\n    Cn_Ast_Identifier *identifier;\n} Cn_Ast_Goto",
+    "summary": "`goto` statement.",
+    "description": "",
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "Cn_Ast_Return",
+    "kind": "struct",
+    "module": "Ast",
+    "decl": "typedef struct { CN_AST_BASE;\n    Cn_Ast_Nodes  attribute_specifiers;\n    Cn_Ast_Node  *expression;\n} Cn_Ast_Return",
+    "summary": "`return` statement.",
+    "description": "",
+    "tags": [
+      { "kind": "MEMBER", "text": "expression: `NULL` if no value is returned." },
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "Cn_Ast_Break",
+    "kind": "struct",
+    "module": "Ast",
+    "decl": "typedef struct { CN_AST_BASE;\n    Cn_Ast_Nodes attribute_specifiers;\n} Cn_Ast_Break",
+    "summary": "`break` statement.",
+    "description": "",
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "Cn_Ast_Continue",
+    "kind": "struct",
+    "module": "Ast",
+    "decl": "typedef struct { CN_AST_BASE;\n    Cn_Ast_Nodes attribute_specifiers;\n} Cn_Ast_Continue",
+    "summary": "`continue` statement.",
+    "description": "",
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "Cn_Ast_Expression_Statement",
+    "kind": "struct",
+    "module": "Ast",
+    "decl": "typedef struct { CN_AST_BASE;\n    Cn_Ast_Nodes  attribute_specifiers;\n    Cn_Ast_Node  *expression;\n} Cn_Ast_Expression_Statement",
+    "summary": "Expression followed by `;`.",
+    "description": "",
+    "tags": [
+      { "kind": "MEMBER", "text": "expression: `NULL` for the empty statement `;`." },
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "Cn_Ast_Declaration",
+    "kind": "struct",
+    "module": "Ast",
+    "decl": "typedef struct { CN_AST_BASE;\n    Cn_Ast_Nodes                   attribute_specifiers;\n    Cn_Ast_Declaration_Specifiers *declaration_specifiers;\n    Cn_Ast_Nodes                   init_declarators;\n} Cn_Ast_Declaration",
+    "summary": "Declaration of zero or more names, `int a, *b = 0;`.",
+    "description": "",
+    "tags": [
+      { "kind": "NOTE", "text": "Flagged with `CN_AST_DECLARATION_IS_EMPTY` if it declares no names, e.g. `struct S { int x; };`.\nWith `CN_GNU`, flagged with `CN_AST_GNU_EXTENSION` if it is preceded by `__extension__`." },
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "Cn_Ast_Function",
+    "kind": "struct",
+    "module": "Ast",
+    "decl": "typedef struct { CN_AST_BASE;\n    Cn_Ast_Nodes                   attribute_specifiers;\n    Cn_Ast_Declaration_Specifiers *declaration_specifiers;\n    Cn_Ast_Declarator             *declarator;\n    Cn_Ast_Block                  *block;\n} Cn_Ast_Function",
+    "summary": "Function definition, a declaration followed by its body.",
+    "description": "",
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -3371,7 +4099,8 @@
     "description": "Only `sizeof(node)` bytes are allocated, so small nodes stay small.",
     "tags": [
       { "kind": "RETURNS", "text": "`void *`, so the result can be assigned to any concrete `Cn_Ast_...` pointer\nwithout a cast." },
-      { "kind": "NOTE", "text": "Variadic, so a compound literal with commas can be passed directly." }
+      { "kind": "NOTE", "text": "Variadic, so a compound literal with commas can be passed directly." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -3379,11 +4108,12 @@
     "symbol": "cn_ast_print",
     "kind": "function",
     "module": "Ast",
-    "decl": "void cn_ast_print(void * idx, int depth)",
+    "decl": "void cn_ast_print(void *node, int depth)",
     "summary": "Recursively prints ast tree of `idx` to `stdout`.",
     "description": "",
     "tags": [
-      { "kind": "IMPORTANT", "text": "Use `0` as starting `depth`." }
+      { "kind": "PARAM", "text": "depth: Use `0` for starting value." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -3391,11 +4121,12 @@
     "symbol": "cn_ast_node_kind_name",
     "kind": "function",
     "module": "Ast",
-    "decl": "const char *cn_ast_node_kind_name(Cn_Ast_Id id)",
+    "decl": "const char *cn_ast_node_kind_name(Cn_Ast_Kind kind)",
     "summary": "Gets enum name of the node `kind`, used in messages.",
     "description": "",
     "tags": [
-      { "kind": "RETURNS", "text": "Static string with the enum name of the node kind." }
+      { "kind": "RETURNS", "text": "Static string with the enum name of the node kind." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -3403,11 +4134,12 @@
     "symbol": "cn_ast_node_size",
     "kind": "function",
     "module": "Ast",
-    "decl": "size_t cn_ast_node_size(Cn_Ast_Id id)",
+    "decl": "size_t cn_ast_node_size(Cn_Ast_Kind kind)",
     "summary": "Gets size of the concrete node struct for the given `kind`.",
     "description": "Nodes are allocated at their own size, so anything that copies or moves a\nnode generically needs this.",
     "tags": [
-      { "kind": "RETURNS", "text": "Size in bytes of the concrete `Cn_Ast_...` struct." }
+      { "kind": "RETURNS", "text": "Size in bytes of the concrete `Cn_Ast_...` struct." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -3419,7 +4151,8 @@
     "summary": "Checks whether `node` is primary: identifier, integer, float or string.",
     "description": "",
     "tags": [
-      { "kind": "RETURNS", "text": "`true` if node is primary, `false` otherwise." }
+      { "kind": "RETURNS", "text": "`true` if node is primary, `false` otherwise." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -3430,27 +4163,33 @@
     "decl": "#define cn_ast_stack_mark() cn_array_list_length(&cn__tu_data->ptr_stack)",
     "summary": "Gets current `ptr_stack` length, used to mark start of a list.",
     "description": "",
-    "tags": [],
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
     "flags": []
   },
   {
     "symbol": "cn_ast_stack_push",
     "kind": "macro",
     "module": "Ast",
-    "decl": "#define cn_ast_stack_push(ptr) cn_array_list_append(&cn__tu_data->ptr_stack, cn_ast_node(ptr))",
+    "decl": "#define cn_ast_stack_push(ptr) cn_array_list_append(&cn__tu_data->ptr_stack, cn_ast_upcast(ptr))",
     "summary": "Pushes `ptr` onto the `ptr_stack`.",
     "description": "",
-    "tags": [],
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
     "flags": []
   },
   {
     "symbol": "cn_ast_stack_prepend",
     "kind": "macro",
     "module": "Ast",
-    "decl": "#define cn_ast_stack_prepend(ptr, mark) cn_array_list_add(&cn__tu_data->ptr_stack, (mark), cn_ast_node(ptr))",
+    "decl": "#define cn_ast_stack_prepend(ptr, mark) cn_array_list_add(&cn__tu_data->ptr_stack, (mark), cn_ast_upcast(ptr))",
     "summary": "Inserts `ptr` into the `ptr_stack` at `mark`.",
     "description": "",
-    "tags": [],
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
     "flags": []
   },
   {
@@ -3460,7 +4199,9 @@
     "decl": "#define cn_ast_stack_discard(mark) cn_array_list_pop_multiple(&cn__tu_data->ptr_stack, cn_array_list_length(&cn__tu_data->ptr_stack) - (mark))",
     "summary": "Discards all pointers added after `mark`, by returning the `ptr_stack` to it.",
     "description": "",
-    "tags": [],
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
     "flags": []
   },
   {
@@ -3471,7 +4212,8 @@
     "summary": "Finalizes range of the `ptr_stack`, from `mark` to the end, into `Cn_Ast_Nodes`.",
     "description": "Finalized pointers are popped from the stack.",
     "tags": [
-      { "kind": "RETURNS", "text": "Finalized list, allocated in the ast arena. Empty list if range is empty." }
+      { "kind": "RETURNS", "text": "Finalized list, allocated in the ast arena. Empty list if range is empty." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -3481,9 +4223,10 @@
     "module": "Ast",
     "decl": "Cn_Ast_Node *cn_ast_remove_from_list(Cn_Ast_Nodes *list, int64_t index)",
     "summary": "Removes entry at `index` from `list`, keeping order of the remaining entries.",
-    "description": "Length of the list is decreased for good.",
+    "description": "Doesn't reallocate memory, removing happens in place.",
     "tags": [
-      { "kind": "RETURNS", "text": "Removed node." }
+      { "kind": "RETURNS", "text": "Removed node." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -3496,7 +4239,7 @@
     "description": "",
     "tags": [
       { "kind": "RETURNS", "text": "Copied list." },
-      { "kind": "NOTE", "text": "Copying is recursive, so copying giant branches is not recommended." }
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -3509,7 +4252,7 @@
     "description": "",
     "tags": [
       { "kind": "RETURNS", "text": "Copied node." },
-      { "kind": "NOTE", "text": "Copying is recursive, so copying giant branches is not recommended." }
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -3521,7 +4264,8 @@
     "summary": "Removes attribute `attribute_name` from attribute list of `target`.",
     "description": "",
     "tags": [
-      { "kind": "RETURNS", "text": "`true` if attribute was found and removed, `false` otherwise." }
+      { "kind": "RETURNS", "text": "`true` if attribute was found and removed, `false` otherwise." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -3534,7 +4278,7 @@
     "description": "",
     "tags": [
       { "kind": "OUTPUTS", "text": "Last declarator in chain, written to `last_declarator`." },
-      { "kind": "TODO", "text": "Make always output `NIL` as identifier on any abstract declarator." }
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -3549,7 +4293,7 @@
       { "kind": "RETURNS", "text": "`true` on success, `false` if declarator is not a proper function." },
       { "kind": "OUTPUTS", "text": "Parameter type list of the function, written to `function_direct_declarator` if it is not `NULL`." },
       { "kind": "OUTPUTS", "text": "Last declarator in chain, written to `last_declarator`." },
-      { "kind": "TODO", "text": "Make always output `NIL` as identifier on any abstract declarator." }
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -3563,7 +4307,8 @@
     "tags": [
       { "kind": "RETURNS", "text": "Found attribute, `NULL` if there is none." },
       { "kind": "OUTPUTS", "text": "Attribute specifier holding the attribute, written to `owner` if it is not `NULL`." },
-      { "kind": "OUTPUTS", "text": "Position of the attribute in the list of that specifier, written to `index` if it is not `NULL`." }
+      { "kind": "OUTPUTS", "text": "Position of the attribute in the list of that specifier, written to `index` if it is not `NULL`." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -3576,7 +4321,8 @@
     "description": "",
     "tags": [
       { "kind": "RETURNS", "text": "Found attribute, `NULL` if there is none." },
-      { "kind": "NOTE", "text": "If there are multiple attributes with the same name, the first one is found." }
+      { "kind": "NOTE", "text": "If there are multiple attributes with the same name, the first one is found." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -3584,12 +4330,133 @@
     "symbol": "cn_get_expression_type",
     "kind": "function",
     "module": "Get",
-    "decl": "Cn_Type *cn_get_expression_type(void * expression)",
+    "decl": "Cn_Type *cn_get_expression_type(void *expression)",
     "summary": "Gets resulting type of `expression`.",
     "description": "Type is read from the first `CN_AST_MEMBER_INFO_TYPE` member of the node, so custom\nexpression nodes are supported too, as long as they declare such member.",
     "tags": [
       { "kind": "RETURNS", "text": "Valid type on success, `NULL` if expression wasn't typechecked." },
-      { "kind": "IMPORTANT", "text": "Expects `expression != NULL`." }
+      { "kind": "IMPORTANT", "text": "Expects `expression != NULL`." },
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "Cn_Diagnostic_Code",
+    "kind": "enum",
+    "module": "Diagnostics",
+    "decl": "typedef enum {\n    CN_DC_ZERO = 0,\n    CN_DC_DUPLICATE_TYPE_SPECIFIER,\n    CN_DC_EXPECTED_TOKEN,\n    CN_DC_EXPECTED_EXPRESSION,\n    CN_DC_UNEXPECTED_TOKEN,\n    CN_DC_INVALID_DECLARATOR,\n    CN_DC_INVALID_TYPE_NAME,\n    CN_DC_MULTIPLE_STORAGE_SPECIFIERS,\n    CN_DC_MISSING_DECLARATION_SPECIFIER,\n    CN_DC_INVALID_TYPE_SPECIFIER,\n    CN_DC_REDEFINITION,\n    CN_DC_INCOMPLETE_TYPE,\n    CN_DC_INVALID_SYMBOL,\n    CN_DC_ILLEGAL_TYPE,\n    CN_DC_INVALID_CONSTANT_EXPRESSION,\n    CN_DC_ILLEGAL_BINDING,\n    CN_DC_FROM,\n    CN_DC_EXPECTED_AST_NODE,\n    CN_DC_UNEXPECTED_FUNCTION,\n    CN_DC_ILLEGAL_ATTRIBUTE,\n    CN__DC_COUNT,\n} Cn_Diagnostic_Code",
+    "summary": "Enum for each possible diagnostic code.",
+    "description": "",
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "CN_DIAGNOSTIC_CODES",
+    "kind": "variable",
+    "module": "Diagnostics",
+    "decl": "extern const Cn_String CN_DIAGNOSTIC_CODES[CN__DC_COUNT]",
+    "summary": "Array that maps `Cn_Diagnostic_Code` to diagnostic code messages.",
+    "description": "",
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "Cn_Diagnostic_Level",
+    "kind": "enum",
+    "module": "Diagnostics",
+    "decl": "typedef enum {\n    CN_DIAGNOSTIC_INFO    = 0,\n    CN_DIAGNOSTIC_WARNING = 1,\n    CN_DIAGNOSTIC_ERROR   = 2,\n} Cn_Diagnostic_Level",
+    "summary": "Enum for diagnostic level that is given to each diagnostic message.",
+    "description": "",
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "cn_min_diagnostic_level",
+    "kind": "variable",
+    "module": "Diagnostics",
+    "decl": "extern Cn_Diagnostic_Level cn_min_diagnostic_level",
+    "summary": "Diagnostics with a level below `cn_min_diagnostic_level` are suppressed by `cn_default_log_handler`.",
+    "description": "Works the same as: `cn_log_min_level`.",
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "Cn_Diagnostic_Annotation",
+    "kind": "struct",
+    "module": "Diagnostics",
+    "decl": "typedef struct {\n    int64_t offset;\n    int64_t length;\n} Cn_Diagnostic_Annotation",
+    "summary": "Represents region in the diagnostic snippet that is highlighted.",
+    "description": "",
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "Cn_Diagnostic_Handler",
+    "kind": "typedef",
+    "module": "Diagnostics",
+    "decl": "typedef void (Cn_Diagnostic_Handler)(Cn_Diagnostic_Level level, Cn_Location *loc, Cn_Diagnostic_Code code, Cn_String span, Cn_Diagnostic_Annotation annotations[], size_t annotations_length, const char *format, va_list args)",
+    "summary": "Type definition of diagnostic handler, `cn_diagnostic_handler` is declared with this type.",
+    "description": "",
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "cn_diagnostic_handler",
+    "kind": "variable",
+    "module": "Diagnostics",
+    "decl": "extern Cn_Diagnostic_Handler *cn_diagnostic_handler",
+    "summary": "Current diagnostic handler, set to `cn_default_diagnostic_handler` by default.",
+    "description": "",
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "cn_default_diagnostic_handler",
+    "kind": "function",
+    "module": "Diagnostics",
+    "decl": "Cn_Diagnostic_Handler cn_default_diagnostic_handler",
+    "summary": "Prints formatted diagnostic with code snippet to `stderr`.",
+    "description": "",
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "cn_null_diagnostic_handler",
+    "kind": "function",
+    "module": "Diagnostics",
+    "decl": "Cn_Diagnostic_Handler cn_null_diagnostic_handler",
+    "summary": "Ignores all incoming diagnostics, doesn't output anything anywhere.",
+    "description": "",
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "cn_diagnostic_src",
+    "kind": "function",
+    "module": "Diagnostics",
+    "decl": "void cn_diagnostic_src(Cn_Diagnostic_Level level, Cn_Location *loc, Cn_Source *src, Cn_Diagnostic_Code code, const char *format, ...)",
+    "summary": "Passes formatted diagnostic message to the current diagnostic handler.",
+    "description": "Uses `loc` and `src` to directly specify location and code source for the diagnostic.",
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -3597,10 +4464,103 @@
     "symbol": "cn_diagnostic_node",
     "kind": "function",
     "module": "Diagnostics",
-    "decl": "void cn_diagnostic_node(Cn_Diagnostic_Level level, void * idx, Cn_Diagnostic_Code code, const char *format, ...)",
-    "summary": "Reports diagnostic per node.",
-    "description": "If node was modified or replaced, multiple diagnostics eventually\npointing to the same source location will be emitted.",
-    "tags": [],
+    "decl": "void cn_diagnostic_node(Cn_Diagnostic_Level level, void *node, Cn_Diagnostic_Code code, const char *format, ...)",
+    "summary": "Reports diagnostic using current diagnostic handler per node.",
+    "description": "",
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "Cn_Binding_Idx",
+    "kind": "typedef",
+    "module": "Binding",
+    "decl": "typedef uint32_t Cn_Binding_Idx",
+    "summary": "Type definition for index type used for binding's intrusive list.",
+    "description": "",
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "CN_BINDING_NIL_IDX",
+    "kind": "macro",
+    "module": "Binding",
+    "decl": "#define CN_BINDING_NIL_IDX 0",
+    "summary": "`NIL` binding idx value.",
+    "description": "",
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "Cn_Binding_Kind",
+    "kind": "enum",
+    "module": "Binding",
+    "decl": "typedef enum {\n    CN_BINDING_TAG,\n    CN_BINDING_VARIABLE,\n    CN_BINDING_FUCNTION,\n    CN_BINDING_TYPEDEF,\n    CN_BINDING_ENUM_CONSTANT,\n    CN_BINDING_LABEL,\n    CN_BINDING_BUILTIN,\n} Cn_Binding_Kind",
+    "summary": "Enum defining bindings' kinds.",
+    "description": "",
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "Cn_Binding_Variable",
+    "kind": "struct",
+    "module": "Binding",
+    "decl": "typedef struct {\n    Cn_Ast_Storage_Specifier_Flags storage_flags;\n    bool is_definition;\n} Cn_Binding_Variable",
+    "summary": "Variable binding struct definition.",
+    "description": "",
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "Cn_Binding_Function",
+    "kind": "struct",
+    "module": "Binding",
+    "decl": "typedef struct {\n    Cn_Ast_Storage_Specifier_Flags storage_flags;\n    Cn_Ast_Function_Specifier_Flags function_flags;\n    Cn_String *parameter_names;\n    bool is_definition;\n} Cn_Binding_Function",
+    "summary": "Function binding struct definition.",
+    "description": "",
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "Cn_Binding_Enum_Constant",
+    "kind": "struct",
+    "module": "Binding",
+    "decl": "typedef struct {\n    int64_t value;\n} Cn_Binding_Enum_Constant",
+    "summary": "Enum constant binding struct definition.",
+    "description": "",
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "Cn_Binding",
+    "kind": "struct",
+    "module": "Binding",
+    "decl": "typedef struct {\n    Cn_Binding_Kind kind;\n    Cn_String       name;\n    Cn_Ast_Node    *src;\n    Cn_Type        *type;\n    Cn_Binding_Idx  next_idx;\n    int64_t         scope_idx;\n    union {\n        Cn_Binding_Variable         b_variable;\n        Cn_Binding_Function         b_function;\n        Cn_Binding_Enum_Constant    b_enum_constant;\n    };\n} Cn_Binding",
+    "summary": "Struct definition of binding.",
+    "description": "",
+    "tags": [
+      { "kind": "MEMBER", "text": "kind: Kind of the binding, different kinds can be stored and modified differently." },
+      { "kind": "MEMBER", "text": "name: Name of the binding, a single keyword that identifies it.\nDepending on the kind of the binding, it could be a variable name, typedef name or tag name." },
+      { "kind": "MEMBER", "text": "src: Ast node the binding is coming from, usually an identifier." },
+      { "kind": "MEMBER", "text": "type: Resolved type of the binding." },
+      { "kind": "MEMBER", "text": "next_idx: Next binding in the linked list of bindings with the same name.\nEach binding can shadow a previous binding, in such case\nthe most recent binding is at the head of the linked list." },
+      { "kind": "MEMBER", "text": "scope_idx: Index of the scope in which this binding was added.\nBinding must NOT be used if its scope no longer exists." },
+      { "kind": "NOTE", "text": "`b_variable`, `b_function` and `b_enum_constant` contain additional data\nper binding kind---storage flags, parameter names, whether it is a definition or not,\nand so on." },
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
     "flags": []
   },
   {
@@ -3610,7 +4570,9 @@
     "decl": "#define cn_binding_get(idx)    (cn__tu_data->binding_list + (idx))",
     "summary": "Gets binding based on its `idx`.",
     "description": "",
-    "tags": [],
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
     "flags": []
   },
   {
@@ -3621,7 +4583,8 @@
     "summary": "Adds `binding` to the binding list, and puts its index into `binding_table` under its name.",
     "description": "",
     "tags": [
-      { "kind": "RETURNS", "text": "Index of the added binding." }
+      { "kind": "RETURNS", "text": "Index of the added binding." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -3633,7 +4596,8 @@
     "summary": "Looks up binding `name` in `binding_table`.",
     "description": "",
     "tags": [
-      { "kind": "RETURNS", "text": "Index of the found binding, `CN_BINDING_NIL_IDX` if there is none." }
+      { "kind": "RETURNS", "text": "Index of the found binding, `CN_BINDING_NIL_IDX` if there is none." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -3641,11 +4605,12 @@
     "symbol": "cn_binding_declare_function",
     "kind": "function",
     "module": "Binding",
-    "decl": "Cn_Binding_Idx cn_binding_declare_function(Cn_String name, void * source, Cn_Ast_Storage_Specifier_Flags storage_flags, Cn_Ast_Function_Specifier_Flags function_flags, Cn_Type *type, Cn_Ast_Nodes *parameter_declarations, bool is_definition)",
+    "decl": "Cn_Binding_Idx cn_binding_declare_function(Cn_String name, void *source, Cn_Ast_Storage_Specifier_Flags storage_flags, Cn_Ast_Function_Specifier_Flags function_flags, Cn_Type *type, Cn_Ast_Nodes *parameter_declarations, bool is_definition)",
     "summary": "Adds new function binding to the current scope.",
     "description": "If same binding already exists, handles redeclaration and redefinition of the binding.",
     "tags": [
-      { "kind": "RETURNS", "text": "Binding index on success, `NIL` if an error occurred." }
+      { "kind": "RETURNS", "text": "Binding index on success, `NIL` if an error occurred." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -3653,11 +4618,12 @@
     "symbol": "cn_binding_declare_variable",
     "kind": "function",
     "module": "Binding",
-    "decl": "Cn_Binding_Idx cn_binding_declare_variable(Cn_String name, void * source, Cn_Ast_Storage_Specifier_Flags storage_flags, Cn_Type *type, bool is_definition)",
+    "decl": "Cn_Binding_Idx cn_binding_declare_variable(Cn_String name, void *source, Cn_Ast_Storage_Specifier_Flags storage_flags, Cn_Type *type, bool is_definition)",
     "summary": "Adds new variable binding to the current scope.",
     "description": "If same binding already exists, handles redeclaration and redefinition of the binding.",
     "tags": [
-      { "kind": "RETURNS", "text": "Binding index on success, `NIL` if an error occurred." }
+      { "kind": "RETURNS", "text": "Binding index on success, `NIL` if an error occurred." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -3665,11 +4631,12 @@
     "symbol": "cn_binding_declare_typedef",
     "kind": "function",
     "module": "Binding",
-    "decl": "Cn_Binding_Idx cn_binding_declare_typedef(Cn_String name, void * source, Cn_Type *type)",
+    "decl": "Cn_Binding_Idx cn_binding_declare_typedef(Cn_String name, void *source, Cn_Type *type)",
     "summary": "Adds new typedef binding to the current scope.",
     "description": "If same binding already exists, handles redeclaration and redefinition of the binding.",
     "tags": [
-      { "kind": "RETURNS", "text": "Binding index on success, `NIL` if an error occurred." }
+      { "kind": "RETURNS", "text": "Binding index on success, `NIL` if an error occurred." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -3677,11 +4644,12 @@
     "symbol": "cn_binding_declare_enum_constant",
     "kind": "function",
     "module": "Binding",
-    "decl": "Cn_Binding_Idx cn_binding_declare_enum_constant(Cn_String name, void * source, Cn_Type *type, int64_t value)",
+    "decl": "Cn_Binding_Idx cn_binding_declare_enum_constant(Cn_String name, void *source, Cn_Type *type, int64_t value)",
     "summary": "Adds new enum constant binding to the current scope.",
     "description": "If same binding already exists, handles redeclaration and redefinition of the binding.",
     "tags": [
-      { "kind": "RETURNS", "text": "Binding index on success, `NIL` if an error occurred." }
+      { "kind": "RETURNS", "text": "Binding index on success, `NIL` if an error occurred." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -3693,7 +4661,8 @@
     "summary": "Declares new tag binding in the current scope.",
     "description": "If same binding already exists, handles redeclaration:\n\n- If binding exists and is complete in any scope, including current scope,\nthat binding is returned.\n\n- If binding exists but is not complete in a different scope,\nnew binding is declared in current scope.\n\n- If binding exists but is not complete in current scope,\nthat declaration is referenced.\n\n- If binding doesn't exist, new binding is declared in current scope.",
     "tags": [
-      { "kind": "RETURNS", "text": "Binding index on success, `NIL` if an error occurred." }
+      { "kind": "RETURNS", "text": "Binding index on success, `NIL` if an error occurred." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -3701,11 +4670,12 @@
     "symbol": "cn_binding_declare_label",
     "kind": "function",
     "module": "Binding",
-    "decl": "Cn_Binding_Idx cn_binding_declare_label(Cn_String name, void * source)",
+    "decl": "Cn_Binding_Idx cn_binding_declare_label(Cn_String name, void *source)",
     "summary": "Declares new label binding in the current function scope.",
     "description": "",
     "tags": [
-      { "kind": "RETURNS", "text": "Binding index on success, `NIL` if an error occurred." }
+      { "kind": "RETURNS", "text": "Binding index on success, `NIL` if an error occurred." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -3719,7 +4689,8 @@
     "tags": [
       { "kind": "PARAM", "text": "source: Only used to print error diagnostics of the source location." },
       { "kind": "RETURNS", "text": "Binding index on success, `NIL` if an error occurred." },
-      { "kind": "NOTE", "text": "Builtin's don't have source location,\nthey are names that are only binded to `CN_OPAQUE` type." }
+      { "kind": "NOTE", "text": "Builtin's don't have source location,\nthey are names that are only binded to `CN_OPAQUE` type." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -3731,7 +4702,8 @@
     "summary": "Binds parameters of function definition `function_binding_idx` as arguments in the current scope.",
     "description": "",
     "tags": [
-      { "kind": "RETURNS", "text": "`true` on success, `false` if any errors occurred." }
+      { "kind": "RETURNS", "text": "`true` on success, `false` if any errors occurred." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -3740,34 +4712,52 @@
     "kind": "enum",
     "module": "Hook",
     "decl": "typedef enum {\n    CN_HOOK_RESPONSE_NONE     = 0,\n    CN_HOOK_RESPONSE_ERROR    = 0x1,\n} Cn_Hook_Response",
-    "summary": "Response flags, they are returned by every hook function,\nthey are used to communicate on how processing should\ncontinue after hook's execution.",
-    "description": "",
-    "tags": [],
+    "summary": "Response flags, they are returned by every hook function.",
+    "description": "They are used to communicate on how processing should\ncontinue after hook's execution.",
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
     "flags": []
   },
   {
     "symbol": "Cn_Hook_Ast_Parsed",
     "kind": "typedef",
     "module": "Hook",
-    "decl": "typedef Cn_Hook_Response (Cn_Hook_Ast_Parsed)(Cn_Ast_Node **node_ptr, bool *ast_is_modified)",
-    "summary": "Classic meta programming hook, it is called after code was parsed\ninto AST.",
+    "decl": "typedef Cn_Hook_Response (Cn_Hook_Ast_Parsed)(Cn_Ast_Node **node_ptr, bool *ast_is_modified, bool first)",
+    "summary": "Type definition of classic meta programming hook, it is called after code\nwas parsed into AST.",
     "description": "It guarantees that given AST is typechecked and is correct.\nIt allows any modification of AST, those modifications will be reparsed\nsending proper diagnostics if errors occured.",
     "tags": [
+      { "kind": "IMPORTANT", "text": "Each registered hook will be called at least once." },
       { "kind": "OUTPUTS", "text": "`true` to `ast_is_modified` if AST modifications occured." },
-      { "kind": "NOTE", "text": "The reason why `node_ptr` is `Cn_Ast_Node **` is because the hook\ncan completely delete the AST node by setting `*node_ptr = NULL`.\nEssentially `*node_ptr` value is what being utilized by the library,\nmeaning it can point to a completely different AST and library will\nutilize that new node." }
+      { "kind": "PARAM", "text": "first: Is `true` if and only if this is the first call of this specific hook." },
+      { "kind": "NOTE", "text": "The reason why `node_ptr` is `Cn_Ast_Node **` is because the hook\ncan completely delete the AST node by setting `*node_ptr = NULL`.\nEssentially `*node_ptr` value is what being utilized by the library,\nmeaning it can point to a completely different AST and library will\nutilize that new node." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
   {
-    "symbol": "Cn_Hook_Parse",
+    "symbol": "Cn_Hook_Tu_Start",
     "kind": "typedef",
     "module": "Hook",
-    "decl": "typedef Cn_Hook_Response (Cn_Hook_Parse)(Cn_Ast_Slot_Id id, Cn_Ast_Node **null_ptr, Cn_Lexer *lexer)",
-    "summary": "Subparsing hook, is used to extend parsing grammar of core library.",
-    "description": "There are two ways to attach subparsed nodes to the parent ast.\n\n1) `Substitution`: The pointer to parsed node is copied to `null_ptr` output parameter.\nUpon the hook return, this pointer is utilized in the related ast slot.\n\n2) `Extension`: The subparsing uses `cn_ast_ext_*` functions to push new extensions consisting\nof ast nodes or ast lists, no need to output it anywhere. Those extensions are stored are stored\nin the `Cn_Tu_Data.ext_stack` and will be collected after all hooks finish on that slot.",
+    "decl": "typedef Cn_Hook_Response (Cn_Hook_Tu_Start)(Cn_Ast_Node **null_ptr)",
+    "summary": "Meta programming hook that is called right before parsing of translation unit starts.",
+    "description": "It guarantees that given `*null_ptr == NULL` is `true`.\nIt allows prepending of AST into translation unit, by setting `*null_ptr` to whatever AST node needed.\nThat AST is reparsed as external declarations, see `cn_parse_external_declaration`.",
     "tags": [
-      { "kind": "IMPORTANT", "text": "`null_ptr` can be `NULL` itself, only in cases where grammar slot doesn't permit\ngrammar substitution with custom ast nodes, for such slots only ast extensions are allowed." },
-      { "kind": "NOTE", "text": "Since analyzing comes from parsing, hook is responsible for analyzing and\ntypechecking whatever it parses, e.g. by calling `cn_analyze_typecheck_expression`,\nafter the expression was parsed." }
+      { "kind": "IMPORTANT", "text": "Each such hook registered is called only once." },
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "Cn_Hook_Tu_End",
+    "kind": "typedef",
+    "module": "Hook",
+    "decl": "typedef Cn_Hook_Response (Cn_Hook_Tu_End)(Cn_Ast_Node **null_ptr)",
+    "summary": "Meta programming hook that is called right after parsing of translation unit ends.",
+    "description": "Exaclty the same as `Cn_Hook_Tu_Start`, it guarantees that given `*null_ptr == NULL` is `true`.\nDifference is that it allows appending of AST into translation unit instead of prepending,\nby setting `*null_ptr` to whatever AST node needed. That AST is reparsed as external declarations,\nsee `cn_parse_external_declaration`.",
+    "tags": [
+      { "kind": "IMPORTANT", "text": "Each such hook registered is called only once." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -3775,23 +4765,12 @@
     "symbol": "Cn_Hook_Analyze_Declarator",
     "kind": "typedef",
     "module": "Hook",
-    "decl": "typedef Cn_Hook_Response (Cn_Hook_Analyze_Declarator)(Cn_Ast_Node *declarator, Cn_Type **type_ptr)",
+    "decl": "typedef Cn_Hook_Response (Cn_Hook_Analyze_Declarator)(const Cn_Ast_Node *declarator, Cn_Type **type_ptr)",
     "summary": "Analyze hook that is called whenever declarator was analyzed to type.",
     "description": "",
     "tags": [
-      { "kind": "IMPORTANT", "text": "It is not allowed to perfom AST modifications in here.\nBut modification of the analyzed type are expected." }
-    ],
-    "flags": []
-  },
-  {
-    "symbol": "Cn_Hook_Analyze_Type_Specifier",
-    "kind": "typedef",
-    "module": "Hook",
-    "decl": "typedef Cn_Hook_Response (Cn_Hook_Analyze_Type_Specifier)(Cn_Ast_Node *type_specifier, Cn_Type **type_out)",
-    "summary": "Analyze hook that resolves base type of a custom type specifier node.",
-    "description": "Called for type specifiers of non-core ast node kinds, for example ones substituted by\n`CN_AST_SLOT_TYPE_SPECIFIER` subparsing.",
-    "tags": [
-      { "kind": "OUTPUTS", "text": "Resolved type, written to `type_out`. Left `NULL` if type specifier is not handled by the hook." }
+      { "kind": "IMPORTANT", "text": "It is not allowed to perfom AST modifications in here.\nBut modification of the analyzed type are expected." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -3799,35 +4778,49 @@
     "symbol": "Cn_Hook_Analyze_Layout",
     "kind": "typedef",
     "module": "Hook",
-    "decl": "typedef Cn_Hook_Response (Cn_Hook_Analyze_Layout)(Cn_Ast_Node *tag_specifier, Cn_Type *type)",
+    "decl": "typedef Cn_Hook_Response (Cn_Hook_Analyze_Layout)(const Cn_Ast_Node *tag_specifier, Cn_Type *type)",
     "summary": "Analyze hook that lays out tag `type` defined by `tag_specifier`: `struct`, `union` or `enum` specifier.",
-    "description": "Called once types and names of all members are resolved into `type`, while it is still incomplete.\nHook lays out the type by filling its `size`, `align` and offsets of struct members, and then marks it\nwith `CN_TYPE_COMPLETE`. Usually done by calling `cn_analyze_layout_default` with custom options.\n\nMember at index `i` of the type comes from the `i`-th member declarator of `tag_specifier`, in declaration\norder, so member specific extensions can be found on those declarators.",
+    "description": "Called once types and names of all members are resolved into `type`, while it is still incomplete.\nHook lays out the type by filling its `size`, `align` and offsets of struct members, and then marks it\nwith `CN_TYPE_COMPLETE`. Usually done by calling `cn_analyze_layout_default` with custom options.\n\nMember at index `i` of the type comes from the `i`-th member declarator of `tag_specifier`, in declaration\norder, so member specific attributes can be found on those declarators.",
     "tags": [
-      { "kind": "OUTPUTS", "text": "Laid out `type`, marked with `CN_TYPE_COMPLETE`. Left incomplete if not handled by the hook." }
+      { "kind": "OUTPUTS", "text": "Laid out `type`, marked with `CN_TYPE_COMPLETE`. Left incomplete if not handled by the hook." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
   {
-    "symbol": "Cn_Hook_Analyze_Expression",
-    "kind": "typedef",
+    "symbol": "Cn_Hooks",
+    "kind": "struct",
     "module": "Hook",
-    "decl": "typedef Cn_Hook_Response (Cn_Hook_Analyze_Expression)(Cn_Ast_Node *expression, Cn_Type **type_out)",
-    "summary": "Analyze hook that typechecks custom `expression` node.",
-    "description": "Called for expressions of non-core ast node kinds, for example ones substituted by `CN_AST_SLOT_PRIMARY`\nsubparsing. Resulting type is stored by the library into the first `CN_AST_MEMBER_INFO_TYPE`\nmember of the node, so it can be retrieved with `cn_get_expression_type`.",
+    "decl": "typedef struct {\n    Cn_Hook_Ast_Parsed         **ast_parsed_hooks;\n    Cn_Hook_Tu_Start           **tu_start_hooks;\n    Cn_Hook_Tu_End             **tu_end_hooks;\n    Cn_Hook_Analyze_Declarator **analyze_declarator_hooks;\n    Cn_Hook_Analyze_Layout     **analyze_layout_hooks;\n} Cn_Hooks",
+    "summary": "Struct of dynamic arrays of hooks.",
+    "description": "",
     "tags": [
-      { "kind": "OUTPUTS", "text": "Resulting type of the expression, written to `type_out`. Left `NULL` if not handled by the hook." }
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
   {
-    "symbol": "Cn_Hook_Analyze_Evaluate",
+    "symbol": "cn_hooks",
+    "kind": "variable",
+    "module": "Hook",
+    "decl": "extern Cn_Hooks cn_hooks",
+    "summary": "Stores all hooks used during processing.",
+    "description": "",
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "Cn_Extension",
     "kind": "typedef",
     "module": "Hook",
-    "decl": "typedef Cn_Hook_Response (Cn_Hook_Analyze_Evaluate)(Cn_Ast_Node *expression, void *buffer, Cn_Any *out)",
-    "summary": "Analyze hook that evaluates custom, already typechecked, `expression` node at compile time.",
-    "description": "Called for expressions of non-core ast node kinds. Not producing value is not an error,\nit simply means expression is not a constant expression.",
+    "decl": "typedef bool (Cn_Extension)(Cn_Hooks *)",
+    "summary": "Type definition for any function that extends hooks.",
+    "description": "",
     "tags": [
-      { "kind": "OUTPUTS", "text": "Value of the expression stored in `buffer`, written to `out`. Left `NIL` if not handled or not constant." }
+      { "kind": "IMPORTANT", "text": "Should return `true` on success, `false` on error." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -3840,7 +4833,8 @@
     "description": "",
     "tags": [
       { "kind": "IMPORTANT", "text": "Must be called only once, all memory allocated inside this function is expected\nto live throughout the program`s life time, no freeing is required." },
-      { "kind": "RETURNS", "text": "`true` on success, `false` on error." }
+      { "kind": "RETURNS", "text": "`true` on success, `false` on error." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -3867,7 +4861,9 @@
     "decl": "typedef enum {\n    CN_ANALYZE_NO_FLAGS                     = 0x0,\n    CN_ANALYZE_APPLY_PARAMETER_ADJUSTMENT   = 0x1,\n} Cn_Analyze_Flags",
     "summary": "Flags to specify details on how certain analyze functions should work.",
     "description": "",
-    "tags": [],
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
     "flags": []
   },
   {
@@ -3877,7 +4873,9 @@
     "decl": "typedef struct {\n    void *declarator;\n    void *initializer;\n    Cn_Analyze_Flags flags;\n} Cn_Analyze_Declaration_Opt",
     "summary": "Optional values passed to `cn_analyze_declaration`.",
     "description": "",
-    "tags": [],
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
     "flags": []
   },
   {
@@ -3888,7 +4886,8 @@
     "summary": "Analyzes already constructed specifiers, declarator and initializer as one binding.",
     "description": "Modifies the global state, by recording new binding from the given ast nodes.\nInitializer can be passed as `NULL` if binding doesn't contain a definition.\nDeclarator itself can also be passed as `NULL`, in that case only declaration specifiers are checked.\n\nPerforms typechecking, can error if the binding is illegal in the current context,\nor if there is any type mismatch, or undefined names.",
     "tags": [
-      { "kind": "RETURNS", "text": "`true` on success, `false` if any errors occurred." }
+      { "kind": "RETURNS", "text": "`true` on success, `false` if any errors occurred." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -3901,7 +4900,8 @@
     "description": "Modifies the global state and performs typechecking.",
     "tags": [
       { "kind": "RETURNS", "text": "`true` on success, `false` if any errors occurred." },
-      { "kind": "OUTPUTS", "text": "Function binding on success, written to `function_binding_idx`." }
+      { "kind": "OUTPUTS", "text": "Function binding on success, written to `function_binding_idx`." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -3914,7 +4914,8 @@
     "description": "Type specifier gives the base type, qualifiers are applied to it,\nand declarator wraps it in pointer, array or function layers.",
     "tags": [
       { "kind": "PARAM", "text": "declarator: Can be `NULL` if no declarator is present at all.\nIn that case, the type is composed only from type specifier and qualifiers." },
-      { "kind": "RETURNS", "text": "Resolved type, `NULL` on error." }
+      { "kind": "RETURNS", "text": "Resolved type, `NULL` on error." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -3922,10 +4923,15 @@
     "symbol": "Cn_Layout_Opt",
     "kind": "struct",
     "module": "Analyze",
-    "decl": "typedef struct {\n    /**\n     * Caps natural alignment of every member, `0` for no cap, `1` packs the type.\n     */\n    int64_t max_align;\n    /**\n     * Minimal alignment of the whole type, `0` for none.\n     */\n    int64_t min_align;\n    /**\n     * Optional array with one entry per member, explicit alignment of the member,\n     * `0` entry keeps natural alignment. Explicit alignment is not capped by `max_align`.\n     */\n    int64_t *member_aligns;\n} Cn_Layout_Opt",
-    "summary": "Options of `cn_analyze_layout_default`, zeroed options give natural C layout.",
+    "decl": "typedef struct {\n    int64_t  max_align;\n    int64_t  min_align;\n    int64_t *member_aligns;\n} Cn_Layout_Opt",
+    "summary": "Optional values of `cn_analyze_layout_default`, zeroed options give natural C layout.",
     "description": "",
-    "tags": [],
+    "tags": [
+      { "kind": "MEMBER", "text": "max_align: Caps natural alignment of every member, `0` for no cap, `1` packs the type." },
+      { "kind": "MEMBER", "text": "min_align: Minimal alignment of the whole type, `0` for none." },
+      { "kind": "MEMBER", "text": "member_aligns: Optional array with one entry per member, explicit alignment of the member,\n`0` entry keeps natural alignment. Explicit alignment is not capped by `max_align`." },
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
     "flags": []
   },
   {
@@ -3937,7 +4943,8 @@
     "description": "Struct members are placed in order, each at an offset aligned to its alignment, union members\nall start at `0`. Size is padded to the alignment of the type. Enum takes size and alignment\nof its member type, only `min_align` option applies to it.",
     "tags": [
       { "kind": "OUTPUTS", "text": "`size`, `align` and struct member offsets of `type`, which is then marked with `CN_TYPE_COMPLETE`." },
-      { "kind": "NOTE", "text": "Meant to be called by layout analyze hooks with custom options, see `Cn_Hook_Analyze_Layout`." }
+      { "kind": "NOTE", "text": "Meant to be called by layout analyze hooks with custom options, see `Cn_Hook_Analyze_Layout`." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -3950,7 +4957,8 @@
     "description": "Recursively traverses ast nodes from the bottom up.",
     "tags": [
       { "kind": "RETURNS", "text": "Resulting type of the expression on success, `NULL` if an error occurred." },
-      { "kind": "IMPORTANT", "text": "Expects `expression != NULL`." }
+      { "kind": "IMPORTANT", "text": "Expects `expression != NULL`." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -3965,7 +4973,8 @@
       { "kind": "PARAM", "text": "expression: If `NULL`, `NIL` is returned." },
       { "kind": "RETURNS", "text": "Valid any struct on success. `NIL` if expression wasn't typechecked,\nor if it cannot be evaluated at compile time." },
       { "kind": "IMPORTANT", "text": "Expects `expression` to be typechecked, or to be `NULL`." },
-      { "kind": "NOTE", "text": "Size of `buffer` can be determined from the resulting type of the expression." }
+      { "kind": "NOTE", "text": "Size of `buffer` can be determined from the resulting type of the expression." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -3977,7 +4986,8 @@
     "summary": "Typechecks `designations` against known `type`, recursively.",
     "description": "",
     "tags": [
-      { "kind": "RETURNS", "text": "`true` on success, `false` if an error occurred." }
+      { "kind": "RETURNS", "text": "`true` on success, `false` if an error occurred." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -3990,7 +5000,8 @@
     "description": "",
     "tags": [
       { "kind": "RETURNS", "text": "`true` on success, `false` if an error occurred." },
-      { "kind": "IMPORTANT", "text": "Expects `initializer != NULL`." }
+      { "kind": "IMPORTANT", "text": "Expects `initializer != NULL`." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -4001,7 +5012,60 @@
     "decl": "typedef void (Cn_Emit_Write)(Cn_String str, void *ctx)",
     "summary": "Write function used by emitter.",
     "description": "Takes in `str`, which is the text sent to write, and `ctx`, which is any user data supplied.\n`ctx` is directly copied from the optional `ctx` of the emitter, so when calling emitter\nuser can specify their own `ctx` and use it however they want at the write call site.",
-    "tags": [],
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "cn_emit_write_file",
+    "kind": "function",
+    "module": "Emit",
+    "decl": "void cn_emit_write_file(Cn_String str, void *ctx)",
+    "summary": "Wrapper that casts `ctx` to `FILE *` and writes `str` to it.",
+    "description": "",
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "cn_emit_write_sb",
+    "kind": "function",
+    "module": "Emit",
+    "decl": "void cn_emit_write_sb(Cn_String str, void *ctx)",
+    "summary": "Wrapper that casts `ctx` to `Cn_String_Builder *` and writes `str` to it.",
+    "description": "",
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "Cn_Emitter_Flags",
+    "kind": "enum",
+    "module": "Emit",
+    "decl": "typedef enum {\n    CN_EMITTER_SKIP_ENDING_NEWLINE_IN_BLOCK     = 0x1,\n    CN_EMITTER_END_DECLARATION_WITH_SEMICOLON   = 0x2,\n} Cn_Emitter_Flags",
+    "summary": "Emitter flags that control emitter behaviour.",
+    "description": "",
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "Cn_Emitter",
+    "kind": "struct",
+    "module": "Emit",
+    "decl": "typedef struct {\n    Cn_Emitter_Flags flags;\n    int64_t          written_length;\n    int              indent;\n    void            *ctx;\n    Cn_Emit_Write   *write;\n} Cn_Emitter",
+    "summary": "Struct definition of emitter.",
+    "description": "",
+    "tags": [
+      { "kind": "MEMBER", "text": "written_length: Total length written during the whole emit." },
+      { "kind": "MEMBER", "text": "indent: Indentation level to be added." },
+      { "kind": "MEMBER", "text": "ctx: User data or context that is shared with every write call made by emitter." },
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
     "flags": []
   },
   {
@@ -4009,9 +5073,11 @@
     "kind": "function",
     "module": "Emit",
     "decl": "void cn_emit(Cn_Emitter *e, void *node)",
-    "summary": "Emits C source code of `node` to the output of `e`.",
-    "description": "Reconstructs valid C source code from the ast representation.",
-    "tags": [],
+    "summary": "Emits C source code of `node` using emitter `e`.",
+    "description": "Reconstructs valid C source code from the AST representation.",
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
     "flags": []
   },
   {
@@ -4022,7 +5088,8 @@
     "summary": "Parses single token of expected `type`, reporting error diagnostic if token doesn't match.",
     "description": "",
     "tags": [
-      { "kind": "RETURNS", "text": "`true` if token was parsed, `false` otherwise." }
+      { "kind": "RETURNS", "text": "`true` if token was parsed, `false` otherwise." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -4034,7 +5101,8 @@
     "summary": "Parses single token of `type` if it is present, without reporting any error otherwise.",
     "description": "",
     "tags": [
-      { "kind": "RETURNS", "text": "`true` if token was parsed, `false` otherwise." }
+      { "kind": "RETURNS", "text": "`true` if token was parsed, `false` otherwise." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -4046,7 +5114,8 @@
     "summary": "Parses translation unit from the current token of `lexer`.",
     "description": "```\n translation_unit\n         : external_declaration* EOF\n         ;\n```",
     "tags": [
-      { "kind": "RETURNS", "text": "Parsed translation unit, `NULL` on error." }
+      { "kind": "RETURNS", "text": "Parsed translation unit, `NULL` on error." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -4056,9 +5125,10 @@
     "module": "Parse",
     "decl": "Cn_Ast_External_Declaration *cn_parse_external_declaration(Cn_Lexer *lexer)",
     "summary": "Parses external declaration from the current token of `lexer`.",
-    "description": "```\n external_declaration\n         : slot(EXTERNAL_DECLARATION_PREFIX) (\n             ';'                         // Stray ';'\n             | slot(EXTERNAL_DECLARATION)\n             | function\n             | declaration ';'\n             )\n         ;\n```",
+    "description": "```\n external_declaration\n         : gnu_extensions? (\n             ';'                         // Stray ';'\n             | gnu_asm_statement\n             | function\n             | declaration ';'\n             )\n         ;\n```",
     "tags": [
-      { "kind": "RETURNS", "text": "Parsed external declaration, `NULL` on error." }
+      { "kind": "RETURNS", "text": "Parsed external declaration, `NULL` on error." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -4071,7 +5141,8 @@
     "description": "It can't be known for certain which one it is, until the ast structure is parsed far enough.\nUltimately, existence of a function body at the end of the declaration signifies that the\ndeclaration is a function definition.\n\nThe deciding logic is to first try to parse a single declarator, and if it is followed by a function\nbody, then it is a function definition.\n\n```\n declaration ';'\n         : attribute_specifiers declaration_specifiers init_declarators? ';'\n         ;\n\n function\n         : attribute_specifiers declaration_specifiers declarator block\n         ;\n```",
     "tags": [
       { "kind": "RETURNS", "text": "Parsed function or declaration, `NULL` on error." },
-      { "kind": "NOTE", "text": "K&R styled function definitions with classic declaration lists are not supported." }
+      { "kind": "NOTE", "text": "K&R styled function definitions with classic declaration lists are not supported." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -4083,7 +5154,8 @@
     "summary": "Finishes parsing declaration from the current token of `lexer`, using already parsed\n`attribute_specifiers`.",
     "description": "```\n declaration\n         : attribute_specifiers declaration_specifiers init_declarators? gnu_attribute_specifiers\n         ;\n```",
     "tags": [
-      { "kind": "RETURNS", "text": "Parsed declaration, `NULL` on error." }
+      { "kind": "RETURNS", "text": "Parsed declaration, `NULL` on error." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -4096,7 +5168,8 @@
     "description": "Used to distinguish between declaration and statement before parsing them.",
     "tags": [
       { "kind": "RETURNS", "text": "`true` if tokens indicate start of a declaration, `false` otherwise." },
-      { "kind": "NOTE", "text": "Doesn't alter state of `lexer`." }
+      { "kind": "NOTE", "text": "Doesn't alter state of `lexer`." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -4109,7 +5182,8 @@
     "description": "Used to distinguish type cast during parsing of an expression.",
     "tags": [
       { "kind": "RETURNS", "text": "`true` if tokens indicate start of a type, `false` otherwise." },
-      { "kind": "NOTE", "text": "Doesn't alter state of `lexer`." }
+      { "kind": "NOTE", "text": "Doesn't alter state of `lexer`." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -4119,9 +5193,10 @@
     "module": "Parse",
     "decl": "Cn_Ast_Node *cn_parse_statement(Cn_Lexer *lexer)",
     "summary": "Parses statement from the current token of `lexer`.",
-    "description": "There is no single statement node kind, instead one of the following statement nodes is returned.\n\n```\n statement\n         : block\n         | selection_statement\n         | iteration_statement\n         | jump_statement\n         | labeled_statement\n         | expression_statement\n         | slot(STATEMENT)\n         ;\n```",
+    "description": "There is no single statement node kind, instead one of the following statement nodes is returned.\n\n```\n statement\n         : block\n         | selection_statement\n         | iteration_statement\n         | jump_statement\n         | labeled_statement\n         | expression_statement\n         | gnu_asm_statement\n         ;\n```",
     "tags": [
-      { "kind": "RETURNS", "text": "Parsed statement, `NULL` on error." }
+      { "kind": "RETURNS", "text": "Parsed statement, `NULL` on error." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -4131,9 +5206,10 @@
     "module": "Parse",
     "decl": "Cn_Ast_Node *cn_parse_finish_statement(Cn_Lexer *lexer, Cn_Ast_Nodes attribute_specifiers)",
     "summary": "Finishes parsing statement from the current token of `lexer`, using already parsed\n`attribute_specifiers`.",
-    "description": "There is no single statement node kind, instead one of the following statement nodes is returned.\n\n```\n statement\n         : block\n         | selection_statement\n         | iteration_statement\n         | jump_statement\n         | labeled_statement\n         | expression_statement\n         | slot(STATEMENT)\n         ;\n```",
+    "description": "There is no single statement node kind, instead one of the following statement nodes is returned.\n\n```\n statement\n         : block\n         | selection_statement\n         | iteration_statement\n         | jump_statement\n         | labeled_statement\n         | expression_statement\n         | gnu_asm_statement\n         ;\n```",
     "tags": [
-      { "kind": "RETURNS", "text": "Parsed statement, `NULL` on error." }
+      { "kind": "RETURNS", "text": "Parsed statement, `NULL` on error." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -4146,7 +5222,8 @@
     "description": "Block introduces new scope, unless `use_current_scope` is set.\n\n```\n block\n         : '{' block_item* '}'\n         ;\n```",
     "tags": [
       { "kind": "PARAM", "text": "use_current_scope: If `true`, block doesn't introduce new scope, everything is declared and\ndefined in the current scope instead." },
-      { "kind": "RETURNS", "text": "Parsed block, `NULL` on error." }
+      { "kind": "RETURNS", "text": "Parsed block, `NULL` on error." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -4156,10 +5233,11 @@
     "module": "Parse",
     "decl": "Cn_Ast_Block_Item *cn_parse_block_item(Cn_Lexer *lexer)",
     "summary": "Parses block item from the current token of `lexer`.",
-    "description": "```\n block_item\n         : slot(DECLARATION_PREFIX) declaration ';'\n         | statement\n         ;\n```",
+    "description": "```\n block_item\n         : gnu_extensions? declaration ';'\n         | statement\n         ;\n```",
     "tags": [
       { "kind": "RETURNS", "text": "Parsed block item, `NULL` on error." },
-      { "kind": "NOTE", "text": "If `gnu_extensions` are present, `CN_AST_GNU_EXTENSION` flag is set on the declaration.\nIf `gnu_extensions` aren't followed by a declaration, item is parsed as a statement, where they\nare a part of the expression, see `cn_parse_expression`." }
+      { "kind": "NOTE", "text": "If `gnu_extensions` are present, `CN_AST_GNU_EXTENSION` flag is set on the declaration.\nIf `gnu_extensions` aren't followed by a declaration, item is parsed as a statement, where they\nare a part of the expression, see `cn_parse_expression`." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -4171,7 +5249,8 @@
     "summary": "Parses `if` statement from the current token of `lexer`.",
     "description": "```\n if_statement\n         : 'if' '(' expression ')' statement ('else' statement)?\n         ;\n```",
     "tags": [
-      { "kind": "RETURNS", "text": "Parsed `if` statement, `NULL` on error." }
+      { "kind": "RETURNS", "text": "Parsed `if` statement, `NULL` on error." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -4183,7 +5262,8 @@
     "summary": "Parses `switch` statement from the current token of `lexer`.",
     "description": "```\n switch_statement\n         : 'switch' '(' expression ')' statement\n         ;\n```",
     "tags": [
-      { "kind": "RETURNS", "text": "Parsed `switch` statement, `NULL` on error." }
+      { "kind": "RETURNS", "text": "Parsed `switch` statement, `NULL` on error." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -4195,7 +5275,8 @@
     "summary": "Parses `while` statement from the current token of `lexer`.",
     "description": "```\n while_statement\n         : 'while' '(' expression ')' statement\n         ;\n```",
     "tags": [
-      { "kind": "RETURNS", "text": "Parsed `while` statement, `NULL` on error." }
+      { "kind": "RETURNS", "text": "Parsed `while` statement, `NULL` on error." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -4207,7 +5288,8 @@
     "summary": "Parses `do while` statement from the current token of `lexer`.",
     "description": "```\n do_while\n         : 'do' statement 'while' '(' expression ')' ';'\n         ;\n```",
     "tags": [
-      { "kind": "RETURNS", "text": "Parsed `do while` statement, `NULL` on error." }
+      { "kind": "RETURNS", "text": "Parsed `do while` statement, `NULL` on error." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -4217,9 +5299,10 @@
     "module": "Parse",
     "decl": "Cn_Ast_Node *cn_parse_for_statement(Cn_Lexer *lexer)",
     "summary": "Parses `for` statement from the current token of `lexer`.",
-    "description": "```\n for_statement\n         : 'for' '(' (slot(DECLARATION_PREFIX) declaration | expression)? ';' expression? ';' expression? ')' statement\n         ;\n```",
+    "description": "```\n for_statement\n         : 'for' '(' (gnu_extensions? declaration | expression)? ';' expression? ';' expression? ')' statement\n         ;\n```",
     "tags": [
-      { "kind": "RETURNS", "text": "Parsed `for` statement, `NULL` on error." }
+      { "kind": "RETURNS", "text": "Parsed `for` statement, `NULL` on error." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -4231,7 +5314,8 @@
     "summary": "Parses `goto` statement from the current token of `lexer`.",
     "description": "```\n goto_statement\n         : 'goto' identifier ';'\n         ;\n```",
     "tags": [
-      { "kind": "RETURNS", "text": "Parsed `goto` statement, `NULL` on error." }
+      { "kind": "RETURNS", "text": "Parsed `goto` statement, `NULL` on error." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -4243,7 +5327,8 @@
     "summary": "Parses `return` statement from the current token of `lexer`.",
     "description": "```\n return_statement\n         : 'return' expression? ';'\n         ;\n```",
     "tags": [
-      { "kind": "RETURNS", "text": "Parsed `return` statement, `NULL` on error." }
+      { "kind": "RETURNS", "text": "Parsed `return` statement, `NULL` on error." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -4255,7 +5340,8 @@
     "summary": "Parses `break` statement from the current token of `lexer`.",
     "description": "```\n break_statement\n         : 'break' ';'\n         ;\n```",
     "tags": [
-      { "kind": "RETURNS", "text": "Parsed `break` statement, `NULL` on error." }
+      { "kind": "RETURNS", "text": "Parsed `break` statement, `NULL` on error." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -4267,7 +5353,8 @@
     "summary": "Parses `continue` statement from the current token of `lexer`.",
     "description": "```\n continue_statement\n         : 'continue' ';'\n         ;\n```",
     "tags": [
-      { "kind": "RETURNS", "text": "Parsed `continue` statement, `NULL` on error." }
+      { "kind": "RETURNS", "text": "Parsed `continue` statement, `NULL` on error." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -4280,7 +5367,8 @@
     "description": "```\n label\n         : (identifier | ('case' expression) | 'default') ':' statement\n         ;\n```",
     "tags": [
       { "kind": "RETURNS", "text": "Parsed label, `NULL` on error." },
-      { "kind": "NOTE", "text": "Instead of separate nodes, label node represents all three kinds of labels: identifier label,\n`case` label and `default` label. Kind is stored in flags, and fields that don't apply to the kind\nare `NULL`." }
+      { "kind": "NOTE", "text": "Instead of separate nodes, label node represents all three kinds of labels: identifier label,\n`case` label and `default` label. Kind is stored in flags, and fields that don't apply to the kind\nare `NULL`." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -4292,7 +5380,8 @@
     "summary": "Parses expression statement from the current token of `lexer`.",
     "description": "```\n expression_statement\n         : expression? ';'\n         ;\n```",
     "tags": [
-      { "kind": "RETURNS", "text": "Parsed expression statement, `NULL` on error." }
+      { "kind": "RETURNS", "text": "Parsed expression statement, `NULL` on error." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -4304,8 +5393,22 @@
     "summary": "Parses argument list from the current token of `lexer`.",
     "description": "```\n argument_list\n         : expression (',' expression)*\n         ;\n```",
     "tags": [
+      { "kind": "OUTPUTS", "text": "`true` on success, `false` on error, written to `ok`." },
       { "kind": "RETURNS", "text": "Parsed list of argument expressions." },
-      { "kind": "OUTPUTS", "text": "`true` on success, `false` on error, written to `ok`." }
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "Cn_Parse_Expression_Flags",
+    "kind": "enum",
+    "module": "Parse",
+    "decl": "typedef enum {\n    CN_NO_COMMA_OPERATOR = 0x1,\n} Cn_Parse_Expression_Flags",
+    "summary": "Flags that are passed to expression parsing function to control its behaviour.",
+    "description": "",
+    "tags": [
+      { "kind": "MEMBER", "text": "CN_NO_COMMA_OPERATOR: If set, comma operator is ignored by this particular parse expression call.\nIt doesn't mean that all recursive calls ignore comma operators too,\nfor example, this flag is reset to `0` when parenthesized expression is encountered.\nThis flag is used when top level comma token acts as a separator,\nfor example in declarations with multiple declarators, or in function arguments." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -4315,7 +5418,7 @@
     "module": "Parse",
     "decl": "Cn_Ast_Node *cn_parse_expression(Cn_Lexer *lexer, int min_precedence, Cn_Parse_Expression_Flags flags)",
     "summary": "Parses expression from the current token of `lexer`.",
-    "description": "First parses left leaf, and then calls increasing precedence parsing until it returns left leaf,\nutilizing the following precedence table as a guide to properly structure ast nodes in order.\n\n```\n C OPERATOR PRECEDENCE TABLE highest (14) to lowest (0)\n ===============================================================\n\n 14                              Associativity: Left-to-right\n ---------------------------------------------------------------\n   ++  --        Postfix increment/decrement\n   ()            Function call\n   []            Array subscript\n   .             Member access\n   ->            Member access through pointer\n   (type){...}   Compound literal\n\n 13                              Associativity: Right-to-left\n ---------------------------------------------------------------\n   ++  --        Prefix increment/decrement\n   +   -         Unary plus/minus\n   !   ~         Logical NOT, bitwise NOT\n   (type)        Cast\n   *             Dereference\n   &             Address-of\n   sizeof        Size-of\n\n 12                              Associativity: Left-to-right\n ---------------------------------------------------------------\n   *   /   %     Multiplication, division, remainder\n\n 11                              Associativity: Left-to-right\n ---------------------------------------------------------------\n   +   -         Addition, subtraction\n\n 10                              Associativity: Left-to-right\n ---------------------------------------------------------------\n   <<  >>        Bitwise left/right shift\n\n 9                               Associativity: Left-to-right\n ---------------------------------------------------------------\n   <   <=        Less than, less-or-equal\n   >   >=        Greater than, greater-or-equal\n\n 8                               Associativity: Left-to-right\n ---------------------------------------------------------------\n   ==  !=        Equal, not equal\n\n 7                               Associativity: Left-to-right\n ---------------------------------------------------------------\n   &             Bitwise AND\n\n 6                               Associativity: Left-to-right\n ---------------------------------------------------------------\n   ^             Bitwise XOR\n\n 5                               Associativity: Left-to-right\n ---------------------------------------------------------------\n   |             Bitwise OR\n\n 4                               Associativity: Left-to-right\n ---------------------------------------------------------------\n   &&            Logical AND\n\n 3                               Associativity: Left-to-right\n ---------------------------------------------------------------\n   ||            Logical OR\n\n 2                               Associativity: Right-to-left\n ---------------------------------------------------------------\n   ? :           Ternary conditional\n\n 1                               Associativity: Right-to-left\n ---------------------------------------------------------------\n   =             Simple assignment\n   +=  -=        Compound assignment (additive)\n   *=  /=  %=    Compound assignment (multiplicative)\n   <<=  >>=      Compound assignment (shift)\n   &=  ^=  |=    Compound assignment (bitwise)\n\n 0                               Associativity: Left-to-right\n ---------------------------------------------------------------\n   ,             Comma\n```\n\nFollowing grammar rules group expressions into certain kinds, but in reality all parsing is based\non the precedence table. Grammar rules only show the general logic, and which specific tokens\nparser might expect in certain expressions.\n\n```\n expression\n         : binary_expression\n         | function_expression\n         | access_expression\n         | unary_expression\n         | cast_expression\n         | compound_literal\n         | sizeof_expression\n         | primary_expression\n         | ternary_expression\n         | assignment_expression\n         | postfix_expression\n         ;\n\n binary_expression\n         : expression binary_operator expression\n         | expression '[' expression ']'\n         | function_expression\n         | access_expression\n         ;\n\n function_expression\n         : expression '(' argument_list? ')'\n         ;\n\n access_expression\n         : expression '.' identifier\n         | expression '->' identifier\n         ;\n\n unary_expression\n         : cast_expression\n         | '(' expression ')'\n         | sizeof_expression\n         | unary_operator expression\n         | slot(EXPRESSION_PREFIX) expression\n         ;\n\n cast_expression\n         : '(' type_name ')' expression\n         | compound\n         ;\n\n compound\n         : '(' type_name ')' designations\n         ;\n\n sizeof_expression\n         : 'sizeof' expression\n         | 'sizeof' '(' type_name ')'\n         ;\n\n primary_expression\n         : slot(PRIMARY)\n         | identifier\n         | integer\n         | float\n         | string\n         ;\n\n ternary_expression\n         : expression '?' expression ':' expression\n         ;\n\n assignment_expression\n         : expression assignment_operator expression\n         ;\n\n postfix_expression\n         : expression '++'\n         | expression '--'\n         ;\n```",
+    "description": "First parses left leaf, and then calls increasing precedence parsing until it returns left leaf,\nutilizing the following precedence table as a guide to properly structure ast nodes in order.\n\n```\n C OPERATOR PRECEDENCE TABLE highest (14) to lowest (0)\n ===============================================================\n\n 14                              Associativity: Left-to-right\n ---------------------------------------------------------------\n   ++  --        Postfix increment/decrement\n   ()            Function call\n   []            Array subscript\n   .             Member access\n   ->            Member access through pointer\n   (type){...}   Compound literal\n\n 13                              Associativity: Right-to-left\n ---------------------------------------------------------------\n   ++  --        Prefix increment/decrement\n   +   -         Unary plus/minus\n   !   ~         Logical NOT, bitwise NOT\n   (type)        Cast\n   *             Dereference\n   &             Address-of\n   sizeof        Size-of\n\n 12                              Associativity: Left-to-right\n ---------------------------------------------------------------\n   *   /   %     Multiplication, division, remainder\n\n 11                              Associativity: Left-to-right\n ---------------------------------------------------------------\n   +   -         Addition, subtraction\n\n 10                              Associativity: Left-to-right\n ---------------------------------------------------------------\n   <<  >>        Bitwise left/right shift\n\n 9                               Associativity: Left-to-right\n ---------------------------------------------------------------\n   <   <=        Less than, less-or-equal\n   >   >=        Greater than, greater-or-equal\n\n 8                               Associativity: Left-to-right\n ---------------------------------------------------------------\n   ==  !=        Equal, not equal\n\n 7                               Associativity: Left-to-right\n ---------------------------------------------------------------\n   &             Bitwise AND\n\n 6                               Associativity: Left-to-right\n ---------------------------------------------------------------\n   ^             Bitwise XOR\n\n 5                               Associativity: Left-to-right\n ---------------------------------------------------------------\n   |             Bitwise OR\n\n 4                               Associativity: Left-to-right\n ---------------------------------------------------------------\n   &&            Logical AND\n\n 3                               Associativity: Left-to-right\n ---------------------------------------------------------------\n   ||            Logical OR\n\n 2                               Associativity: Right-to-left\n ---------------------------------------------------------------\n   ? :           Ternary conditional\n\n 1                               Associativity: Right-to-left\n ---------------------------------------------------------------\n   =             Simple assignment\n   +=  -=        Compound assignment (additive)\n   *=  /=  %=    Compound assignment (multiplicative)\n   <<=  >>=      Compound assignment (shift)\n   &=  ^=  |=    Compound assignment (bitwise)\n\n 0                               Associativity: Left-to-right\n ---------------------------------------------------------------\n   ,             Comma\n```\n\nFollowing grammar rules group expressions into certain kinds, but in reality all parsing is based\non the precedence table. Grammar rules only show the general logic, and which specific tokens\nparser might expect in certain expressions.\n\n```\n expression\n         : binary_expression\n         | function_expression\n         | access_expression\n         | unary_expression\n         | cast_expression\n         | compound_literal\n         | sizeof_expression\n         | primary_expression\n         | ternary_expression\n         | assignment_expression\n         | postfix_expression\n         ;\n\n binary_expression\n         : expression binary_operator expression\n         | expression '[' expression ']'\n         | function_expression\n         | access_expression\n         ;\n\n function_expression\n         : expression '(' argument_list? ')'\n         ;\n\n access_expression\n         : expression '.' identifier\n         | expression '->' identifier\n         ;\n\n unary_expression\n         : cast_expression\n         | '(' expression ')'\n         | sizeof_expression\n         | unary_operator expression\n         | gnu_extensions expression\n         ;\n\n cast_expression\n         : '(' type_name ')' expression\n         | compound\n         ;\n\n compound\n         : '(' type_name ')' designations\n         ;\n\n sizeof_expression\n         : 'sizeof' expression\n         | 'sizeof' '(' type_name ')'\n         ;\n\n primary_expression\n         : identifier\n         | integer\n         | float\n         | string\n         ;\n\n ternary_expression\n         : expression '?' expression ':' expression\n         ;\n\n assignment_expression\n         : expression assignment_operator expression\n         ;\n\n postfix_expression\n         : expression '++'\n         | expression '--'\n         ;\n```",
     "tags": [
       { "kind": "PARAM", "text": "min_precedence: Lowest precedence of binary operators that are parsed, `-1` to parse all of them." },
       { "kind": "RETURNS", "text": "Parsed expression, `NULL` on error." }
@@ -4379,7 +5482,7 @@
     "module": "Parse",
     "decl": "Cn_Ast_Init_Declarator *cn_parse_finish_init_declarator(Cn_Lexer *lexer, Cn_Ast_Declarator *declarator, void *declaration_specifiers)",
     "summary": "Finishes parsing init declarator from the current token of `lexer`, using already parsed\n`declarator`.",
-    "description": "```\n init_declarator\n         : declarator slot(AFTER_DECLARATOR) ('=' initializer)?\n         ;\n```",
+    "description": "```\n init_declarator\n         : declarator (gnu_asm_label | gnu_attribute_specifier)* ('=' initializer)?\n         ;\n```",
     "tags": [
       { "kind": "RETURNS", "text": "Parsed init declarator, `NULL` on error." }
     ],
@@ -4391,7 +5494,7 @@
     "module": "Parse",
     "decl": "Cn_Ast_Init_Declarator *cn_parse_init_declarator(Cn_Lexer *lexer, void *declaration_specifiers)",
     "summary": "Parses init declarator from the current token of `lexer`.",
-    "description": "```\n init_declarator\n         : declarator slot(AFTER_DECLARATOR) ('=' initializer)?\n         ;\n```",
+    "description": "```\n init_declarator\n         : declarator (gnu_asm_label | gnu_attribute_specifier)* ('=' initializer)?\n         ;\n```",
     "tags": [
       { "kind": "RETURNS", "text": "Parsed init declarator, `NULL` on error." }
     ],
@@ -4492,7 +5595,7 @@
     "module": "Parse",
     "decl": "Cn_Ast_Pointer *cn_parse_pointer(Cn_Lexer *lexer)",
     "summary": "Parses pointer from the current token of `lexer`.",
-    "description": "```\n pointer\n         : '*' (qualifier | slot(POINTER))* pointer?\n         ;\n```",
+    "description": "```\n pointer\n         : '*' (qualifier | gnu_attribute_specifier)* pointer?\n         ;\n```",
     "tags": [
       { "kind": "RETURNS", "text": "Parsed pointer, `NULL` on error." }
     ],
@@ -4579,7 +5682,7 @@
     "module": "Parse",
     "decl": "Cn_Ast_Declaration_Specifiers *cn_parse_declaration_specifiers(Cn_Lexer *lexer)",
     "summary": "Parses declaration specifiers from the current token of `lexer`.",
-    "description": "```\n declaration_specifiers\n         : (\n             storage_specifier\n             | qualifier\n             | function_specifier\n             | slot(DECLARATION_SPECIFIERS)\n             | type_specifier\n             )+\n         ;\n```",
+    "description": "```\n declaration_specifiers\n         : (\n             storage_specifier\n             | qualifier\n             | function_specifier\n             | gnu_attribute_specifier\n             | type_specifier\n             )+\n         ;\n```",
     "tags": [
       { "kind": "RETURNS", "text": "Parsed declaration specifiers, `NULL` on error." }
     ],
@@ -4640,7 +5743,7 @@
     "module": "Parse",
     "decl": "int cn_parse_try_type_specifier(Cn_Lexer *lexer, Cn_Primitive_Type_Info *primitive_info, Cn_Ast_Node **type_specifier)",
     "summary": "Tries to parse type specifier from the current token of `lexer`.",
-    "description": "```\n type_specifier\n         : 'void'\n         | 'char'\n         | 'short'\n         | 'int'\n         | 'long'\n         | 'float'\n         | 'double'\n         | 'signed'\n         | 'unsigned'\n         | '_Bool'\n         | '_Complex'\n         | atomic_type_specifier\n         | struct_specifier\n         | union_specifier\n         | enum_specifier\n         | typedef\n         | slot(TYPE_SPECIFIER)\n         ;\n```",
+    "description": "```\n type_specifier\n         : 'void'\n         | 'char'\n         | 'short'\n         | 'int'\n         | 'long'\n         | 'float'\n         | 'double'\n         | 'signed'\n         | 'unsigned'\n         | '_Bool'\n         | '_Complex'\n         | atomic_type_specifier\n         | struct_specifier\n         | union_specifier\n         | enum_specifier\n         | typedef\n         | gnu_typeof_specifier\n         ;\n```",
     "tags": [
       { "kind": "RETURNS", "text": "`0` on success, `1` if token wasn't accepted, `2` on error." },
       { "kind": "OUTPUTS", "text": "For primitive types like `int`, `char`, `signed`, `unsigned`, `long`, `short`, etc.,\nupdates `primitive_info`." },
@@ -4706,7 +5809,7 @@
     "module": "Parse",
     "decl": "Cn_Ast_Node *cn_parse_struct_or_union_specifier(Cn_Lexer *lexer)",
     "summary": "Parses `struct` or `union` specifier from the current token of `lexer`.",
-    "description": "```\n struct_specifier\n         : 'struct' attribute_specifiers slot(TAG)\n         ( identifier? '{' member_declaration* '}' )\n         | identifier\n         ;\n\n union_specifier\n         : 'union' attribute_specifiers slot(TAG)\n         ( identifier? '{' member_declaration* '}' )\n         | identifier\n         ;\n```",
+    "description": "```\n struct_specifier\n         : 'struct' (attribute_specifier | gnu_attribute_specifier)*\n         ( identifier? '{' member_declaration* '}' )\n         | identifier\n         ;\n\n union_specifier\n         : 'union' (attribute_specifier | gnu_attribute_specifier)*\n         ( identifier? '{' member_declaration* '}' )\n         | identifier\n         ;\n```",
     "tags": [
       { "kind": "RETURNS", "text": "Parsed `struct` or `union` specifier, `NULL` on error." }
     ],
@@ -4718,7 +5821,7 @@
     "module": "Parse",
     "decl": "Cn_Ast_Member_Declaration *cn_parse_member_declaration(Cn_Lexer *lexer)",
     "summary": "Parses member declaration from the current token of `lexer`.",
-    "description": "```\n member_declaration\n         : slot(MEMBER_DECLARATION_PREFIX) attribute_specifiers specifier_qualifier member_declarators ';'\n         ;\n```",
+    "description": "```\n member_declaration\n         : gnu_extensions? attribute_specifiers specifier_qualifier member_declarators ';'\n         ;\n```",
     "tags": [
       { "kind": "RETURNS", "text": "Parsed member declaration, `NULL` on error." }
     ],
@@ -4743,7 +5846,7 @@
     "module": "Parse",
     "decl": "Cn_Ast_Member_Declarator *cn_parse_member_declarator(Cn_Lexer *lexer)",
     "summary": "Parses member declarator from the current token of `lexer`.",
-    "description": "```\n member_declarator\n         : declarator slot(MEMBER_DECLARATOR)\n         | declarator? ':' expression slot(MEMBER_DECLARATOR)\n         ;\n```",
+    "description": "```\n member_declarator\n         : declarator gnu_attribute_specifiers\n         | declarator? ':' expression gnu_attribute_specifiers\n         ;\n```",
     "tags": [
       { "kind": "RETURNS", "text": "Parsed member declarator, `NULL` on error." }
     ],
@@ -4755,7 +5858,7 @@
     "module": "Parse",
     "decl": "Cn_Ast_Node *cn_parse_enum_specifier(Cn_Lexer *lexer)",
     "summary": "Parses `enum` specifier from the current token of `lexer`.",
-    "description": "```\n enum_specifier\n         : 'enum' attribute_specifiers slot(TAG)\n         ( identifier? (':' specifier_qualifier)? '{' ( enumerator (',' enumerator)* ','? )? '}' )\n         | identifier  (':' specifier_qualifier)?\n         ;\n```",
+    "description": "```\n enum_specifier\n         : 'enum' (attribute_specifier | gnu_attribute_specifier)*\n         ( identifier? (':' specifier_qualifier)? '{' ( enumerator (',' enumerator)* ','? )? '}' )\n         | identifier  (':' specifier_qualifier)?\n         ;\n```",
     "tags": [
       { "kind": "RETURNS", "text": "Parsed `enum` specifier, `NULL` on error." }
     ],
@@ -4767,7 +5870,7 @@
     "module": "Parse",
     "decl": "Cn_Ast_Enumerator *cn_parse_enumerator(Cn_Lexer *lexer)",
     "summary": "Parses enumerator from the current token of `lexer`.",
-    "description": "```\n enumerator\n         : identifier attribute_specifiers slot(ENUMERATOR) ('=' expression)?\n         ;\n```",
+    "description": "```\n enumerator\n         : identifier (attribute_specifier | gnu_attribute_specifier)* ('=' expression)?\n         ;\n```",
     "tags": [
       { "kind": "RETURNS", "text": "Parsed enumerator, `NULL` on error." }
     ],
@@ -4824,6 +5927,168 @@
     "flags": []
   },
   {
+    "symbol": "cn_parse_gnu_typeof",
+    "kind": "function",
+    "module": "Parse",
+    "decl": "Cn_Ast_Gnu_Typeof *cn_parse_gnu_typeof(Cn_Lexer *lexer)",
+    "summary": "Parses GNU `typeof` specifier from the current token of `lexer`.",
+    "description": "```\n gnu_typeof_specifier\n         : 'typeof' '(' type_name ')'\n         | 'typeof' '(' expression ')'\n         ;\n```",
+    "tags": [
+      { "kind": "RETURNS", "text": "Parsed `typeof` specifier, `NULL` on error." },
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "cn_parse_gnu_attribute_specifiers",
+    "kind": "function",
+    "module": "Parse",
+    "decl": "Cn_Ast_Nodes cn_parse_gnu_attribute_specifiers(Cn_Lexer *lexer, bool *ok)",
+    "summary": "Parses GNU attribute specifier sequence from the current token of `lexer`.",
+    "description": "```\n gnu_attribute_specifiers\n         : gnu_attribute_specifier*\n         ;\n```",
+    "tags": [
+      { "kind": "RETURNS", "text": "Parsed list of GNU attribute specifiers." },
+      { "kind": "OUTPUTS", "text": "`true` on success, `false` on error, written to `ok`." },
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "cn_parse_mixed_attribute_specifiers",
+    "kind": "function",
+    "module": "Parse",
+    "decl": "Cn_Ast_Nodes cn_parse_mixed_attribute_specifiers(Cn_Lexer *lexer, bool *ok)",
+    "summary": "Parses attribute specifier sequence of both `[[...]]` and GNU syntax, in any order,\nfrom the current token of `lexer`.",
+    "description": "```\n mixed_attribute_specifiers\n         : (attribute_specifier | gnu_attribute_specifier)*\n         ;\n```",
+    "tags": [
+      { "kind": "RETURNS", "text": "Parsed list of attribute specifiers." },
+      { "kind": "OUTPUTS", "text": "`true` on success, `false` on error, written to `ok`." },
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "cn_parse_gnu_attribute_specifier",
+    "kind": "function",
+    "module": "Parse",
+    "decl": "Cn_Ast_Attribute_Specifier *cn_parse_gnu_attribute_specifier(Cn_Lexer *lexer)",
+    "summary": "Parses GNU attribute specifier from the current token of `lexer`.",
+    "description": "```\n gnu_attribute_specifier\n         : '__attribute__' '(' '(' attributes? ')' ')'\n         ;\n```",
+    "tags": [
+      { "kind": "RETURNS", "text": "Parsed attribute specifier flagged with `CN_AST_ATTRIBUTE_SPECIFIER_IS_GNU`, `NULL` on error." },
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "cn_parse_gnu_asm_statement",
+    "kind": "function",
+    "module": "Parse",
+    "decl": "Cn_Ast_Gnu_Asm_Statement *cn_parse_gnu_asm_statement(Cn_Lexer *lexer)",
+    "summary": "Parses GNU `asm` statement from the current token of `lexer`.",
+    "description": "```\n gnu_asm_statement\n         : 'asm' gnu_asm_qualifier* '(' string gnu_asm_sections? ')' ';'\n         ;\n\n gnu_asm_sections\n         : ':' gnu_asm_operands? ( ':' gnu_asm_operands? ( ':' gnu_asm_clobbers? ( ':' gnu_asm_goto_labels )? )? )?\n         ;\n```",
+    "tags": [
+      { "kind": "RETURNS", "text": "Parsed GNU `asm` statement, `NULL` on error." },
+      { "kind": "NOTE", "text": "Without `gnu_asm_sections` the statement is basic asm, otherwise it is extended asm.\nFirst operand list holds outputs, second holds inputs. Lists that are not present are empty." },
+      { "kind": "NOTE", "text": "Constraints not expressed by the grammar, reported as errors:\n- each qualifier may appear at most once, in any order,\n- `goto` qualifier is not allowed in basic asm,\n- `goto` qualifier requires the goto labels section, with at least one label,\n- goto labels section is not allowed without `goto` qualifier." },
+      { "kind": "NOTE", "text": "Also used for file-scope asm, which is a basic asm statement appearing as an external\ndeclaration. Callers at file scope should reject extended asm and any qualifiers, GCC and Clang\nreject them too." },
+      { "kind": "AI", "text": "Generated." },
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "cn_parse_try_gnu_asm_qualifier",
+    "kind": "function",
+    "module": "Parse",
+    "decl": "int cn_parse_try_gnu_asm_qualifier(Cn_Lexer *lexer, Cn_Ast_Gnu_Asm_Qualifier_Flags *output)",
+    "summary": "Tries to parse GNU `asm` qualifier from the current token of `lexer`.",
+    "description": "```\n gnu_asm_qualifier\n         : 'volatile'\n         | 'inline'\n         | 'goto'\n         ;\n```",
+    "tags": [
+      { "kind": "RETURNS", "text": "`0` on success, `1` if token wasn't accepted, `2` on error." },
+      { "kind": "OUTPUTS", "text": "Parsed qualifier, added to `output`." },
+      { "kind": "NOTE", "text": "Returns `2` if the qualifier is already set in `output`." },
+      { "kind": "AI", "text": "Generated." },
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "cn_parse_gnu_asm_operands",
+    "kind": "function",
+    "module": "Parse",
+    "decl": "Cn_Ast_Nodes cn_parse_gnu_asm_operands(Cn_Lexer *lexer, bool *ok)",
+    "summary": "Parses GNU `asm` operand list from the current token of `lexer`.",
+    "description": "```\n gnu_asm_operands\n         : gnu_asm_operand (',' gnu_asm_operand)*\n         ;\n```",
+    "tags": [
+      { "kind": "RETURNS", "text": "Parsed list of GNU `asm` operands." },
+      { "kind": "OUTPUTS", "text": "`true` on success, `false` on error, written to `ok`." },
+      { "kind": "NOTE", "text": "Returns an empty list without consuming tokens if current token is `:` or `)`,\nsince operand lists may be empty." },
+      { "kind": "AI", "text": "Generated." },
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "cn_parse_gnu_asm_operand",
+    "kind": "function",
+    "module": "Parse",
+    "decl": "Cn_Ast_Gnu_Asm_Operand *cn_parse_gnu_asm_operand(Cn_Lexer *lexer)",
+    "summary": "Parses GNU `asm` operand from the current token of `lexer`.",
+    "description": "```\n gnu_asm_operand\n         : ('[' identifier ']')? string '(' expression ')'\n         ;\n```",
+    "tags": [
+      { "kind": "RETURNS", "text": "Parsed GNU `asm` operand, `NULL` on error." },
+      { "kind": "NOTE", "text": "`string` is the constraint, e.g. `\"=r\"`, `\"+m\"`, `\"i\"`. Identifier is the optional\nsymbolic name referenced from the template as `%[name]`." },
+      { "kind": "AI", "text": "Generated." },
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "cn_parse_gnu_asm_clobbers",
+    "kind": "function",
+    "module": "Parse",
+    "decl": "Cn_Ast_Nodes cn_parse_gnu_asm_clobbers(Cn_Lexer *lexer, bool *ok)",
+    "summary": "Parses GNU `asm` clobber list from the current token of `lexer`.",
+    "description": "```\n gnu_asm_clobbers\n         : string (',' string)*\n         ;\n```",
+    "tags": [
+      { "kind": "RETURNS", "text": "Parsed list of clobber strings." },
+      { "kind": "OUTPUTS", "text": "`true` on success, `false` on error, written to `ok`." },
+      { "kind": "NOTE", "text": "Returns an empty list without consuming tokens if current token is `:` or `)`." },
+      { "kind": "AI", "text": "Generated." },
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "cn_parse_gnu_asm_goto_labels",
+    "kind": "function",
+    "module": "Parse",
+    "decl": "Cn_Ast_Nodes cn_parse_gnu_asm_goto_labels(Cn_Lexer *lexer, bool *ok)",
+    "summary": "Parses GNU `asm goto` label list from the current token of `lexer`.",
+    "description": "```\n gnu_asm_goto_labels\n         : identifier (',' identifier)*\n         ;\n```",
+    "tags": [
+      { "kind": "RETURNS", "text": "Parsed list of label identifiers." },
+      { "kind": "OUTPUTS", "text": "`true` on success, `false` on error, written to `ok`." },
+      { "kind": "AI", "text": "Generated." },
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "cn_parse_gnu_asm_label",
+    "kind": "function",
+    "module": "Parse",
+    "decl": "Cn_Ast_Gnu_Asm_Label *cn_parse_gnu_asm_label(Cn_Lexer *lexer)",
+    "summary": "Parses GNU `asm` label from the current token of `lexer`.",
+    "description": "```\n gnu_asm_label\n         : 'asm' '(' string ')'\n         ;\n```",
+    "tags": [
+      { "kind": "RETURNS", "text": "Parsed GNU `asm` label, `NULL` on error." },
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
     "symbol": "cn_parse_int_literal",
     "kind": "function",
     "module": "Parse",
@@ -4832,7 +6097,8 @@
     "description": "Accepts decimal, octal and `0x` hex literals, with optional `u`, `U`, `l` or `L` suffix.\nNo leading sign is accepted, since unary minus is its own ast node.",
     "tags": [
       { "kind": "RETURNS", "text": "`true` on success, `false` on error." },
-      { "kind": "OUTPUTS", "text": "Magnitude of the literal, written to `out`." }
+      { "kind": "OUTPUTS", "text": "Magnitude of the literal, written to `out`." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -4846,7 +6112,8 @@
     "tags": [
       { "kind": "RETURNS", "text": "`true` on success, `false` on error." },
       { "kind": "OUTPUTS", "text": "Value of the literal, written to `out`." },
-      { "kind": "TODO", "text": "Hex floats are not handled, they output `NIL`." }
+      { "kind": "TODO", "text": "Hex floats are not handled, they output `NIL`." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -4861,7 +6128,8 @@
       { "kind": "RETURNS", "text": "`true` on success, `false` on error." },
       { "kind": "OUTPUTS", "text": "Value of the literal, written to `out`. It is 64 bits wide, because multi-character\nliteral can occupy more than one byte." },
       { "kind": "OUTPUTS", "text": "Number of character units in the literal, written to `unit_count_out`." },
-      { "kind": "AI", "text": "Generated." }
+      { "kind": "AI", "text": "Generated." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -4869,10 +6137,14 @@
     "symbol": "Cn_Build_Opt",
     "kind": "struct",
     "module": "Build",
-    "decl": "typedef struct {\n    /**\n     * Defines whether call to build function should allocate memory internally,\n     * in permanent arena, for any supplied data.\n     *\n     * IMPORTANT: If set to `false`, the function trusts its user to manage passed memory,\n     * for example any names, snippets of code, etc.\n     *\n     * NOTE: Setting it to `false` is helpful if certain piece of code is inserted a lot.\n     * For example, it prevents build function from allocating memory over and over again\n     * for the same piece of string data.\n     */\n    bool alloc;\n\n    /**\n     * File and line indicate where specific build function was called from,\n     * used to trace meta program code insertions.\n     */\n    const char *file;\n    int64_t line;\n} Cn_Build_Opt",
+    "decl": "typedef struct {\n    bool        alloc;\n    const char *file;\n    int64_t     line;\n} Cn_Build_Opt",
     "summary": "Optional values that can be set for most of the `cn_build_*` functions.",
     "description": "",
-    "tags": [],
+    "tags": [
+      { "kind": "MEMBER", "text": "alloc: Defines whether call to build function should allocate memory internally,\nin permanent arena, for any supplied data. If set to `false`, the function trusts its user\nto manage passed memory, for example any names, snippets of code, etc.\nSetting it to `false` is helpful if certain piece of code is inserted a lot.\nFor example, it prevents build function from allocating memory over and over again\nfor the same piece of string data." },
+      { "kind": "MEMBER", "text": "file: File and line indicate where specific build function was called from,\nused to trace meta program code insertions." },
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
     "flags": []
   },
   {
@@ -4883,7 +6155,8 @@
     "summary": "Builds code ast node that contains formatted text.",
     "description": "Once reparsed, the node is expanded and parsed into actual ast nodes.",
     "tags": [
-      { "kind": "RETURNS", "text": "Built code node." }
+      { "kind": "RETURNS", "text": "Built code node." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -4895,7 +6168,8 @@
     "summary": "Builds list out of supplied nodes, passed as variadic arguments in order.",
     "description": "",
     "tags": [
-      { "kind": "RETURNS", "text": "List composed of supplied nodes, allocated internally in arena." }
+      { "kind": "RETURNS", "text": "List composed of supplied nodes, allocated internally in arena." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -4907,7 +6181,8 @@
     "summary": "Builds list out of `length` nodes in `ptrs`.",
     "description": "",
     "tags": [
-      { "kind": "RETURNS", "text": "List composed of supplied nodes, allocated internally in arena." }
+      { "kind": "RETURNS", "text": "List composed of supplied nodes, allocated internally in arena." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -4919,7 +6194,8 @@
     "summary": "Builds identifier with supplied `name`.",
     "description": "",
     "tags": [
-      { "kind": "RETURNS", "text": "Built identifier." }
+      { "kind": "RETURNS", "text": "Built identifier." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -4931,7 +6207,8 @@
     "summary": "Builds integer with supplied `value`.",
     "description": "",
     "tags": [
-      { "kind": "RETURNS", "text": "Built integer." }
+      { "kind": "RETURNS", "text": "Built integer." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -4943,7 +6220,8 @@
     "summary": "Builds float with supplied `value`.",
     "description": "",
     "tags": [
-      { "kind": "RETURNS", "text": "Built float." }
+      { "kind": "RETURNS", "text": "Built float." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -4955,7 +6233,8 @@
     "summary": "Builds string with supplied `str`.",
     "description": "",
     "tags": [
-      { "kind": "RETURNS", "text": "Built string." }
+      { "kind": "RETURNS", "text": "Built string." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -4968,7 +6247,8 @@
     "description": "",
     "tags": [
       { "kind": "RETURNS", "text": "Built binary expression." },
-      { "kind": "IMPORTANT", "text": "`left` and `right` must be valid built nodes." }
+      { "kind": "IMPORTANT", "text": "`left` and `right` must be valid built nodes." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -4981,7 +6261,8 @@
     "description": "",
     "tags": [
       { "kind": "RETURNS", "text": "Built assignment expression." },
-      { "kind": "IMPORTANT", "text": "`left` and `right` must be valid built nodes." }
+      { "kind": "IMPORTANT", "text": "`left` and `right` must be valid built nodes." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -4994,7 +6275,8 @@
     "description": "",
     "tags": [
       { "kind": "RETURNS", "text": "Built unary expression." },
-      { "kind": "IMPORTANT", "text": "`expression` must be a valid built node." }
+      { "kind": "IMPORTANT", "text": "`expression` must be a valid built node." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -5007,7 +6289,8 @@
     "description": "",
     "tags": [
       { "kind": "RETURNS", "text": "Built function call expression." },
-      { "kind": "IMPORTANT", "text": "`callee` must be a valid built node, and `arguments` must be constructed beforehand\nwith appropriate expression children." }
+      { "kind": "IMPORTANT", "text": "`callee` must be a valid built node, and `arguments` must be constructed beforehand\nwith appropriate expression children." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -5020,7 +6303,8 @@
     "description": "",
     "tags": [
       { "kind": "RETURNS", "text": "Built expression statement." },
-      { "kind": "IMPORTANT", "text": "`expression` must be a valid built node." }
+      { "kind": "IMPORTANT", "text": "`expression` must be a valid built node." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -5033,7 +6317,8 @@
     "description": "",
     "tags": [
       { "kind": "RETURNS", "text": "Built `goto` statement." },
-      { "kind": "IMPORTANT", "text": "`identifier` must be a valid built node." }
+      { "kind": "IMPORTANT", "text": "`identifier` must be a valid built node." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -5046,7 +6331,8 @@
     "description": "",
     "tags": [
       { "kind": "RETURNS", "text": "Built `return` statement." },
-      { "kind": "IMPORTANT", "text": "`expression` must be a valid built node." }
+      { "kind": "IMPORTANT", "text": "`expression` must be a valid built node." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -5059,7 +6345,8 @@
     "description": "",
     "tags": [
       { "kind": "RETURNS", "text": "Built label." },
-      { "kind": "IMPORTANT", "text": "`identifier` and `statement` must be valid built nodes." }
+      { "kind": "IMPORTANT", "text": "`identifier` and `statement` must be valid built nodes." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -5072,7 +6359,8 @@
     "description": "",
     "tags": [
       { "kind": "RETURNS", "text": "Built block item." },
-      { "kind": "IMPORTANT", "text": "`declaration_or_statement` must be a valid built node." }
+      { "kind": "IMPORTANT", "text": "`declaration_or_statement` must be a valid built node." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -5085,7 +6373,8 @@
     "description": "Chains `pointer` that stands closer to the declared name. As in `char * const * name`,\nwhere outer built pointer holds `const` qualifier and chains the inner one.",
     "tags": [
       { "kind": "RETURNS", "text": "Built pointer." },
-      { "kind": "IMPORTANT", "text": "`pointer` must be `NIL` or a valid built pointer." }
+      { "kind": "IMPORTANT", "text": "`pointer` must be `NIL` or a valid built pointer." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -5099,7 +6388,8 @@
     "tags": [
       { "kind": "RETURNS", "text": "Built grouped direct declarator." },
       { "kind": "IMPORTANT", "text": "`declarator` must be a valid built node." },
-      { "kind": "NOTE", "text": "Identifier direct declarator variation has no dedicated build function,\nplain `cn_build_identifier` result is used in its place." }
+      { "kind": "NOTE", "text": "Identifier direct declarator variation has no dedicated build function,\nplain `cn_build_identifier` result is used in its place." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -5113,7 +6403,8 @@
     "tags": [
       { "kind": "PARAM", "text": "direct_declarator: Valid built node, or `NIL` if array declarator is abstract." },
       { "kind": "PARAM", "text": "expression: Can be `NIL` to build unsized `[]` array." },
-      { "kind": "RETURNS", "text": "Built array direct declarator." }
+      { "kind": "RETURNS", "text": "Built array direct declarator." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -5128,7 +6419,8 @@
       { "kind": "PARAM", "text": "direct_declarator: Valid built node, or `NIL` if function declarator is abstract." },
       { "kind": "PARAM", "text": "parameter_declarations: Must be constructed beforehand with appropriate parameter\ndeclaration children, empty list builds `(void)`." },
       { "kind": "PARAM", "text": "variadic: Marks declarator as ending with `...`." },
-      { "kind": "RETURNS", "text": "Built function direct declarator." }
+      { "kind": "RETURNS", "text": "Built function direct declarator." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -5143,7 +6435,8 @@
       { "kind": "PARAM", "text": "pointer: Can be `NIL` if declarator is not wrapped with pointers." },
       { "kind": "PARAM", "text": "direct_declarator: Can be `NIL` only if declarator is abstract." },
       { "kind": "RETURNS", "text": "Built declarator." },
-      { "kind": "NOTE", "text": "`CN_AST_DECLARATOR_IS_ABSTRACT` flag is deduced from supplied direct declarator chain,\ndeclarator is abstract when that chain carries no identifier." }
+      { "kind": "NOTE", "text": "`CN_AST_DECLARATOR_IS_ABSTRACT` flag is deduced from supplied direct declarator chain,\ndeclarator is abstract when that chain carries no identifier." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -5157,7 +6450,8 @@
     "tags": [
       { "kind": "PARAM", "text": "initializer: Can be `NIL` if declared name is left uninitialized." },
       { "kind": "RETURNS", "text": "Built init declarator." },
-      { "kind": "IMPORTANT", "text": "`declarator` must be a valid non-abstract built node." }
+      { "kind": "IMPORTANT", "text": "`declarator` must be a valid non-abstract built node." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -5171,7 +6465,8 @@
     "tags": [
       { "kind": "PARAM", "text": "init_declarators: Must be constructed beforehand with appropriate init declarator children,\nempty list builds empty declaration." },
       { "kind": "RETURNS", "text": "Built declaration." },
-      { "kind": "IMPORTANT", "text": "`declaration_specifiers` must be a valid built node." }
+      { "kind": "IMPORTANT", "text": "`declaration_specifiers` must be a valid built node." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -5179,10 +6474,79 @@
     "symbol": "Cn_Tu_Data",
     "kind": "struct",
     "module": "Translation Unit",
-    "decl": "typedef struct {\n    /**\n     * Stores all non-label bindings in growing array list.\n     *\n     * IMPORTANT: Access elements by indices, so no unsafe situations occur.\n     * First element is considered `NIL` element, it is reserved to identify illegal references.\n     */\n    Cn_Binding *binding_list;\n    /**\n     * Tag table uses tag names of `struct`, `enum` and `union` as keys, and bindings as values.\n     */\n    Cn_Binding_Idx *tag_binding_table;\n    /**\n     * Symbol table acts similar to the tag table, except it contains\n     * variables, functions, typedefs and enum constants.\n     */\n    Cn_Binding_Idx *symbol_binding_table;\n    /**\n     * Stores all label bindings in growing array list.\n     *\n     * IMPORTANT: Access elements by indices, so no unsafe situations occur.\n     * First element is considered `NIL` element, it is reserved to identify illegal references.\n     */\n    Cn_Binding *label_binding_list;\n    /**\n     * Label table stores only label bindings.\n     */\n    Cn_Binding_Idx *label_binding_table;\n    /**\n     * Prevents a really annoying binding related issue, that comes up during reparsing,\n     * specifically checkpoint loading, after user executed a hook.\n     *\n     * To understand this, first understand that in C most of the bindings are allowed to be redeclared,\n     * and some even redefined. For example tag types, `struct`, `enum` and `union`, are allowed to be\n     * redeclared as many times as you want, and eventually defined, therefore completing previously\n     * declared tag type. And C variables are allowed to be redefined under certain scope conditions too.\n     *\n     * Canonically, this works under a mechanism that simply ignores duplicate redeclarations and\n     * merges them into previous declarations, and if declaration completes a type, for example in tag\n     * type case, the type that was PREVIOUSLY created gets filled with values and completed (defined).\n     *\n     * But that brings an issue when used with the checkpoint and rollback system that this tool provides.\n     * If rollback occurs, by the rules, all state is reverted to the checkpoint in order to reparse\n     * ast tree. This includes deleting all types and bindings that were created AFTER checkpoint was set.\n     * And that's the problem, since a binding with definition can occur AFTER checkpoint is set, and it\n     * can complete (define) the type that was PREVIOUSLY created by an older declaration. So when rollback\n     * occurs, the ast tree that made the definition is erased, but the definition is still saved in the\n     * type, since it was first declared before the checkpoint, and therefore is not reverted to its\n     * previous undefined state.\n     *\n     * Solution is then NOT to destroy existing binding structure, because it would likely only\n     * overcomplicate and possibly break some C grammar rules, but rather to track binding indices in a\n     * growing list. Each time a binding is defined, its index is added to this list. Then it's simple,\n     * because checkpoint places a marker, and every index added after that marker is taken out and\n     * undefined. This list is also scoped, so bindings that were removed on their own get their\n     * indices removed from here as well.\n     */\n    Cn_Binding_Idx *binding_defined_idx_list;\n\n    /**\n     * Arena that stores type structs, so that pointers to types never change.\n     */\n    Cn_Chained_Arena type_arena;\n    /**\n     * Arena that stores various type children, for example struct members, function parameters, etc.\n     *\n     * Since each type has its own array of members, which doesn't overlap,\n     * all of them can be stored in a single arena.\n     */\n    Cn_Chained_Arena type_children_arena;\n    /**\n     * Set of pointers to the types, used to deduplicate structural types.\n     *\n     * Whenever such type is found, it is inserted into this set if it is not already there.\n     */\n    Cn_Type **type_ptr_set;\n\n    /**\n     * Arena that stores every scoped string data.\n     *\n     * Pointers to the data remain the same throughout the execution,\n     * since chained arena guarantees that memory once allocated is not moved.\n     * Deallocation mechanism of the arena is used to pop string data once it is out of scope.\n     *\n     * Used for binding names, such as functions, variables, typedefs and enums.\n     */\n    Cn_Chained_Arena scoped_strings_arena;\n    /**\n     * Arena that stores string data, that lives globally outside of source.\n     *\n     * Pointers to the data remain the same throughout the execution,\n     * since chained arena guarantees that memory once allocated is not moved.\n     *\n     * Used for type names and persistent names, such as struct members and tags.\n     */\n    Cn_Chained_Arena permanent_strings_arena;\n\n    /**\n     * Source string of the code being parsed.\n     */\n    Cn_String source;\n    /**\n     * Arena that stores data of all nodes.\n     */\n    Cn_Chained_Arena ast_arena;\n    /**\n     * Stack of `Cn_Ast_Node *` used during parsing to build `Cn_Ast_Nodes` arrays.\n     *\n     * Parsing functions push nodes onto this stack, then finalize ranges\n     * into `Cn_Ast_Nodes` when the list is complete.\n     */\n    Cn_Ast_Node **ptr_stack;\n    /**\n     * Stack of `Cn_Ast_Extension` used by subparsers to add custom ast extensions to the node.\n     *\n     * Parsing functions push extensions onto this stack, then finalize ranges\n     * into `Cn_Ast_Extensions` when the list is complete.\n     */\n    Cn_Ast_Extension *ext_stack;\n    /**\n     * Error and warning count, incremented by `cn_diagnostic`\n     * every time an error or a warning is reported.\n     */\n    int64_t error_count, warning_count;\n    uint64_t counter;\n\n    /**\n     * Regular array list used as a stack to properly handle scoping throughout parsing.\n     */\n    Cn_Scope *scope_stack;\n    /**\n     * Index of the current function scope, `NIL` if not inside a function scope.\n     */\n    int64_t function_scope_idx;\n\n    /**\n     * Output generated by the emitter.\n     */\n    Cn_Chained_Arena output_arena;\n} Cn_Tu_Data",
+    "decl": "typedef struct {\n    Cn_Binding         *binding_list;\n    Cn_Binding_Idx     *tag_binding_table;\n    Cn_Binding_Idx     *symbol_binding_table;\n    Cn_Binding         *label_binding_list;\n    Cn_Binding_Idx     *label_binding_table;\n    Cn_Binding_Idx     *binding_defined_idx_list;\n    Cn_Chained_Arena    type_arena;\n    Cn_Chained_Arena    type_children_arena;\n    Cn_Type           **type_ptr_set;\n    Cn_Chained_Arena    scoped_strings_arena;\n    Cn_Chained_Arena    permanent_strings_arena;\n    Cn_String           source;\n    Cn_Chained_Arena    ast_arena;\n    Cn_Ast_Node       **ptr_stack;\n    int64_t             error_count;\n    int64_t             warning_count;\n    Cn_Scope           *scope_stack;\n    int64_t             function_scope_idx;\n    Cn_Chained_Arena    output_arena;\n    uint64_t            counter;\n} Cn_Tu_Data",
     "summary": "Groups all translation unit data together.",
-    "description": "Owned by a user, and acts as a global scope for the library.",
-    "tags": [],
+    "description": "Owned by a user, and acts as a global state for the library.",
+    "tags": [
+      { "kind": "MEMBER", "text": "binding_list: Stores all non-label bindings in growing array list.\nAccess elements by indices, so no unsafe situations occur.\nFirst element is considered `NIL` element, it is reserved to identify illegal references." },
+      { "kind": "MEMBER", "text": "tag_binding_table: Tag table uses tag names of `struct`, `enum` and `union` as keys,\nand bindings as values." },
+      { "kind": "MEMBER", "text": "symbol_binding_table: Symbol table acts similar to the tag table, except it contains\nvariables, functions, typedefs and enum constants." },
+      { "kind": "MEMBER", "text": "label_binding_list: Stores all label bindings in growing array list.\nAccess elements by indices, so no unsafe situations occur.\nFirst element is considered `NIL` element, it is reserved to identify illegal references." },
+      { "kind": "MEMBER", "text": "label_binding_table: Label table stores only label bindings." },
+      { "kind": "MEMBER", "text": "binding_defined_idx_list:\nPrevents a really annoying binding related issue, that comes up during reparsing,\nspecifically checkpoint loading, after user executed a hook.\nTo understand this, first understand that in C most of the bindings are allowed to be redeclared,\nand some even redefined. For example tag types, `struct`, `enum` and `union`, are allowed to be\nredeclared as many times as you want, and eventually defined, therefore completing previously\ndeclared tag type. And C variables are allowed to be redefined under certain scope conditions too.\nCanonically, this works under a mechanism that simply ignores duplicate redeclarations and\nmerges them into previous declarations, and if declaration completes a type, for example in tag\ntype case, the type that was PREVIOUSLY created gets filled with values and completed (defined).\nBut that brings an issue when used with the checkpoint and rollback system that this tool provides.\nIf rollback occurs, by the rules, all state is reverted to the checkpoint in order to reparse\nast tree. This includes deleting all types and bindings that were created AFTER checkpoint was set.\nAnd that's the problem, since a binding with definition can occur AFTER checkpoint is set, and it\ncan complete (define) the type that was PREVIOUSLY created by an older declaration. So when rollback\noccurs, the ast tree that made the definition is erased, but the definition is still saved in the\ntype, since it was first declared before the checkpoint, and therefore is not reverted to its\nprevious undefined state.\nSolution is then NOT to destroy existing binding structure, because it would likely only\novercomplicate and possibly break some C grammar rules, but rather to track binding indices in a\ngrowing list. Each time a binding is defined, its index is added to this list. Then it's simple,\nbecause checkpoint places a marker, and every index added after that marker is taken out and\nundefined. This list is also scoped, so bindings that were removed on their own get their\nindices removed from here as well." },
+      { "kind": "MEMBER", "text": "type_arena: Arena that stores type structs, so that pointers to types never change." },
+      { "kind": "MEMBER", "text": "type_children_arena: Arena that stores various type children, for example struct members, function parameters, etc.\nSince each type has its own array of members, which doesn't overlap, all of them can be stored in a single arena." },
+      { "kind": "MEMBER", "text": "type_ptr_set: Set of pointers to the types, used to deduplicate structural types.\nWhenever such type is found, it is inserted into this set if it is not already there." },
+      { "kind": "MEMBER", "text": "scoped_strings_arena: Arena that stores every scoped string data.\nPointers to the data remain the same throughout the execution,\nsince chained arena guarantees that memory once allocated is not moved.\nDeallocation mechanism of the arena is used to pop string data once it is out of scope.\nUsed for binding names, such as functions, variables, typedefs and enums." },
+      { "kind": "MEMBER", "text": "permanent_strings_arena: Arena that stores string data, that lives globally outside of source.\nPointers to the data remain the same throughout the execution,\nsince chained arena guarantees that memory once allocated is not moved.\nUsed for type names and persistent names, such as struct members and tags." },
+      { "kind": "MEMBER", "text": "source: Source string of the code being parsed." },
+      { "kind": "MEMBER", "text": "ast_arena: Arena that stores data of all nodes." },
+      { "kind": "MEMBER", "text": "ptr_stack: Stack of `Cn_Ast_Node *` used during parsing to build `Cn_Ast_Nodes` arrays.\nParsing functions push nodes onto this stack, then finalize ranges\ninto `Cn_Ast_Nodes` when the list is complete." },
+      { "kind": "MEMBER", "text": "error_count: Error count, incremented by `cn_diagnostic_handler` every time an error is reported." },
+      { "kind": "MEMBER", "text": "warning_count: Warning count, incremented by `cn_diagnostic_handler` every time a warning is reported." },
+      { "kind": "MEMBER", "text": "scope_stack: Regular array list used as a stack to properly handle scoping throughout parsing." },
+      { "kind": "MEMBER", "text": "function_scope_idx: Index of the current function scope, `NIL` if not inside a function scope." },
+      { "kind": "MEMBER", "text": "output_arena: Output generated by the emitter." },
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "Cn_Tu_Saved",
+    "kind": "struct",
+    "module": "Translation Unit",
+    "decl": "typedef struct {\n    uint64_t saved_output_length;\n    uint64_t saved_ast_length;\n    uint64_t saved_type_length;\n    uint64_t saved_type_children_length;\n    int64_t  saved_binding_length;\n    int64_t  saved_label_binding_length;\n    int64_t  saved_binding_defined_idx_length;\n    uint64_t saved_scoped_strings_length;\n    uint64_t saved_permanent_strings_length;\n    int64_t  saved_scope_length;\n    int64_t  saved_function_scope_idx;\n    int64_t  saved_ptr_stack_length;\n    uint64_t saved_counter;\n} Cn_Tu_Saved",
+    "summary": "Struct to preserve state needed for full rollback of processing.",
+    "description": "",
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "Cn_Tu_Flags",
+    "kind": "enum",
+    "module": "Translation Unit",
+    "decl": "typedef enum {\n    CN_TU_PRINT_SOURCE   = 0x1,\n    CN_TU_PRINT_TOKENS   = 0x2,\n    CN_TU_PRINT_AST      = 0x4,\n    CN_TU_PRINT_TYPES    = 0x8,\n    CN_TU_PRINT_BINDINGS = 0x10,\n    CN_TU_NO_CODE_OUTPUT = 0x20,\n    CN__TU_OPT_SOURCE    = 0x40,\n} Cn_Tu_Flags",
+    "summary": "Flags that can be passed to `cn_tu_init` to enable or disable some behaviour.",
+    "description": "",
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "Cn_Tu_Make_Opt",
+    "kind": "struct",
+    "module": "Translation Unit",
+    "decl": "typedef struct {\n    Cn_String   source;\n    char       *output_path;\n    Cn_Tu_Flags flags;\n} Cn_Tu_Make_Opt",
+    "summary": "Optionals that can be passed to `cn_tu_init`.",
+    "description": "",
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "Cn_Translation_Unit",
+    "kind": "struct",
+    "module": "Translation Unit",
+    "decl": "typedef struct {\n    Cn_Tu_Flags flags;\n    char       *output_path;\n    char       *path;\n    Cn_Tu_Data  data;\n} Cn_Translation_Unit",
+    "summary": "Struct that represents one whole translation unit which canonically is a single `.c` file.",
+    "description": "",
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
     "flags": []
   },
   {
@@ -5194,7 +6558,8 @@
     "description": "Translation unit represents classic C translation unit, in which all lexing, parsing,\ninferring and modification occurs.\n\nPath must point to an `.i` file, that is the intermediate pre-processed representation of\na translation unit. Simply, it is a `.c` file that has all macros expanded and is ready to be\nsent to the compiler. In `gcc` it would be generated by executing the following:\n\n```\n$ gcc -E -o file.i file.c\n```",
     "tags": [
       { "kind": "RETURNS", "text": "`true` on success, `false` on error." },
-      { "kind": "IMPORTANT", "text": "Supplying `.c` files with macros that are not expanded results in an error,\nmake sure to pass the `.c` file through the compiler's pre-processor first." }
+      { "kind": "IMPORTANT", "text": "Supplying `.c` files with macros that are not expanded results in an error,\nmake sure to pass the `.c` file through the compiler's pre-processor first." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -5204,9 +6569,10 @@
     "module": "Translation Unit",
     "decl": "int cn_tu_process(Cn_Translation_Unit *tu)",
     "summary": "Processes translation unit `tu` from top to bottom.",
-    "description": "Translation unit passes through Infer and Size stages. Meaning ast is built, type and symbol\ntables are constructed, and sizes of the types are calculated too.\n\nThroughout the processing, various messages are sent, which can be intercepted to introspect\nand modify code, state, etc. This can be done by setting `cn_message_handler`.\nSee `Message` section for more info.",
+    "description": "Translation unit passes through Infer and Size stages. Meaning ast is built, type and symbol\ntables are constructed, and sizes of the types are calculated too.\n\nThroughout the processing, various hooks are triggered, which can be intercepted to introspect\nand modify code, state, etc. This can be done by adding custom hooks to `cn_hooks`.\nSee `Hook` section for more info.",
     "tags": [
-      { "kind": "RETURNS", "text": "`0` if processing is successful, `-1` if an error occurred." }
+      { "kind": "RETURNS", "text": "`0` if processing is successful, `-1` if an error occurred." },
+      { "kind": "SINCE", "text": "0.3.0" }
     ],
     "flags": []
   },
@@ -5217,7 +6583,34 @@
     "decl": "void cn_tu_free(Cn_Translation_Unit *tu)",
     "summary": "Frees all memory used by translation unit `tu`, including closing previously opened file.",
     "description": "",
-    "tags": [],
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "cn_tu_log_types",
+    "kind": "function",
+    "module": "Translation Unit",
+    "decl": "void cn_tu_log_types(Cn_Translation_Unit *tu)",
+    "summary": "Logs current type universe in `tu`.",
+    "description": "",
+    "tags": [
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
+    "flags": []
+  },
+  {
+    "symbol": "cn_tu_log_bindings",
+    "kind": "function",
+    "module": "Translation Unit",
+    "decl": "void cn_tu_log_bindings(Cn_Translation_Unit *tu)",
+    "summary": "Logs current bindings in `tu`.",
+    "description": "",
+    "tags": [
+      { "kind": "NOTE", "text": "Bindings are popped when their scope ends.\nThis log shows only current scope visible bindings." },
+      { "kind": "SINCE", "text": "0.3.0" }
+    ],
     "flags": []
   }
 ]

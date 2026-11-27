@@ -1,6 +1,6 @@
+#define CN_GNU
 #define CN_IMPLEMENTATION
 #include "../cnotes.h"
-#include "../cnotes_gnu.h"
 
 #include "../testing_utility.h"
 
@@ -14,8 +14,6 @@ int main(int argc, char **argv) {
         fprintf(stderr, "gnu runner: expected parsing test input.");
         return -1;
     }
-
-    cn_extension_register(cn_gnu_extension);
 
     Cn_Translation_Unit tu = {0};
     cn_tu_init(&tu, argv[0], .flags = CN_TU_NO_CODE_OUTPUT);

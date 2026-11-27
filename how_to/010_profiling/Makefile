@@ -27,8 +27,9 @@ $(BUILD_DIR)/%.o: $(BUILD_DIR)/%.i
 $(BUILD_DIR):
 	mkdir -p $(BUILD_DIR)
 
+# Meta program is built with `CN_GNU`, since `.i` files produced by gcc carry GNU extensions from system headers.
 $(META): meta.c timer.c defer.c
-	$(CC) $(CFLAGS) meta.c timer.c defer.c -o $(META)
+	$(CC) $(CFLAGS) -DCN_GNU meta.c timer.c defer.c -o $(META)
 
 $(TARGET): $(OBJS)
 	$(CC) $(CFLAGS) $(OBJS) -o $(TARGET)
