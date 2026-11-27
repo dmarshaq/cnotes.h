@@ -1,0 +1,132 @@
+// Test: Reparse of function definitions - cn_ast_reparse_* path
+#include "../../testing_utility.h"
+
+const Cn_String src = CN_STR_BUFFER(
+    "typedef struct Point { int x, y; } Point;\n"
+    "typedef unsigned long Size;\n"
+    "\n"
+    "struct Wrapper {\n"
+    "    Point p;\n"
+    "    union { int i; float f; } u;\n"
+    "    unsigned int bits : 3;\n"
+    "    const char *name;\n"
+    "    int matrix[2][3];\n"
+    "};\n"
+    "\n"
+    "enum Color { RED, GREEN = 4, BLUE = GREEN + 1 };\n"
+    "\n"
+    "[[deprecated]] int global_counter = 1 + 2 * 3;\n"
+    "static const Point origin = { .x = 0, .y = 1 };\n"
+    "int table[3] = { [0] = 1, 2, 3 };\n"
+    "\n"
+    "int helper(int a, int b);\n"
+    "int helper(int a, int b);\n"
+    "int variadic(const char *fmt, ...);\n"
+    "\n"
+    "[[reparse]] int helper(int a, int b) {\n"
+    "    return a + b;\n"
+    "}\n"
+    "\n"
+    "[[reparse]] [[my::note(\"text\", 1)]] int driver(int n, Point *p, int (*fn)(int, int)) {\n"
+    "    int local = n;\n"
+    "    Size size = sizeof(struct Wrapper);\n"
+    "    typedef int Alias;\n"
+    "    Alias aliased = (Alias)size;\n"
+    "    enum Color c = BLUE;\n"
+    "    struct Wrapper w = { .name = \"abc\" \"def\" };\n"
+    "    Point compound = (Point){ .x = 1, .y = 2 };\n"
+    "    int same = local;\n"
+    "    int *ptr = &local;\n"
+    "    char buffer[sizeof(Point) * 2];\n"
+    "\n"
+    "    p->x = compound.x;\n"
+    "    w.p.x = c;\n"
+    "    same = *ptr + aliased + (int)size + (int)buffer[0];\n"
+    "\n"
+    "    if (local > 0) {\n"
+    "        local = local - 1;\n"
+    "    } else if (local < 0) {\n"
+    "        local = fn(local, 2);\n"
+    "    } else {\n"
+    "        local = helper(1, 2);\n"
+    "    }\n"
+    "\n"
+    "    switch (c) {\n"
+    "        case RED:\n"
+    "            local = local + 1;\n"
+    "            break;\n"
+    "        case 1 << 2:\n"
+    "            local = local + 2;\n"
+    "            break;\n"
+    "        default:\n"
+    "            break;\n"
+    "    }\n"
+    "\n"
+    "    while (local > 0) local = local - 1;\n"
+    "\n"
+    "    do {\n"
+    "        local = local + 1;\n"
+    "    } while (local < 3);\n"
+    "\n"
+    "    for ([[unroll]] int i = 0; i < 3; i = i + 1) {\n"
+    "        if (i == 1) continue;\n"
+    "        if (i == 2) break;\n"
+    "        local = local + i;\n"
+    "    }\n"
+    "\n"
+    "    for (;;) break;\n"
+    "\n"
+    "    local = local > 0 ? local++ : --local;\n"
+    "    local = (local, n);\n"
+    "\n"
+    "    goto done;\n"
+    "\n"
+    "    [[note]] done:\n"
+    "    ;\n"
+    "\n"
+    "    return local;\n"
+    "}\n"
+    "\n"
+    "[[reparse]] int recursive(int n) {\n"
+    "    struct Local { int a; enum Inner { ONE = 1 } e; } l = { 1, ONE };\n"
+    "    typedef int (*Callback)(int, int);\n"
+    "    Callback cb = &helper;\n"
+    "    static int counter = 0;\n"
+    "    counter = counter + l.a + cb(1, 2);\n"
+    "    {\n"
+    "        int shadow = n;\n"
+    "        {\n"
+    "            char shadow = (char)n;\n"
+    "            counter = counter + shadow;\n"
+    "        }\n"
+    "        counter = counter + shadow;\n"
+    "    }\n"
+    "    if (n <= 0) return counter;\n"
+    "    return recursive(n - 1);\n"
+    "}\n"
+);
+
+Cn_Hook_Response hook(Cn_Ast_Node **node_ptr, bool *ast_is_modified, bool first) {
+    if ((*node_ptr)->kind == CN_AST_FUNCTION && first) {
+        *ast_is_modified = true;
+    }
+
+    return CN_HOOK_RESPONSE_NONE;
+}
+
+bool my_extension(Cn_Hooks *hooks) {
+    cn_array_list_append(&hooks->ast_parsed_hooks, hook);
+
+    return true;
+}
+
+int main(void) {
+    cn_diagnostic_handler = &cn_test_diagnostic_handler;
+
+    cn_extension_register(my_extension);
+
+    Cn_Translation_Unit tu = {0};
+    cn_tu_init(&tu, "input.i", .source = src, .flags = CN_TU_NO_CODE_OUTPUT);
+    cn_tu_process(&tu);
+    return 0;
+}

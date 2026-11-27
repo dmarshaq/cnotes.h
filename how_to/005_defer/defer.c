@@ -72,17 +72,28 @@ void defer_replace_returns(Cn_Ast_Node **statement_ptr);
 // Helper that builds the replacement for one `return` statement.
 Cn_Ast_Node *defer_make_return_replacement(Deferred_Entry *entry, Cn_Ast_Node *return_expression);
 
-Cn_Message_Response defer_handler(Cn_Message *message) {
-    // Filtering messages down to parsed function definitions.
-    //
-    // NOTE: Unlike `001_basic_usage` we deliberately do not filter on `CN_MESSAGE_AST_UNMODIFIED`.
-    // If another meta program modified the function and the library reparsed it, we still want to
-    // see the result, because that other meta program might have generated `[[defer]]` itself.
-    // That is precisely how `010_profiling` builds on top of this file.
-    if (message->kind != CN_MESSAGE_AST_PARSED)         return CN_MESSAGE_RESPONSE_NONE;
-    if (!(message->flags & CN_MESSAGE_AST_FUNCTION))    return CN_MESSAGE_RESPONSE_NONE;
+Cn_Hook_Response defer_hook(Cn_Ast_Node **node_ptr, bool *ast_is_modified, bool first);
 
-    Cn_Ast_Function *function = cn_ast_as(Function, *((Cn_Message_Ast_Parsed *)message)->node_ptr);
+// Extension that adds `defer_hook` to the library, it is registered in `meta.c`.
+bool defer_extension(Cn_Hooks *hooks) {
+    cn_array_list_append(&hooks->ast_parsed_hooks, defer_hook);
+    return true;
+}
+
+Cn_Hook_Response defer_hook(Cn_Ast_Node **node_ptr, bool *ast_is_modified, bool first) {
+    // NOTE: Unlike `001_basic_usage` we deliberately do not filter on `first`.
+    // After this hook reports a modification the library reparses the function and calls it again,
+    // the reparsed function is checked once more, which is harmless, since all `[[defer]]` attributes were consumed.
+    (void) first;
+
+    // Filtering nodes down to parsed function definitions.
+    //
+    // NOTE: If another meta program's hook runs before this one and modifies the function, this hook receives
+    // the already reparsed result, because that other meta program might have generated `[[defer]]` itself.
+    // That is precisely how `010_profiling` builds on top of this file.
+    if ((*node_ptr)->kind != CN_AST_FUNCTION) return CN_HOOK_RESPONSE_NONE;
+
+    Cn_Ast_Function *function = cn_ast_as(Function, *node_ptr);
 
     // Getting the function's type before touching anything, because the shape of a rerouted
     // `return` depends on it: a `void` function has no value to carry across the jump.
@@ -162,7 +173,7 @@ Cn_Message_Response defer_handler(Cn_Message *message) {
     if (!found_defer) {
         cn_array_list_free(&items);
         cn_array_list_free(&deferred_stack);
-        return CN_MESSAGE_RESPONSE_NONE;
+        return CN_HOOK_RESPONSE_NONE;
     }
 
     // Emitting the clean up chain at the end of the function, popping the stack so the statements
@@ -225,7 +236,9 @@ Cn_Message_Response defer_handler(Cn_Message *message) {
     cn_array_list_free(&items);
     cn_array_list_free(&deferred_stack);
 
-    return CN_MESSAGE_RESPONSE_MODIFIED;
+    // Reporting the modification, so the library emits the function back to text and reparses it.
+    *ast_is_modified = true;
+    return CN_HOOK_RESPONSE_NONE;
 }
 
 // Walks one statement of the function looking for jumps that need rerouting.
@@ -237,7 +250,7 @@ void defer_replace_returns(Cn_Ast_Node **statement_ptr) {
     if (statement == NULL) return;
 
     // Any `[[defer]]` that reaches this function is nested somewhere inside the function scope,
-    // the walk in `defer_handler` handles the function scope itself and never passes those here.
+    // the walk in `defer_hook` handles the function scope itself and never passes those here.
     if (cn_get_attribute(statement, CN_STR_LIT("defer")) != NULL) {
         cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, statement, CN_DC_ILLEGAL_ATTRIBUTE, "Expected 'defer' attribute in the function scope, this defer implementation only defers to the end of the function.");
         return;
@@ -306,7 +319,7 @@ void defer_replace_returns(Cn_Ast_Node **statement_ptr) {
 //      }
 // ```
 Cn_Ast_Node *defer_make_return_replacement(Deferred_Entry *entry, Cn_Ast_Node *return_expression) {
-    // Marking the entry, so `defer_handler` knows it has to give this one a label,
+    // Marking the entry, so `defer_hook` knows it has to give this one a label,
     // and that the clean up chain has to end with a real `return`.
     entry->jumped_to        = true;
     defer_rerouted_return   = true;

@@ -1,0 +1,42 @@
+# Runs the whole test suite on every push and pull request, check fails if any test fails.
+name: Tests
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      # nob calls plain `cc`, cnotes.h needs GCC 14 for `enum : type` declarations.
+      - name: Use GCC 14 as cc
+        run: |
+          mkdir -p "$HOME/.local/bin"
+          ln -sf "$(command -v gcc-14)" "$HOME/.local/bin/cc"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Build nob
+        run: cc -o nob nob.c
+
+      # Exec tests link against bin/libcnotes.a.
+      - name: Build library
+        run: ./nob lib
+
+      - name: Run tests
+        run: ./nob test
+
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tests
+          path: doc/tests.json
+          if-no-files-found: ignore

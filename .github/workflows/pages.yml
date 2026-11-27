@@ -1,0 +1,58 @@
+# Publishes doc/ to GitHub Pages on every push to main.
+# Documentation and test results are generated from the pushed cnotes.h, failing tests don't stop
+# the deploy, the tests page shows them instead.
+name: Deploy site
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-24.04
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      # nob calls plain `cc`, cnotes.h needs GCC 14 for `enum : type` declarations.
+      - name: Use GCC 14 as cc
+        run: |
+          mkdir -p "$HOME/.local/bin"
+          ln -sf "$(command -v gcc-14)" "$HOME/.local/bin/cc"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Build nob
+        run: cc -o nob nob.c
+
+      # Exec tests link against bin/libcnotes.a.
+      - name: Build library
+        run: ./nob lib
+
+      # Writes doc/tests.json, failures are shown on the site.
+      - name: Run tests
+        run: ./nob test || echo "::warning::Some tests failed, see the tests page."
+
+      # Writes doc/doc.json and doc/library.json.
+      - name: Generate documentation
+        run: ./nob doc
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: doc
+
+      - id: deployment
+        uses: actions/deploy-pages@v4

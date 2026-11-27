@@ -26,32 +26,39 @@
 // exits it has, or what its return type is. `defer.c` already knows all of that, so `[[time]]`
 // gets to be about timing and nothing else.
 //
-// The handoff works because of `CN_MESSAGE_RESPONSE_MODIFIED`. Returning it makes the library
-// emit the modified function back to text and parse it again, so on the next round the `[[defer]]`
-// written above is a real attribute on a real ast node, and `defer_handler` picks it up like any
-// other defer the user could have written by hand.
+// The handoff works because of `ast_is_modified`. Setting it makes the library emit the modified
+// function back to text and parse it again, so once `defer_hook` is called the `[[defer]]` written
+// above is a real attribute on a real ast node, and `defer_hook` picks it up like any other defer
+// the user could have written by hand.
 
 #include "cnotes.h"
 
-Cn_Message_Response timer_handler(Cn_Message *message) {
-    if (message->kind != CN_MESSAGE_AST_PARSED)             return CN_MESSAGE_RESPONSE_NONE;
-    if (!(message->flags & CN_MESSAGE_AST_FUNCTION))        return CN_MESSAGE_RESPONSE_NONE;
+Cn_Hook_Response timer_hook(Cn_Ast_Node **node_ptr, bool *ast_is_modified, bool first);
 
-    // `[[time]]` sits on the function itself, so unlike `defer` this handler can lean on the
-    // `CN_MESSAGE_AST_HAS_ATTRIBUTES` flag and skip every function that carries no attributes at
-    // all, without walking anything.
-    if (!(message->flags & CN_MESSAGE_AST_HAS_ATTRIBUTES))  return CN_MESSAGE_RESPONSE_NONE;
+// Extension that adds `timer_hook` to the library, it is registered in `meta.c`.
+bool timer_extension(Cn_Hooks *hooks) {
+    cn_array_list_append(&hooks->ast_parsed_hooks, timer_hook);
+    return true;
+}
 
-    Cn_Ast_Function *function = cn_ast_as(Function, *((Cn_Message_Ast_Parsed *)message)->node_ptr);
+Cn_Hook_Response timer_hook(Cn_Ast_Node **node_ptr, bool *ast_is_modified, bool first) {
+    (void) first;
 
-    if (cn_get_attribute(function, CN_STR_LIT("time")) == NULL) return CN_MESSAGE_RESPONSE_NONE;
+    if ((*node_ptr)->kind != CN_AST_FUNCTION) return CN_HOOK_RESPONSE_NONE;
+
+    Cn_Ast_Function *function = cn_ast_as(Function, *node_ptr);
+
+    // `[[time]]` sits on the function itself, so unlike `defer` this hook can look at the function's own
+    // attribute specifiers and skip every function that carries no attributes at all, without walking anything.
+    if (function->attribute_specifiers.length == 0) return CN_HOOK_RESPONSE_NONE;
+
+    if (cn_get_attribute(function, CN_STR_LIT("time")) == NULL) return CN_HOOK_RESPONSE_NONE;
 
     // IMPORTANT: Removing the attribute.
     //
-    // Reporting a modification below sends this very function through the handler again, so if
+    // Reporting a modification below sends this very function through the hook again, so if
     // `[[time]]` were left in place we would generate another timer, report another modification,
-    // and never stop. Anything that answers `CN_MESSAGE_RESPONSE_MODIFIED` has to consume what
-    // made it answer that way.
+    // and never stop. Any hook that sets `ast_is_modified` has to consume what made it do so.
     cn_ast_remove_attribute(function, CN_STR_LIT("time"));
 
     // Getting the function's name to print, `cn_get_declarator_info` walks the declarator down to
@@ -94,6 +101,7 @@ Cn_Message_Response timer_handler(Cn_Message *message) {
     cn_array_list_free(&items);
 
     // Reporting the modification, which is what gets the generated text parsed into ast nodes and
-    // handed back to every meta program, `defer_handler` included.
-    return CN_MESSAGE_RESPONSE_MODIFIED;
+    // handed to the following hooks, `defer_hook` included.
+    *ast_is_modified = true;
+    return CN_HOOK_RESPONSE_NONE;
 }

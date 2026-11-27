@@ -53,26 +53,45 @@ Cn_Ast_Node *defer_make_return_replacement(Deferred_Entry *entry, Cn_Ast_Node *r
 Cn_Ast_Node *defer_make_break_replacement(Deferred_Entry *entry);
 Cn_Ast_Node *defer_make_continue_replacement(Deferred_Entry *entry);
 
-Cn_Message_Response defer_handler(Cn_Message *message) {
-    // This message `CN_MESSAGE_TU_START` is sent in the beginning of any translation unit processing.
-    // It works well to initialize anything, and even prepend strings to the translation unit.
-    // We will use it initialize `deferred_function_names` set.
-    if (message->kind == CN_MESSAGE_TU_START) {
-        deferred_function_names = cn_hash_set_make(Cn_String, 32, (Cn_Hash_Function *)cn_str_hash, (Cn_Equals_Function *)cn_str_equals);
-        return CN_MESSAGE_RESPONSE_NONE;
-    }
+// Forward declaring all three hooks this meta program uses.
+Cn_Hook_Response defer_tu_start_hook(Cn_Ast_Node **null_ptr);
+Cn_Hook_Response defer_tu_end_hook(Cn_Ast_Node **null_ptr);
+Cn_Hook_Response defer_hook(Cn_Ast_Node **node_ptr, bool *ast_is_modified, bool first);
 
-    // Likewise `CN_MESSAGE_TU_END` is sent after every external declaration was processed in translation unit.
-    // We can use it to free `deferred_function_names` set.
-    if (message->kind == CN_MESSAGE_TU_END) {
-        cn_hash_set_free(&deferred_function_names);
-        return CN_MESSAGE_RESPONSE_NONE;
-    }
+// Extension that adds all hooks to the library, it is registered in `meta.c`.
+bool defer_extension(Cn_Hooks *hooks) {
+    cn_array_list_append(&hooks->tu_start_hooks,    defer_tu_start_hook);
+    cn_array_list_append(&hooks->tu_end_hooks,      defer_tu_end_hook);
+    cn_array_list_append(&hooks->ast_parsed_hooks,  defer_hook);
+    return true;
+}
 
-    if (message->kind != CN_MESSAGE_AST_PARSED)         return CN_MESSAGE_RESPONSE_NONE;
-    if (!(message->flags & CN_MESSAGE_AST_FUNCTION))    return CN_MESSAGE_RESPONSE_NONE;
+// This hook is called in the beginning of any translation unit processing.
+// It works well to initialize anything, and even prepend code to the translation unit by setting `*null_ptr`.
+// We will use it initialize `deferred_function_names` set.
+Cn_Hook_Response defer_tu_start_hook(Cn_Ast_Node **null_ptr) {
+    (void) null_ptr;
+    deferred_function_names = cn_hash_set_make(Cn_String, 32, (Cn_Hash_Function *)cn_str_hash, (Cn_Equals_Function *)cn_str_equals);
+    return CN_HOOK_RESPONSE_NONE;
+}
 
-    Cn_Ast_Function *function = cn_ast_as(Function, *((Cn_Message_Ast_Parsed *)message)->node_ptr);
+// Likewise this hook is called after every external declaration was processed in translation unit.
+// We can use it to free `deferred_function_names` set.
+Cn_Hook_Response defer_tu_end_hook(Cn_Ast_Node **null_ptr) {
+    (void) null_ptr;
+    cn_hash_set_free(&deferred_function_names);
+    return CN_HOOK_RESPONSE_NONE;
+}
+
+Cn_Hook_Response defer_hook(Cn_Ast_Node **node_ptr, bool *ast_is_modified, bool first) {
+    // Modifications below are done in place and never reported, the generated nodes don't need
+    // to be reparsed, so `ast_is_modified` stays untouched and this hook is called once per function.
+    (void) ast_is_modified;
+    (void) first;
+
+    if ((*node_ptr)->kind != CN_AST_FUNCTION) return CN_HOOK_RESPONSE_NONE;
+
+    Cn_Ast_Function *function = cn_ast_as(Function, *node_ptr);
 
 
     // Making all stacks that will be used.
@@ -141,7 +160,7 @@ Cn_Message_Response defer_handler(Cn_Message *message) {
     cn_array_list_free(&closest_break_mark_stack);
     cn_array_list_free(&closest_continue_mark_stack);
     
-    return CN_MESSAGE_RESPONSE_NONE;
+    return CN_HOOK_RESPONSE_NONE;
 }
 
 bool defer_walk_block(Cn_Ast_Block *block) {
@@ -386,7 +405,7 @@ bool defer_explore_statement(Cn_Ast_Node **statement_ptr) {
         }
     }
 
-    return CN_MESSAGE_RESPONSE_NONE;
+    return false;
 }
 
 // The following function simply builds replacement for every return statement defer needs to change, producing something like:

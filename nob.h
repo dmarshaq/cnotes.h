@@ -1,4 +1,4 @@
-/* nob - v3.5.0 - Public Domain - https://github.com/tsoding/nob.h
+/* nob - v3.10.0 - Public Domain - https://github.com/tsoding/nob.h
 
    This library is the next generation of the [NoBuild](https://github.com/tsoding/nobuild) idea.
 
@@ -80,6 +80,8 @@
         but if you want to know what is discouraged you may want to enable this flag.
       - NOB_EXPERIMENTAL_DELETE_OLD - Experimental feature that automatically removes `nob.old` files. It's unclear how well
         it works on Windows, so it's experimental for now.
+      - NOB_EXPERIMENTAL_TRACE_CMD_RUN_FAIL - Log the locations of fail nob_cmd_run()-s. It's behind an experimental flag
+        because I'm not sure how much it alters the UX of the library for other people, but this is something I personally need.
       - NOB_UNSTRIP_PREFIX - do not strip the `nob_` prefixes from non-redefinable names.
       - NOB_NO_ECHO - do not echo the actions various nob functions are doing (like nob_cmd_run(), nob_mkdir_if_not_exists(), etc).
 
@@ -93,7 +95,7 @@
       - NOB_FREE(ptr) - Redefine which free() nob.h shall use.
       - NOB_DEPRECATED(message) - Redefine how nob.h shall mark functions as deprecated.
       - NOB_DA_INIT_CAP - Redefine initial capacity of Dynamic Arrays.
-      - NOB_TEMP_CAPACITY - Redefine the capacity of the temporary storate.
+      - NOB_TEMP_CAPACITY - Redefine the capacity of the temporary storage.
       - NOB_REBUILD_URSELF(binary_path, source_path) - redefine how nob.h shall rebuild itself.
       - NOB_WIN32_ERR_MSG_SIZE - Redefine the capacity of the buffer for error message on Windows.
 */
@@ -201,9 +203,13 @@
 #    define NOB_PRINTF_FORMAT(STRING_INDEX, FIRST_TO_CHECK)
 #endif
 
+NOBDEF void nob__panicf(const char *file, int line, const char *label, const char *format, ...);
+
 #define NOB_UNUSED(value) (void)(value)
 #define NOB_TODO(message) do { fprintf(stderr, "%s:%d: TODO: %s\n", __FILE__, __LINE__, message); abort(); } while(0)
+#define NOB_TODOF(...) nob__panicf(__FILE__, __LINE__, "TODO", __VA_ARGS__)
 #define NOB_UNREACHABLE(message) do { fprintf(stderr, "%s:%d: UNREACHABLE: %s\n", __FILE__, __LINE__, message); abort(); } while(0)
+#define NOB_UNREACHABLEF(...) nob__panicf(__FILE__, __LINE__, "UNREACHABLE", __VA_ARGS__)
 
 #define NOB_ARRAY_LEN(array) (sizeof(array)/sizeof(array[0]))
 #define NOB_ARRAY_GET(array, index) \
@@ -216,7 +222,7 @@ typedef enum {
     NOB_NO_LOGS,
 } Nob_Log_Level;
 
-// Any messages with the level below nob_minimal_log_level are going to be suppressed.
+// Any messages with the level below nob_minimal_log_level are going to be suppressed by the nob_default_log_handler.
 extern Nob_Log_Level nob_minimal_log_level;
 
 typedef void (Nob_Log_Handler)(Nob_Log_Level level, const char *fmt, va_list args);
@@ -272,13 +278,15 @@ typedef enum {
 } Nob_Walk_Action;
 
 typedef struct {
-    // The path to the visited file
+    // The path to the visited file. The lifetime of the path string is very short.
+    // As soon as the execution exits the Nob_Walk_Func it's dead. Dup it somewhere
+    // if you want to preserve it for longer periods of time.
     const char *path;
-    // The type of the visited file
+    // The type of the visited file.
     Nob_File_Type type;
-    // How nested we currently are in the directory tree
+    // How nested we currently are in the directory tree.
     size_t level;
-    // User data supplied in Nob_Walk_Dir_Opt.data
+    // User data supplied in Nob_Walk_Dir_Opt.data.
     void *data;
     // The action nob_walk_dir_opt() must perform after the Nob_Walk_Func has returned.
     // Default is NOB_WALK_CONT.
@@ -303,7 +311,7 @@ typedef struct {
 
 NOBDEF bool nob_walk_dir_opt(const char *root, Nob_Walk_Func func, Nob_Walk_Dir_Opt);
 
-#define nob_walk_dir(root, func, ...) nob_walk_dir_opt((root), (func), (Nob_Walk_Dir_Opt){__VA_ARGS__})
+#define nob_walk_dir(root, func, ...) nob_walk_dir_opt((root), (func), NOB_CLIT(Nob_Walk_Dir_Opt){__VA_ARGS__})
 
 typedef struct {
     char *name;
@@ -446,6 +454,9 @@ NOBDEF void nob_sb_pad_align(Nob_String_Builder *sb, size_t size);
 // Append a sized buffer to a string builder
 #define nob_sb_append_buf(sb, buf, size) nob_da_append_many(sb, buf, size)
 
+// Append a string view to a string builder
+#define nob_sb_append_sv(sb, sv) nob_sb_append_buf((sb), (sv).data, (sv).count)
+
 // Append a NULL-terminated string to a string builder
 #define nob_sb_append_cstr(sb, cstr)  \
     do {                              \
@@ -535,6 +546,7 @@ typedef struct {
 
 // Run the command with options.
 NOBDEF bool nob_cmd_run_opt(Nob_Cmd *cmd, Nob_Cmd_Opt opt);
+NOBDEF bool nob__cmd_run_opt_with_location(Nob_Cmd *cmd, const char *file, int line, Nob_Cmd_Opt opt);
 
 // Command Chains (in Shell Scripting they are know as Pipes)
 //
@@ -582,14 +594,14 @@ typedef struct {
 typedef struct {
     const char *stdin_path;
 } Nob_Chain_Begin_Opt;
-#define nob_chain_begin(chain, ...) nob_chain_begin_opt((chain), (Nob_Chain_Begin_Opt) { __VA_ARGS__ })
+#define nob_chain_begin(chain, ...) nob_chain_begin_opt((chain), NOB_CLIT(Nob_Chain_Begin_Opt) { __VA_ARGS__ })
 NOBDEF bool nob_chain_begin_opt(Nob_Chain *chain, Nob_Chain_Begin_Opt opt);
 
 typedef struct {
     bool err2out;
     bool dont_reset;
 } Nob_Chain_Cmd_Opt;
-#define nob_chain_cmd(chain, cmd, ...) nob_chain_cmd_opt((chain), (cmd), (Nob_Chain_Cmd_Opt) { __VA_ARGS__ })
+#define nob_chain_cmd(chain, cmd, ...) nob_chain_cmd_opt((chain), (cmd), NOB_CLIT(Nob_Chain_Cmd_Opt) { __VA_ARGS__ })
 NOBDEF bool nob_chain_cmd_opt(Nob_Chain *chain, Nob_Cmd *cmd, Nob_Chain_Cmd_Opt opt);
 
 typedef struct {
@@ -598,7 +610,7 @@ typedef struct {
     const char *stdout_path;
     const char *stderr_path;
 } Nob_Chain_End_Opt;
-#define nob_chain_end(chain, ...) nob_chain_end_opt((chain), (Nob_Chain_End_Opt) { __VA_ARGS__ })
+#define nob_chain_end(chain, ...) nob_chain_end_opt((chain), NOB_CLIT(Nob_Chain_End_Opt) { __VA_ARGS__ })
 NOBDEF bool nob_chain_end_opt(Nob_Chain *chain, Nob_Chain_End_Opt opt);
 
 // Get amount of processors on the machine.
@@ -611,7 +623,7 @@ NOBDEF uint64_t nob_nanos_since_unspecified_epoch(void);
 
 // Same as nob_cmd_run_opt but using cool variadic macro to set the default options.
 // See https://x.com/vkrajacic/status/1749816169736073295 for more info on how to use such macros.
-#define nob_cmd_run(cmd, ...) nob_cmd_run_opt((cmd), (Nob_Cmd_Opt){__VA_ARGS__})
+#define nob_cmd_run(cmd, ...) nob__cmd_run_opt_with_location((cmd), __FILE__, __LINE__, NOB_CLIT(Nob_Cmd_Opt){ __VA_ARGS__ })
 
 // DEPRECATED:
 //
@@ -648,9 +660,26 @@ typedef struct {
 // use it as a C string.
 NOBDEF void nob_cmd_render(Nob_Cmd cmd, Nob_String_Builder *render);
 
-NOBDEF void nob__cmd_append(Nob_Cmd *cmd, size_t n, ...);
-#define nob_cmd_append(cmd, ...) \
-    nob__cmd_append(cmd, (sizeof((const char*[]){__VA_ARGS__})/sizeof(const char*)), __VA_ARGS__)
+// Compound Literal
+#if defined(__cplusplus)
+    #define NOB_CLIT(type) type
+#else
+    #define NOB_CLIT(type) (type)
+#endif
+
+NOBDEF void nob__cmd_append(Nob_Cmd *cmd, size_t n, const char **args);
+#if defined(__cplusplus)
+    template <typename... Args>
+    static inline void nob__cpp_cmd_append_wrapper(Nob_Cmd *cmd, Args... strs)
+    {
+        const char* args[] = { strs... };
+        nob__cmd_append(cmd, sizeof(args)/sizeof(args[0]), args);
+    }
+    #define nob_cmd_append(cmd, ...) nob__cpp_cmd_append_wrapper(cmd, __VA_ARGS__)
+#else
+    #define nob_cmd_append(cmd, ...) \
+        nob__cmd_append(cmd, sizeof((const char*[]){__VA_ARGS__})/sizeof(const char*), (const char*[]){__VA_ARGS__})
+#endif // __cplusplus
 
 // TODO: nob_cmd_extend() evaluates other_cmd twice
 // It can be fixed by turning nob_cmd_extend() call into a statement.
@@ -764,7 +793,7 @@ NOBDEF char *nob_temp_running_executable_path(void);
 // TODO: we should probably document somewhere all the compilers we support
 
 // The nob_cc_* macros try to abstract away the specific compiler.
-// They are verify basic and not particularly flexible, but you can redefine them if you need to
+// They are very basic and not particularly flexible, but you can redefine them if you need to
 // or not use them at all and create your own abstraction on top of Nob_Cmd.
 
 #ifndef nob_cc
@@ -880,7 +909,10 @@ NOBDEF void nob__go_rebuild_urself(int argc, char **argv, const char *source_pat
 
 typedef struct {
     size_t count;
-    const char *data;
+    union {
+        const char *data;
+        const char *items;
+    };
 } Nob_String_View;
 
 NOBDEF const char *nob_temp_sv_to_cstr(Nob_String_View sv);
@@ -888,19 +920,38 @@ NOBDEF const char *nob_temp_sv_to_cstr(Nob_String_View sv);
 NOBDEF Nob_String_View nob_sv_chop_while(Nob_String_View *sv, int (*p)(int x));
 NOBDEF Nob_String_View nob_sv_chop_by_delim(Nob_String_View *sv, char delim);
 NOBDEF Nob_String_View nob_sv_chop_left(Nob_String_View *sv, size_t n);
+NOBDEF Nob_String_View nob_sv_chop_right(Nob_String_View *sv, size_t n);
 // If `sv` starts with `prefix` chops off the prefix and returns true.
 // Otherwise, leaves `sv` unmodified and returns false.
 NOBDEF bool nob_sv_chop_prefix(Nob_String_View *sv, Nob_String_View prefix);
+// If `sv` ends with `suffix` chops off the suffix and returns true.
+// Otherwise, leaves `sv` unmodified and returns false.
+NOBDEF bool nob_sv_chop_suffix(Nob_String_View *sv, Nob_String_View suffix);
 NOBDEF Nob_String_View nob_sv_trim(Nob_String_View sv);
 NOBDEF Nob_String_View nob_sv_trim_left(Nob_String_View sv);
 NOBDEF Nob_String_View nob_sv_trim_right(Nob_String_View sv);
 NOBDEF bool nob_sv_eq(Nob_String_View a, Nob_String_View b);
+NOB_DEPRECATED("Use nob_sv_ends_with_cstr(sv, suffix) instead. "
+               "Pay attention to the `s` at the end of the `end`. "
+               "The reason this function was deprecated is because "
+               "of the typo in the name, of course, but also "
+               "because the second argument was a NULL-terminated string "
+               "while nob_sv_starts_with() accepted Nob_String_View as the "
+               "prefix which created an inconsistency in the API.")
 NOBDEF bool nob_sv_end_with(Nob_String_View sv, const char *cstr);
-NOBDEF bool nob_sv_starts_with(Nob_String_View sv, Nob_String_View expected_prefix);
+NOBDEF bool nob_sv_ends_with_cstr(Nob_String_View sv, const char *cstr);
+NOBDEF bool nob_sv_ends_with(Nob_String_View sv, Nob_String_View suffix);
+NOBDEF bool nob_sv_starts_with(Nob_String_View sv, Nob_String_View prefix);
 NOBDEF Nob_String_View nob_sv_from_cstr(const char *cstr);
 NOBDEF Nob_String_View nob_sv_from_parts(const char *data, size_t count);
 // nob_sb_to_sv() enables you to just view Nob_String_Builder as Nob_String_View
 #define nob_sb_to_sv(sb) nob_sv_from_parts((sb).items, (sb).count)
+
+#define NOB_SVLIT(lit) (NOB_CLIT(Nob_String_View){.count = sizeof(lit)-1, .data = (lit)})
+// Generally majority of the C/C++ compilers will allow you to use NOB_SVLIT to construct global variables.
+// But there are some (specifically MSVC with /TC flag enabled) that will refuse.
+// For such compilers use NOB_SVLIT_STATIC instead.
+#define NOB_SVLIT_STATIC(lit) {.count = sizeof(lit)-1, .data = (lit)}
 
 // printf macros for String_View
 #ifndef SV_Fmt
@@ -912,6 +963,29 @@ NOBDEF Nob_String_View nob_sv_from_parts(const char *data, size_t count);
 // USAGE:
 //   String_View name = ...;
 //   printf("Name: "SV_Fmt"\n", SV_Arg(name));
+
+// Stolen from Jai's Unicode module
+// Example:
+// ```c
+// String_View sv = SVLIT("Привет, Мир!");
+// while (sv.count > 0) {
+//     size_t n = nob_bytes_for_utf8[(uint8_t)*sv.data];
+//     String_View c = sv_chop_left(&sv, n);
+//     printf(SV_Fmt" => %zu\n", SV_Arg(c), n);
+// }
+// ```
+static const uint8_t nob_bytes_for_utf8[] = {
+    1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1, 1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
+    1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1, 1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
+    1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1, 1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
+    1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1, 1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
+    1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1, 1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
+    1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1, 1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
+    2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2, 2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
+    3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3, 4,4,4,4,4,4,4,4,5,5,5,5,6,6,6,6,
+};
+
+NOBDEF size_t nob_sv_utf8_len(Nob_String_View sv, size_t *bytes_overrun);
 
 #ifdef _WIN32
 
@@ -934,15 +1008,27 @@ static Nob_Proc nob__cmd_start_process(Nob_Cmd cmd, Nob_Fd *fdin, Nob_Fd *fdout,
 // Any messages with the level below nob_minimal_log_level are going to be suppressed.
 Nob_Log_Level nob_minimal_log_level = NOB_INFO;
 
-NOBDEF void nob__cmd_append(Nob_Cmd *cmd, size_t n, ...)
+NOBDEF void nob__cmd_append(Nob_Cmd *cmd, size_t n, const char **args)
 {
-    va_list args;
-    va_start(args, n);
     for (size_t i = 0; i < n; ++i) {
-        const char *arg = va_arg(args, const char *);
-        nob_da_append(cmd, arg);
+        nob_da_append(cmd, args[i]);
     }
-    va_end(args);
+}
+
+NOBDEF size_t nob_sv_utf8_len(Nob_String_View sv, size_t *bytes_overrun)
+{
+    size_t i = 0;
+    size_t n = 0;
+    while (true) {
+        if (i >= sv.count) {
+            if (bytes_overrun) *bytes_overrun = i - sv.count;
+            return n;
+        }
+        i += nob_bytes_for_utf8[(uint8_t)sv.data[i]];
+        n += 1;
+    }
+    NOB_UNREACHABLE("sv_utf8_len");
+    return 0;
 }
 
 #ifdef _WIN32
@@ -985,6 +1071,17 @@ NOBDEF char *nob_win32_error_message(DWORD err) {
 
 #endif // _WIN32
 
+NOBDEF void nob__panicf(const char *file, int line, const char *label, const char *format, ...)
+{
+    fprintf(stderr, "%s:%d: %s: ", file, line, label);
+    va_list args;
+    va_start(args, format);
+    vfprintf(stderr, format, args);
+    va_end(args);
+    fprintf(stderr, "\n");
+    abort();
+}
+
 // The implementation idea is stolen from https://github.com/zhiayang/nabs
 NOBDEF void nob__go_rebuild_urself(int argc, char **argv, const char *source_path, ...)
 {
@@ -992,7 +1089,7 @@ NOBDEF void nob__go_rebuild_urself(int argc, char **argv, const char *source_pat
 #ifdef _WIN32
     // On Windows executables almost always invoked without extension, so
     // it's ./nob, not ./nob.exe. For renaming the extension is a must.
-    if (!nob_sv_end_with(nob_sv_from_cstr(binary_path), ".exe")) {
+    if (!nob_sv_ends_with_cstr(nob_sv_from_cstr(binary_path), ".exe")) {
         binary_path = nob_temp_sprintf("%s.exe", binary_path);
     }
 #endif
@@ -1200,6 +1297,20 @@ NOBDEF int nob_nprocs(void)
 #endif
 }
 
+NOBDEF bool nob__cmd_run_opt_with_location(Nob_Cmd *cmd, const char *file, int line, Nob_Cmd_Opt opt)
+{
+    bool ok = nob_cmd_run_opt(cmd, opt);
+#ifdef NOB_EXPERIMENTAL_TRACE_CMD_RUN_FAIL
+    if (!ok) {
+        nob_log(NOB_ERROR, "%s:%d: ERROR: cmd_run failed", file, line);
+    }
+#else
+    NOB_UNUSED(file);
+    NOB_UNUSED(line);
+#endif // NOB_EXPERIMENTAL_TRACE_CMD_RUN_FAIL
+    return ok;
+}
+
 NOBDEF bool nob_cmd_run_opt(Nob_Cmd *cmd, Nob_Cmd_Opt opt)
 {
     bool result = true;
@@ -1275,8 +1386,8 @@ NOBDEF bool nob_chain_cmd_opt(Nob_Chain *chain, Nob_Cmd *cmd, Nob_Chain_Cmd_Opt 
     bool result = true;
     Nob_Pipe pp = {0};
     struct {
-        Nob_Fd items[5]; // should be no more than 3, but we allocate 5 just in case
         size_t count;
+        Nob_Fd items[5]; // should be no more than 3, but we allocate 5 just in case
     } fds = {0};
 
     NOB_ASSERT(cmd->count > 0);
@@ -1327,8 +1438,8 @@ NOBDEF bool nob_chain_end_opt(Nob_Chain *chain, Nob_Chain_End_Opt opt)
 
     Nob_Fd *pfdin = NULL;
     struct {
-        Nob_Fd items[5]; // should be no more than 3, but we allocate 5 just in case
         size_t count;
+        Nob_Fd items[5]; // should be no more than 3, but we allocate 5 just in case
     } fds = {0};
 
     if (chain->fdin != NOB_INVALID_FD) {
@@ -1503,7 +1614,7 @@ static Nob_Proc nob__cmd_start_process(Nob_Cmd cmd, Nob_Fd *fdin, Nob_Fd *fdout,
         // But do we actually care? It's a one off leak anyway...
         Nob_Cmd cmd_null = {0};
         nob_da_append_many(&cmd_null, cmd.items, cmd.count);
-        nob_cmd_append(&cmd_null, NULL);
+        nob_cmd_append(&cmd_null, (const char*)NULL);
 
         if (execvp(cmd.items[0], (char * const*) cmd_null.items) < 0) {
             nob_log(NOB_ERROR, "Could not exec child process for %s: %s", cmd.items[0], strerror(errno));
@@ -1868,23 +1979,26 @@ NOBDEF void nob_default_log_handler(Nob_Log_Level level, const char *fmt, va_lis
 {
     if (level < nob_minimal_log_level) return;
 
+    const char *prefix = NULL;
     switch (level) {
     case NOB_INFO:
-        fprintf(stderr, "[INFO] ");
+        prefix = "[INFO] ";
         break;
     case NOB_WARNING:
-        fprintf(stderr, "[WARNING] ");
+        prefix = "[WARNING] ";
         break;
     case NOB_ERROR:
-        fprintf(stderr, "[ERROR] ");
+        prefix = "[ERROR] ";
         break;
     case NOB_NO_LOGS: return;
     default:
         NOB_UNREACHABLE("Nob_Log_Level");
     }
 
-    vfprintf(stderr, fmt, args);
-    fprintf(stderr, "\n");
+    size_t mark = nob_temp_save();
+    const char *msg = nob_temp_vsprintf(fmt, args);
+    fprintf(stderr, "%s%s\n", prefix, msg);
+    nob_temp_rewind(mark);
 }
 
 NOBDEF void nob_null_log_handler(Nob_Log_Level level, const char *fmt, va_list args)
@@ -1896,23 +2010,28 @@ NOBDEF void nob_null_log_handler(Nob_Log_Level level, const char *fmt, va_list a
 
 NOBDEF void nob_cancer_log_handler(Nob_Log_Level level, const char *fmt, va_list args)
 {
+    if (level < nob_minimal_log_level) return;
+
+    const char *prefix = NULL;
     switch (level) {
     case NOB_INFO:
-        fprintf(stderr, "ℹ️ \x1b[36m[INFO]\x1b[0m ");
+        prefix = "ℹ️ \x1b[36m[INFO]\x1b[0m ";
         break;
     case NOB_WARNING:
-        fprintf(stderr, "⚠️ \x1b[33m[WARNING]\x1b[0m ");
+        prefix = "⚠️ \x1b[33m[WARNING]\x1b[0m ";
         break;
     case NOB_ERROR:
-        fprintf(stderr, "🚨 \x1b[31m[ERROR]\x1b[0m ");
+        prefix = "🚨 \x1b[31m[ERROR]\x1b[0m ";
         break;
     case NOB_NO_LOGS: return;
     default:
         NOB_UNREACHABLE("Nob_Log_Level");
     }
 
-    vfprintf(stderr, fmt, args);
-    fprintf(stderr, "\n");
+    size_t mark = nob_temp_save();
+    const char *msg = nob_temp_vsprintf(fmt, args);
+    fprintf(stderr, "%s%s\n", prefix, msg);
+    nob_temp_rewind(mark);
 }
 
 NOBDEF void nob_log(Nob_Log_Level level, const char *fmt, ...)
@@ -2004,7 +2123,7 @@ bool nob__walk_dir_opt_impl(Nob_String_Builder *file_path, Nob_Walk_Func func, s
 
     // Pre-order walking
     if (!opt.post_order) {
-        if (!func((Nob_Walk_Entry) {
+        if (!func(NOB_CLIT(Nob_Walk_Entry) {
             .path = file_path->items,
             .type = file_type,
             .level = level,
@@ -2051,7 +2170,7 @@ bool nob__walk_dir_opt_impl(Nob_String_Builder *file_path, Nob_Walk_Func func, s
 
     // Post-order walking
     if (opt.post_order) {
-        if (!func((Nob_Walk_Entry) {
+        if (!func(NOB_CLIT(Nob_Walk_Entry) {
             .path = file_path->items,
             .type = file_type,
             .level = level,
@@ -2143,7 +2262,7 @@ NOBDEF Nob_File_Type nob_get_file_type(const char *path)
     DWORD attr = GetFileAttributesA(path);
     if (attr == INVALID_FILE_ATTRIBUTES) {
         nob_log(NOB_ERROR, "Could not get file attributes of %s: %s", path, nob_win32_error_message(GetLastError()));
-        return -1;
+        return (Nob_File_Type)-1;
     }
 
     if (attr & FILE_ATTRIBUTE_DIRECTORY) return NOB_FILE_DIRECTORY;
@@ -2553,6 +2672,15 @@ NOBDEF bool nob_sv_chop_prefix(Nob_String_View *sv, Nob_String_View prefix)
     return false;
 }
 
+NOBDEF bool nob_sv_chop_suffix(Nob_String_View *sv, Nob_String_View suffix)
+{
+    if (nob_sv_ends_with(*sv, suffix)) {
+        nob_sv_chop_right(sv, suffix.count);
+        return true;
+    }
+    return false;
+}
+
 NOBDEF Nob_String_View nob_sv_chop_left(Nob_String_View *sv, size_t n)
 {
     if (n > sv->count) {
@@ -2562,6 +2690,19 @@ NOBDEF Nob_String_View nob_sv_chop_left(Nob_String_View *sv, size_t n)
     Nob_String_View result = nob_sv_from_parts(sv->data, n);
 
     sv->data  += n;
+    sv->count -= n;
+
+    return result;
+}
+
+NOBDEF Nob_String_View nob_sv_chop_right(Nob_String_View *sv, size_t n)
+{
+    if (n > sv->count) {
+        n = sv->count;
+    }
+
+    Nob_String_View result = nob_sv_from_parts(sv->data + sv->count - n, n);
+
     sv->count -= n;
 
     return result;
@@ -2581,6 +2722,11 @@ NOBDEF Nob_String_View nob_sv_trim_left(Nob_String_View sv)
     while (i < sv.count && isspace(sv.data[i])) {
         i += 1;
     }
+
+    // Apparently if sv.data == 0 and i == 0 adding them
+    // together is an undefined behavior. According to
+    // clang's UndefinedBehaviorSanitizer at least.
+    if (i == 0) return sv;
 
     return nob_sv_from_parts(sv.data + i, sv.count - i);
 }
@@ -2616,15 +2762,25 @@ NOBDEF bool nob_sv_eq(Nob_String_View a, Nob_String_View b)
 
 NOBDEF bool nob_sv_end_with(Nob_String_View sv, const char *cstr)
 {
-    size_t cstr_count = strlen(cstr);
-    if (sv.count >= cstr_count) {
-        size_t ending_start = sv.count - cstr_count;
-        Nob_String_View sv_ending = nob_sv_from_parts(sv.data + ending_start, cstr_count);
-        return nob_sv_eq(sv_ending, nob_sv_from_cstr(cstr));
+    return nob_sv_ends_with_cstr(sv, cstr);
+}
+
+NOBDEF bool nob_sv_ends_with_cstr(Nob_String_View sv, const char *cstr)
+{
+    return nob_sv_ends_with(sv, nob_sv_from_cstr(cstr));
+}
+
+NOBDEF bool nob_sv_ends_with(Nob_String_View sv, Nob_String_View suffix)
+{
+    if (sv.count >= suffix.count) {
+        Nob_String_View sv_tail = {
+            .count = suffix.count,
+            .data = sv.data + sv.count - suffix.count,
+        };
+        return nob_sv_eq(sv_tail, suffix);
     }
     return false;
 }
-
 
 NOBDEF bool nob_sv_starts_with(Nob_String_View sv, Nob_String_View expected_prefix)
 {
@@ -2706,8 +2862,8 @@ NOBDEF char *nob_temp_dir_name(const char *path)
     return nob_temp_strndup(path, i + 1);
 #else
     if (!path) path = ""; // Treating NULL as empty.
-    char *drive = nob_temp_alloc(_MAX_DRIVE);
-    char *dir   = nob_temp_alloc(_MAX_DIR);
+    char *drive = (char*) nob_temp_alloc(_MAX_DRIVE);
+    char *dir   = (char*) nob_temp_alloc(_MAX_DIR);
     // https://learn.microsoft.com/en-us/previous-versions/visualstudio/visual-studio-2010/8e46eyt7(v=vs.100)
     errno_t ret = _splitpath_s(path, drive, _MAX_DRIVE, dir, _MAX_DIR, NULL, 0, NULL, 0);
     NOB_ASSERT(ret == 0);
@@ -2729,8 +2885,8 @@ NOBDEF char *nob_temp_file_name(const char *path)
     return s+i;
 #else
     if (!path) path = ""; // Treating NULL as empty.
-    char *fname = nob_temp_alloc(_MAX_FNAME);
-    char *ext = nob_temp_alloc(_MAX_EXT);
+    char *fname = (char*)nob_temp_alloc(_MAX_FNAME);
+    char *ext   = (char*)nob_temp_alloc(_MAX_EXT);
     // https://learn.microsoft.com/en-us/previous-versions/visualstudio/visual-studio-2010/8e46eyt7(v=vs.100)
     errno_t ret = _splitpath_s(path, NULL, 0, NULL, 0, fname, _MAX_FNAME, ext, _MAX_EXT);
     NOB_ASSERT(ret == 0);
@@ -2744,7 +2900,7 @@ NOBDEF char *nob_temp_file_ext(const char *path)
     return strrchr(nob_temp_file_name(path), '.');
 #else
     if (!path) path = ""; // Treating NULL as empty.
-    char *ext = nob_temp_alloc(_MAX_EXT);
+    char *ext = (char*)nob_temp_alloc(_MAX_EXT);
     // https://learn.microsoft.com/en-us/previous-versions/visualstudio/visual-studio-2010/8e46eyt7(v=vs.100)
     errno_t ret = _splitpath_s(path, NULL, 0, NULL, 0, NULL, 0, ext, _MAX_EXT);
     NOB_ASSERT(ret == 0);
@@ -2800,7 +2956,11 @@ NOBDEF char *nob_temp_running_executable_path(void)
     // end of the file after the NOB_IMPLEMENTATION.
     #ifndef NOB_UNSTRIP_PREFIX
         #define TODO NOB_TODO
+        #define TODOF NOB_TODOF
         #define UNREACHABLE NOB_UNREACHABLE
+        #define UNREACHABLEF NOB_UNREACHABLEF
+        #define SVLIT NOB_SVLIT
+        #define SVLIT_STATIC NOB_SVLIT_STATIC
         #define UNUSED NOB_UNUSED
         #define ARRAY_LEN NOB_ARRAY_LEN
         #define ARRAY_GET NOB_ARRAY_GET
@@ -2862,11 +3022,15 @@ NOBDEF char *nob_temp_running_executable_path(void)
         #define da_remove_unordered nob_da_remove_unordered
         #define da_foreach nob_da_foreach
         #define fa_append nob_fa_append
-        #define swap nob_swap
+        // C++ has it's own std::swap which may collide with ours
+        #ifndef __cplusplus
+            #define swap nob_swap
+        #endif // __cplusplus
         #define String_Builder Nob_String_Builder
         #define read_entire_file nob_read_entire_file
         #define sb_appendf nob_sb_appendf
         #define sb_append_buf nob_sb_append_buf
+        #define sb_append_sv nob_sb_append_sv
         #define sb_append_cstr nob_sb_append_cstr
         #define sb_append_null nob_sb_append_null
         #define sb_append nob_sb_append
@@ -2897,6 +3061,7 @@ NOBDEF char *nob_temp_running_executable_path(void)
         #define procs_wait_and_reset nob_procs_wait_and_reset
         #define procs_append_with_flush nob_procs_append_with_flush
         #define procs_flush nob_procs_flush
+        #define CLIT NOB_CLIT
         #define Cmd Nob_Cmd
         #define Cmd_Redirect Nob_Cmd_Redirect
         #define Cmd_Opt Nob_Cmd_Opt
@@ -2939,15 +3104,21 @@ NOBDEF char *nob_temp_running_executable_path(void)
         #define sv_chop_by_delim nob_sv_chop_by_delim
         #define sv_chop_while nob_sv_chop_while
         #define sv_chop_prefix nob_sv_chop_prefix
+        #define sv_chop_suffix nob_sv_chop_suffix
         #define sv_chop_left nob_sv_chop_left
+        #define sv_chop_right nob_sv_chop_right
         #define sv_trim nob_sv_trim
         #define sv_trim_left nob_sv_trim_left
         #define sv_trim_right nob_sv_trim_right
         #define sv_eq nob_sv_eq
         #define sv_starts_with nob_sv_starts_with
         #define sv_end_with nob_sv_end_with
+        #define sv_ends_with nob_sv_ends_with
+        #define sv_ends_with_cstr nob_sv_ends_with_cstr
         #define sv_from_cstr nob_sv_from_cstr
         #define sv_from_parts nob_sv_from_parts
+        #define sv_utf8_len nob_sv_utf8_len
+        #define bytes_for_utf8 nob_bytes_for_utf8
         #define sb_to_sv nob_sb_to_sv
         #define win32_error_message nob_win32_error_message
         #define nprocs nob_nprocs
@@ -2959,7 +3130,27 @@ NOBDEF char *nob_temp_running_executable_path(void)
 /*
    Revision history:
 
-      3.5.0 (2026-03-13) Add nob_null_log_handler (by @rexim)
+     3.10.0 (2026-07-17) Make NOB_SVLIT a bit more usable at compile-time (by @Arhcout)
+                         Add NOB_SVLIT_STATIC for when a compiler simply refuses to accept NOB_SVLIT() at compile-time (looking at you `cl.exe /TC`) (by @rexim)
+      3.9.0 (2026-07-15) Add NOB_TODOF() and NOB_UNREACHABLEF()
+                         Add NOB_SVLIT()
+                         Add nob_bytes_for_utf8[] and nob_sv_utf8_len()
+                         Add String_View.items alias to String_View.data
+                         Make nob_cmd_run log the location of its failure
+                         Make nob_default_log_handler and nob_cancer_log_handler work better in multi-threaded or multi-process environments (by @ChenXinyu-CHD)
+                         Do not strip the prefix for nob_swap on C++ (by @LoganjdM)
+      3.8.3 (2026-07-14) Fix "applying zero offset to null pointer" error by clang's UndefinedBehaviorSanitizer
+      3.8.2 (2026-04-01) Fix the broken type safety of nob_cmd_append() (by @aalmkainzi)
+      3.8.1 (2026-04-01) Fix annoying clang warning
+      3.8.0 (2026-03-24) Add NOB_CLIT()
+                         Fix compliation on MSVC with /TP
+      3.7.0 (2026-03-20) Add nob_sb_append_sv()
+      3.6.0 (2026-03-16) Add nob_sv_chop_suffix()
+                         Deprecate nob_sv_end_with()
+                         Add nob_sv_ends_with_cstr() instead of nob_sv_end_with()
+                         Add nob_sv_ends_with()
+                         Add nob_sv_chop_right()
+      3.5.0 (2026-03-13) Add nob_null_log_handler() (by @rexim)
                          Rename nob_log_handler to Nob_Log_Handler (by @rexim)
       3.4.0 (2026-03-12) Add nob_da_first() (by @rexim)
                          Add nob_da_pop() (by @rexim)
