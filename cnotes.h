@@ -1,4 +1,4 @@
-/*  cnotes - v0.3.0 - MIT License - https://github.com/dmarshaq/cnotes.h
+/*  cnotes - v0.4.0 - MIT License - https://github.com/dmarshaq/cnotes.h
 
     A header-only library for building C meta programs, static analysis tools, 
     and source transformation pipelines - operating directly on pre-processed .i files.
@@ -29,7 +29,7 @@
 
         The rules below ensure a stable, well documented API across all public releases. 
         Since this library grew larger than expected, it's split into multiple sections, 
-        each following its own convention and grouping related functions into manageable, 
+        each following one convention, grouping all related functionality into manageable, 
         easy to understand units.
 
     ## Conventions
@@ -812,11 +812,11 @@ typedef CNDEF void (Cn_Free_All)(Cn_Allocator *allocator);
  * CNDEF void cn_free_all(Cn_Allocator *allocator);
  * ```
  *
- * NOTE: If an allocator cannot perform a certain function, like an arena that cannot free memory by pointer,
- * it is allowed to stub out the function and log a warning on attempt to use it.
- *
  * Switching the global allocator then becomes as simple as setting the global allocator variable,
  * and separate allocators for different parts of the library can be replaced too.
+ *
+ * NOTE: If an allocator cannot perform a certain function, like an arena that cannot free memory by pointer,
+ * it is allowed to stub out the function and log a warning on attempt to use it.
  *
  * SINCE: 0.3.0
  */
@@ -1038,7 +1038,7 @@ CNDEF void cn_chained_arena_dealloc(Cn_Chained_Arena *arena, size_t size);
  *
  * RETURNS: Index of the block, `-1` if `allocation_ptr` doesn't point to the allocated memory.
  *
- * OUTPUTS: Byte offset to the allocated memory from the beginning of the block, written to `offset`.
+ * PARAM offset [out]: Byte offset to the allocated memory from the beginning of the block.
  *
  * NOTE: Returns properly whenever `allocation_ptr` points to memory held by the arena,
  * even if it isn't the exact address returned by an allocation.
@@ -1222,7 +1222,7 @@ CNDEF void cn_pool_free_all(Cn_Pool *pool);
  * RETURNS: Block containing the pointer, `NULL` if `allocation_ptr` doesn't point to the
  * beginning of an occupied slot, which is also the case for already freed memory.
  *
- * OUTPUTS: Index of the occupied slot in the found block, written to `slot`.
+ * PARAM slot [out]: Index of the occupied slot in the found block.
  *
  * NOTE: Returns properly whenever `allocation_ptr` points to the beginning of an occupied slot,
  * even if it isn't the exact address returned by an allocation.
@@ -2013,7 +2013,7 @@ typedef struct {
 /**
  * Initializes `lexer` with specific `content`, setting up queue and getting ready to output tokens.
  *
- * PARAM blacklist: Optional, but if set, tokens from that list won't appear in the lexed output.
+ * PARAM blacklist [optional]: If set, tokens from that list won't appear in the lexed output.
  *
  * SINCE: 0.3.0
  */
@@ -2600,7 +2600,7 @@ CNDEF double cn_any_as_double(Cn_Any any);
  *
  * RETURNS: `true` on success, `false` on failure.
  *
- * OUTPUTS: Converted value, written to `out`.
+ * PARAM out [out]: Converted value.
  *
  * SINCE: 0.3.0
  */
@@ -3343,7 +3343,7 @@ typedef struct { CN_AST_BASE;
 /**
  * Single file scope declaration, function definition, stray `;` or GNU file scope `asm`.
  *
- * MEMBER child: `Function`, `Declaration` or `Gnu_Asm_Statement` node, `NULL` for stray `;`.
+ * MEMBER child [optional]: `Function`, `Declaration` or `Gnu_Asm_Statement` node, `NULL` for stray `;`.
  *
  * NOTE: With `CN_GNU`, node is flagged with `CN_AST_GNU_EXTENSION` if it is preceded by `__extension__`.
  *
@@ -3421,7 +3421,7 @@ typedef struct { CN_AST_BASE;
 /**
  * Single attribute, `vendor::identifier(arguments)`.
  *
- * MEMBER vendor_identifier: Attribute namespace, `NULL` if not specified, always `NULL` in GNU syntax.
+ * MEMBER vendor_identifier [optional]: Attribute namespace, `NULL` if not specified, always `NULL` in GNU syntax.
  *
  * SINCE: 0.3.0
  */
@@ -3474,7 +3474,7 @@ typedef struct { CN_AST_BASE;
 /**
  * Single operand of GNU `asm` statement, `[identifier] string (expression)`.
  *
- * MEMBER identifier: Symbolic name, referenced from template as `%[name]`, `NULL` if not specified.
+ * MEMBER identifier [optional]: Symbolic name, referenced from template as `%[name]`, `NULL` if not specified.
  *
  * MEMBER string: Constraint, e.g. `"=r"`.
  *
@@ -3504,7 +3504,7 @@ typedef struct { CN_AST_BASE;
  *
  * MEMBER attribute_specifiers: GNU attribute specifiers among the qualifiers.
  *
- * MEMBER pointer: Next `*`, `NULL` if this is the last one.
+ * MEMBER pointer [optional]: Next `*`, `NULL` if this is the last one.
  *
  * SINCE: 0.3.0
  */
@@ -3519,9 +3519,9 @@ typedef struct cn_ast_pointer { CN_AST_BASE;
 /**
  * Declarator, optional pointer followed by a direct declarator.
  *
- * MEMBER pointer: `NULL` if declarator has no pointer.
+ * MEMBER pointer [optional]: `NULL` if declarator has no pointer.
  *
- * MEMBER direct_declarator: `Identifier`, `Direct_Declarator_Grouped`, `Direct_Declarator_Array` or
+ * MEMBER direct_declarator [optional]: `Identifier`, `Direct_Declarator_Grouped`, `Direct_Declarator_Array` or
  * `Direct_Declarator_Function` node, `NULL` for an abstract declarator without one.
  *
  * NOTE: Flagged with `CN_AST_DECLARATOR_IS_ABSTRACT` if it declares no name.
@@ -3545,7 +3545,7 @@ typedef struct { CN_AST_BASE;
 /**
  * Array declarator, `direct_declarator[expression]`.
  *
- * MEMBER expression: Array size, `NULL` if size is not specified.
+ * MEMBER expression [optional]: Array size, `NULL` if size is not specified.
  *
  * SINCE: 0.3.0
  */
@@ -3569,7 +3569,7 @@ typedef struct { CN_AST_BASE;
 /**
  * Initializer, either a single expression or a braced list.
  *
- * MEMBER expression: Initializing expression, `NULL` for a braced list.
+ * MEMBER expression [optional]: Initializing expression, `NULL` for a braced list.
  *
  * MEMBER designations: `Designation` nodes of a braced list.
  *
@@ -3595,11 +3595,11 @@ typedef struct { CN_AST_BASE;
 /**
  * Single designator, `.identifier`, `[expression]` or GNU range `[expression ... expression_range_end]`.
  *
- * MEMBER identifier: Member name, `NULL` for an index designator.
+ * MEMBER identifier [optional]: Member name, `NULL` for an index designator.
  *
- * MEMBER expression: Index, `NULL` for a member designator.
+ * MEMBER expression [optional]: Index, `NULL` for a member designator.
  *
- * MEMBER expression_range_end: Last index of a range designator, `NULL` otherwise.
+ * MEMBER expression_range_end [optional]: Last index of a range designator, `NULL` otherwise.
  *
  * SINCE: 0.3.0
  */
@@ -3612,9 +3612,9 @@ typedef struct { CN_AST_BASE;
 /**
  * Single declarator of a declaration, with its optional initializer.
  *
- * MEMBER initializer: `NULL` if there is no initializer.
+ * MEMBER initializer [optional]: `NULL` if there is no initializer.
  *
- * MEMBER asm_label: GNU `asm("name")` label, `NULL` if there is none.
+ * MEMBER asm_label [optional]: GNU `asm("name")` label, `NULL` if there is none.
  *
  * MEMBER attribute_specifiers: GNU attribute specifiers that follow the declarator.
  *
@@ -3622,11 +3622,11 @@ typedef struct { CN_AST_BASE;
  */
 typedef struct { CN_AST_BASE;
     Cn_Ast_Declarator    *declarator;
+    Cn_Ast_Initializer   *initializer;
+    Cn_Ast_Nodes          attribute_specifiers;
 #ifdef CN_GNU
     Cn_Ast_Gnu_Asm_Label *asm_label;
-    Cn_Ast_Nodes          attribute_specifiers;
 #endif // CN_GNU
-    Cn_Ast_Initializer   *initializer;
 } Cn_Ast_Init_Declarator;
 
 /**
@@ -3669,7 +3669,7 @@ typedef struct { CN_AST_BASE;
 /**
  * Type name, used by casts, `sizeof` and compound literals.
  *
- * MEMBER abstract_declarator: `NULL` if type name has no declarator.
+ * MEMBER abstract_declarator [optional]: `NULL` if type name has no declarator.
  *
  * SINCE: 0.3.0
  */
@@ -3700,7 +3700,7 @@ typedef struct { CN_AST_BASE;
 /**
  * Single parameter of a function declarator.
  *
- * MEMBER declarator: Named or abstract declarator, `NULL` if parameter has none.
+ * MEMBER declarator [optional]: Named or abstract declarator, `NULL` if parameter has none.
  *
  * SINCE: 0.3.0
  */
@@ -3717,7 +3717,7 @@ typedef struct { CN_AST_BASE;
  *
  * MEMBER attribute_specifiers: Attribute specifiers right after the `struct` keyword.
  *
- * MEMBER identifier: Tag name, `NULL` for an anonymous struct.
+ * MEMBER identifier [optional]: Tag name, `NULL` for an anonymous struct.
  *
  * NOTE: Flagged with `CN_AST_STRUCT_HAS_DEFINITION` if it has a member list.
  *
@@ -3734,7 +3734,7 @@ typedef struct { CN_AST_BASE;
  *
  * MEMBER attribute_specifiers: Attribute specifiers right after the `union` keyword.
  *
- * MEMBER identifier: Tag name, `NULL` for an anonymous union.
+ * MEMBER identifier [optional]: Tag name, `NULL` for an anonymous union.
  *
  * NOTE: Flagged with `CN_AST_UNION_HAS_DEFINITION` if it has a member list.
  *
@@ -3762,9 +3762,9 @@ typedef struct { CN_AST_BASE;
 /**
  * Single declarator of a member declaration.
  *
- * MEMBER declarator: `NULL` for an unnamed bit-field.
+ * MEMBER declarator [optional]: `NULL` for an unnamed bit-field.
  *
- * MEMBER bitfield: Bit-field width, `NULL` if member is not a bit-field.
+ * MEMBER bitfield [optional]: Bit-field width, `NULL` if member is not a bit-field.
  *
  * MEMBER attribute_specifiers: GNU attribute specifiers that follow the declarator.
  *
@@ -3783,9 +3783,9 @@ typedef struct { CN_AST_BASE;
  *
  * MEMBER attribute_specifiers: Attribute specifiers right after the `enum` keyword.
  *
- * MEMBER identifier: Tag name, `NULL` for an anonymous enum.
+ * MEMBER identifier [optional]: Tag name, `NULL` for an anonymous enum.
  *
- * MEMBER specifier_qualifier: Fixed underlying type, `NULL` if not specified.
+ * MEMBER specifier_qualifier [optional]: Fixed underlying type, `NULL` if not specified.
  *
  * NOTE: Flagged with `CN_AST_ENUM_HAS_DEFINITION` if it has an enumerator list.
  *
@@ -3801,7 +3801,7 @@ typedef struct { CN_AST_BASE;
 /**
  * Single enumerator of an enum, `identifier = expression`.
  *
- * MEMBER expression: Explicit value, `NULL` if not specified.
+ * MEMBER expression [optional]: Explicit value, `NULL` if not specified.
  *
  * SINCE: 0.3.0
  */
@@ -3975,7 +3975,7 @@ typedef struct { CN_AST_BASE;
 /**
  * `if` statement.
  *
- * MEMBER else_statement: `NULL` if there is no `else` branch.
+ * MEMBER else_statement [optional]: `NULL` if there is no `else` branch.
  *
  * SINCE: 0.3.0
  */
@@ -4037,9 +4037,9 @@ typedef struct { CN_AST_BASE;
 /**
  * Labeled statement: named label, `case` or `default`.
  *
- * MEMBER identifier: Label name, `NULL` for `case` and `default`.
+ * MEMBER identifier [optional]: Label name, `NULL` for `case` and `default`.
  *
- * MEMBER expression: Constant expression of `case`, `NULL` otherwise.
+ * MEMBER expression [optional]: Constant expression of `case`, `NULL` otherwise.
  *
  * NOTE: Flagged with `CN_AST_LABEL_IS_CASE` or `CN_AST_LABEL_IS_DEFAULT`.
  *
@@ -4065,7 +4065,7 @@ typedef struct { CN_AST_BASE;
 /**
  * `return` statement.
  *
- * MEMBER expression: `NULL` if no value is returned.
+ * MEMBER expression [optional]: `NULL` if no value is returned.
  *
  * SINCE: 0.3.0
  */
@@ -4095,7 +4095,7 @@ typedef struct { CN_AST_BASE;
 /**
  * Expression followed by `;`.
  *
- * MEMBER expression: `NULL` for the empty statement `;`.
+ * MEMBER expression [optional]: `NULL` for the empty statement `;`.
  *
  * SINCE: 0.3.0
  */
@@ -4257,13 +4257,13 @@ CNDEF Cn_Ast_Nodes cn_ast_copy_list(Cn_Ast_Nodes list);
 CNDEF void *cn_ast_copy(void *node);
 
 /**
- * Removes attribute `attribute_name` from attribute list of `target`.
+ * Removes attribute `attribute_name` from attribute list `attribute_specifiers`.
  *
  * RETURNS: `true` if attribute was found and removed, `false` otherwise.
  *
  * SINCE: 0.3.0
  */
-CNDEF bool cn_ast_remove_attribute(void *target, Cn_String attribute_name);
+CNDEF bool cn_ast_remove_attribute(Cn_Ast_Nodes attribute_specifiers, Cn_String attribute_name);
 
 /**
  * ============================================
@@ -4274,7 +4274,7 @@ CNDEF bool cn_ast_remove_attribute(void *target, Cn_String attribute_name);
 /**
  * Traverses declarator nodes to get declarator identifier.
  *
- * OUTPUTS: Last declarator in chain, written to `last_declarator`.
+ * PARAM last_declarator [out]: Last declarator in chain.
  *
  * SINCE: 0.3.0
  */
@@ -4285,29 +4285,29 @@ CNDEF void cn_get_declarator_info(Cn_Ast_Declarator *declarator, Cn_Ast_Node **l
  *
  * RETURNS: `true` on success, `false` if declarator is not a proper function.
  *
- * OUTPUTS: Parameter type list of the function, written to `function_direct_declarator` if it is not `NULL`.
+ * PARAM function_direct_declarator [out optional]: Parameter type list of the function.
  *
- * OUTPUTS: Last declarator in chain, written to `last_declarator`.
+ * PARAM last_declarator [out]: Last declarator in chain.
  *
  * SINCE: 0.3.0
  */
 CNDEF bool cn_get_function_declarator_info(Cn_Ast_Declarator *declarator, Cn_Ast_Node **function_direct_declarator, Cn_Ast_Node **last_declarator);
 
 /**
- * Finds attribute `attribute_name` on `target` node.
+ * Finds attribute `attribute_name` in `attribute_specifiers`.
  *
  * RETURNS: Found attribute, `NULL` if there is none.
  *
- * OUTPUTS: Attribute specifier holding the attribute, written to `owner` if it is not `NULL`.
+ * PARAM owner [out optional]: Attribute specifier holding the attribute.
  *
- * OUTPUTS: Position of the attribute in the list of that specifier, written to `index` if it is not `NULL`.
+ * PARAM index [out optional]: Position of the attribute in the list of that specifier.
  *
  * SINCE: 0.3.0
  */
-CNDEF Cn_Ast_Attribute *cn_get_attribute_info(void *target, Cn_String attribute_name, Cn_Ast_Attribute_Specifier **owner, int64_t *index);
+CNDEF Cn_Ast_Attribute *cn_get_attribute_info(Cn_Ast_Nodes attribute_specifiers, Cn_String attribute_name, Cn_Ast_Attribute_Specifier **owner, int64_t *index);
 
 /**
- * Finds attribute `attribute_name` on `target` node.
+ * Finds attribute `attribute_name` in `attribute_specifiers`.
  *
  * RETURNS: Found attribute, `NULL` if there is none.
  *
@@ -4315,7 +4315,21 @@ CNDEF Cn_Ast_Attribute *cn_get_attribute_info(void *target, Cn_String attribute_
  *
  * SINCE: 0.3.0
  */
-CNDEF Cn_Ast_Attribute *cn_get_attribute(void *target, Cn_String attribute_name);
+CNDEF Cn_Ast_Attribute *cn_get_attribute(Cn_Ast_Nodes attribute_specifiers, Cn_String attribute_name);
+
+/**
+ * Gets attribute specifiers attached to `node`.
+ *
+ * Specifiers are read from the `CN_AST_MEMBER_INFO_NODES` member named `attribute_specifiers`, so every
+ * node is supported, as long as they declare such member.
+ *
+ * RETURNS: Attribute specifiers of the node, empty list if node has none or can't have them.
+ *
+ * IMPORTANT: Expects `node != NULL`.
+ *
+ * SINCE: 0.4.0
+ */
+CNDEF Cn_Ast_Nodes cn_get_attribute_specifiers(void *node);
 
 /**
  * Gets resulting type of `expression`.
@@ -4707,7 +4721,7 @@ typedef enum {
  *
  * IMPORTANT: Each registered hook will be called at least once.
  *
- * OUTPUTS: `true` to `ast_is_modified` if AST modifications occured.
+ * PARAM ast_is_modified [out]: Set to `true` if AST modifications occured.
  *
  * PARAM first: Is `true` if and only if this is the first call of this specific hook.
  *
@@ -4768,7 +4782,7 @@ typedef Cn_Hook_Response (Cn_Hook_Analyze_Declarator)(const Cn_Ast_Node *declara
  * Member at index `i` of the type comes from the `i`-th member declarator of `tag_specifier`, in declaration
  * order, so member specific attributes can be found on those declarators.
  *
- * OUTPUTS: Laid out `type`, marked with `CN_TYPE_COMPLETE`. Left incomplete if not handled by the hook.
+ * PARAM type [in out]: Laid out and marked with `CN_TYPE_COMPLETE`. Left incomplete if not handled by the hook.
  *
  * SINCE: 0.3.0
  */
@@ -4825,8 +4839,6 @@ CNDEF bool cn__extension_register(Cn_Extension *extensions[], int64_t length);
  */
 
 /**
- * TODO: Make sure if exposed to public API, that it properly handles interning of tagged types.
- *
  * Interns `type` into the type universe of the current translation unit.
  *
  * Structurally equal types are stored only once, so interned types can be compared by pointer.
@@ -4838,9 +4850,11 @@ CNDEF bool cn__extension_register(Cn_Extension *extensions[], int64_t length);
  *
  * NOTE: `type` itself can be a temporary, it is copied when stored.
  *
+ * TODO: Make sure if exposed to public API, that it properly handles interning of tagged types.
+ *
  * SINCE: 0.3.0
  */
-CNDEF Cn_Type *cn_analyze_intern_type(Cn_Type *type);
+CNDEF Cn_Type *cn_analyze_intern_type(const Cn_Type *type);
 
 /**
  * Flags to specify details on how certain analyze functions should work.
@@ -4861,10 +4875,11 @@ typedef struct {
     void *declarator;
     void *initializer;
     Cn_Analyze_Flags flags;
+    Cn_Ast_Nodes attribute_specifiers;
 } Cn_Analyze_Declaration_Opt;
 
 /**
- * Analyzes already constructed specifiers, declarator and initializer as one binding.
+ * Analyzes already constructed `declaration_specifiers`, `declarator` and `initializer` as one binding.
  *
  * Modifies the global state, by recording new binding from the given ast nodes.
  * Initializer can be passed as `NULL` if binding doesn't contain a definition.
@@ -4877,7 +4892,7 @@ typedef struct {
  *
  * SINCE: 0.3.0
  */
-#define cn_analyze_declaration(declaration_specifiers, ...) cn__analyze_declaration_opt(declaration_specifiers, (Cn_Analyze_Declaration_Opt) { __VA_ARGS__ })
+#define cn_analyze_declaration(declaration_specifiers, ...) cn__analyze_declaration_opt((declaration_specifiers), (Cn_Analyze_Declaration_Opt) { __VA_ARGS__ })
 CNDEF bool cn__analyze_declaration_opt(void *declaration_specifiers, Cn_Analyze_Declaration_Opt opt);
 
 /**
@@ -4887,11 +4902,22 @@ CNDEF bool cn__analyze_declaration_opt(void *declaration_specifiers, Cn_Analyze_
  *
  * RETURNS: `true` on success, `false` if any errors occurred.
  *
- * OUTPUTS: Function binding on success, written to `function_binding_idx`.
+ * PARAM function_binding_idx [out]: Function binding on success.
  *
  * SINCE: 0.3.0
  */
 CNDEF bool cn_analyze_function_definition(void *declaration_specifiers, void *declarator, Cn_Binding_Idx *function_binding_idx);
+
+/**
+ * Optional values passed to `cn_analyze_to_type`.
+ *
+ * SINCE: 0.4.0
+ */
+typedef struct {
+    void            *declarator;
+    Cn_Analyze_Flags flags;
+    Cn_Ast_Nodes     attribute_specifiers;
+} Cn_Analyze_To_Type_Opt;
 
 /**
  * Converts `qualifier`, `type_specifier` and `declarator` triple into a resolved `Cn_Type`.
@@ -4899,14 +4925,28 @@ CNDEF bool cn_analyze_function_definition(void *declaration_specifiers, void *de
  * Type specifier gives the base type, qualifiers are applied to it,
  * and declarator wraps it in pointer, array or function layers.
  *
- * PARAM declarator: Can be `NULL` if no declarator is present at all.
- * In that case, the type is composed only from type specifier and qualifiers.
+ * PARAM declarator           [optional]: 
  *
- * RETURNS: Resolved type, `NULL` on error.
+ *      Can be `NULL` if no declarator is present at all.
+ *      In that case, the type is composed only from type specifier and qualifiers.
+ *
+ * PARAM attribute_specifiers [optional]: 
+ *
+ *      Analysis sometimes needs to know about attributes that
+ *      are beyond `type_specifier` or `declarator` nodes. For example some gnu attributes are 
+ *      attached to `init_declarator`, I am looking at you `__attribute__((vector_size(16)))`.
+ *
+ *      But are applied to a type extracted from `type_specifier` or `declarator`. So this
+ *      array is simply an additional list of attributes that analyze function will account for
+ *      when producing a type. Empty list can be passed here.
+ *
+ * RETURNS: `Cn_Type *` Resolved type, `NULL` on error.
  *
  * SINCE: 0.3.0
  */
-CNDEF Cn_Type *cn_analyze_to_type(Cn_Ast_Qualifier_Flags qualifier, void *type_specifier, void *declarator, Cn_Analyze_Flags flags);
+#define cn_analyze_to_type(qualifier, type_specifier, ...) cn__analyze_to_type_opt((qualifier), (type_specifier), (Cn_Analyze_To_Type_Opt) { __VA_ARGS__ })
+
+CNDEF Cn_Type *cn__analyze_to_type_opt(Cn_Ast_Qualifier_Flags qualifier, void *type_specifier, Cn_Analyze_To_Type_Opt opt);
 
 /**
  * Optional values of `cn_analyze_layout_default`, zeroed options give natural C layout.
@@ -4915,7 +4955,7 @@ CNDEF Cn_Type *cn_analyze_to_type(Cn_Ast_Qualifier_Flags qualifier, void *type_s
  *
  * MEMBER min_align: Minimal alignment of the whole type, `0` for none.
  *
- * MEMBER member_aligns: Optional array with one entry per member, explicit alignment of the member,
+ * MEMBER member_aligns [optional]: Array with one entry per member, explicit alignment of the member,
  * `0` entry keeps natural alignment. Explicit alignment is not capped by `max_align`.
  *
  * SINCE: 0.3.0
@@ -4933,7 +4973,7 @@ typedef struct {
  * all start at `0`. Size is padded to the alignment of the type. Enum takes size and alignment
  * of its member type, only `min_align` option applies to it.
  *
- * OUTPUTS: `size`, `align` and struct member offsets of `type`, which is then marked with `CN_TYPE_COMPLETE`.
+ * PARAM type [in out]: Gets its `size`, `align` and struct member offsets, then is marked with `CN_TYPE_COMPLETE`.
  *
  * NOTE: Meant to be called by layout analyze hooks with custom options, see `Cn_Hook_Analyze_Layout`.
  *
@@ -4957,7 +4997,7 @@ CNDEF Cn_Type *cn_analyze_typecheck_expression(void *expression);
 /**
  * Evaluates `expression`, using supplied `buffer` to store data.
  *
- * PARAM expression: If `NULL`, `NIL` is returned.
+ * PARAM expression [optional]: If `NULL`, `NIL` is returned.
  *
  * RETURNS: Valid any struct on success. `NIL` if expression wasn't typechecked,
  * or if it cannot be evaluated at compile time.
@@ -5454,7 +5494,7 @@ CNDEF Cn_Ast_Node *cn_parse_expression_statement(Cn_Lexer *lexer);
  *          ;
  * ```
  *
- * OUTPUTS: `true` on success, `false` on error, written to `ok`.
+ * PARAM ok [out]: `true` on success, `false` on error.
  *
  * RETURNS: Parsed list of argument expressions.
  * 
@@ -5786,7 +5826,7 @@ CNDEF Cn_Ast_Node *cn_parse_expression_leaf(Cn_Lexer *lexer, Cn_Parse_Expression
  *
  * RETURNS: Parsed list of init declarators.
  *
- * OUTPUTS: `true` on success, `false` on error, written to `ok`.
+ * PARAM ok [out]: `true` on success, `false` on error.
  */
 CNDEF Cn_Ast_Nodes cn_parse_finish_init_declarators(Cn_Lexer *lexer, void *declarator, bool *ok, void *declaration_specifiers);
 
@@ -5801,7 +5841,7 @@ CNDEF Cn_Ast_Nodes cn_parse_finish_init_declarators(Cn_Lexer *lexer, void *decla
  *
  * RETURNS: Parsed list of init declarators.
  *
- * OUTPUTS: `true` on success, `false` on error, written to `ok`.
+ * PARAM ok [out]: `true` on success, `false` on error.
  */
 CNDEF Cn_Ast_Nodes cn_parse_init_declarators(Cn_Lexer *lexer, bool *ok, void *declaration_specifiers);
 
@@ -5857,7 +5897,7 @@ CNDEF Cn_Ast_Initializer *cn_parse_initializer(Cn_Lexer *lexer);
  *
  * RETURNS: Parsed list of designations.
  *
- * OUTPUTS: `true` on success, `false` on error, written to `ok`.
+ * PARAM ok [out]: `true` on success, `false` on error.
  */
 CNDEF Cn_Ast_Nodes cn_parse_designations(Cn_Lexer *lexer, bool *ok);
 
@@ -5885,7 +5925,7 @@ CNDEF Cn_Ast_Designation *cn_parse_designation(Cn_Lexer *lexer);
  *
  * RETURNS: Parsed list of designators.
  *
- * OUTPUTS: `true` on success, `false` on error, written to `ok`.
+ * PARAM ok [out]: `true` on success, `false` on error.
  */
 CNDEF Cn_Ast_Nodes cn_parse_designators(Cn_Lexer *lexer, bool *ok);
 
@@ -5926,7 +5966,7 @@ CNDEF bool cn_parse_starts_designator(Cn_Lexer *lexer);
  *
  * RETURNS: Parsed declarator, `NULL` on error or if declarator is completely empty.
  *
- * OUTPUTS: `true` on success, `false` on error, written to `ok`.
+ * PARAM ok [out]: `true` on success, `false` on error.
  *
  * NOTE: `NULL` can be returned on success, only in case of a completely empty abstract declarator,
  * meaning abstract declarator without direct declarator. In that case no tokens are consumed, since
@@ -5961,8 +6001,8 @@ CNDEF Cn_Ast_Pointer *cn_parse_pointer(Cn_Lexer *lexer);
  *
  * RETURNS: Parsed direct declarator, `NULL` on error.
  *
- * OUTPUTS: `true` if no identifier was found at the end of the direct declarator, `false` otherwise,
- * written to `is_abstract`.
+ * PARAM is_abstract [out]: `true` if no identifier was found at the end of the direct declarator,
+ * `false` otherwise.
  */
 CNDEF Cn_Ast_Node *cn_parse_direct_declarator(Cn_Lexer *lexer, bool *is_abstract);
 
@@ -6039,7 +6079,7 @@ CNDEF Cn_Ast_Declaration_Specifiers *cn_parse_declaration_specifiers(Cn_Lexer *l
  *
  * RETURNS: `0` on success, `1` if token wasn't accepted, `2` on error.
  *
- * OUTPUTS: Parsed storage specifier, written to `output`.
+ * PARAM output [in out]: Parsed storage specifier is added to the flags.
  */
 CNDEF int cn_parse_try_storage_specifier(Cn_Lexer *lexer, Cn_Ast_Storage_Specifier_Flags *output);
 
@@ -6057,7 +6097,7 @@ CNDEF int cn_parse_try_storage_specifier(Cn_Lexer *lexer, Cn_Ast_Storage_Specifi
  *
  * RETURNS: `0` on success, `1` if token wasn't accepted, `2` on error.
  *
- * OUTPUTS: Parsed qualifier, written to `output`.
+ * PARAM output [in out]: Parsed qualifier is added to the flags.
  */
 CNDEF int cn_parse_try_qualifier(Cn_Lexer *lexer, Cn_Ast_Qualifier_Flags *output);
 
@@ -6073,7 +6113,7 @@ CNDEF int cn_parse_try_qualifier(Cn_Lexer *lexer, Cn_Ast_Qualifier_Flags *output
  *
  * RETURNS: `0` on success, `1` if token wasn't accepted, `2` on error.
  *
- * OUTPUTS: Parsed function specifier, written to `output`.
+ * PARAM output [in out]: Parsed function specifier is added to the flags.
  */
 CNDEF int cn_parse_try_function_specifier(Cn_Lexer *lexer, Cn_Ast_Function_Specifier_Flags *output);
 
@@ -6113,10 +6153,10 @@ typedef struct {
  *
  * RETURNS: `0` on success, `1` if token wasn't accepted, `2` on error.
  *
- * OUTPUTS: For primitive types like `int`, `char`, `signed`, `unsigned`, `long`, `short`, etc.,
- * updates `primitive_info`.
+ * PARAM primitive_info [in out]: Updated for primitive types like `int`, `char`, `signed`, `unsigned`,
+ * `long`, `short`, etc.
  *
- * OUTPUTS: For typedef, `struct`, `union`, `enum` and `typeof`, sets `type_specifier` to the node.
+ * PARAM type_specifier [out]: Set to the node for typedef, `struct`, `union`, `enum` and `typeof`.
  *
  * NOTE: Returning `1` is NOT an error. It occurs when current token is not a valid token
  * type specifier can accept, and no errors occurred. This way type specifier can check everything
@@ -6170,9 +6210,9 @@ CNDEF Cn_Ast_Specifier_Qualifier *cn_parse_specifier_qualifier(Cn_Lexer *lexer);
  *
  * RETURNS: Parsed list of parameter declarations.
  *
- * OUTPUTS: `true` on success, `false` on error, written to `ok`.
+ * PARAM variadic [out]: `true` if list ends with `...`.
  *
- * OUTPUTS: `true` if list ends with `...`, written to `variadic`.
+ * PARAM ok [out]: `true` on success, `false` on error.
  */
 CNDEF Cn_Ast_Nodes cn_parse_parameter_declarations(Cn_Lexer *lexer, bool *variadic, bool *ok);
 
@@ -6234,7 +6274,7 @@ CNDEF Cn_Ast_Member_Declaration *cn_parse_member_declaration(Cn_Lexer *lexer);
  *
  * RETURNS: Parsed list of member declarators.
  *
- * OUTPUTS: `true` on success, `false` on error, written to `ok`.
+ * PARAM ok [out]: `true` on success, `false` on error.
  */
 CNDEF Cn_Ast_Nodes cn_parse_member_declarators(Cn_Lexer *lexer, bool *ok);
 
@@ -6291,7 +6331,7 @@ CNDEF Cn_Ast_Enumerator *cn_parse_enumerator(Cn_Lexer *lexer);
  *
  * RETURNS: Parsed list of attribute specifiers.
  *
- * OUTPUTS: `true` on success, `false` on error, written to `ok`.
+ * PARAM ok [out]: `true` on success, `false` on error.
  */
 CNDEF Cn_Ast_Nodes cn_parse_attribute_specifiers(Cn_Lexer *lexer, bool *ok);
 
@@ -6319,7 +6359,7 @@ CNDEF Cn_Ast_Attribute_Specifier *cn_parse_attribute_specifier(Cn_Lexer *lexer);
  *
  * RETURNS: Parsed list of attributes.
  *
- * OUTPUTS: `true` on success, `false` on error, written to `ok`.
+ * PARAM ok [out]: `true` on success, `false` on error.
  */
 CNDEF Cn_Ast_Nodes cn_parse_attributes(Cn_Lexer *lexer, bool *ok);
 
@@ -6380,7 +6420,7 @@ CNDEF Cn_Ast_Gnu_Typeof *cn_parse_gnu_typeof(Cn_Lexer *lexer);
  *
  * RETURNS: Parsed list of GNU attribute specifiers.
  *
- * OUTPUTS: `true` on success, `false` on error, written to `ok`.
+ * PARAM ok [out]: `true` on success, `false` on error.
  *
  * SINCE: 0.3.0
  */
@@ -6398,7 +6438,7 @@ CNDEF Cn_Ast_Nodes cn_parse_gnu_attribute_specifiers(Cn_Lexer *lexer, bool *ok);
  *
  * RETURNS: Parsed list of attribute specifiers.
  *
- * OUTPUTS: `true` on success, `false` on error, written to `ok`.
+ * PARAM ok [out]: `true` on success, `false` on error.
  *
  * SINCE: 0.3.0
  */
@@ -6466,7 +6506,7 @@ CNDEF Cn_Ast_Gnu_Asm_Statement *cn_parse_gnu_asm_statement(Cn_Lexer *lexer);
  *
  * RETURNS: `0` on success, `1` if token wasn't accepted, `2` on error.
  *
- * OUTPUTS: Parsed qualifier, added to `output`.
+ * PARAM output [in out]: Parsed qualifier is added to the flags.
  *
  * NOTE: Returns `2` if the qualifier is already set in `output`.
  *
@@ -6487,7 +6527,7 @@ CNDEF int cn_parse_try_gnu_asm_qualifier(Cn_Lexer *lexer, Cn_Ast_Gnu_Asm_Qualifi
  *
  * RETURNS: Parsed list of GNU `asm` operands.
  *
- * OUTPUTS: `true` on success, `false` on error, written to `ok`.
+ * PARAM ok [out]: `true` on success, `false` on error.
  *
  * NOTE: Returns an empty list without consuming tokens if current token is `:` or `)`,
  * since operand lists may be empty.
@@ -6529,7 +6569,7 @@ CNDEF Cn_Ast_Gnu_Asm_Operand *cn_parse_gnu_asm_operand(Cn_Lexer *lexer);
  *
  * RETURNS: Parsed list of clobber strings.
  *
- * OUTPUTS: `true` on success, `false` on error, written to `ok`.
+ * PARAM ok [out]: `true` on success, `false` on error.
  *
  * NOTE: Returns an empty list without consuming tokens if current token is `:` or `)`.
  *
@@ -6550,7 +6590,7 @@ CNDEF Cn_Ast_Nodes cn_parse_gnu_asm_clobbers(Cn_Lexer *lexer, bool *ok);
  *
  * RETURNS: Parsed list of label identifiers.
  *
- * OUTPUTS: `true` on success, `false` on error, written to `ok`.
+ * PARAM ok [out]: `true` on success, `false` on error.
  *
  * AI: Generated.
  *
@@ -6583,7 +6623,7 @@ CNDEF Cn_Ast_Gnu_Asm_Label *cn_parse_gnu_asm_label(Cn_Lexer *lexer);
  *
  * RETURNS: `true` on success, `false` on error.
  *
- * OUTPUTS: Magnitude of the literal, written to `out`.
+ * PARAM out [out]: Magnitude of the literal.
  *
  * SINCE: 0.3.0
  */
@@ -6597,7 +6637,7 @@ CNDEF bool cn_parse_int_literal(Cn_String literal, uint64_t *out);
  *
  * RETURNS: `true` on success, `false` on error.
  *
- * OUTPUTS: Value of the literal, written to `out`.
+ * PARAM out [out]: Value of the literal.
  *
  * TODO: Hex floats are not handled, they output `NIL`.
  *
@@ -6612,10 +6652,10 @@ CNDEF bool cn_parse_float_literal(Cn_String literal, double *out);
  *
  * RETURNS: `true` on success, `false` on error.
  *
- * OUTPUTS: Value of the literal, written to `out`. It is 64 bits wide, because multi-character
+ * PARAM out [out]: Value of the literal. It is 64 bits wide, because multi-character
  * literal can occupy more than one byte.
  *
- * OUTPUTS: Number of character units in the literal, written to `unit_count_out`.
+ * PARAM unit_count_out [out]: Number of character units in the literal.
  *
  * AI: Generated.
  *
@@ -10478,8 +10518,8 @@ CNDEF Cn_String cn__ast_permanent_save_string(Cn_String str) {
     return str;
 }
 
-CNDEF Cn_Type *cn_analyze_intern_type(Cn_Type *type) {
-    if (!cn_hash_set_contains(&cn__tu_data->type_ptr_set, type)) {
+CNDEF Cn_Type *cn_analyze_intern_type(const Cn_Type *type) {
+    if (!cn_hash_set_contains(&cn__tu_data->type_ptr_set, (Cn_Type *)type)) {
         // Arena allocate memory for type.
         Cn_Type *result = cn_chained_arena_alloc(&cn__tu_data->type_arena, sizeof(Cn_Type));
         *result = *type;
@@ -10488,7 +10528,7 @@ CNDEF Cn_Type *cn_analyze_intern_type(Cn_Type *type) {
     } else {
         // Acts as a get, since type is already in there, 
         // the put will return actual item stored in the hash set.
-        return cn_hash_set_put(&cn__tu_data->type_ptr_set, type);
+        return cn_hash_set_put(&cn__tu_data->type_ptr_set, (Cn_Type *)type);
     }
 }
 
@@ -10931,11 +10971,11 @@ CNDEF void *cn_ast_copy(void * idx) {
 }
 
 
-CNDEF bool cn_ast_remove_attribute(void *target, Cn_String attribute_name) {
+CNDEF bool cn_ast_remove_attribute(Cn_Ast_Nodes attribute_specifiers, Cn_String attribute_name) {
     Cn_Ast_Attribute_Specifier *owner = NULL;
     int64_t index = -1;
 
-    if (cn_get_attribute_info(target, attribute_name, &owner, &index) == NULL) return false;
+    if (cn_get_attribute_info(attribute_specifiers, attribute_name, &owner, &index) == NULL) return false;
 
     cn_ast_remove_from_list(&owner->attributes, index);
     return true;
@@ -11031,97 +11071,7 @@ CNDEF bool cn_get_function_declarator_info(Cn_Ast_Declarator *declarator, Cn_Ast
     return false;
 }
 
-CNDEF Cn_Ast_Attribute *cn_get_attribute_info(void *target, Cn_String attribute_name, Cn_Ast_Attribute_Specifier **owner, int64_t *index) {
-    if (target == NULL) return NULL;
-
-    Cn_Ast_Node *node = target;
-    Cn_Ast_Nodes attribute_specifiers;
-
-    switch (node->kind) {
-        case CN_AST_DECLARATION:
-            attribute_specifiers = cn_ast_as(Declaration, node)->attribute_specifiers;
-            break;
-        case CN_AST_FUNCTION:
-            attribute_specifiers = cn_ast_as(Function, node)->attribute_specifiers;
-            break;
-        case CN_AST_BLOCK:
-            attribute_specifiers = cn_ast_as(Block, node)->attribute_specifiers;
-            break;
-        case CN_AST_IF:
-            attribute_specifiers = cn_ast_as(If, node)->attribute_specifiers;
-            break;
-        case CN_AST_SWITCH:
-            attribute_specifiers = cn_ast_as(Switch, node)->attribute_specifiers;
-            break;
-        case CN_AST_WHILE:
-            attribute_specifiers = cn_ast_as(While, node)->attribute_specifiers;
-            break;
-        case CN_AST_DO_WHILE:
-            attribute_specifiers = cn_ast_as(Do_While, node)->attribute_specifiers;
-            break;
-        case CN_AST_FOR:
-            attribute_specifiers = cn_ast_as(For, node)->attribute_specifiers;
-            break;
-        case CN_AST_LABEL:
-            attribute_specifiers = cn_ast_as(Label, node)->attribute_specifiers;
-            break;
-        case CN_AST_GOTO:
-            attribute_specifiers = cn_ast_as(Goto, node)->attribute_specifiers;
-            break;
-        case CN_AST_RETURN:
-            attribute_specifiers = cn_ast_as(Return, node)->attribute_specifiers;
-            break;
-        case CN_AST_BREAK:
-            attribute_specifiers = cn_ast_as(Break, node)->attribute_specifiers;
-            break;
-        case CN_AST_CONTINUE:
-            attribute_specifiers = cn_ast_as(Continue, node)->attribute_specifiers;
-            break;
-        case CN_AST_EXPRESSION_STATEMENT:
-            attribute_specifiers = cn_ast_as(Expression_Statement, node)->attribute_specifiers;
-            break;
-        // case CN_AST_PARAMETER_DECLARATION:
-        case CN_AST_STRUCT_SPECIFIER:
-            attribute_specifiers = cn_ast_as(Struct_Specifier, node)->attribute_specifiers;
-            break;
-        case CN_AST_UNION_SPECIFIER:
-            attribute_specifiers = cn_ast_as(Union_Specifier, node)->attribute_specifiers;
-            break;
-        case CN_AST_MEMBER_DECLARATION:
-            attribute_specifiers = cn_ast_as(Member_Declaration, node)->attribute_specifiers;
-            break;
-        case CN_AST_ENUM_SPECIFIER:
-            attribute_specifiers = cn_ast_as(Enum_Specifier, node)->attribute_specifiers;
-            break;
-        case CN_AST_ENUMERATOR:
-            attribute_specifiers = cn_ast_as(Enumerator, node)->attribute_specifiers;
-            break;
-#ifdef CN_GNU
-        case CN_AST_INIT_DECLARATOR:
-            attribute_specifiers = cn_ast_as(Init_Declarator, node)->attribute_specifiers;
-            break;
-        case CN_AST_POINTER:
-            attribute_specifiers = cn_ast_as(Pointer, node)->attribute_specifiers;
-            break;
-        case CN_AST_DECLARATION_SPECIFIERS:
-            attribute_specifiers = cn_ast_as(Declaration_Specifiers, node)->attribute_specifiers;
-            break;
-        case CN_AST_SPECIFIER_QUALIFIER:
-            attribute_specifiers = cn_ast_as(Specifier_Qualifier, node)->attribute_specifiers;
-            break;
-        case CN_AST_MEMBER_DECLARATOR:
-            attribute_specifiers = cn_ast_as(Member_Declarator, node)->attribute_specifiers;
-            break;
-#endif
-
-        case CN_AST_ATTRIBUTE_SPECIFIER:
-            // A specifier is searched directly, it owns its attributes.
-            attribute_specifiers = (Cn_Ast_Nodes) { .ptrs = &node, .length = 1 };
-            break;
-        default:
-            return NULL;
-    }
-
+CNDEF Cn_Ast_Attribute *cn_get_attribute_info(Cn_Ast_Nodes attribute_specifiers, Cn_String attribute_name, Cn_Ast_Attribute_Specifier **owner, int64_t *index) {
     for (int64_t i = 0; i < attribute_specifiers.length; i++) {
         Cn_Ast_Attribute_Specifier *attribute_specifier = cn_ast_as(Attribute_Specifier, attribute_specifiers.ptrs[i]);
         for (int64_t j = 0; j < attribute_specifier->attributes.length; j++) {
@@ -11137,8 +11087,23 @@ CNDEF Cn_Ast_Attribute *cn_get_attribute_info(void *target, Cn_String attribute_
     return NULL;
 }
 
-CNDEF Cn_Ast_Attribute *cn_get_attribute(void *target, Cn_String attribute_name) {
-    return cn_get_attribute_info(target, attribute_name, NULL, NULL);
+CNDEF Cn_Ast_Attribute *cn_get_attribute(Cn_Ast_Nodes attribute_specifiers,  Cn_String attribute_name) {
+    return cn_get_attribute_info(attribute_specifiers, attribute_name, NULL, NULL);
+}
+
+CNDEF Cn_Ast_Nodes cn_get_attribute_specifiers(void *node) {
+    CN_ASSERT(node != NULL);
+    Cn_Ast_Info *info = cn_ast_info(((Cn_Ast_Node *)node)->kind);
+
+    // Linear search, based on meta info, but small, maybe later replace with hard coded switch.
+    for (int64_t i = 0; i < info->members_count; i++) {
+        Cn_Ast_Member_Info *member = &info->members[i];
+        if (member->kind == CN_AST_MEMBER_INFO_NODES && strcmp(member->name, "attribute_specifiers") == 0) {
+            return *(Cn_Ast_Nodes *)((uint8_t *)node + member->offset);
+        }
+    }
+
+    return (Cn_Ast_Nodes) {0};
 }
 
 /**
@@ -11838,12 +11803,13 @@ CNDEF bool cn__extension_register(Cn_Extension *extensions[], int64_t length) {
  */
 
 
-// AI: Generated.
 /**
  * Helper function, opaque type is trusted by every typecheck, to be whatever makes the checked
  * construct valid. Typecheck only errors if non-opaque operands make it invalid on their own.
  *
  * RETURNS: `true` if `type` is opaque, ignoring qualifiers.
+ *
+ * AI: Generated.
  */
 CNDEF bool cn__analyze_is_opaque(Cn_Type *type) {
     return cn_type_unqualified(type)->kind == CN_OPAQUE;
@@ -11860,7 +11826,7 @@ CNDEF bool cn__analyze_declaration_opt(void *declaration_specifiers, Cn_Analyze_
         // But for now they are not analyzed for any type information.
         if (decl_spec->type_specifier == NULL) return true;
             
-        return cn_analyze_to_type(decl_spec->qualifiers, decl_spec->type_specifier, NULL, 0) != NULL;
+        return cn_analyze_to_type(decl_spec->qualifiers, decl_spec->type_specifier) != NULL;
     }
 
     if (decl_spec->type_specifier == NULL) {
@@ -11871,8 +11837,8 @@ CNDEF bool cn__analyze_declaration_opt(void *declaration_specifiers, Cn_Analyze_
     Cn_Type *type = cn_analyze_to_type(
             decl_spec->qualifiers, 
             decl_spec->type_specifier, 
-            decl, 
-            CN_ANALYZE_NO_FLAGS
+            .declarator = decl,
+            .attribute_specifiers = opt.attribute_specifiers,
             );
 
     if (type == NULL) return false;
@@ -11942,93 +11908,13 @@ CNDEF bool cn__analyze_declaration_opt(void *declaration_specifiers, Cn_Analyze_
     return true;
 }
 
-// CNDEF bool cn_analyze_declaration(void *declaration_specifiers, Cn_Ast_Nodes init_declarators) {
-//     Cn_Ast_Declaration_Specifiers *decl_spec = declaration_specifiers;
-// 
-//     // No declarators, then just analyzing declaration specifiers.
-//     if (init_declarators.length == 0) {
-//         Cn_Type *type = cn_analyze_to_type(decl_spec->qualifiers, decl_spec->type_specifier, NULL);
-//         return type != NULL;
-//     }
-// 
-//     // Iterating over declarators.
-//     for (int64_t i = 0; i < init_declarators.length; i++) {
-//         Cn_Ast_Init_Declarator *init_decl = cn_ast_as(Init_Declarator, init_declarators.ptrs[i]);
-// 
-//         Cn_Type *type = cn_analyze_to_type(decl_spec->qualifiers, decl_spec->type_specifier, init_decl->declarator);
-//         if (type == NULL) return false;
-// 
-//         // Adding declarator to variable or typedef binding, if it is not abstract.
-//         Cn_Ast_Node *identifier;
-//         cn_get_declarator_info(init_decl->declarator, &identifier);
-// 
-//         if (((Cn_Ast_Node *)identifier)->kind == CN_AST_IDENTIFIER) {
-//             Cn_String name = ((Cn_Ast_Identifier *)identifier)->name;
-// 
-//             // Function declaration case.
-//             if (type->kind == CN_FUNCTION) {
-//                 Cn_Ast_Node *parameter_type_list;
-//                 cn_get_function_declarator_info(
-//                         init_decl->declarator,
-//                         &parameter_type_list,
-//                         &identifier
-//                         );
-// 
-//                 Cn_Ast_Nodes *parameter_declarations = NULL;
-//                 if (parameter_type_list != NULL)
-//                     parameter_declarations = &((Cn_Ast_Direct_Declarator_Function *)parameter_type_list)->parameter_declarations;
-// 
-//                 if (cn_binding_declare_function(
-//                             name,
-//                             identifier,
-//                             decl_spec->storage_specifiers,
-//                             decl_spec->function_specifiers,
-//                             type,
-//                             parameter_declarations,
-//                             false
-//                             ) == CN_BINDING_NIL_IDX) return false;
-// 
-//                 continue;
-//             }
-// 
-//             // Typedef declaration case.
-//             if (decl_spec->storage_specifiers & CN_AST_STORAGE_SPECIFIER_TYPEDEF) {
-//                 if (cn_binding_declare_typedef(name, identifier, type) == CN_BINDING_NIL_IDX) return false;
-// 
-//                 continue;
-//             }
-// 
-//             // Variable declaration case.
-//             bool is_definition = init_decl->initializer != NULL;
-// 
-//             if (cn_binding_declare_variable(
-//                         name,
-//                         identifier,
-//                         decl_spec->storage_specifiers,
-//                         type,
-//                         is_definition
-//                         ) == CN_BINDING_NIL_IDX) return false;
-// 
-// 
-//             // Analyze initializer here (only happens in variable declaration case).
-//             if (init_decl->initializer != NULL) {
-//                 if (!cn_analyze_typecheck_initializer(init_decl->initializer, type)) return false;
-//             }
-//         }
-//     }
-// 
-//     return true;
-// }
-
-
 CNDEF bool cn_analyze_function_definition(void * declaration_specifiers, void * declarator, Cn_Binding_Idx *function_binding_idx) {
     Cn_Ast_Declaration_Specifiers *decl_spec = declaration_specifiers;
 
     Cn_Type *type = cn_analyze_to_type(
             decl_spec->qualifiers, 
             decl_spec->type_specifier, 
-            declarator,
-            0
+            .declarator = declarator
             );
     if (type == NULL) return false;
 
@@ -12375,7 +12261,7 @@ CNDEF Cn_Type *cn__gnu_analyze_typeof(Cn_Ast_Node *type_specifier) {
     if (typeof_spec->target->kind == CN_AST_TYPE_NAME) {
         Cn_Ast_Type_Name *tn = cn_ast_as(Type_Name, typeof_spec->target);
         Cn_Ast_Specifier_Qualifier *sq = tn->specifier_qualifier;
-        result = cn_analyze_to_type(sq->qualifiers, sq->type_specifier, tn->abstract_declarator, 0);
+        result = cn_analyze_to_type(sq->qualifiers, sq->type_specifier, .declarator = tn->abstract_declarator);
     } else {
         // Expression operand was already typechecked when it was parsed.
         result = cn_get_expression_type(typeof_spec->target);
@@ -12454,7 +12340,7 @@ CNDEF Cn_Type *cn__analyze_type_from_struct(Cn_Ast_Node *ts) {
  
             for (int64_t d = 0; d < md->member_declarators.length; d++) {
                 Cn_Ast_Member_Declarator *decl = cn_ast_as(Member_Declarator, md->member_declarators.ptrs[d]);
-                Cn_Type *member_type = cn_analyze_to_type(sq->qualifiers, sq->type_specifier, decl->declarator, 0);
+                Cn_Type *member_type = cn_analyze_to_type(sq->qualifiers, sq->type_specifier, .declarator = decl->declarator);
                 if (member_type == NULL) goto error;
  
                 if (!(member_type->flags & CN_TYPE_COMPLETE)) {
@@ -12523,7 +12409,7 @@ CNDEF Cn_Type *cn__analyze_type_from_union(Cn_Ast_Node *ts) {
  
             for (int64_t d = 0; d < md->member_declarators.length; d++) {
                 Cn_Ast_Member_Declarator *decl = cn_ast_as(Member_Declarator, md->member_declarators.ptrs[d]);
-                Cn_Type *member_type = cn_analyze_to_type(sq->qualifiers, sq->type_specifier, decl->declarator, 0);
+                Cn_Type *member_type = cn_analyze_to_type(sq->qualifiers, sq->type_specifier, .declarator = decl->declarator);
                 if (member_type == NULL) goto error;
  
                 if (!(member_type->flags & CN_TYPE_COMPLETE)) {
@@ -12583,7 +12469,7 @@ CNDEF Cn_Type *cn__analyze_type_from_enum(Cn_Ast_Node *ts) {
         Cn_Type *enum_base_type;
         if (enum_spec->specifier_qualifier != NULL) {
             Cn_Ast_Specifier_Qualifier *sq = enum_spec->specifier_qualifier;
-            enum_base_type = cn_analyze_to_type(sq->qualifiers, sq->type_specifier, NULL, 0);
+            enum_base_type = cn_analyze_to_type(sq->qualifiers, sq->type_specifier);
 
             if (enum_base_type == NULL) goto error;
 
@@ -12845,7 +12731,7 @@ CNDEF Cn_Type *cn__analyze_type_apply_function(Cn_Type *result, Cn_Ast_Node *dd,
             if (!ok) goto error;
 
 
-            Cn_Type *param_type = cn_analyze_to_type(decl_spec->qualifiers, decl_spec->type_specifier, p->declarator, CN_ANALYZE_APPLY_PARAMETER_ADJUSTMENT);
+            Cn_Type *param_type = cn_analyze_to_type(decl_spec->qualifiers, decl_spec->type_specifier, .declarator = p->declarator, .flags = CN_ANALYZE_APPLY_PARAMETER_ADJUSTMENT);
  
             type.function.params[i] = (Cn_Type_Function_Param) {
                 .type = param_type,
@@ -12932,12 +12818,27 @@ error:
     return NULL;
 }
  
-CNDEF Cn_Type *cn_analyze_to_type(Cn_Ast_Qualifier_Flags qualifier, void *type_specifier, void *declarator, Cn_Analyze_Flags flags) {
+CNDEF Cn_Type *cn__analyze_to_type_opt(Cn_Ast_Qualifier_Flags qualifier, void *type_specifier, Cn_Analyze_To_Type_Opt opt) {
     CN_ASSERT(type_specifier != NULL);
 
     // Base type named by the specifier.
     Cn_Type *result = cn__analyze_base_type_from_specifier(type_specifier);
     if (result == NULL) goto error;
+
+#ifdef CN_GNU
+    // Applying __attribute__((vector_size(16))), apparently it makes its own vector type.
+    // That can look like an array but is not. It is passed by value, arithmetic operations
+    // work just like vector operations in linear alg. Has alignment of its size, etc...
+    // So as of right now---decision is to simply make it cast the base type to `CN_OPAQUE`.
+    // Since I am not yet convinced how neccessary it would be to fully incorporate this type
+    // as libraries extension under GNU. If later it will cause problems it will be implemented
+    // as its own type.
+    Cn_Ast_Attribute *attr_vec_size = cn_get_attribute(opt.attribute_specifiers, CN_STR_LIT("vector_size"));
+    if (attr_vec_size != NULL) {
+        result = cn_analyze_intern_type(&CN_TYPE_OPAQUE);
+    }
+#endif // CN_GNU
+
  
     // Qualifiers on the base type itself.
     if (qualifier != 0) {
@@ -12946,7 +12847,7 @@ CNDEF Cn_Type *cn_analyze_to_type(Cn_Ast_Qualifier_Flags qualifier, void *type_s
     }
  
     // Declarator layers (* [] ()).
-    result = cn__analyze_type_apply_declarator(result, declarator, flags);
+    result = cn__analyze_type_apply_declarator(result, opt.declarator, opt.flags);
     if (result == NULL) goto error;
  
     return result;
@@ -13536,7 +13437,7 @@ CNDEF Cn_Type *cn__analyze_typecheck_cast(Cn_Ast_Node *node) {
     // Resolve the target type from the typename.
     Cn_Ast_Node *type_name = cn_ast_upcast((cn_ast_as(Cast, node)->type_name));
     Cn_Ast_Node *spec_qual = cn_ast_upcast((cn_ast_as(Type_Name, type_name)->specifier_qualifier));
-    Cn_Type *target = cn_analyze_to_type(cn_ast_as(Specifier_Qualifier, spec_qual)->qualifiers, cn_ast_as(Specifier_Qualifier, spec_qual)->type_specifier, cn_ast_as(Type_Name, type_name)->abstract_declarator, 0);
+    Cn_Type *target = cn_analyze_to_type(cn_ast_as(Specifier_Qualifier, spec_qual)->qualifiers, cn_ast_as(Specifier_Qualifier, spec_qual)->type_specifier, .declarator = cn_ast_as(Type_Name, type_name)->abstract_declarator);
     if (target == NULL) goto error;
 
     Cn_Type *operand = cn_analyze_typecheck_expression(cn_ast_as(Cast, node)->expression);
@@ -13587,7 +13488,7 @@ CNDEF Cn_Type *cn__analyze_typecheck_compound(Cn_Ast_Node *node) {
     // Resolve the target type from the typename.
     Cn_Ast_Node *type_name = cn_ast_upcast((cn_ast_as(Compound, node)->type_name));
     Cn_Ast_Node *spec_qual = cn_ast_upcast((cn_ast_as(Type_Name, type_name)->specifier_qualifier));
-    Cn_Type *target = cn_analyze_to_type(cn_ast_as(Specifier_Qualifier, spec_qual)->qualifiers, cn_ast_as(Specifier_Qualifier, spec_qual)->type_specifier, cn_ast_as(Type_Name, type_name)->abstract_declarator, 0);
+    Cn_Type *target = cn_analyze_to_type(cn_ast_as(Specifier_Qualifier, spec_qual)->qualifiers, cn_ast_as(Specifier_Qualifier, spec_qual)->type_specifier, .declarator = cn_ast_as(Type_Name, type_name)->abstract_declarator);
     if (target == NULL) goto error;
 
     if (!(cn_type_unqualified(target)->flags & CN_TYPE_COMPLETE)) {
@@ -13618,8 +13519,7 @@ CNDEF Cn_Type *cn__analyze_typecheck_sizeof(Cn_Ast_Node *node) {
         operand = cn_analyze_to_type(
             spec_qual->qualifiers,
             spec_qual->type_specifier,
-            cn_ast_as(Type_Name, child)->abstract_declarator,
-            0
+            .declarator = cn_ast_as(Type_Name, child)->abstract_declarator
             );
     } else {
         // Case: sizeof expr, operand is not evaluated; only its type is needed.
@@ -14347,7 +14247,7 @@ CNDEF Cn_Any cn__analyze_evaluate_sizeof(Cn_Ast_Node *node, void *buffer) {
     Cn_Type *operand_type;
     if (child->kind == CN_AST_TYPE_NAME) {
         Cn_Ast_Specifier_Qualifier *sq = (Cn_Ast_Specifier_Qualifier *)cn_ast_upcast((cn_ast_as(Type_Name, child)->specifier_qualifier));
-        operand_type    = cn_analyze_to_type(cn_ast_as(Specifier_Qualifier, sq)->qualifiers, cn_ast_as(Specifier_Qualifier, sq)->type_specifier, cn_ast_as(Type_Name, child)->abstract_declarator, 0);
+        operand_type    = cn_analyze_to_type(cn_ast_as(Specifier_Qualifier, sq)->qualifiers, cn_ast_as(Specifier_Qualifier, sq)->type_specifier, .declarator = cn_ast_as(Type_Name, child)->abstract_declarator);
     } else {
         // The operand of sizeof is unevaluated, only its type is needed.
         operand_type = cn_get_expression_type(cn_ast_as(Sizeof, node)->target);
@@ -17287,7 +17187,7 @@ CNDEF Cn_Ast_Init_Declarator *cn_parse_finish_init_declarator(Cn_Lexer *lexer, C
 
 
     // Creating binding from the finished init declarator.
-    ok = cn_analyze_declaration(declaration_specifiers, .declarator = node.declarator, .initializer = node.initializer);
+    ok = cn_analyze_declaration(declaration_specifiers, .declarator = node.declarator, .initializer = node.initializer, .attribute_specifiers = node.attribute_specifiers);
     if (!ok) goto error;
 
     Cn_Ast_Init_Declarator *parent = cn_ast_new(node);
@@ -20858,13 +20758,18 @@ static Cn_Ast_Info cn__ast_infos[CN_AST__END] = {
 #endif
 };
 
-
 #endif // CN_IMPLEMENTATION_GUARD_
 #endif // CN_IMPLEMENTATION
 
 
 /* 
     Revision history:
+        0.4.0 ()            Revised documentation layout and added tag modifiers for PARAM and MEMBER.
+                            Added optional parameters to `cn_analyze_to_type`.
+                            Added ability to pass additional attribute specifiers to `cn_analyze_to_type` and `cn_analyze_declaration`.
+                            Added GNU `__attribute__((vector_size(...)))` support, now it sets base type to `OPAQUE` whenever applied.
+                            Added `cn_get_attribute_specifiers` which returns attribute specifiers on any node, empty list if non are present.
+                            Revised `cn_get_attribute` and `cn_get_attribute_info` to now take attribute specifiers instead of any ast node.
         0.3.0 (2026-11-27)  Revised whole documentation throughout public API:
                                 - All items now contain entries.
                                 - All items now contain `SINCE` tag, marking when entry was added.

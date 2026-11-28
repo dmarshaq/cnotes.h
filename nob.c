@@ -446,7 +446,6 @@ static Arena arena_strings;
     X(RETURNS,      Returns,    returns)    \
     X(PARAM,        Param,      param)      \
     X(MEMBER,       Member,     member)     \
-    X(OUTPUTS,      Outputs,    outputs)    \
     X(SINCE,        Since,      since)      \
     X(NOTE,         Note,       note)       \
     X(IMPORTANT,    Important,  important)  \
@@ -464,8 +463,28 @@ typedef enum {
     UNKNOWN,
 } Doc_Tag_Kind;
 
+/**
+ * Modifiers of "PARAM name [...]:" and "MEMBER name [...]:" tags, written between brackets in any order.
+ * PARAM without "in" or "out" is "in" by default, MEMBER only takes "optional".
+ */
+#define DOC_MODIFIER_GEN_LIST(X)            \
+    X(IN,           0x1,        "in")       \
+    X(OUT,          0x2,        "out")      \
+    X(OPTIONAL,     0x4,        "optional") \
+
+typedef enum {
+    DOC_NO_MODIFIERS = 0,
+#define X(K, v, lit) DOC_MODIFIER_##K = v,
+    DOC_MODIFIER_GEN_LIST(X)
+#undef X
+} Doc_Modifiers;
+
+#define DOC_MODIFIER_DIRECTION (DOC_MODIFIER_IN | DOC_MODIFIER_OUT)
+
 typedef struct {
     Doc_Tag_Kind    kind;
+    Nob_String_View name;       // Name of the "PARAM name:" and "MEMBER name:" tags, empty otherwise.
+    Doc_Modifiers   modifiers;
     Nob_String_View text;
 } Doc_Tag;
 
@@ -533,14 +552,20 @@ const char     *doc_tag_to_lit(Doc_Tag_Kind tag);
 const char     *doc_kind_to_lit(Doc_Kind kind);
 Doc_Flags       doc_sv_to_flag(Nob_String_View sv);
 bool            doc_parse_flags(Nob_String_View symbol, Nob_String_View line, Doc_Flags *flags);
+bool            doc_tag_is_named(Doc_Tag_Kind kind);
+Doc_Modifiers   doc_sv_to_modifier(Nob_String_View sv);
+bool            doc_parse_modifiers(Nob_String_View symbol, Nob_String_View modifiers, Doc_Tag *tag);
+bool            doc_parse_tag_head(Nob_String_View symbol, Nob_String_View head, Doc_Tag *tag, bool *ok);
+void            doc_print_json_modifiers(FILE *f, Doc_Modifiers modifiers);
+Nob_String_View doc_chop_word(Nob_String_View *sv);
 bool            doc_is_identifier_char(char c);
 bool            doc_sv_is_identifier(Nob_String_View sv);
 bool            doc_sv_starts_with_word(Nob_String_View sv, Nob_String_View word);
 Nob_String_View doc_sv_first_identifier(Nob_String_View sv);
 Nob_String_View doc_sv_last_identifier(Nob_String_View sv);
 bool            doc_sv_has_library_prefix(Nob_String_View symbol);
-void            doc_append_line(Nob_String_Builder *sb, size_t *count, Nob_String_View line);
-void            doc_append_to_target(Doc_Entry *entry, Nob_String_Builder *text_sb, Nob_String_Builder *description_sb, Doc_Target target, Nob_String_View line);
+void            doc_append_line(Nob_String_Builder *sb, size_t *count, Nob_String_View line, bool new_paragraph);
+void            doc_append_to_target(Doc_Entry *entry, Nob_String_Builder *text_sb, Nob_String_Builder *description_sb, Doc_Target target, Nob_String_View line, bool new_paragraph);
 void            doc_print_json_entry(FILE *f, Doc_Entry *entry);
 Nob_String_View doc_get_next_comment(Nob_String_View *content);
 Nob_String_View doc_get_section(Nob_String_View doc);
@@ -630,14 +655,8 @@ bool doc_parse_flags(Nob_String_View symbol, Nob_String_View line, Doc_Flags *fl
     bool ok = true;
 
     while (true) {
-        line = nob_sv_trim_left(line);
-        if (line.count == 0) break;
-
-        // Chopping one word, words are separated by any whitespace.
-        size_t length = 0;
-        while (length < line.count && !isspace((unsigned char)line.data[length])) length++;
-        Nob_String_View word = nob_sv_from_parts(line.data, length);
-        nob_sv_chop_left(&line, length);
+        Nob_String_View word = doc_chop_word(&line);
+        if (word.count == 0) break;
 
         if (!nob_sv_starts_with(word, DOC_SV_LIT("--"))) {
             nob_log(NOB_ERROR, "Non flag text '%.*s' on flags line in documentation of '%.*s', flags must be on their own line.", DOC_SV_UNPACK(word), DOC_SV_UNPACK(symbol));
@@ -656,6 +675,140 @@ bool doc_parse_flags(Nob_String_View symbol, Nob_String_View line, Doc_Flags *fl
     }
 
     return ok;
+}
+
+/**
+ * Checks whether tag of the kind is followed by a name, like "PARAM name:" or "MEMBER name:".
+ */
+bool doc_tag_is_named(Doc_Tag_Kind kind) {
+    return kind == PARAM || kind == MEMBER;
+}
+
+/**
+ * Maps modifier literal, like "out", to its modifier value, DOC_NO_MODIFIERS if modifier is unknown.
+ */
+Doc_Modifiers doc_sv_to_modifier(Nob_String_View sv) {
+#define X(K, v, lit) if (nob_sv_eq(sv, DOC_SV_LIT(lit))) return DOC_MODIFIER_##K;
+    DOC_MODIFIER_GEN_LIST(X)
+#undef X
+    return DOC_NO_MODIFIERS;
+}
+
+/**
+ * Parses whitespace separated modifiers, the text between "[" and "]", into modifiers of the named tag.
+ * Unknown modifiers and "in" or "out" on MEMBER are errors, empty and repeated modifiers are warnings.
+ * Returns false if any errors were logged.
+ */
+bool doc_parse_modifiers(Nob_String_View symbol, Nob_String_View modifiers, Doc_Tag *tag) {
+    bool ok = true;
+
+    if (nob_sv_trim(modifiers).count == 0) {
+        nob_log(NOB_WARNING, "Empty modifiers of '%.*s' in documentation of '%.*s'.", DOC_SV_UNPACK(tag->name), DOC_SV_UNPACK(symbol));
+    }
+
+    while (true) {
+        Nob_String_View word = doc_chop_word(&modifiers);
+        if (word.count == 0) break;
+
+        Doc_Modifiers modifier = doc_sv_to_modifier(word);
+        if (modifier == DOC_NO_MODIFIERS) {
+            nob_log(NOB_ERROR, "Unknown modifier '%.*s' of '%.*s' in documentation of '%.*s'.", DOC_SV_UNPACK(word), DOC_SV_UNPACK(tag->name), DOC_SV_UNPACK(symbol));
+            ok = false;
+            continue;
+        }
+
+        if (tag->kind == MEMBER && (modifier & DOC_MODIFIER_DIRECTION)) {
+            nob_log(NOB_ERROR, "Modifier '%.*s' of member '%.*s' in documentation of '%.*s', members only take 'optional'.", DOC_SV_UNPACK(word), DOC_SV_UNPACK(tag->name), DOC_SV_UNPACK(symbol));
+            ok = false;
+            continue;
+        }
+
+        if (tag->modifiers & modifier) {
+            nob_log(NOB_WARNING, "Repeated modifier '%.*s' of '%.*s' in documentation of '%.*s'.", DOC_SV_UNPACK(word), DOC_SV_UNPACK(tag->name), DOC_SV_UNPACK(symbol));
+        }
+
+        tag->modifiers |= modifier;
+    }
+
+    return ok;
+}
+
+/**
+ * Parses head of a tag line, the text before its ':', like "RETURNS", "PARAM name" or "PARAM name [out optional]".
+ * Returns true if head is a tag, writing its kind, name and modifiers to tag.
+ * Invalid modifiers are logged and false is written to ok, head is still a tag then, so its text is not lost.
+ */
+bool doc_parse_tag_head(Nob_String_View symbol, Nob_String_View head, Doc_Tag *tag, bool *ok) {
+    Nob_String_View rest = head;
+    Doc_Tag_Kind    kind = doc_sv_to_tag(doc_chop_word(&rest));
+    if (kind == UNKNOWN) return false;
+
+    rest = nob_sv_trim(rest);
+    *tag = (Doc_Tag) { .kind = kind };
+
+    if (!doc_tag_is_named(kind)) {
+        if (nob_sv_starts_with(rest, DOC_SV_LIT("["))) {
+            nob_log(NOB_WARNING, "Modifiers on '%s' tag in documentation of '%.*s', only PARAM and MEMBER take them, line is kept as text.", doc_tag_to_lit(kind), DOC_SV_UNPACK(symbol));
+        }
+        return rest.count == 0;
+    }
+
+    // Name is not required, "PARAM: text" is a tag without one.
+    if (rest.count > 0) {
+        size_t length = 0;
+        while (length < rest.count && doc_is_identifier_char(rest.data[length])) length++;
+        tag->name = nob_sv_from_parts(rest.data, length);
+        if (!doc_sv_is_identifier(tag->name)) return false;
+
+        nob_sv_chop_left(&rest, length);
+        rest = nob_sv_trim_left(rest);
+
+        // Anything else than modifiers after the name, like "PARAM some words:", is plain text.
+        if (rest.count > 0) {
+            if (!nob_sv_starts_with(rest, DOC_SV_LIT("["))) return false;
+
+            if (!nob_sv_ends_with_cstr(rest, "]")) {
+                nob_log(NOB_ERROR, "Malformed modifiers '%.*s' of '%.*s' in documentation of '%.*s', expected '[modifier ...]' right before ':'.", DOC_SV_UNPACK(rest), DOC_SV_UNPACK(tag->name), DOC_SV_UNPACK(symbol));
+                *ok = false;
+            } else if (!doc_parse_modifiers(symbol, nob_sv_from_parts(rest.data + 1, rest.count - 2), tag)) {
+                *ok = false;
+            }
+        }
+    }
+
+    if (kind == PARAM && !(tag->modifiers & DOC_MODIFIER_DIRECTION)) tag->modifiers |= DOC_MODIFIER_IN;
+
+    return true;
+}
+
+/**
+ * Prints modifiers as JSON array of their literals, like ["in", "out"].
+ */
+void doc_print_json_modifiers(FILE *f, Doc_Modifiers modifiers) {
+    fputc('[', f);
+    bool first = true;
+#define X(K, v, lit)                                    \
+    if (modifiers & DOC_MODIFIER_##K) {                 \
+        fputs(first ? "\"" lit "\"" : ", \"" lit "\"", f); \
+        first = false;                                  \
+    }
+    DOC_MODIFIER_GEN_LIST(X)
+#undef X
+    fputc(']', f);
+}
+
+/**
+ * Chops the next word off sv, words are separated by any whitespace. Returns empty view if there are no words left.
+ */
+Nob_String_View doc_chop_word(Nob_String_View *sv) {
+    *sv = nob_sv_trim_left(*sv);
+
+    size_t length = 0;
+    while (length < sv->count && !isspace((unsigned char)sv->data[length])) length++;
+
+    Nob_String_View word = nob_sv_from_parts(sv->data, length);
+    nob_sv_chop_left(sv, length);
+    return word;
 }
 
 bool doc_is_identifier_char(char c) {
@@ -724,13 +877,14 @@ bool doc_sv_has_library_prefix(Nob_String_View symbol) {
 }
 
 /**
- * Appends line to sb, separated by newline if text of the given count is not empty.
- * Count of the text the line belongs to is advanced accordingly.
+ * Appends line to sb, separated by newline if text of the given count is not empty,
+ * or by blank line if it starts a new paragraph. Count of the text the line belongs to is advanced accordingly.
  */
-void doc_append_line(Nob_String_Builder *sb, size_t *count, Nob_String_View line) {
+void doc_append_line(Nob_String_Builder *sb, size_t *count, Nob_String_View line, bool new_paragraph) {
     if (*count > 0) {
-        nob_da_append(sb, '\n');
-        (*count)++;
+        size_t separators = new_paragraph ? 2 : 1;
+        for (size_t i = 0; i < separators; i++) nob_da_append(sb, '\n');
+        *count += separators;
     }
     nob_sb_append_buf(sb, line.data, line.count);
     *count += line.count;
@@ -739,18 +893,18 @@ void doc_append_line(Nob_String_Builder *sb, size_t *count, Nob_String_View line
 /**
  * Appends line to whatever text target points to, target must be open.
  */
-void doc_append_to_target(Doc_Entry *entry, Nob_String_Builder *text_sb, Nob_String_Builder *description_sb, Doc_Target target, Nob_String_View line) {
+void doc_append_to_target(Doc_Entry *entry, Nob_String_Builder *text_sb, Nob_String_Builder *description_sb, Doc_Target target, Nob_String_View line, bool new_paragraph) {
     switch (target) {
     case DOC_TARGET_SUMMARY:
-        doc_append_line(text_sb, &entry->summary.count, line);
+        doc_append_line(text_sb, &entry->summary.count, line, new_paragraph);
         break;
 
     case DOC_TARGET_TAG:
-        doc_append_line(text_sb, &nob_da_last(&entry->tags).text.count, line);
+        doc_append_line(text_sb, &nob_da_last(&entry->tags).text.count, line, new_paragraph);
         break;
 
     case DOC_TARGET_DESCRIPTION:
-        if (description_sb->count != 0) nob_da_append(description_sb, '\n');
+        if (description_sb->count != 0) nob_da_append_many(description_sb, "\n\n", new_paragraph ? 2 : 1);
         nob_sb_append_buf(description_sb, line.data, line.count);
         break;
 
@@ -789,7 +943,15 @@ void doc_print_json_entry(FILE *f, Doc_Entry *entry) {
     for (size_t i = 0; i < entry->tags.count; i++) {
         Doc_Tag *tag = &entry->tags.items[i];
         fputs(i == 0 ? "\n" : ",\n", f);
-        fprintf(f, "      { \"kind\": \"%s\", \"text\": ", doc_tag_to_lit(tag->kind));
+        fprintf(f, "      { \"kind\": \"%s\", ", doc_tag_to_lit(tag->kind));
+        if (doc_tag_is_named(tag->kind)) {
+            fputs("\"name\": ", f);
+            doc_print_json_string(f, tag->name);
+            fputs(", \"modifiers\": ", f);
+            doc_print_json_modifiers(f, tag->modifiers);
+            fputs(", ", f);
+        }
+        fputs("\"text\": ", f);
         doc_print_json_string(f, tag->text);
         fputs(" }", f);
     }
@@ -1115,15 +1277,17 @@ bool doc_parse_entry(Nob_String_View symbol, Nob_String_View signature, Nob_Stri
     doc__description_sb.count   = 0;
 
 
-    // Examining doc line by line.
-    // Consecutive lines are joined with '\n' into whatever is currently open: summary, tag or description.
-    // A blank line closes it. Text after a blank line goes to description, a tag line always opens a new tag.
+    // Examining doc line by line, lines are joined with '\n' into whatever is currently open.
+    // First lines up to a blank line are the summary, text after it is description.
+    // A tag line opens a tag, every following line belongs to it until the next tag line.
+    // Blank lines inside description and tags separate paragraphs, same as in markdown.
     // Inside ``` fences lines are kept verbatim: indentation and blank lines stay, tags are not detected.
     // A line starting with "--" is a flags line, it is parsed into flags and not added to any text.
     Doc_Target target = DOC_TARGET_NONE;
     bool has_content = false;
+    bool new_paragraph = false;
     bool in_fence = false;
-    bool flags_ok = true;
+    bool ok = true;
 
     while (doc.count > 0) {
         Nob_String_View raw = nob_sv_trim(nob_sv_chop_by_delim(&doc, '\n'));
@@ -1143,66 +1307,46 @@ bool doc_parse_entry(Nob_String_View symbol, Nob_String_View signature, Nob_Stri
         if (in_fence) {
             // Target is always open here, opening fence line opened it.
             if (toggles_fence) in_fence = false;
-            doc_append_to_target(&entry, &doc__text_sb, &doc__description_sb, target, toggles_fence ? line : raw);
+            doc_append_to_target(&entry, &doc__text_sb, &doc__description_sb, target, toggles_fence ? line : raw, false);
             continue;
         }
 
-        // Blank line closes current summary, tag or description paragraph.
+        // Blank line closes the summary, in description and tags it only starts a new paragraph.
         if (line.count == 0) {
-            target = DOC_TARGET_NONE;
+            if (target == DOC_TARGET_SUMMARY) target = DOC_TARGET_NONE;
+            else if (target != DOC_TARGET_NONE) new_paragraph = true;
             continue;
         }
 
-        // Flags line closes current text same as blank line.
         if (nob_sv_starts_with(line, DOC_SV_LIT("--"))) {
-            if (!doc_parse_flags(symbol, line, &entry.flags)) flags_ok = false;
-            target = DOC_TARGET_NONE;
+            if (!doc_parse_flags(symbol, line, &entry.flags)) ok = false;
             continue;
         }
 
         // Tag lines have priority, they are checked first.
-        Nob_String_View tag_sv = doc_get_sv_till(line, DOC_SV_LIT(":"));
-        size_t tag_length = tag_sv.count + 1; // +1 for ':'.
-
-        // "PARAM name: text" and "MEMBER name: text", the name is kept in the text as "name: text".
-        Nob_String_View tag_word = doc_get_sv_till(tag_sv, DOC_SV_LIT(" "));
-        bool is_named_tag = tag_word.count < tag_sv.count &&
-            (nob_sv_eq(tag_word, DOC_SV_LIT("PARAM")) || nob_sv_eq(tag_word, DOC_SV_LIT("MEMBER")));
-        if (is_named_tag && doc_sv_is_identifier(nob_sv_from_parts(tag_sv.data + tag_word.count + 1, tag_sv.count - tag_word.count - 1))) {
-            tag_sv     = tag_word;
-            tag_length = tag_word.count + 1; // +1 for ' ', name itself stays in the line.
-        }
-
-        Doc_Tag_Kind tag_kind = is_fence ? UNKNOWN : doc_sv_to_tag(tag_sv);
-        if (tag_kind != UNKNOWN) {
-            Doc_Tag tag = { .kind = tag_kind };
+        Nob_String_View tag_head = doc_get_sv_till(line, DOC_SV_LIT(":"));
+        Doc_Tag         tag      = {0};
+        if (!is_fence && doc_parse_tag_head(symbol, tag_head, &tag, &ok)) {
             nob_da_append(&entry.tags, tag);
 
-            // Removing tag from the line to just add text.
-            nob_sv_chop_left(&line, tag_length);
+            // Removing tag head from the line to just add text.
+            nob_sv_chop_left(&line, tag_head.count + 1); // +1 for ':'.
             line = nob_sv_trim_left(line);
-            doc_append_line(&doc__text_sb, &nob_da_last(&entry.tags).text.count, line);
+            doc_append_line(&doc__text_sb, &nob_da_last(&entry.tags).text.count, line, false);
 
             target = DOC_TARGET_TAG;
             has_content = true;
+            new_paragraph = false;
             continue;
         }
 
-        if (target == DOC_TARGET_NONE) {
-            if (!has_content) {
-                // Summary only starts from the very first line, if it is tagged summary is skipped.
-                target = DOC_TARGET_SUMMARY;
-            } else {
-                // New description paragraph. Together with '\n' added on append,
-                // paragraphs end up separated by blank line, same as in markdown.
-                if (doc__description_sb.count != 0) nob_da_append(&doc__description_sb, '\n');
-                target = DOC_TARGET_DESCRIPTION;
-            }
-        }
+        // Summary only starts from the very first line, if it is tagged summary is skipped.
+        if (target == DOC_TARGET_NONE) target = has_content ? DOC_TARGET_DESCRIPTION : DOC_TARGET_SUMMARY;
 
         if (toggles_fence) in_fence = true;
-        doc_append_to_target(&entry, &doc__text_sb, &doc__description_sb, target, line);
+        doc_append_to_target(&entry, &doc__text_sb, &doc__description_sb, target, line, new_paragraph);
         has_content = true;
+        new_paragraph = false;
     }
 
     if (in_fence) {
@@ -1223,7 +1367,7 @@ bool doc_parse_entry(Nob_String_View symbol, Nob_String_View signature, Nob_Stri
 
     *entry_out = entry;
 
-    return flags_ok;
+    return ok;
 }
 
 
@@ -1489,9 +1633,14 @@ bool test_scan_record(Test_Record *r) {
     nob_da_foreach(Doc_Tag, t, &entry.tags) {
         if (t->kind != TEST) continue;
 
+        // First paragraph of the tag is the title, the rest is the description.
+        Nob_String_View description = doc_trim_sv_till(t->text, DOC_SV_LIT("\n\n"));
+        Nob_String_View title       = nob_sv_from_parts(t->text.data, t->text.count - description.count);
+        description = nob_sv_trim(description);
+
         // Texts of the entry are reused by the next doc_parse_entry call, so they are copied.
-        r->title       = arena_sv_dup(&arena_strings, t->text);
-        r->description = arena_sv_dup(&arena_strings, entry.description);
+        r->title       = arena_sv_dup(&arena_strings, title);
+        r->description = arena_sv_dup(&arena_strings, description);
         r->gnu         = (entry.flags & DOC_FLAG_GNU) != 0;
         break;
     }

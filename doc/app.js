@@ -20,7 +20,6 @@
         MEMBER:    { label: "Members",    kind: "section" },
         PARAM:     { label: "Parameters", kind: "section" },
         RETURNS:   { label: "Returns",    kind: "section" },
-        OUTPUTS:   { label: "Outputs",    kind: "section" },
         SINCE:     { label: "Since",      kind: "badge" },
         NOTE:      { label: "Note",      kind: "callout", tone: "note" },
         AI:        { label: "AI",        kind: "callout", tone: "note" },
@@ -30,7 +29,7 @@
         LEAK:      { label: "Leak",      kind: "callout", tone: "warn" },
         TEMPORARY: { label: "Temporary", kind: "callout", tone: "warn" },
     };
-    const SECTION_ORDER = ["MEMBER", "PARAM", "RETURNS", "OUTPUTS"];
+    const SECTION_ORDER = ["MEMBER", "PARAM", "RETURNS"];
 
     // Flags from nob.c, shown as badges.
     const FLAGS = {
@@ -106,21 +105,43 @@
         return parts.map((p) => p.trim()).filter(Boolean);
     }
 
-    // Reads return type and named parameters out of a function declaration.
-    // Returns { returnType, params: Map name -> type }, empty if `decl` is not a function.
+    function tidyType(type) {
+        return type.replace(/\s+/g, " ").replace(/\s+\*/g, " *").trim();
+    }
+
+    // Splits a single declaration, like `int *x` or `void (*f)(int)`, into its name and type.
+    // Returns null if it declares no name.
+    function splitDeclaration(text) {
+        // Function pointer `ret (*name)(args)`, otherwise the last identifier, before any `[...]` or bit-field width.
+        const fnPtr = /\(\s*\*\s*([A-Za-z_]\w*)\s*\)/.exec(text);
+        const plain = /([A-Za-z_]\w*)\s*(\[[^\]]*\]\s*)*(:\s*\w+\s*)?$/.exec(text);
+        const match = fnPtr || plain;
+        if (!match || C_KEYWORDS.has(match[1]) || C_TYPES.has(match[1])) return null;
+
+        const name = match[1];
+        const type = tidyType(fnPtr
+            ? text.slice(0, fnPtr.index) + "(*)" + text.slice(fnPtr.index + fnPtr[0].length)
+            : text.slice(0, plain.index) + text.slice(plain.index + name.length));
+        return type ? { name, type } : null;
+    }
+
+    // Reads return type and named parameters out of a function, function typedef or function-like macro.
+    // Returns { returnType, params: Map name -> type }, empty if `decl` is none of those.
     function parseDecl(decl, symbol) {
         const result = { returnType: "", params: new Map() };
-        const at = decl.indexOf(symbol + "(");
-        if (at === -1) return result;
 
-        result.returnType = decl.slice(0, at)
-            .replace(/\b(CNDEF|static|inline|extern)\b/g, "")
-            .replace(/\s+/g, " ").replace(/\s+\*/g, " *").trim();
+        // Name is followed by the parameter list, function typedefs close their `(name)` or `(*name)` first.
+        const head = new RegExp(`\\b${symbol}\\s*\\)?\\s*\\(`).exec(decl);
+        if (!head) return result;
+
+        result.returnType = tidyType(decl.slice(0, head.index)
+            .replace(/\b(CNDEF|static|inline|extern|typedef)\b/g, "")
+            .replace(/\(\s*\*?\s*$/, ""));
 
         // Matching ")" of the parameter list.
         let depth = 0;
         let end = -1;
-        const open = at + symbol.length;
+        const open = head.index + head[0].length - 1;
         for (let i = open; i < decl.length; i++) {
             if (decl[i] === "(") depth++;
             else if (decl[i] === ")" && --depth === 0) { end = i; break; }
@@ -128,20 +149,57 @@
         if (end === -1) return result;
 
         for (const param of splitTopLevel(decl.slice(open + 1, end))) {
-            // Function pointer `ret (*name)(args)`, otherwise the last identifier, before any `[...]`.
-            const fnPtr = /\(\s*\*\s*([A-Za-z_]\w*)\s*\)/.exec(param);
-            const plain = /([A-Za-z_]\w*)\s*(\[[^\]]*\]\s*)*$/.exec(param);
-            const match = fnPtr || plain;
-            if (!match || C_KEYWORDS.has(match[1]) || C_TYPES.has(match[1])) continue;
-
-            const name = match[1];
-            const type = (fnPtr
-                ? param.slice(0, fnPtr.index) + "(*)" + param.slice(fnPtr.index + fnPtr[0].length)
-                : param.slice(0, plain.index) + param.slice(plain.index + name.length)
-            ).replace(/\s+/g, " ").replace(/\s+\*/g, " *").trim();
-            if (type) result.params.set(name, type);
+            const field = splitDeclaration(param);
+            if (field) result.params.set(field.name, field.type);
         }
         return result;
+    }
+
+    // Reads members of a struct or union declaration into `members`, Map name -> type.
+    // Members of anonymous nested structs and unions belong to the outer one, named nested ones are shown collapsed.
+    function parseMembers(decl, members = new Map()) {
+        const open = decl.indexOf("{");
+        const close = decl.lastIndexOf("}");
+        if (open === -1 || close < open) return members;
+
+        // Preprocessor lines and comments are not members.
+        const body = decl.slice(open + 1, close)
+            .replace(/\/\*[\s\S]*?\*\//g, "")
+            .replace(/\/\/.*$/gm, "")
+            .replace(/^\s*#.*$/gm, "");
+
+        let depth = 0;
+        let start = 0;
+        for (let i = 0; i < body.length; i++) {
+            const c = body[i];
+            if (c === "{") depth++;
+            else if (c === "}") depth--;
+            if (c !== ";" || depth !== 0) continue;
+
+            const member = body.slice(start, i).trim();
+            start = i + 1;
+
+            if (member.includes("{")) {
+                const after = member.slice(member.lastIndexOf("}") + 1).trim();
+                const keyword = /^\s*(struct|union)\b/.exec(member);
+                if (!after) parseMembers(member, members);
+                else if (/^[A-Za-z_]\w*$/.test(after)) members.set(after, `${keyword ? keyword[1] : "struct"} { … }`);
+                continue;
+            }
+
+            // `int a, *b` declares several members of the same base type.
+            const [first, ...rest] = splitTopLevel(member);
+            const field = first && splitDeclaration(first);
+            if (!field) continue;
+            members.set(field.name, field.type);
+
+            const base = field.type.replace(/[\s*]+$/, "");
+            for (const other of rest) {
+                const extra = splitDeclaration(`${base} ${other}`);
+                if (extra) members.set(extra.name, extra.type);
+            }
+        }
+        return members;
     }
 
     // Turns raw JSON into a well-formed entry, or null if it is unusable.
@@ -154,10 +212,12 @@
         const tags = (Array.isArray(raw.tags) ? raw.tags : [])
             .filter((tag) => tag && typeof tag === "object")
             .map((tag) => ({
-                kind: asString(tag.kind).toUpperCase() || "NOTE",
-                text: asString(tag.text).trim(),
+                kind:      asString(tag.kind).toUpperCase() || "NOTE",
+                name:      asString(tag.name).trim(),
+                modifiers: (Array.isArray(tag.modifiers) ? tag.modifiers : []).map(asString).filter(Boolean),
+                text:      asString(tag.text).trim(),
             }))
-            .filter((tag) => tag.text);
+            .filter((tag) => tag.text || tag.name);
 
         const flags = (Array.isArray(raw.flags) ? raw.flags : []).map(asString).filter(Boolean);
 
@@ -174,16 +234,17 @@
             module:      asString(raw.module).trim(),
         };
 
-        // Parameter names come from function and function-like macro declarations, return type only from functions.
+        // Types of parameters and members, shown next to their names. Return type comes from functions and function typedefs.
         entry.sig = parseDecl(entry.decl, symbol);
-        if (entry.kind !== "function") entry.sig.returnType = "";
+        if (entry.kind !== "function" && entry.kind !== "typedef") entry.sig.returnType = "";
+        if (entry.kind === "struct" || entry.kind === "union") parseMembers(entry.decl, entry.sig.params);
 
         entry.haystack = {
             symbol:  entry.symbol.toLowerCase(),
             name:    entry.name.toLowerCase(),
             decl:    entry.decl.toLowerCase(),
             summary: entry.summary.toLowerCase(),
-            rest:    (entry.description + "\n" + tags.map((t) => t.text).join("\n")).toLowerCase(),
+            rest:    (entry.description + "\n" + tags.map((t) => (t.name ? t.name + " " : "") + t.text).join("\n")).toLowerCase(),
         };
         return entry;
     }
@@ -368,41 +429,42 @@
 
     /* ---------- Pages ---------- */
 
-    // "PARAM name: text" arrives as "name: text".
-    function splitParam(text) {
-        const match = /^([A-Za-z_]\w*):\s*/.exec(text);
-        return match ? { name: match[1], text: text.slice(match[0].length) } : { name: "", text };
+    // Modifiers of a PARAM or MEMBER, plain "in" is the default and is not shown.
+    function modifierBadges(modifiers) {
+        const shown = modifiers.includes("out") ? modifiers : modifiers.filter((m) => m !== "in");
+        return shown.map((m) => `<span class="pmod">${escapeHtml(m)}</span>`).join("");
     }
 
-    function paramItem(tag, sig) {
-        const { name, text } = splitParam(tag.text);
-        if (!name) return `<div class="item plain"><dd>${renderBlocks(text)}</dd></div>`;
-        const type = sig.params.get(name);
-        return `<div class="item"><dt><span class="pname">${escapeHtml(name)}</span>` +
-            (type ? `<span class="ptype">${highlightC(type)}</span>` : "") +
-            `</dt><dd>${renderBlocks(text)}</dd></div>`;
+    // Row of a section table: name with its modifiers, type and description.
+    function sectionRow(tag, entry) {
+        if (tag.kind === "RETURNS") {
+            const type = entry.sig.returnType === "void" ? "" : entry.sig.returnType;
+            return { name: "", modifiers: [], type, text: tag.text };
+        }
+        return { name: tag.name, modifiers: tag.modifiers, type: entry.sig.params.get(tag.name) || "", text: tag.text };
     }
 
-    function returnsItem(tag, sig) {
-        const type = sig.returnType;
-        if (!type || type === "void") return `<div class="item plain"><dd>${renderBlocks(tag.text)}</dd></div>`;
-        return `<div class="item"><dt>${highlightC(type)}</dt><dd>${renderBlocks(tag.text)}</dd></div>`;
+    // Every section is one table, its rows share the columns, so descriptions line up no matter the name lengths.
+    // Name and type columns are only there if at least one row has them.
+    function renderSection(label, rows) {
+        const hasName = rows.some((r) => r.name);
+        const hasType = rows.some((r) => r.type);
+        const cls = ["fields", hasName && "has-name", hasType && "has-type"].filter(Boolean).join(" ");
+
+        const cells = (r) =>
+            (hasName ? `<div class="field-name"><span class="pname">${escapeHtml(r.name)}</span>${modifierBadges(r.modifiers)}</div>` : "") +
+            (hasType ? `<div class="field-type">${r.type ? `<code>${highlightC(r.type)}</code>` : ""}</div>` : "") +
+            `<div class="field-text">${renderBlocks(r.text)}</div>`;
+
+        return `<section class="section"><h2 class="eyebrow">${escapeHtml(label)}</h2>` +
+            `<div class="${cls}">${rows.map((r) => `<div class="field">${cells(r)}</div>`).join("")}</div></section>`;
     }
 
     function renderSections(entry) {
-        let html = "";
-        for (const kind of SECTION_ORDER) {
+        return SECTION_ORDER.map((kind) => {
             const tags = entry.tags.filter((t) => t.kind === kind);
-            if (!tags.length) continue;
-            const items = tags.map((t) =>
-                kind === "PARAM" || kind === "MEMBER" ? paramItem(t, entry.sig) :
-                kind === "RETURNS" ? returnsItem(t, entry.sig) :
-                `<div class="item plain"><dd>${renderBlocks(t.text)}</dd></div>`
-            ).join("");
-            html += `<section class="section"><h2 class="eyebrow">${escapeHtml(TAGS[kind].label)}</h2>` +
-                `<dl class="items">${items}</dl></section>`;
-        }
-        return html;
+            return tags.length ? renderSection(TAGS[kind].label, tags.map((t) => sectionRow(t, entry))) : "";
+        }).join("");
     }
 
     function renderCallouts(tags) {
@@ -436,11 +498,13 @@
                 <pre><code>${highlightC(signature, entry.symbol)}</code></pre>
                 <button class="copy" type="button" data-copy="${escapeHtml(signature)}">Copy</button>
             </div>
-            <div class="body">
-                ${entry.summary
-                    ? `<p class="summary">${renderInline(unwrap(entry.summary))}</p>`
-                    : `<p class="summary missing">No summary.</p>`}
-                ${entry.description ? renderBlocks(entry.description) : ""}
+            <div class="entry">
+                <div class="prose">
+                    ${entry.summary
+                        ? `<p class="summary">${renderInline(unwrap(entry.summary))}</p>`
+                        : `<p class="summary missing">No summary.</p>`}
+                    ${entry.description ? renderBlocks(entry.description) : ""}
+                </div>
                 ${renderSections(entry)}
                 ${renderCallouts(entry.tags)}
             </div>

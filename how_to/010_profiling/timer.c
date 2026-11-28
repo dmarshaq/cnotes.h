@@ -47,19 +47,20 @@ Cn_Hook_Response timer_hook(Cn_Ast_Node **node_ptr, bool *ast_is_modified, bool 
     if ((*node_ptr)->kind != CN_AST_FUNCTION) return CN_HOOK_RESPONSE_NONE;
 
     Cn_Ast_Function *function = cn_ast_as(Function, *node_ptr);
+    Cn_Ast_Nodes attr_specs = cn_get_attribute_specifiers(function);
 
     // `[[time]]` sits on the function itself, so unlike `defer` this hook can look at the function's own
     // attribute specifiers and skip every function that carries no attributes at all, without walking anything.
     if (function->attribute_specifiers.length == 0) return CN_HOOK_RESPONSE_NONE;
 
-    if (cn_get_attribute(function, CN_STR_LIT("time")) == NULL) return CN_HOOK_RESPONSE_NONE;
+    if (cn_get_attribute(attr_specs, CN_STR_LIT("time")) == NULL) return CN_HOOK_RESPONSE_NONE;
 
     // IMPORTANT: Removing the attribute.
     //
     // Reporting a modification below sends this very function through the hook again, so if
     // `[[time]]` were left in place we would generate another timer, report another modification,
     // and never stop. Any hook that sets `ast_is_modified` has to consume what made it do so.
-    cn_ast_remove_attribute(function, CN_STR_LIT("time"));
+    cn_ast_remove_attribute(attr_specs, CN_STR_LIT("time"));
 
     // Getting the function's name to print, `cn_get_declarator_info` walks the declarator down to
     // the identifier it declares, which for a function definition is the function name.

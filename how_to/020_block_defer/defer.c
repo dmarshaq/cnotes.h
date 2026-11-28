@@ -122,8 +122,7 @@ Cn_Hook_Response defer_hook(Cn_Ast_Node **node_ptr, bool *ast_is_modified, bool 
             Cn_Type_Function *type = (Cn_Type_Function *) cn_analyze_to_type(
                     function->declaration_specifiers->qualifiers, 
                     function->declaration_specifiers->type_specifier, 
-                    function->declarator,
-                    CN_ANALYZE_NO_FLAGS
+                    .declarator = function->declarator
                     );
             CN_ASSERT(type->kind == CN_FUNCTION);
 
@@ -174,10 +173,11 @@ bool defer_walk_block(Cn_Ast_Block *block) {
         // Getting block item, and from it also statement.
         Cn_Ast_Block_Item *item = cn_ast_as(Block_Item, block->block_items.ptrs[i]);
         Cn_Ast_Node *statement = item->declaration_or_statement;
+        Cn_Ast_Nodes attr_specs = cn_get_attribute_specifiers(statement);
 
         // If statement contains defer, there is no need to know whats inside it if it is a block.
         // We just need to make sure that statement is of valid kind.
-        if (cn_get_attribute(statement, CN_STR_LIT("defer")) != NULL) {
+        if (cn_get_attribute(attr_specs, CN_STR_LIT("defer")) != NULL) {
 
             // Validating kind.
             switch (statement->kind) {
@@ -195,7 +195,7 @@ bool defer_walk_block(Cn_Ast_Block *block) {
             }
 
             // Remove 'defer' attribute, mostly for clarity.
-            cn_ast_remove_attribute(statement, CN_STR_LIT("defer"));
+            cn_ast_remove_attribute(attr_specs, CN_STR_LIT("defer"));
 
             // Pushing to the stack, and continuing.
             static uint32_t id_counter = 0;

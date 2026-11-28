@@ -110,8 +110,7 @@ Cn_Hook_Response defer_hook(Cn_Ast_Node **node_ptr, bool *ast_is_modified, bool 
     Cn_Type_Function *type = (Cn_Type_Function *) cn_analyze_to_type(
             function->declaration_specifiers->qualifiers,
             function->declaration_specifiers->type_specifier,
-            function->declarator,
-            CN_ANALYZE_NO_FLAGS
+            .declarator = function->declarator
             );
     CN_ASSERT(type->kind == CN_FUNCTION);
 
@@ -134,8 +133,9 @@ Cn_Hook_Response defer_hook(Cn_Ast_Node **node_ptr, bool *ast_is_modified, bool 
         // Getting block item, and from it also the statement.
         Cn_Ast_Block_Item *item = cn_ast_as(Block_Item, block->block_items.ptrs[i]);
         Cn_Ast_Node *statement  = item->declaration_or_statement;
+        Cn_Ast_Nodes attr_specs = cn_get_attribute_specifiers(statement);
 
-        if (cn_get_attribute(statement, CN_STR_LIT("defer")) != NULL) {
+        if (cn_get_attribute(attr_specs, CN_STR_LIT("defer")) != NULL) {
             // A deferred statement is moved as is, so it only has to be something that survives
             // being written somewhere else. An expression statement and a block cover everything
             // clean up code ever needs, anything else is far more likely to be a mistake.
@@ -146,7 +146,7 @@ Cn_Hook_Response defer_hook(Cn_Ast_Node **node_ptr, bool *ast_is_modified, bool 
 
             // Removing the attribute, mostly for clarity, it also saves future iteration of defer meta program to not trigger on same statements, 
             // the statement itself is emitted later.
-            cn_ast_remove_attribute(statement, CN_STR_LIT("defer"));
+            cn_ast_remove_attribute(attr_specs, CN_STR_LIT("defer"));
 
             // Pushing the entry and continuing, note that the statement is NOT appended to `items`
             // here, that is the whole point, it leaves the place it was written in.
@@ -251,7 +251,7 @@ void defer_replace_returns(Cn_Ast_Node **statement_ptr) {
 
     // Any `[[defer]]` that reaches this function is nested somewhere inside the function scope,
     // the walk in `defer_hook` handles the function scope itself and never passes those here.
-    if (cn_get_attribute(statement, CN_STR_LIT("defer")) != NULL) {
+    if (cn_get_attribute(cn_get_attribute_specifiers(statement), CN_STR_LIT("defer")) != NULL) {
         cn_diagnostic_node(CN_DIAGNOSTIC_ERROR, statement, CN_DC_ILLEGAL_ATTRIBUTE, "Expected 'defer' attribute in the function scope, this defer implementation only defers to the end of the function.");
         return;
     }

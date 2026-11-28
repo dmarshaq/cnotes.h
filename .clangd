@@ -2,6 +2,7 @@ CompileFlags:
   Add: 
     - -xc
     - -DCN_IMPLEMENTATION
+    - -DCN_GNU
     - -Wno-missing-prototypes
     - -Wno-unknown-attributes
     - -Wno-macro-redefined

@@ -11,23 +11,22 @@ Comments fall into two categories: **In-Code Comments** and **Documentation**.
 * **In-Code Comments** should use double slashes `//`. They are not scanned by the documentation tool; they are there to guide a reader through the logic and structure of the code.
 * **Documentation** follows multiline comment formatting `/**...*/` and should generally be written right next to the declaration it is attached to, so the documentation tool can pick it up and properly record it.
 
-Tags are written inside comments to signify the importance of certain information. The format is `TAG: text`: an uppercase word, then a colon and a space, at the start of a comment line. All tags are listed below with their respective descriptions and whether they are documentation-specific or not.
+Tags are written inside comments to signify the importance of certain information. The format is `TAG: text`: an uppercase word, then a colon and a space, at the start of a comment line. In documentation, every line after a tag belongs to it until the next tag, blank lines inside separate paragraphs. All tags are listed below with their respective descriptions and whether they are documentation-specific or not.
 
-| TAG               | Meaning                                                                   | Documentation-Specific |
-|-------------------|---------------------------------------------------------------------------|------------------------|
-| `RETURNS`         | Return value semantics, including failure values.                         | **Yes**                |
-| `PARAM`           | Optional. Use it only when a parameter needs explaining.                  | **Yes**                |
-| `MEMBER`          | Optional. Use it only when a member needs explaining.                     | **Yes**                |
-| `OUTPUTS`         | When a paramemeter value is used as output.                               | **Yes**                |
-| `SINCE`           | Version that introduced the symbol, e.g. `SINCE: 0.2.0`.                  | **Yes**                |
-| `NOTE`            | Useful detail the user might need to know, not a contract.                | **No**                 |
-| `IMPORTANT`       | Contract the caller must respect: lifetime, ownership, preconditions.     | **No**                 |
-| `AI`              | Description of AI usage in code. See **AI Usage** for more info.          | **No**                 |
-| `TODO`            | Planned work.                                                             | **No**                 |
-| `LEAK`            | Known memory leak, usually one done on purpose.                           | **No**                 |
-| `TEMPORARY`       | Code meant to be replaced.                                                | **No**                 |
-| `FIXME`           | Known bug.                                                                | **No**                 |
-| `TEST`            | Signifies that doc comment is for the test. See **Testing**.              | **Yes**                |
+| TAG               | Meaning                                                                                                                               | Documentation-Specific |
+|-------------------|---------------------------------------------------------------------------------------------------------------------------------------|------------------------|
+| `RETURNS`         | Return value semantics, including failure values.                                                                                     | **Yes**                |
+| `PARAM`           | Optional. Use it only when a parameter needs explaining. Format is `PARAM name [modifiers]: text`, modifiers `in`, `out`, `optional`. | **Yes**                |
+| `MEMBER`          | Optional. Use it only when a member needs explaining. Format is `MEMBER name [optional]: text`.                                       | **Yes**                |
+| `SINCE`           | Version that introduced the symbol, e.g. `SINCE: 0.2.0`.                                                                              | **Yes**                |
+| `NOTE`            | Useful detail the user might need to know, not a contract.                                                                            | **No**                 |
+| `IMPORTANT`       | Contract the caller must respect: lifetime, ownership, preconditions.                                                                 | **No**                 |
+| `AI`              | Description of AI usage in code. See **AI Usage** for more info.                                                                      | **No**                 |
+| `TODO`            | Planned work.                                                                                                                         | **No**                 |
+| `LEAK`            | Known memory leak, usually one done on purpose.                                                                                       | **No**                 |
+| `TEMPORARY`       | Code meant to be replaced.                                                                                                            | **No**                 |
+| `FIXME`           | Known bug.                                                                                                                            | **No**                 |
+| `TEST`            | Signifies that doc comment is for the test. See **Testing**.                                                                          | **Yes**                |
 
 By default, all tags should be renderable by the documentation tool---documentation-specific tags are simply the ones used only inside documentation blocks.
 
