@@ -19,7 +19,7 @@ The library is influenced by the design philosophy of [`stb`](https://github.com
 The library core meta-programming ideas are also heavily inspired by Jai Programming Language.
 
 > [!IMPORTANT]
-> **Above all**, `cnotes.h` is a personal learning project. I built it to explore how language parsing, source transformation and meta-programming work under the hood. It's shared openly in case others find it useful or interesting, but it isn't meant to be a product or a replacement for established tools.
+> **Above all**, `cnotes.h` is a personal learning project. I use it myself and I built it to explore how language parsing, source transformation and meta-programming work under the hood. It's shared openly in case others find it useful or interesting.
 
 ---
 
@@ -45,7 +45,6 @@ Following is the list of features that are still not implemented, but will be in
  -  **Struct and Union empty member declarations.**
  -  **Tag type same name proper shadowing.**
  -  **K&R-style function definitions.**
- -  **_Atomic specifiers.**
  -  **_Complex types.**
  -  **HEX float literals.**
  -  **Binary integer literals.**
